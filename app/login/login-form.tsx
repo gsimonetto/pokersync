@@ -2,7 +2,7 @@
 
 import { useState, type ComponentType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { User, AtSign, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
+import { User, AtSign, Lock, Eye, EyeOff, ArrowLeft, Phone } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/logo";
 
@@ -35,6 +35,17 @@ function Field({ icon: Icon, value, onChange, placeholder, type = "text", right 
   );
 }
 
+// Mascara progressiva enquanto digita: (41) 9 9999-9999
+function formatWhatsapp(raw: string) {
+  const digits = raw.replace(/\D/g, "").slice(0, 11);
+  const ddd = digits.slice(0, 2);
+  const rest = digits.slice(2);
+  if (digits.length === 0) return "";
+  if (digits.length <= 2) return `(${ddd}`;
+  if (rest.length <= 5) return `(${ddd}) ${rest}`;
+  return `(${ddd}) ${rest.slice(0, 5)}-${rest.slice(5)}`;
+}
+
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -43,6 +54,7 @@ export default function LoginForm() {
   const [mode, setMode] = useState<Mode>("signin");
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
+  const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
   const [show, setShow] = useState(false);
@@ -85,8 +97,8 @@ export default function LoginForm() {
 
   async function handleSignUp() {
     reset();
-    if (!name || !nickname || !email || !pass) {
-      return setErr("Preencha nome, apelido, e-mail e senha.");
+    if (!name || !nickname || !email || !pass || !whatsapp) {
+      return setErr("Preencha nome, apelido, WhatsApp, e-mail e senha.");
     }
     if (pass.length < 6) return setErr("A senha precisa ter ao menos 6 caracteres.");
     setLoading(true);
@@ -95,7 +107,7 @@ export default function LoginForm() {
       const { data, error } = await supabase.auth.signUp({
         email,
         password: pass,
-        options: { data: { nome: name, apelido: nickname } },
+        options: { data: { nome: name, apelido: nickname, whatsapp } },
       });
       if (error) throw error;
 
@@ -152,6 +164,18 @@ export default function LoginForm() {
                     Apelido
                   </span>
                   <Field icon={AtSign} value={nickname} onChange={setNickname} placeholder="Como quer ser chamado" />
+                </div>
+                <div className="flex flex-col gap-1.5">
+                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                    WhatsApp
+                  </span>
+                  <Field
+                    icon={Phone}
+                    type="tel"
+                    value={whatsapp}
+                    onChange={(v) => setWhatsapp(formatWhatsapp(v))}
+                    placeholder="(41) 99999-9999"
+                  />
                 </div>
               </>
             )}
