@@ -1,0 +1,68 @@
+@import "tailwindcss";
+
+@theme {
+  --color-void: #000000;
+  --color-surface: #111111;
+  --color-elevated: #1e1e1e;
+  --color-ink: #ffffff;
+  --color-muted: #c4c7c8;
+  --color-hairline: rgba(255, 255, 255, 0.08);
+  --color-positive: #22c55e;
+  --color-negative: #e0555a;
+  --color-training: #3b82f6;
+  --color-evolution: #f59e0b;
+  --color-review: #a855f7;
+  --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+}
+
+:root {
+  color-scheme: dark;
+  --background: #000000;
+  --foreground: #ffffff;
+}
+
+html,
+body {
+  background: var(--background);
+  color: var(--foreground);
+}
+
+body {
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+}
+
+.tnum {
+  font-variant-numeric: tabular-nums;
+}
+
+/* Utilitarios de acento: a cor vem da custom property --acc definida
+   inline no elemento. Evita depender do scanner de propriedade
+   arbitraria do Tailwind (hover:[color:var(--acc)] nao compila). */
+.acc-border:hover {
+  border-color: var(--acc);
+}
+.acc-text:hover {
+  color: var(--acc);
+}
+.acc-bar {
+  background-color: var(--acc);
+}
+
+/* Variante "group": acende ao passar o mouse em qualquer parte do
+   card pai (.group), nao apenas no proprio elemento. */
+.group:hover .acc-text-group {
+  color: var(--acc);
+}
+.group:hover .acc-border-group {
+  border-color: var(--acc);
+}
+.acc-glow {
+  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+}
+.group:hover .acc-glow {
+  border-color: var(--acc);
+  box-shadow:
+    0 0 0 1px var(--acc),
+    0 18px 34px -14px color-mix(in srgb, var(--acc) 60%, transparent);
+}
