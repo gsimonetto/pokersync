@@ -55,26 +55,30 @@ export function WelcomeHero({
           </span>
         </div>
 
-        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
-          <h1 id="welcome-heading" className="text-4xl font-bold tracking-tight text-ink sm:text-5xl">
-            {name}
-          </h1>
+        <h1 id="welcome-heading" className="mt-2 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+          {name}
+        </h1>
 
-          {/* Plano: chip com o mesmo tratamento visual do XP no Hub (borda + fundo suave na cor). */}
+        {/* Plano e time ficam juntos numa linha abaixo do apelido, nao ao lado dele. */}
+        <div className="mt-2.5 flex flex-wrap items-center gap-2">
           <span
-            className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
-            style={{ color: planStyle.color, borderColor: `${planStyle.color}40`, background: `${planStyle.color}14` }}
+            className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+            style={{
+              color: planStyle.color,
+              borderColor: `${planStyle.color}55`,
+              background: `${planStyle.color}1A`,
+              boxShadow: `0 0 10px ${planStyle.color}80, 0 0 2px ${planStyle.color}`,
+            }}
           >
             {planStyle.label}
           </span>
-        </div>
 
-        {/* Time: so aparece se o jogador participa de algum. Cor propria do time. */}
-        {team && (
-          <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: team.accent }}>
-            {team.name}
-          </p>
-        )}
+          {team && (
+            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: team.accent }}>
+              {team.name}
+            </span>
+          )}
+        </div>
       </div>
     </section>
   );

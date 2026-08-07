@@ -44,8 +44,8 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo className="h-10 w-auto sm:h-12" />
+      <div className="mx-auto flex h-24 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Logo className="h-14 w-auto sm:h-16" />
 
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
           {TABS.map((tab) => {
