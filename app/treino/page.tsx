@@ -1,12 +1,19 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Loader2, AlertTriangle, SkipForward } from "lucide-react";
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { ActionBar, type DrillAction } from "@/components/drill/action-bar";
 import { GtoFeedback } from "@/components/drill/gto-feedback";
-import { fetchDrillBatch, fetchDrillFacets, type DrillHand, type DrillFacet } from "@/lib/services/drill-service";
+import {
+  fetchDrillBatch,
+  fetchDrillBatchBySuggestion,
+  fetchDrillFacets,
+  type DrillHand,
+  type DrillFacet,
+} from "@/lib/services/drill-service";
 import { useDrillFilters, type DrillFilterKey } from "@/lib/poker/use-drill-filters";
 import { matchUserActionToGtoNode, describeAction } from "@/lib/poker/gto-verdict";
 import { parseBoard, parseHeroCombo } from "@/lib/poker/parse-board";
@@ -77,11 +84,13 @@ function FilterSidebar({
   onSet,
   facets,
   activeCount,
+  disabled,
 }: {
   filters: Record<DrillFilterKey, string | null>;
   onSet: (key: DrillFilterKey, value: string | null) => void;
   facets: DrillFacet[];
   activeCount: number;
+  disabled: boolean;
 }) {
   const counts = useMemo(() => {
     const out: Record<string, Record<string, number>> = {};
@@ -121,6 +130,8 @@ function FilterSidebar({
         background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
         border: "1px solid rgba(255,255,255,0.08)",
         overflowY: "auto",
+        opacity: disabled ? 0.4 : 1,
+        pointerEvents: disabled ? "none" : "auto",
       }}
     >
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
@@ -133,6 +144,12 @@ function FilterSidebar({
           </span>
         )}
       </div>
+
+      {disabled && (
+        <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
+          Sugestão do Revisor de Mãos ativa — filtros manuais desabilitados.
+        </div>
+      )}
 
       {SIDEBAR_SECTIONS.map((section) => (
         <div key={section.key} style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -210,24 +227,42 @@ function NextButton({ onClick }: { onClick: () => void }) {
   );
 }
 
-export default function TreinoPage() {
-  const { filters, set: setFilter, activeCount } = useDrillFilters();
+function TreinoPageInner() {
+  const searchParams = useSearchParams();
+  const suggestionId = searchParams.get("suggestionId");
+
+  const { filters, set: setFilter, activeCount, isComplete } = useDrillFilters();
   const [facets, setFacets] = useState<DrillFacet[]>([]);
   const [hands, setHands] = useState<DrillHand[]>([]);
-  const [loading, setLoading] = useState(true);
+  // loading comeca false: so vira true quando ha criterio valido e uma
+  // busca de fato foi disparada. Isso evita o spinner enganoso na tela
+  // vazia inicial (sem filtro, sem sugestao).
+  const [loading, setLoading] = useState(false);
   const [error, setError] = useState<Error | null>(null);
   const [idx, setIdx] = useState(0);
   const [chosen, setChosen] = useState<DrillAction | null>(null);
   const [stats, setStats] = useState({ hits: 0, total: 0 });
 
+  // Unico criterio valido para buscar mao: filtros manuais completos
+  // (posicao + situacao + rua) OU uma sugestao do Revisor na URL.
+  // Sem isso, a tela nunca chama o Supabase — regra de negocio central.
+  const canLoad = isComplete || !!suggestionId;
+
   const reload = useCallback(() => {
+    if (!canLoad) {
+      setHands([]);
+      setError(null);
+      setLoading(false);
+      return;
+    }
     setLoading(true);
     setError(null);
-    fetchDrillBatch(20, filters)
+    const request = suggestionId ? fetchDrillBatchBySuggestion(suggestionId, 20) : fetchDrillBatch(20, filters);
+    request
       .then(setHands)
       .catch((e) => setError(e instanceof Error ? e : new Error("Erro ao carregar mãos.")))
       .finally(() => setLoading(false));
-  }, [filters]);
+  }, [canLoad, suggestionId, filters]);
 
   useEffect(() => {
     fetchDrillFacets()
@@ -240,7 +275,7 @@ export default function TreinoPage() {
     setIdx(0);
     setChosen(null);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [filters.position, filters.action, filters.street]);
+  }, [filters.position, filters.action, filters.street, suggestionId]);
 
   const hand = hands[idx] || null;
 
@@ -317,6 +352,15 @@ export default function TreinoPage() {
 
   const sessionPct = stats.total > 0 ? Math.round((stats.hits / stats.total) * 100) : 0;
 
+  // Mensagem do estado vazio: distingue "ainda selecionando", "sugestao
+  // sem resultado" e "filtro completo sem resultado" — evita mensagem
+  // generica que mascare o motivo real de nao haver mao na tela.
+  const emptyMessage = suggestionId
+    ? "Nenhuma mão encontrada para essa sugestão do Revisor de Mãos."
+    : isComplete
+      ? "Nenhuma mão encontrada para esses filtros."
+      : "Selecione posição, situação e rua nos filtros ao lado pra começar.";
+
   return (
     <div style={{ fontFamily: F, minHeight: "100vh", background: "#050505", padding: 16, boxSizing: "border-box" }}>
       <div
@@ -350,7 +394,14 @@ export default function TreinoPage() {
           >
             <ArrowLeft size={16} strokeWidth={1.5} />
           </Link>
-          <h1 style={{ fontSize: 18, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Modo Treino</h1>
+          <div>
+            <h1 style={{ fontSize: 18, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Modo Treino</h1>
+            {suggestionId && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(168,85,247,0.9)" }}>
+                Sugestão do Revisor de Mãos
+              </span>
+            )}
+          </div>
           <div style={{ flex: 1, minWidth: 0 }}>
             {hand && <SessionInline handIdx={idx + 1} handsTotal={hands.length} hits={stats.hits} total={stats.total} sessionPct={sessionPct} />}
           </div>
@@ -358,7 +409,7 @@ export default function TreinoPage() {
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr) 280px", gap: 12, minHeight: 420 }}>
-          <FilterSidebar filters={filters} onSet={setFilter} facets={facets} activeCount={activeCount} />
+          <FilterSidebar filters={filters} onSet={setFilter} facets={facets} activeCount={activeCount} disabled={!!suggestionId} />
 
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: 0 }}>
             {hand && tableHand ? (
@@ -382,7 +433,7 @@ export default function TreinoPage() {
                   </>
                 ) : (
                   <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, textAlign: "center", maxWidth: 320 }}>
-                    {activeCount > 0 ? "Nenhuma mão encontrada para esses filtros." : "Selecione posição, situação e rua nos filtros ao lado pra começar."}
+                    {emptyMessage}
                   </p>
                 )}
               </div>
@@ -423,7 +474,7 @@ export default function TreinoPage() {
                   <StatRow label="Aproveitamento" value={stats.total > 0 ? `${sessionPct}%` : "—"} />
                 </div>
                 <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-                  {hand ? "Escolha uma ação na barra abaixo — o feedback GTO aparece aqui." : "Selecione posição, situação e rua nos filtros ao lado pra começar."}
+                  {hand ? "Escolha uma ação na barra abaixo — o feedback GTO aparece aqui." : emptyMessage}
                 </div>
               </aside>
             )}
@@ -452,5 +503,17 @@ export default function TreinoPage() {
         </div>
       </div>
     </div>
+  );
+}
+
+// useSearchParams exige um limite de Suspense em volta no App Router —
+// sem isso o build acusa erro. A pagina em si so renderiza no client
+// (ja depende de fetch client-side), entao o fallback praticamente
+// nunca aparece de fato.
+export default function TreinoPage() {
+  return (
+    <Suspense fallback={null}>
+      <TreinoPageInner />
+    </Suspense>
   );
 }
