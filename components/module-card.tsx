@@ -1,9 +1,7 @@
-"use client";
-
-import { useState, useCallback } from "react";
 import type { LucideIcon } from "lucide-react";
 import Link from "next/link";
 import { Lock, ArrowRight } from "lucide-react";
+import { ModuleCardShell } from "./module-card-shell";
 
 export type ModuleStatus = "ATIVO" | "NOVO" | "EM BREVE";
 
@@ -38,6 +36,8 @@ function StatusBadge({ tag, available }: { tag?: ModuleStatus; available: boolea
   );
 }
 
+// Server Component: resolve o icone aqui (JSX ja renderizado), so o
+// que precisa de interacao de toque vive no ModuleCardShell (client).
 export function ModuleCard({
   icon: Icon,
   title,
@@ -47,37 +47,8 @@ export function ModuleCard({
   available,
   href,
 }: Omit<ModuleDef, "key">) {
-  // No desktop o hover puro (:hover / group-hover) ja acende o card.
-  // No celular nao existe hover, entao o toque ativa manualmente a
-  // mesma classe "is-active" que o CSS trata como equivalente ao hover.
-  const [active, setActive] = useState(false);
-
-  const onPointerDown = useCallback((e: React.PointerEvent) => {
-    if (e.pointerType !== "mouse") setActive(true);
-  }, []);
-
-  const endTouch = useCallback((e: React.PointerEvent) => {
-    if (e.pointerType !== "mouse") {
-      window.setTimeout(() => setActive(false), 180);
-    }
-  }, []);
-
-  const accentStyle: React.CSSProperties & { "--acc": string } = {
-    "--acc": accent,
-  };
-
   const content = (
-    <article
-      style={accentStyle}
-      onPointerDown={onPointerDown}
-      onPointerUp={endTouch}
-      onPointerCancel={endTouch}
-      className={
-        "group acc-card relative flex min-h-[168px] flex-col justify-between overflow-hidden rounded-xl border border-hairline bg-surface p-4 " +
-        (available ? "acc-lift cursor-pointer" : "opacity-50") +
-        (active ? " is-active" : "")
-      }
-    >
+    <ModuleCardShell accent={accent} available={available}>
       {/* Blob de brilho ambiente atras do icone, igual a referencia do v0. */}
       <div
         aria-hidden="true"
@@ -104,8 +75,9 @@ export function ModuleCard({
           className="acc-fg absolute bottom-4 right-4 -translate-x-1 text-muted opacity-0 transition-all duration-200 group-hover:translate-x-0 group-hover:opacity-100 group-[.is-active]:translate-x-0 group-[.is-active]:opacity-100"
         />
       )}
-    </article>
+    </ModuleCardShell>
   );
+
   if (available && href) {
     return (
       <Link href={href} className="block">
