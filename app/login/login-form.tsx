@@ -121,33 +121,33 @@ export default function LoginForm() {
   const submit = isSignup ? handleSignUp : handleSignIn;
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-12">
-      <main className="w-full max-w-md">
-        <section className="relative rounded-xl border border-hairline bg-surface/70 p-8 shadow-2xl shadow-black/50 backdrop-blur-xl">
+    <div className="flex min-h-screen items-center justify-center px-6 py-8">
+      <main className="w-full max-w-sm">
+        <section className="relative rounded-xl border border-hairline bg-surface/70 p-6 shadow-2xl shadow-black/50 backdrop-blur-xl">
           {isSignup && (
             <button
               onClick={() => switchMode("signin")}
               aria-label="Voltar ao login"
-              className="absolute left-5 top-5 grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"
+              className="absolute left-4 top-4 grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"
             >
               <ArrowLeft size={18} />
             </button>
           )}
 
-          <h1 className="mb-7 flex justify-center">
-            <Logo />
-          </h1>
+          <div className="mb-6 flex justify-center">
+            <Logo className="h-16 w-auto sm:h-20" />
+          </div>
 
-          <div className="flex flex-col gap-5">
+          <div className="flex flex-col gap-3.5">
             {isSignup && (
               <>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
                     Nome completo
                   </span>
                   <Field icon={User} value={name} onChange={setName} placeholder="Seu nome" />
                 </div>
-                <div className="flex flex-col gap-2">
+                <div className="flex flex-col gap-1.5">
                   <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
                     Apelido
                   </span>
@@ -156,14 +156,14 @@ export default function LoginForm() {
               </>
             )}
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
                 E-mail
               </span>
               <Field icon={User} value={email} onChange={setEmail} placeholder="exemplo@pokersync.com" />
             </div>
 
-            <div className="flex flex-col gap-2">
+            <div className="flex flex-col gap-1.5">
               <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
                 Senha
               </span>
@@ -199,7 +199,7 @@ export default function LoginForm() {
             </button>
           </div>
 
-          <div className="relative my-7">
+          <div className="relative my-5">
             <div className="absolute inset-0 flex items-center">
               <span className="w-full border-t border-hairline" />
             </div>
