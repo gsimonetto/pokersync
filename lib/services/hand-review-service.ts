@@ -242,6 +242,7 @@ export async function getReview(reviewId: string): Promise<ReviewDetail> {
       `
       id, user_id, title, free_text, hand_history, status,
       learning_note, drill_suggestion, created_at, updated_at, concluded_at,
+      parsed_data, source, session_id,
       hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
       hand_review_images ( id, storage_path, position ),
       hand_review_answers ( id, position, question, answer )
