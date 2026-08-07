@@ -1,5 +1,4 @@
 "use client";
-
 import { useCallback, useMemo, useState } from "react";
 
 // Portado de useFilters.js. So as dimensoes que existem de verdade nos
@@ -27,5 +26,13 @@ export function useDrillFilters() {
     return count;
   }, [filters]);
 
-  return { filters, set, reset, activeCount };
+  // Os 3 eixos precisam estar preenchidos pra um fetch ser disparado.
+  // E o sinal que drill-service.ts e a pagina usam pra saber se ha
+  // criterio valido — sem isso, nenhuma mao deve ser buscada.
+  const isComplete = useMemo(
+    () => !!filters.position && !!filters.action && !!filters.street,
+    [filters]
+  );
+
+  return { filters, set, reset, activeCount, isComplete };
 }
