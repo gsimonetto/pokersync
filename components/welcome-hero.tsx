@@ -59,10 +59,11 @@ export function WelcomeHero({
           {name}
         </h1>
 
-        {/* Plano e time ficam juntos numa linha abaixo do apelido, nao ao lado dele. */}
-        <div className="mt-2.5 flex flex-wrap items-center gap-2">
+        {/* Plano e time: chips empilhados abaixo do apelido, mesmo tratamento visual
+            (borda + brilho na cor), com hover para dar feedback de interacao. */}
+        <div className="mt-2.5 flex flex-col items-start gap-1.5">
           <span
-            className="inline-flex items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide"
+            className="inline-flex cursor-default items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition duration-200 hover:scale-[1.04] hover:brightness-125"
             style={{
               color: planStyle.color,
               borderColor: `${planStyle.color}55`,
@@ -74,7 +75,15 @@ export function WelcomeHero({
           </span>
 
           {team && (
-            <span className="text-xs font-semibold uppercase tracking-wide" style={{ color: team.accent }}>
+            <span
+              className="inline-flex cursor-default items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition duration-200 hover:scale-[1.04] hover:brightness-125"
+              style={{
+                color: team.accent,
+                borderColor: `${team.accent}55`,
+                background: `${team.accent}1A`,
+                boxShadow: `0 0 10px ${team.accent}80, 0 0 2px ${team.accent}`,
+              }}
+            >
               {team.name}
             </span>
           )}
