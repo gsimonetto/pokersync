@@ -37,32 +37,59 @@ body {
 }
 
 /* Utilitarios de acento: a cor vem da custom property --acc definida
-   inline no elemento. Evita depender do scanner de propriedade
-   arbitraria do Tailwind (hover:[color:var(--acc)] nao compila). */
-.acc-border:hover {
+   inline no elemento. Espelha exatamente o design de referencia (v0). */
+.acc-card {
+  transition:
+    border-color 0.2s ease,
+    box-shadow 0.2s ease,
+    transform 0.2s ease;
+}
+.acc-card:hover,
+.acc-card.is-active {
   border-color: var(--acc);
+  box-shadow: 0 12px 34px -10px var(--acc);
 }
-.acc-text:hover {
-  color: var(--acc);
-}
-.acc-bar {
-  background-color: var(--acc);
+.acc-lift:hover,
+.acc-lift.is-active {
+  transform: translateY(-2px);
 }
 
-/* Variante "group": acende ao passar o mouse em qualquer parte do
-   card pai (.group), nao apenas no proprio elemento. */
-.group:hover .acc-text-group {
+/* Blob de brilho ambiente: div separada dentro do card (nao o proprio
+   card), por isso ".group:hover .acc-glow" funciona como selecionador
+   de descendente de verdade. */
+.acc-glow {
+  background: var(--acc);
+  opacity: 0;
+  transition: opacity 0.3s ease;
+}
+.group:hover .acc-glow,
+.group.is-active .acc-glow {
+  opacity: 0.22;
+}
+.group:hover .acc-fg,
+.group.is-active .acc-fg {
   color: var(--acc);
 }
-.group:hover .acc-border-group {
+.group:hover .acc-bg,
+.group.is-active .acc-bg {
+  background-color: var(--acc);
+}
+.group:hover .acc-border,
+.group.is-active .acc-border {
   border-color: var(--acc);
 }
-.acc-glow {
-  transition: box-shadow 0.2s ease, border-color 0.2s ease;
+.group:hover .acc-bar,
+.group.is-active .acc-bar {
+  background-color: var(--acc);
+  box-shadow: 0 0 14px var(--acc);
 }
-.group:hover .acc-glow {
-  border-color: var(--acc);
-  box-shadow:
-    0 0 0 1px var(--acc),
-    0 18px 34px -14px color-mix(in srgb, var(--acc) 60%, transparent);
+.acc-fg,
+.acc-bg,
+.acc-border,
+.acc-bar {
+  transition:
+    color 0.25s ease,
+    background-color 0.25s ease,
+    border-color 0.25s ease,
+    box-shadow 0.25s ease;
 }
