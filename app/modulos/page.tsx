@@ -5,7 +5,6 @@ import { ProgressSection } from "@/components/progress-section";
 import { BrandValues } from "@/components/brand-values";
 import { modules } from "@/lib/modules-data";
 import { ModuleCard } from "@/components/module-card";
-import { getPatente } from "@/lib/services/xp-service";
 import { aggregate } from "@/lib/bankroll/calc";
 import { fmtMoney, fmtSignedMoney, fmtPct } from "@/lib/bankroll/format";
 import type { Session } from "@/lib/bankroll/types";
@@ -39,14 +38,17 @@ export default async function ModulosPage() {
   const meta = (user?.user_metadata ?? {}) as { nome?: string; apelido?: string };
   const displayName = meta.apelido || meta.nome || "Jogador";
 
-  const [{ data: progressRow }, { data: sessionRows }] = await Promise.all([
-    supabase.from("user_progress").select("level, streak_days").maybeSingle(),
+  const [{ data: sessionRows }, { data: planRow }, { data: teamRow }] = await Promise.all([
     supabase.from("bankroll_sessions").select("*"),
+    supabase.from("user_plans").select("plan").maybeSingle(),
+    supabase.from("team_members").select("teams ( name, accent )").maybeSingle(),
   ]);
 
-  const level = progressRow?.level ?? 1;
-  const streakDays = progressRow?.streak_days ?? 0;
-  const patente = getPatente(level);
+  // Ausencia de linha em user_plans == free (nao exige trigger de signup).
+  const plan = (planRow?.plan as "free" | "pro" | "master") ?? "free";
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const teamData = teamRow?.teams as any;
+  const team = teamData ? { name: teamData.name as string, accent: teamData.accent as string } : null;
 
   const sessions = (sessionRows ?? []).map(rowToSession);
   const agg = aggregate(sessions);
@@ -57,7 +59,7 @@ export default async function ModulosPage() {
       <TopNav />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="space-y-6">
-          <WelcomeHero name={displayName} streakDays={streakDays} patente={patente} />
+          <WelcomeHero name={displayName} plan={plan} team={team} />
 
           <StatCards
             bankrollAtual={fmtMoney(agg.profit)}
