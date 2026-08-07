@@ -4,6 +4,7 @@ import { useState, type ComponentType } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { User, AtSign, Lock, Eye, EyeOff, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Logo } from "@/components/logo";
 
 type Mode = "signin" | "signup";
 
@@ -133,8 +134,8 @@ export default function LoginForm() {
             </button>
           )}
 
-          <h1 className="mb-7 text-center text-2xl font-semibold tracking-tight">
-            Poker<span className="font-light">Sync</span>
+          <h1 className="mb-7 flex justify-center">
+            <Logo />
           </h1>
 
           <div className="flex flex-col gap-5">
