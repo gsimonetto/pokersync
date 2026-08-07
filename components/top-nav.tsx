@@ -5,6 +5,12 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, CircleHelp } from "lucide-react";
 import { Logo } from "./logo";
+import { Avatar } from "./avatar";
+import { ProfileMenu } from "./profile-menu";
+import { NotificationsMenu } from "./notifications-menu";
+import { HelpMenu } from "./help-menu";
+import { fetchProfile, type Profile } from "@/lib/services/profile-service";
+import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
 
 const TABS = [
@@ -12,35 +18,48 @@ const TABS = [
   { label: "Tarefas", href: "/hub" },
 ] as const;
 
-function initialsFrom(nome?: string | null, apelido?: string | null, email?: string | null) {
-  const source = apelido || nome || email || "";
-  const parts = source.trim().split(/\s+/).filter(Boolean);
-  if (parts.length === 0) return "PS";
-  if (parts.length === 1) return parts[0].slice(0, 2).toUpperCase();
-  return (parts[0][0] + parts[parts.length - 1][0]).toUpperCase();
-}
+type OpenMenu = "profile" | "notifications" | "help" | null;
 
 export function TopNav() {
   const pathname = usePathname();
-  const [initials, setInitials] = useState("PS");
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [level, setLevel] = useState<number | null>(null);
+  const [unread, setUnread] = useState(0);
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
-        if (!alive || !data.user) return;
-        const meta = data.user.user_metadata || {};
-        setInitials(initialsFrom(meta.nome, meta.apelido, data.user.email));
+        const [p, { data: progressRow }, unreadCount] = await Promise.all([
+          fetchProfile(),
+          supabase.from("user_progress").select("level").maybeSingle(),
+          fetchUnreadCount().catch(() => 0),
+        ]);
+        if (!alive) return;
+        setProfile(p);
+        setLevel(progressRow?.level ?? null);
+        setUnread(unreadCount);
       } catch {
-        // sem sessao configurada: mantem o fallback "PS"
+        // sem sessao configurada: mantem os fallbacks
       }
     })();
     return () => {
       alive = false;
     };
   }, []);
+
+  function toggle(menu: OpenMenu) {
+    setOpenMenu((prev) => (prev === menu ? null : menu));
+  }
+
+  function closeAndRefreshUnread() {
+    setOpenMenu(null);
+    fetchUnreadCount()
+      .then(setUnread)
+      .catch(() => {});
+  }
 
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
@@ -71,31 +90,55 @@ export function TopNav() {
         </nav>
 
         <div className="flex items-center gap-1.5">
-          <button
-            type="button"
-            className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-ink"
-            aria-label="Notificações"
-          >
-            <Bell className="size-[18px]" />
-            <span className="absolute right-2 top-2 size-1.5 rounded-full bg-ink ring-2 ring-void" />
-          </button>
-          <button
-            type="button"
-            className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-ink"
-            aria-label="Ajuda"
-          >
-            <CircleHelp className="size-[18px]" />
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => toggle("notifications")}
+              className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-ink"
+              aria-label="Notificações"
+            >
+              <Bell className="size-[18px]" />
+              {unread > 0 && (
+                <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
+                  {unread > 9 ? "9+" : unread}
+                </span>
+              )}
+            </button>
+            {openMenu === "notifications" && <NotificationsMenu onClose={closeAndRefreshUnread} />}
+          </div>
 
-          <button
-            type="button"
-            className="relative ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-white/[0.04] py-1 pl-1 pr-2.5 transition-colors hover:bg-white/[0.08]"
-            aria-label="Perfil"
-          >
-            <span className="grid size-7 place-items-center rounded-full bg-ink text-[11px] font-bold text-void">
-              {initials}
-            </span>
-          </button>
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => toggle("help")}
+              className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-ink"
+              aria-label="Ajuda"
+            >
+              <CircleHelp className="size-[18px]" />
+            </button>
+            {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
+          </div>
+
+          {/* Avatar maior + nivel ao lado — antes so tinha iniciais pequenas. */}
+          <div className="relative">
+            <button
+              type="button"
+              onClick={() => toggle("profile")}
+              className="ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-white/[0.04] py-1 pl-1 pr-2.5 transition-colors hover:bg-white/[0.08]"
+              aria-label="Perfil"
+            >
+              <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={34} />
+              {level != null && (
+                <span className="flex items-center gap-1 text-xs font-bold text-ink">
+                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted">Nv</span>
+                  {level}
+                </span>
+              )}
+            </button>
+            {openMenu === "profile" && profile && (
+              <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />
+            )}
+          </div>
         </div>
       </div>
     </header>
