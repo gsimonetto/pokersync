@@ -36,6 +36,7 @@ export const modules: ModuleDef[] = [
     subtitle: "Analise tecnica de jogadas",
     accent: ACCENT.purple,
     available: true,
+    href: "/revisor",
   },
   {
     key: "performance",
