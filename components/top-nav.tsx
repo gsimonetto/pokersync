@@ -1,11 +1,16 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname } from "next/navigation";
 import { Bell, CircleHelp } from "lucide-react";
 import { Logo } from "./logo";
 import { createClient } from "@/lib/supabase/client";
 
-const tabs = ["Início", "Desempenho"] as const;
+const TABS = [
+  { label: "Início", href: "/modulos" },
+  { label: "Tarefas", href: "/hub" },
+] as const;
 
 function initialsFrom(nome?: string | null, apelido?: string | null, email?: string | null) {
   const source = apelido || nome || email || "";
@@ -16,7 +21,7 @@ function initialsFrom(nome?: string | null, apelido?: string | null, email?: str
 }
 
 export function TopNav() {
-  const [active, setActive] = useState<(typeof tabs)[number]>("Início");
+  const pathname = usePathname();
   const [initials, setInitials] = useState("PS");
 
   useEffect(() => {
@@ -39,29 +44,28 @@ export function TopNav() {
 
   return (
     <header className="sticky top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo />
+      <div className="mx-auto flex h-20 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Logo className="h-10 w-auto sm:h-12" />
 
         <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
-          {tabs.map((tab) => {
-            const isActive = active === tab;
+          {TABS.map((tab) => {
+            const isActive = pathname === tab.href;
             return (
-              <button
-                key={tab}
-                type="button"
-                onClick={() => setActive(tab)}
+              <Link
+                key={tab.href}
+                href={tab.href}
                 aria-current={isActive ? "page" : undefined}
                 className={`relative rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-colors ${
                   isActive ? "text-ink" : "text-muted hover:text-ink"
                 }`}
               >
-                {tab}
+                {tab.label}
                 <span
                   className={`absolute inset-x-2 -bottom-[9px] h-0.5 rounded-full bg-ink transition-opacity ${
                     isActive ? "opacity-100" : "opacity-0"
                   }`}
                 />
-              </button>
+              </Link>
             );
           })}
         </nav>

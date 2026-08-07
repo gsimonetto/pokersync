@@ -1,5 +1,3 @@
-import { Flame, Sparkles } from "lucide-react";
-
 function Chip({ size, className }: { size: number; className?: string }) {
   return (
     <span
@@ -12,15 +10,23 @@ function Chip({ size, className }: { size: number; className?: string }) {
   );
 }
 
+const PLAN_STYLE: Record<string, { label: string; color: string }> = {
+  free: { label: "Free", color: "#B8B8B8" },
+  pro: { label: "Pro", color: "#EF4444" },
+  master: { label: "Master", color: "#F97316" },
+};
+
 export function WelcomeHero({
   name,
-  streakDays,
-  patente,
+  plan,
+  team,
 }: {
   name: string;
-  streakDays: number;
-  patente: string;
+  plan: "free" | "pro" | "master";
+  team: { name: string; accent: string } | null;
 }) {
+  const planStyle = PLAN_STYLE[plan] ?? PLAN_STYLE.free;
+
   return (
     <section
       aria-labelledby="welcome-heading"
@@ -49,26 +55,26 @@ export function WelcomeHero({
           </span>
         </div>
 
-        <h1 id="welcome-heading" className="mt-2 text-4xl font-bold tracking-tight text-ink sm:text-5xl">
-          {name}
-        </h1>
+        <div className="mt-2 flex flex-wrap items-baseline gap-x-3 gap-y-1.5">
+          <h1 id="welcome-heading" className="text-4xl font-bold tracking-tight text-ink sm:text-5xl">
+            {name}
+          </h1>
 
-        <p className="mt-3 max-w-md text-pretty text-sm leading-relaxed text-muted">
-          {streakDays > 0
-            ? "Você está em uma sequência sólida. Continue treinando ranges para manter a evolução constante."
-            : "Comece hoje uma sessão de estudo para abrir sua sequência de evolução."}
-        </p>
-
-        <div className="mt-5 flex flex-wrap items-center gap-2">
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.06] px-2.5 py-1 text-xs font-medium text-ink">
-            <Flame className="size-3.5" />
-            Sequência de {streakDays} {streakDays === 1 ? "dia" : "dias"}
-          </span>
-          <span className="inline-flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.03] px-2.5 py-1 text-xs font-medium text-muted">
-            <Sparkles className="size-3.5 text-ink" />
-            Patente {patente}
+          {/* Plano: chip com o mesmo tratamento visual do XP no Hub (borda + fundo suave na cor). */}
+          <span
+            className="inline-flex items-center rounded-full border px-2.5 py-1 text-[11px] font-bold uppercase tracking-wide"
+            style={{ color: planStyle.color, borderColor: `${planStyle.color}40`, background: `${planStyle.color}14` }}
+          >
+            {planStyle.label}
           </span>
         </div>
+
+        {/* Time: so aparece se o jogador participa de algum. Cor propria do time. */}
+        {team && (
+          <p className="mt-1.5 text-xs font-semibold uppercase tracking-wide" style={{ color: team.accent }}>
+            {team.name}
+          </p>
+        )}
       </div>
     </section>
   );
