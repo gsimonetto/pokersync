@@ -22,6 +22,16 @@ export interface DrillFilters {
   street?: string | null;
 }
 
+type CompleteDrillFilters = { position: string; action: string; street: string };
+
+// Regra de negocio central: so existe criterio valido quando os 3 eixos
+// (posicao, situacao, rua) estao presentes. Usado tanto pelo fetch manual
+// quanto pela resolucao de sugestao do Revisor — nenhum dos dois caminhos
+// busca no banco com criterio parcial ou vazio.
+export function hasCompleteFilters(filters: DrillFilters): filters is CompleteDrillFilters {
+  return !!filters.position && !!filters.action && !!filters.street;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isValidGtoNode(n: any): n is GtoNode {
   return (
@@ -44,20 +54,21 @@ function dealHeroCombo(strategy: Record<string, number[]>): string {
   return combos[idx];
 }
 
-export async function fetchDrillBatch(size = 20, filters: DrillFilters = {}): Promise<DrillHand[]> {
+async function queryDrills(size: number, filters: CompleteDrillFilters): Promise<DrillHand[]> {
   const supabase = createClient();
   const clampedSize = Math.min(Math.max(size, 1), 50);
 
-  let query = supabase.from("drills").select("spot_id, board, pot, effective_stack, gto_nodes").limit(clampedSize * 3); // margem para os que forem filtrados por gto_nodes invalido
+  const { data, error } = await supabase
+    .from("drills")
+    .select("spot_id, board, pot, effective_stack, gto_nodes")
+    .eq("position", filters.position)
+    .eq("action", filters.action)
+    .eq("street", filters.street)
+    .limit(clampedSize * 3); // margem para os que forem filtrados por gto_nodes invalido
 
-  if (filters.position) query = query.eq("position", filters.position);
-  if (filters.street) query = query.eq("street", filters.street);
-  if (filters.action) query = query.eq("action", filters.action);
-
-  const { data, error } = await query;
   if (error) throw error;
 
-  const hands: DrillHand[] = (data ?? [])
+  return (data ?? [])
     .filter((r) => isValidGtoNode(r.gto_nodes))
     .slice(0, clampedSize)
     .map((r) => {
@@ -71,8 +82,36 @@ export async function fetchDrillBatch(size = 20, filters: DrillFilters = {}): Pr
         heroCards: dealHeroCombo(gtoNodes.strategy),
       };
     });
+}
 
-  return hands;
+// Caminho manual: jogador seleciona posicao + situacao + rua nos filtros.
+// Sem os 3 completos, nao faz nenhuma chamada ao Supabase — retorna vazio
+// direto. Essa e a correcao do bug: antes, filters={} ja disparava a query.
+export async function fetchDrillBatch(size = 20, filters: DrillFilters = {}): Promise<DrillHand[]> {
+  if (!hasCompleteFilters(filters)) return [];
+  return queryDrills(size, filters);
+}
+
+// Caminho do Revisor de Maos: resolve o filter_config de uma sugestao ativa
+// e busca os drills correspondentes. Se a sugestao nao tiver os 3 campos
+// preenchidos, tambem nao busca nada — mesma regra de precisao do caminho manual.
+export async function fetchDrillBatchBySuggestion(suggestionId: string, size = 20): Promise<DrillHand[]> {
+  const supabase = createClient();
+
+  const { data: suggestion, error } = await supabase
+    .from("hand_review_drill_suggestions")
+    .select("filter_config, active")
+    .eq("id", suggestionId)
+    .eq("active", true)
+    .single();
+
+  if (error) throw error;
+  if (!suggestion) throw new Error("SUGGESTION_NOT_FOUND");
+
+  const config = (suggestion.filter_config ?? {}) as DrillFilters;
+  if (!hasCompleteFilters(config)) return [];
+
+  return queryDrills(size, config);
 }
 
 export interface DrillFacet {
