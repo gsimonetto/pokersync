@@ -19,6 +19,7 @@ export const modules: ModuleDef[] = [
     accent: ACCENT.green,
     tag: "ATIVO",
     available: true,
+    href: "/treino",
   },
   {
     key: "bankroll",
