@@ -28,14 +28,15 @@ import { useDrillFilters, type DrillFilterKey } from "@/lib/poker/use-drill-filt
 import { matchUserActionToGtoNode, describeAction } from "@/lib/poker/gto-verdict";
 import { parseBoard, parseHeroCombo } from "@/lib/poker/parse-board";
 import { computeStylizedSeatLayout, type SeatLayoutSlot } from "@/lib/poker/seat-layout";
-import {
-  parseHandHistory,
-  HandHistoryParseError,
-  UnsupportedHandHistoryFormatError,
-  type ParsedHand,
-} from "@/lib/poker/hand-history-parser";
 import { projectHandAtStreet, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
-import { saveHandReview } from "@/lib/services/hand-review-service";
+import {
+  parseHand,
+  validateParsedHand,
+  HandParseError,
+  type ParsedHand,
+} from "@/lib/poker/hand-parser";
+import { createReview } from "@/lib/services/hand-review-service";
+import { createClient } from "@/lib/supabase/client";
 import { T, F } from "@/lib/poker/drill-theme";
 
 // As mesmas 8 posicoes de antes, mas agora o hero e' calculado a partir
@@ -468,17 +469,30 @@ function TreinoPageInner() {
   const handleParsePaste = useCallback(() => {
     setParseError(null);
     try {
-      const parsed = parseHandHistory(pasteText);
+      const parsed = parseHand(pasteText);
+      validateParsedHand(parsed);
       setParsedHand(parsed);
       setReplayStreetIndex(0);
       resetFilters();
 
       setSaveState("saving");
-      saveHandReview(parsed, pasteText)
+      const title = `${parsed.site === "pokerstars" ? "PokerStars" : parsed.site} #${parsed.handId ?? "?"}`;
+      const supabase = createClient();
+      supabase.auth
+        .getUser()
+        .then(({ data: { user } }) => {
+          if (!user) throw new Error("Usuário não autenticado.");
+          return createReview(user.id, {
+            title,
+            handHistory: pasteText,
+            parsedData: parsed,
+            source: "manual",
+          });
+        })
         .then(() => setSaveState("saved"))
         .catch(() => setSaveState("error"));
     } catch (e) {
-      if (e instanceof UnsupportedHandHistoryFormatError || e instanceof HandHistoryParseError) {
+      if (e instanceof HandParseError) {
         setParseError(e.message);
       } else {
         setParseError("Não foi possível interpretar esse hand history. Confira se o texto foi colado completo.");
