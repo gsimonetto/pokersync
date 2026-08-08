@@ -8,7 +8,7 @@
 // qual posicao o filtro selecionasse. Isso rotulava a mesa errado sempre
 // que o hero nao fosse BTN.
 
-import type { ParsedSeat } from "./hand-history-parser";
+import type { ParsedSeat } from "./hand-parser";
 
 export type CardSide = "left" | "right" | "above" | "below";export type SeatLayoutSlot = {
   posLabel: string;

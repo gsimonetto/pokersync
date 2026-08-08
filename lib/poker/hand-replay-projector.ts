@@ -1,8 +1,10 @@
-import type { ParsedHand, Street, ParsedAction } from "./hand-history-parser";
+import type { ParsedHand, ParsedStreet, ParsedAction } from "./hand-parser";
 import { computeRealSeatLayout, type SeatLayoutSlot } from "./seat-layout";
 import type { TableHand, SeatState, HistoryStep } from "@/components/drill/poker-table";
 
-const STREET_LABELS: Record<Street, string> = {
+type StreetName = ParsedStreet["name"];
+
+const STREET_LABELS: Record<StreetName, string> = {
   preflop: "PREFLOP",
   flop: "FLOP",
   turn: "TURN",
@@ -16,73 +18,70 @@ export type ReplayState = {
   streetCount: number;
 };
 
-// Mão pode não ter ido até o river (ex: todo mundo foldou no flop) — só
-// as ruas que de fato aconteceram entram no stepper.
-function computeActiveStreets(hand: ParsedHand): Street[] {
-  const streets: Street[] = ["preflop"];
-  if (hand.boardByStreet.flop) streets.push("flop");
-  if (hand.boardByStreet.turn) streets.push("turn");
-  if (hand.boardByStreet.river) streets.push("river");
-  return streets;
+export class HandReplayError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "HandReplayError";
+  }
+}
+
+// hand.streets ja vem so com as ruas que de fato aconteceram (parseHand
+// so empurra "flop"/"turn"/"river" se o marcador respectivo existir no
+// texto) — nao precisa recalcular isso aqui, so usar a ordem que ja veio.
+function activeStreetNames(hand: ParsedHand): StreetName[] {
+  return hand.streets.map((s) => s.name);
 }
 
 function actionLabel(a: ParsedAction): string {
-  switch (a.type) {
-    case "post_small_blind":
-      return `posts SB ${a.amount}`;
-    case "post_big_blind":
-      return `posts BB ${a.amount}`;
-    case "post_ante":
-      return `ante ${a.amount}`;
-    case "fold":
+  switch (a.action) {
+    case "posts":
+      return `posts ${a.amount}`;
+    case "folds":
       return "fold";
-    case "check":
+    case "checks":
       return "check";
-    case "bet":
+    case "bets":
       return `bet ${a.amount}`;
-    case "call":
+    case "calls":
       return `call ${a.amount}`;
-    case "raise":
+    case "raises":
       return `raise to ${a.raiseTo}`;
-    case "shows":
-      return "mostra";
-    case "collected":
-      return `ganha ${a.amount}`;
     default:
-      return a.type;
+      return a.action;
   }
 }
 
 // Reconstroi o pote acumulado ate (e incluindo) as ruas informadas,
 // rastreando quanto cada jogador ja colocou NAQUELA RUA — necessario
-// porque "raises X to Y" no PokerStars usa Y como total da rua pro
-// jogador, nao como incremento. Validado a mao contra o hand history
-// real fornecido (bate exatamente com "Total pot 720" do SUMMARY).
-function computePotAndFoldsUpToStreet(
+// porque "raises X to Y" usa Y como total da rua pro jogador, nao como
+// incremento. Validado a mao contra o hand history real fornecido
+// (bate exatamente com o "Total pot" do SUMMARY).
+function computePotAndFolds(
   hand: ParsedHand,
-  streets: Street[]
+  streetNames: StreetName[]
 ): { pot: number; foldedPlayers: Set<string> } {
   const foldedPlayers = new Set<string>();
   let pot = 0;
 
-  for (const street of streets) {
+  for (const streetName of streetNames) {
+    const street = hand.streets.find((s) => s.name === streetName);
+    if (!street) continue;
+
     const committedThisStreet = new Map<string, number>();
-    for (const action of hand.actions.filter((a) => a.street === street)) {
-      switch (action.type) {
-        case "fold":
+    for (const action of street.actions) {
+      switch (action.action) {
+        case "folds":
           foldedPlayers.add(action.player);
           break;
-        case "post_small_blind":
-        case "post_big_blind":
-        case "post_ante":
-        case "bet":
-        case "call": {
+        case "posts":
+        case "bets":
+        case "calls": {
           const amt = action.amount ?? 0;
           committedThisStreet.set(action.player, (committedThisStreet.get(action.player) ?? 0) + amt);
           pot += amt;
           break;
         }
-        case "raise": {
+        case "raises": {
           const newTotal = action.raiseTo ?? 0;
           const already = committedThisStreet.get(action.player) ?? 0;
           const delta = newTotal - already;
@@ -102,68 +101,93 @@ function computePotAndFoldsUpToStreet(
   return { pot, foldedPlayers };
 }
 
-export class HandReplayError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "HandReplayError";
-  }
-}
-
 // Constroi o estado da mesa (board, pote, seats, historico) pra uma rua
 // especifica do replay. Pura — cada chamada recalcula do zero a partir
 // da mao parseada inteira, sem estado mutavel entre streets. Mesmo
-// principio do veredito GTO: uma unica fonte de verdade, sem duas
-// implementacoes que podem divergir.
+// principio do veredito GTO: uma unica fonte de verdade.
 export function projectHandAtStreet(hand: ParsedHand, streetIndex: number): ReplayState {
-  const activeStreets = computeActiveStreets(hand);
-  const clampedIndex = Math.max(0, Math.min(streetIndex, activeStreets.length - 1));
-  const currentStreet = activeStreets[clampedIndex];
-  const streetsUpToNow = activeStreets.slice(0, clampedIndex + 1);
+  const streetNames = activeStreetNames(hand);
+  if (streetNames.length === 0) {
+    throw new HandReplayError("Essa mão não tem nenhuma rua reconhecida — não é possível montar o replay.");
+  }
+  const clampedIndex = Math.max(0, Math.min(streetIndex, streetNames.length - 1));
+  const currentStreet = streetNames[clampedIndex];
+  const streetsUpToNow = streetNames.slice(0, clampedIndex + 1);
 
-  const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat, hand.maxSeats);
+  const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat ?? 0, hand.maxSeats ?? hand.seats.length);
 
-  const { pot, foldedPlayers } = computePotAndFoldsUpToStreet(hand, streetsUpToNow);
+  const { pot, foldedPlayers } = computePotAndFolds(hand, streetsUpToNow);
 
   // Checagem de sanidade: na ultima rua, o pote calculado deve bater com
-  // o total do SUMMARY (fonte mais confiavel do proprio hand history).
+  // o total do proprio hand history (extractPot, fonte independente).
   // Se nao bater, algo no parser ou nessa reconstrucao esta errado —
   // melhor sinalizar do que mostrar um numero silenciosamente incorreto.
-  if (clampedIndex === activeStreets.length - 1 && hand.totalPot > 0) {
-    const diff = Math.abs(pot - hand.totalPot);
+  if (clampedIndex === streetNames.length - 1 && hand.pot != null && hand.pot > 0) {
+    const diff = Math.abs(pot - hand.pot);
     if (diff > 0.01) {
       throw new HandReplayError(
-        `Pote calculado (${pot}) não bate com o total da mão (${hand.totalPot}). Não exibindo — pode haver side pot ou ação não reconhecida pelo parser.`
+        `Pote calculado (${pot}) não bate com o total da mão (${hand.pot}). Não exibindo — pode haver side pot ou ação não reconhecida pelo parser.`
       );
     }
   }
 
-  const board = currentStreet === "preflop" ? [] : hand.boardByStreet[currentStreet] ?? [];
+  const currentStreetData = hand.streets.find((s) => s.name === currentStreet);
+  const board = currentStreet === "preflop" ? [] : currentStreetData?.board ?? [];
 
   const seats: Record<string, SeatState> = {};
   for (const slot of seatLayout) {
+    if (!slot.playerName) continue;
     const seatData = hand.seats.find((s) => s.playerName === slot.playerName);
-    if (!seatData || !slot.playerName) continue;
+    if (!seatData) continue;
 
     const folded = foldedPlayers.has(slot.playerName);
-    const showsAction = hand.actions.find((a) => a.type === "shows" && a.player === slot.playerName);
+    const showsEntry = hand.showdown.find((s) => s.player === slot.playerName);
 
     seats[slot.posLabel] = {
       status: folded ? "folded" : "live",
       stack: seatData.startingChips,
-      cards: slot.isHero ? hand.heroCards ?? undefined : showsAction?.cards,
+      cards: slot.isHero ? hand.heroCards ?? undefined : showsEntry?.cards,
     };
   }
 
-  const history: HistoryStep[] = activeStreets.map((street) => ({
-    street: STREET_LABELS[street],
-    current: street === currentStreet,
-    actions: hand.actions
-      .filter((a) => a.street === street && a.type !== "uncalled_return")
+  const lastStreet = streetNames[streetNames.length - 1];
+
+  const history: HistoryStep[] = streetNames.map((streetName) => {
+    const street = hand.streets.find((s) => s.name === streetName)!;
+    const displayActions = street.actions
+      .filter((a) => a.action !== "uncalled_return")
       .map((a) => {
         const slot = seatLayout.find((s) => s.playerName === a.player);
         return { pos: slot?.posLabel ?? a.player, label: actionLabel(a) };
-      }),
-  }));
+      });
+
+    // Showdown e resultado final so fazem sentido anexados na ultima rua
+    // que de fato aconteceu — "shows"/"collected" nunca ficam dentro de
+    // nenhuma street no parser (vem depois do SHOW DOWN).
+    const extra =
+      streetName === lastStreet
+        ? [
+            ...hand.showdown.map((s) => {
+              const slot = seatLayout.find((sl) => sl.playerName === s.player);
+              return { pos: slot?.posLabel ?? s.player, label: `mostra (${s.handDescription})` };
+            }),
+            ...(hand.winner
+              ? [
+                  {
+                    pos: seatLayout.find((sl) => sl.playerName === hand.winner)?.posLabel ?? hand.winner,
+                    label: hand.pot != null ? `ganha ${hand.pot}` : "ganha",
+                  },
+                ]
+              : []),
+          ]
+        : [];
+
+    return {
+      street: STREET_LABELS[streetName],
+      current: streetName === currentStreet,
+      actions: [...displayActions, ...extra],
+    };
+  });
 
   const tableHand: TableHand = {
     pot,
@@ -180,6 +204,6 @@ export function projectHandAtStreet(hand: ParsedHand, streetIndex: number): Repl
     tableHand,
     seatLayout,
     streetIndex: clampedIndex,
-    streetCount: activeStreets.length,
+    streetCount: streetNames.length,
   };
 }
