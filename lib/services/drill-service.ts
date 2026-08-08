@@ -14,6 +14,10 @@ export interface DrillHand {
   effectiveStack: number;
   gtoNodes: GtoNode;
   heroCards: string;
+  // Posicao real do hero nesse spot (ex: "BB"). Fonte de verdade pro
+  // layout de seats — nao usar filters.position pra isso, porque no
+  // caminho de sugestao do Revisor o filtro manual fica vazio.
+  position: string;
 }
 
 export interface DrillFilters {
@@ -60,7 +64,7 @@ async function queryDrills(size: number, filters: CompleteDrillFilters): Promise
 
   const { data, error } = await supabase
     .from("drills")
-    .select("spot_id, board, pot, effective_stack, gto_nodes")
+    .select("spot_id, board, pot, effective_stack, gto_nodes, position")
     .eq("position", filters.position)
     .eq("action", filters.action)
     .eq("street", filters.street)
@@ -80,6 +84,7 @@ async function queryDrills(size: number, filters: CompleteDrillFilters): Promise
         effectiveStack: Number(r.effective_stack),
         gtoNodes,
         heroCards: dealHeroCombo(gtoNodes.strategy),
+        position: r.position,
       };
     });
 }
