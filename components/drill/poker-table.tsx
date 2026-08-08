@@ -1,8 +1,9 @@
 "use client";
 
-import { Fragment, useState } from "react";
+import { Fragment } from "react";
 import { Card, CardBackPair } from "./card";
 import { T, F, POS, ACT, num } from "@/lib/poker/drill-theme";
+import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
 
 export interface SeatState {
   status: "empty" | "live" | "acting" | "folded";
@@ -24,17 +25,6 @@ export interface TableHand {
   history: HistoryStep[];
   seats: Record<string, SeatState>;
 }
-
-const SEATS = [
-  { pos: "UTG", x: 13, y: 30, card: "right" as const },
-  { pos: "UTG+1", x: 34, y: 12, card: "below" as const },
-  { pos: "MP", x: 66, y: 12, card: "below" as const },
-  { pos: "HJ", x: 87, y: 30, card: "left" as const },
-  { pos: "CO", x: 92, y: 62, card: "left" as const },
-  { pos: "BB", x: 74, y: 84, card: "above" as const },
-  { pos: "BTN", x: 50, y: 92, card: "above" as const, hero: true },
-  { pos: "SB", x: 26, y: 84, card: "above" as const },
-];
 
 const NEUTRAL = "#3A4048";
 const NEUTRAL_GLOW = "#5A6270";
@@ -69,16 +59,20 @@ function Seat({
   state,
   heroTimer,
 }: {
-  seat: (typeof SEATS)[number];
+  seat: SeatLayoutSlot;
   state: SeatState;
   heroTimer?: number;
 }) {
-  const posCol = POS[seat.pos];
+  const posCol = POS[seat.posLabel];
   const { status = "empty", stack, action, cards } = state;
-  const hero = !!seat.hero;
+  const hero = seat.isHero;
   const acting = status === "acting";
   const empty = status === "empty";
-  const facedown = !hero && (status === "live" || acting);
+  // Se ha cartas reveladas pra um nao-hero (showdown do replay), mostra
+  // face-up em vez de card-back. So acontece quando o parser marcou
+  // "shows" pra esse jogador — nunca no Treino (villoes la nunca tem cards).
+  const revealedVillainCards = !hero && !!cards && cards.length > 0 && cards.every(Boolean);
+  const facedown = !hero && !revealedVillainCards && (status === "live" || acting);
 
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = acting ? 1 : status === "live" ? 0.15 : status === "folded" ? 0.1 : 0.08;
@@ -92,7 +86,7 @@ function Seat({
           left: { flexDirection: "row-reverse", alignItems: "center" },
           right: { flexDirection: "row", alignItems: "center" },
         } as const
-      )[seat.card];
+      )[seat.cardSide];
 
   const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
@@ -168,7 +162,7 @@ function Seat({
             transition: "all 200ms ease",
           }}
         >
-          {seat.pos}
+          {seat.posLabel}
         </div>
       </div>
 
@@ -234,7 +228,17 @@ function Seat({
         ) : (
           <>
             {seatInfo}
-            {facedown && <CardBackPair side={seat.card === "left" ? "left" : "right"} />}
+            {revealedVillainCards ? (
+              <div style={{ display: "flex", gap: 5 }}>
+                {cards!.map((c, i) => (
+                  <div key={i} style={{ transform: `rotate(${i ? 4 : -4}deg)`, animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+                    <Card card={c} size="board" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              facedown && <CardBackPair side={seat.cardSide === "left" ? "left" : "right"} />
+            )}
           </>
         )}
       </div>
@@ -242,7 +246,19 @@ function Seat({
   );
 }
 
-export function PokerTable({ hand, heroTimer }: { hand: TableHand | null; heroTimer?: number }) {
+export function PokerTable({
+  hand,
+  seats,
+  heroTimer,
+  onStreetClick,
+}: {
+  hand: TableHand | null;
+  seats: SeatLayoutSlot[];
+  heroTimer?: number;
+  // Presente so no modo replay — clicavel na barra de historico pra
+  // pular pra rua correspondente. No Treino, undefined = labels nao clicaveis.
+  onStreetClick?: (streetIndex: number) => void;
+}) {
   const active = !!hand;
   const history = hand?.history || [];
   const hasHistory = history.length > 0;
@@ -274,9 +290,23 @@ export function PokerTable({ hand, heroTimer }: { hand: TableHand | null; heroTi
         >
           {history.map((h, i) => (
             <Fragment key={i}>
-              <span style={{ fontFamily: F, fontSize: 9.5, fontWeight: 800, letterSpacing: 1.2, color: h.current ? "#fff" : "rgba(255,255,255,.4)", whiteSpace: "nowrap" }}>
+              <button
+                type="button"
+                onClick={onStreetClick ? () => onStreetClick(i) : undefined}
+                disabled={!onStreetClick}
+                style={{
+                  all: "unset",
+                  cursor: onStreetClick ? "pointer" : "default",
+                  fontFamily: F,
+                  fontSize: 9.5,
+                  fontWeight: 800,
+                  letterSpacing: 1.2,
+                  color: h.current ? "#fff" : "rgba(255,255,255,.4)",
+                  whiteSpace: "nowrap",
+                }}
+              >
                 {h.street}
-              </span>
+              </button>
               <div style={{ display: "flex", gap: 5 }}>
                 {h.actions.map((a, j) => (
                   <span
@@ -385,8 +415,8 @@ export function PokerTable({ hand, heroTimer }: { hand: TableHand | null; heroTi
           )}
         </div>
 
-        {SEATS.map((s) => (
-          <Seat key={s.pos} seat={s} state={seatData(s.pos)} heroTimer={heroTimer} />
+        {seats.map((s) => (
+          <Seat key={s.posLabel} seat={s} state={seatData(s.posLabel)} heroTimer={heroTimer} />
         ))}
       </div>
     </div>
