@@ -3,7 +3,17 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Loader2, AlertTriangle, SkipForward } from "lucide-react";
+import {
+  ArrowLeft,
+  Loader2,
+  AlertTriangle,
+  SkipForward,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardPaste,
+  ImagePlus,
+  CheckCircle2,
+} from "lucide-react";
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { ActionBar, type DrillAction } from "@/components/drill/action-bar";
 import { GtoFeedback } from "@/components/drill/gto-feedback";
@@ -17,18 +27,31 @@ import {
 import { useDrillFilters, type DrillFilterKey } from "@/lib/poker/use-drill-filters";
 import { matchUserActionToGtoNode, describeAction } from "@/lib/poker/gto-verdict";
 import { parseBoard, parseHeroCombo } from "@/lib/poker/parse-board";
+import { computeStylizedSeatLayout, type SeatLayoutSlot } from "@/lib/poker/seat-layout";
+import {
+  parseHandHistory,
+  HandHistoryParseError,
+  UnsupportedHandHistoryFormatError,
+  type ParsedHand,
+} from "@/lib/poker/hand-history-parser";
+import { projectHandAtStreet, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
+import { saveHandReview } from "@/lib/services/hand-review-service";
 import { T, F } from "@/lib/poker/drill-theme";
 
-const SEAT_INVOLVEMENT = [
-  { pos: "BTN", hero: true },
-  { pos: "SB", inHand: true },
-  { pos: "CO", inHand: true },
-  { pos: "UTG", inHand: false },
-  { pos: "UTG+1", inHand: false },
-  { pos: "HJ", inHand: false },
-  { pos: "BB", inHand: true },
-  { pos: "MP", inHand: true },
-];
+// As mesmas 8 posicoes de antes, mas agora o hero e' calculado a partir
+// da posicao REAL da mao (hand.position) — nao mais fixo em "BTN".
+// Villoes "decorativos" (so pra mesa nao ficar vazia) continuam os
+// mesmos 4 de antes, exceto quando coincidem com a posicao do hero.
+const ALL_POSITIONS = ["UTG", "UTG+1", "MP", "HJ", "CO", "BB", "BTN", "SB"];
+const DECORATIVE_VILLAIN_POSITIONS = ["SB", "CO", "BB", "MP"];
+
+function buildSeatInvolvement(heroPosition: string) {
+  return ALL_POSITIONS.map((pos) => ({
+    pos,
+    hero: pos === heroPosition,
+    inHand: pos !== heroPosition && DECORATIVE_VILLAIN_POSITIONS.includes(pos),
+  }));
+}
 
 const SIDEBAR_SECTIONS: { key: DrillFilterKey; label: string; options: string[] }[] = [
   { key: "position", label: "Posição", options: ["BB", "BTN", "SB"] },
@@ -85,12 +108,16 @@ function FilterSidebar({
   facets,
   activeCount,
   disabled,
+  disabledReason,
+  onStartPaste,
 }: {
   filters: Record<DrillFilterKey, string | null>;
   onSet: (key: DrillFilterKey, value: string | null) => void;
   facets: DrillFacet[];
   activeCount: number;
   disabled: boolean;
+  disabledReason?: string;
+  onStartPaste: () => void;
 }) {
   const counts = useMemo(() => {
     const out: Record<string, Record<string, number>> = {};
@@ -124,19 +151,39 @@ function FilterSidebar({
         fontFamily: F,
         display: "flex",
         flexDirection: "column",
-        gap: 18,
+        gap: 14,
         padding: "16px 14px",
         borderRadius: 14,
         background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
         border: "1px solid rgba(255,255,255,0.08)",
         overflowY: "auto",
-        opacity: disabled ? 0.4 : 1,
-        pointerEvents: disabled ? "none" : "auto",
       }}
     >
+      <button
+        onClick={onStartPaste}
+        style={{
+          all: "unset",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          gap: 6,
+          cursor: "pointer",
+          padding: "9px 10px",
+          borderRadius: 10,
+          background: "rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.14)",
+          color: "#FFFFFF",
+          fontSize: 12,
+          fontWeight: 700,
+        }}
+      >
+        <ClipboardPaste size={13} strokeWidth={2} />
+        Colar novo hand history
+      </button>
+
       <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
         <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-          Cenário
+          Filtros GTO (opcional)
         </span>
         {activeCount > 0 && (
           <span style={{ fontSize: 9, fontWeight: 700, padding: "2px 7px", borderRadius: 999, background: "rgba(255,255,255,0.08)", color: "rgba(255,255,255,0.7)" }}>
@@ -145,30 +192,30 @@ function FilterSidebar({
         )}
       </div>
 
-      {disabled && (
-        <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>
-          Sugestão do Revisor de Mãos ativa — filtros manuais desabilitados.
-        </div>
-      )}
+      <div style={{ opacity: disabled ? 0.4 : 1, pointerEvents: disabled ? "none" : "auto", display: "flex", flexDirection: "column", gap: 14 }}>
+        {disabled && disabledReason && (
+          <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.5)", lineHeight: 1.5 }}>{disabledReason}</div>
+        )}
 
-      {SIDEBAR_SECTIONS.map((section) => (
-        <div key={section.key} style={{ display: "flex", flexDirection: "column", gap: 7 }}>
-          <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>
-            {section.label}
-          </span>
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {section.options.map((opt) => (
-              <FilterChip
-                key={opt}
-                label={opt}
-                active={filters[section.key] === opt}
-                disabled={counts[section.key][opt] === 0}
-                onClick={() => toggle(section.key, opt)}
-              />
-            ))}
+        {SIDEBAR_SECTIONS.map((section) => (
+          <div key={section.key} style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+            <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>
+              {section.label}
+            </span>
+            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+              {section.options.map((opt) => (
+                <FilterChip
+                  key={opt}
+                  label={opt}
+                  active={filters[section.key] === opt}
+                  disabled={counts[section.key][opt] === 0}
+                  onClick={() => toggle(section.key, opt)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      ))}
+        ))}
+      </div>
     </aside>
   );
 }
@@ -227,11 +274,126 @@ function NextButton({ onClick }: { onClick: () => void }) {
   );
 }
 
+// Tela principal ao entrar no Modo Treino: colar hand history (texto)
+// ou anexar print. O anexo de print ainda nao esta ligado a biblioteca
+// de imagens (hand_review_images) — botao fica visivelmente desabilitado
+// em vez de fingir que funciona.
+function PasteHandBox({
+  value,
+  onChange,
+  onSubmit,
+  error,
+  loading,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onSubmit: () => void;
+  error: string | null;
+  loading: boolean;
+}) {
+  return (
+    <div style={{ width: "100%", maxWidth: 620, display: "flex", flexDirection: "column", gap: 14, fontFamily: F }}>
+      <div>
+        <h2 style={{ color: "#FFFFFF", fontSize: 17, fontWeight: 700, margin: "0 0 4px" }}>Revisar uma mão</h2>
+        <p style={{ color: "rgba(255,255,255,0.45)", fontSize: 12.5, lineHeight: 1.5, margin: 0 }}>
+          Cole o hand history da mão (PokerStars, por enquanto) — a mesa monta sozinha e a mão já entra na fila do Revisor de Mãos.
+        </p>
+      </div>
+
+      <textarea
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        placeholder="Cole aqui o texto do hand history..."
+        rows={8}
+        style={{
+          fontFamily: "monospace",
+          fontSize: 12,
+          padding: 12,
+          borderRadius: 12,
+          background: "#0A0A0A",
+          border: "1px solid rgba(255,255,255,0.12)",
+          color: "rgba(255,255,255,0.85)",
+          resize: "vertical",
+          outline: "none",
+        }}
+      />
+
+      {error && (
+        <div
+          style={{
+            display: "flex",
+            gap: 8,
+            alignItems: "flex-start",
+            padding: "10px 12px",
+            borderRadius: 10,
+            background: "rgba(239,68,68,0.08)",
+            border: "1px solid rgba(239,68,68,0.3)",
+            color: "#FCA5A5",
+            fontSize: 12,
+            lineHeight: 1.5,
+          }}
+        >
+          <AlertTriangle size={14} style={{ flexShrink: 0, marginTop: 1 }} />
+          <span>{error}</span>
+        </div>
+      )}
+
+      <div style={{ display: "flex", gap: 10 }}>
+        <button
+          onClick={onSubmit}
+          disabled={!value.trim() || loading}
+          style={{
+            flex: 1,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            background: !value.trim() || loading ? "rgba(255,255,255,0.15)" : "#FFFFFF",
+            color: !value.trim() || loading ? "rgba(255,255,255,0.4)" : "#111111",
+            border: 0,
+            borderRadius: 10,
+            padding: "11px 20px",
+            cursor: !value.trim() || loading ? "not-allowed" : "pointer",
+            fontWeight: 700,
+            fontSize: 13,
+          }}
+        >
+          {loading ? <Loader2 size={15} style={{ animation: "spin 1s linear infinite" }} /> : null}
+          Analisar mão
+        </button>
+
+        <button
+          disabled
+          title="Em breve — biblioteca de prints ainda não conectada"
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 6,
+            background: "transparent",
+            color: "rgba(255,255,255,0.3)",
+            border: "1px solid rgba(255,255,255,0.10)",
+            borderRadius: 10,
+            padding: "11px 16px",
+            cursor: "not-allowed",
+            fontWeight: 700,
+            fontSize: 13,
+          }}
+        >
+          <ImagePlus size={14} />
+          Anexar print
+        </button>
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
+
 function TreinoPageInner() {
   const searchParams = useSearchParams();
   const suggestionId = searchParams.get("suggestionId");
 
-  const { filters, set: setFilter, activeCount, isComplete } = useDrillFilters();
+  const { filters, set: setFilter, reset: resetFilters, activeCount, isComplete } = useDrillFilters();
   const [facets, setFacets] = useState<DrillFacet[]>([]);
   const [hands, setHands] = useState<DrillHand[]>([]);
   // loading comeca false: so vira true quando ha criterio valido e uma
@@ -243,10 +405,23 @@ function TreinoPageInner() {
   const [chosen, setChosen] = useState<DrillAction | null>(null);
   const [stats, setStats] = useState({ hits: 0, total: 0 });
 
-  // Unico criterio valido para buscar mao: filtros manuais completos
-  // (posicao + situacao + rua) OU uma sugestao do Revisor na URL.
-  // Sem isso, a tela nunca chama o Supabase — regra de negocio central.
+  // --- Estado do fluxo de colar hand history / replay ---
+  const [pasteText, setPasteText] = useState("");
+  const [parsedHand, setParsedHand] = useState<ParsedHand | null>(null);
+  const [parseError, setParseError] = useState<string | null>(null);
+  const [replayStreetIndex, setReplayStreetIndex] = useState(0);
+  const [saveState, setSaveState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+
+  // Unico criterio valido para buscar mao de drill: filtros manuais
+  // completos (posicao + situacao + rua) OU uma sugestao do Revisor na
+  // URL. Sem isso, a tela nunca chama o Supabase — regra de negocio central.
   const canLoad = isComplete || !!suggestionId;
+
+  // A tela tem 3 modos possiveis, mutuamente exclusivos:
+  // "paste" (landing, tela principal) → "drill" (filtros GTO ativos) →
+  // "replay" (uma mao colada com sucesso). parsedHand tem prioridade —
+  // colar uma mao nova sempre limpa os filtros de drill (ver effect abaixo).
+  const viewMode: "paste" | "drill" | "replay" = parsedHand ? "replay" : canLoad ? "drill" : "paste";
 
   const reload = useCallback(() => {
     if (!canLoad) {
@@ -277,6 +452,49 @@ function TreinoPageInner() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.position, filters.action, filters.street, suggestionId]);
 
+  // Selecionar um filtro GTO enquanto uma mao colada esta na tela sai do
+  // replay — os dois modos nao coexistem, pra nao ambiguar qual mesa
+  // esta ativa.
+  useEffect(() => {
+    if (isComplete && parsedHand) {
+      setParsedHand(null);
+      setPasteText("");
+      setParseError(null);
+      setSaveState("idle");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isComplete]);
+
+  const handleParsePaste = useCallback(() => {
+    setParseError(null);
+    try {
+      const parsed = parseHandHistory(pasteText);
+      setParsedHand(parsed);
+      setReplayStreetIndex(0);
+      resetFilters();
+
+      setSaveState("saving");
+      saveHandReview(parsed, pasteText)
+        .then(() => setSaveState("saved"))
+        .catch(() => setSaveState("error"));
+    } catch (e) {
+      if (e instanceof UnsupportedHandHistoryFormatError || e instanceof HandHistoryParseError) {
+        setParseError(e.message);
+      } else {
+        setParseError("Não foi possível interpretar esse hand history. Confira se o texto foi colado completo.");
+      }
+      setParsedHand(null);
+    }
+  }, [pasteText, resetFilters]);
+
+  const startPaste = useCallback(() => {
+    setParsedHand(null);
+    setPasteText("");
+    setParseError(null);
+    setSaveState("idle");
+    resetFilters();
+  }, [resetFilters]);
+
   const hand = hands[idx] || null;
 
   const board = useMemo(() => (hand ? parseBoard(hand.board) : []), [hand]);
@@ -294,7 +512,7 @@ function TreinoPageInner() {
     const spr = hand.pot > 0 && hand.effectiveStack != null ? Math.round((hand.effectiveStack / hand.pot) * 10) / 10 : null;
 
     const seats: TableHand["seats"] = {};
-    SEAT_INVOLVEMENT.forEach(({ pos, hero: isHero, inHand }) => {
+    buildSeatInvolvement(hand.position).forEach(({ pos, hero: isHero, inHand }) => {
       if (isHero) {
         seats[pos] = {
           status: chosen ? "live" : "acting",
@@ -311,6 +529,39 @@ function TreinoPageInner() {
 
     return { pot: hand.pot, spr, board, history: [], seats };
   }, [hand, board, heroCardsParsed, chosen]);
+
+  // Layout de cadeiras rotacionado pela posicao real do hero. So calcula
+  // quando ha mao — sem mao, nao ha posicao pra rotacionar em torno.
+  // Se a posicao vinda do banco nao for reconhecida (dado inconsistente),
+  // cai pro estado de erro em vez de desenhar uma mesa errada. Pura —
+  // sem setState dentro do useMemo, pra nao gerar efeito colateral em render.
+  const { seatLayout, layoutError } = useMemo((): { seatLayout: SeatLayoutSlot[] | null; layoutError: Error | null } => {
+    if (!hand) return { seatLayout: null, layoutError: null };
+    try {
+      return { seatLayout: computeStylizedSeatLayout(hand.position), layoutError: null };
+    } catch (e) {
+      return { seatLayout: null, layoutError: e instanceof Error ? e : new Error("Posição de hero inválida.") };
+    }
+  }, [hand]);
+
+  // Projecao do replay pra rua atual — pura, recalcula do zero a cada
+  // chamada a partir da mao inteira (mesmo principio do veredito GTO:
+  // uma unica fonte de verdade).
+  const { replayState, replayError } = useMemo((): { replayState: ReplayState | null; replayError: string | null } => {
+    if (!parsedHand) return { replayState: null, replayError: null };
+    try {
+      return { replayState: projectHandAtStreet(parsedHand, replayStreetIndex), replayError: null };
+    } catch (e) {
+      if (e instanceof HandReplayError) return { replayState: null, replayError: e.message };
+      return { replayState: null, replayError: e instanceof Error ? e.message : "Erro ao montar a mesa dessa mão." };
+    }
+  }, [parsedHand, replayStreetIndex]);
+
+  const goToStreet = useCallback((i: number) => setReplayStreetIndex(i), []);
+  const nextStreet = useCallback(() => {
+    if (replayState && replayStreetIndex < replayState.streetCount - 1) setReplayStreetIndex((i) => i + 1);
+  }, [replayState, replayStreetIndex]);
+  const prevStreet = useCallback(() => setReplayStreetIndex((i) => Math.max(0, i - 1)), []);
 
   const onAct = useCallback((action: DrillAction) => setChosen(action), []);
 
@@ -334,10 +585,24 @@ function TreinoPageInner() {
   }, [chosen]);
 
   // Atalhos: Q/W/E para as acoes na ordem da ActionBar, ESPACO para avancar.
+  // So ativos no modo drill — no replay, setas do teclado navegam rua.
   useEffect(() => {
     function onKey(e: KeyboardEvent) {
       const target = e.target as HTMLElement;
       if (target.matches("input, textarea, select")) return;
+
+      if (viewMode === "replay") {
+        if (e.key === "ArrowRight") {
+          e.preventDefault();
+          nextStreet();
+        } else if (e.key === "ArrowLeft") {
+          e.preventDefault();
+          prevStreet();
+        }
+        return;
+      }
+
+      if (viewMode !== "drill") return;
       if (e.code === "Space") {
         e.preventDefault();
         if (chosen) nextHand();
@@ -348,7 +613,7 @@ function TreinoPageInner() {
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [actions, chosen, onAct, nextHand]);
+  }, [viewMode, actions, chosen, onAct, nextHand, nextStreet, prevStreet]);
 
   const sessionPct = stats.total > 0 ? Math.round((stats.hits / stats.total) * 100) : 0;
 
@@ -396,64 +661,157 @@ function TreinoPageInner() {
           </Link>
           <div>
             <h1 style={{ fontSize: 18, fontWeight: 700, color: "#FFFFFF", margin: 0 }}>Modo Treino</h1>
-            {suggestionId && (
+            {viewMode === "drill" && suggestionId && (
               <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(168,85,247,0.9)" }}>
                 Sugestão do Revisor de Mãos
               </span>
             )}
+            {viewMode === "replay" && parsedHand && (
+              <span style={{ fontSize: 10.5, fontWeight: 700, color: "rgba(52,211,153,0.9)" }}>
+                Revisão · {parsedHand.site === "pokerstars" ? "PokerStars" : parsedHand.site} #{parsedHand.handId}
+              </span>
+            )}
           </div>
           <div style={{ flex: 1, minWidth: 0 }}>
-            {hand && <SessionInline handIdx={idx + 1} handsTotal={hands.length} hits={stats.hits} total={stats.total} sessionPct={sessionPct} />}
+            {viewMode === "drill" && hand && (
+              <SessionInline handIdx={idx + 1} handsTotal={hands.length} hits={stats.hits} total={stats.total} sessionPct={sessionPct} />
+            )}
           </div>
-          {chosen && hand && <NextButton onClick={nextHand} />}
+          {viewMode === "drill" && chosen && hand && <NextButton onClick={nextHand} />}
         </div>
 
         <div style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr) 280px", gap: 12, minHeight: 420 }}>
-          <FilterSidebar filters={filters} onSet={setFilter} facets={facets} activeCount={activeCount} disabled={!!suggestionId} />
+          <FilterSidebar
+            filters={filters}
+            onSet={setFilter}
+            facets={facets}
+            activeCount={activeCount}
+            disabled={!!suggestionId || viewMode === "replay"}
+            disabledReason={
+              suggestionId
+                ? "Sugestão do Revisor de Mãos ativa — filtros manuais desabilitados."
+                : viewMode === "replay"
+                  ? "Uma mão colada está ativa — clique em \"Colar novo hand history\" ou selecione um filtro pra sair do replay."
+                  : undefined
+            }
+            onStartPaste={startPaste}
+          />
 
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", minHeight: 0 }}>
-            {hand && tableHand ? (
-              <div style={{ width: "100%", height: "100%", maxWidth: 820, maxHeight: 460, margin: "auto" }}>
-                <PokerTable hand={tableHand} />
-              </div>
-            ) : (
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
-                {loading ? (
-                  <>
-                    <Loader2 size={32} color="rgba(255,255,255,0.5)" />
-                    <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>Carregando mãos...</p>
-                  </>
-                ) : error ? (
-                  <>
-                    <AlertTriangle size={32} color={T.bad} />
-                    <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>Erro ao carregar mãos.</p>
-                    <button onClick={reload} style={{ background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
-                      Tentar novamente
-                    </button>
-                  </>
-                ) : (
-                  <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, textAlign: "center", maxWidth: 320 }}>
-                    {emptyMessage}
-                  </p>
-                )}
-              </div>
+            {viewMode === "paste" && (
+              <PasteHandBox value={pasteText} onChange={setPasteText} onSubmit={handleParsePaste} error={parseError} loading={false} />
             )}
+
+            {viewMode === "drill" &&
+              (hand && tableHand && seatLayout ? (
+                <div style={{ width: "100%", height: "100%", maxWidth: 820, maxHeight: 460, margin: "auto" }}>
+                  <PokerTable hand={tableHand} seats={seatLayout} />
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
+                  {loading ? (
+                    <>
+                      <Loader2 size={32} color="rgba(255,255,255,0.5)" />
+                      <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>Carregando mãos...</p>
+                    </>
+                  ) : error ? (
+                    <>
+                      <AlertTriangle size={32} color={T.bad} />
+                      <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>Erro ao carregar mãos.</p>
+                      <button onClick={reload} style={{ background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+                        Tentar novamente
+                      </button>
+                    </>
+                  ) : hand && layoutError ? (
+                    <>
+                      <AlertTriangle size={32} color={T.bad} />
+                      <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, textAlign: "center", maxWidth: 320 }}>
+                        Essa mão veio com posição inconsistente no banco ({layoutError.message}). Pula pra próxima em vez de exibir errado.
+                      </p>
+                      <button onClick={nextHand} style={{ background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+                        Próxima mão
+                      </button>
+                    </>
+                  ) : (
+                    <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, textAlign: "center", maxWidth: 320 }}>{emptyMessage}</p>
+                  )}
+                </div>
+              ))}
+
+            {viewMode === "replay" &&
+              (replayState ? (
+                <div style={{ width: "100%", height: "100%", maxWidth: 820, maxHeight: 460, margin: "auto" }}>
+                  <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} onStreetClick={goToStreet} />
+                </div>
+              ) : (
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16, maxWidth: 360, textAlign: "center" }}>
+                  <AlertTriangle size={32} color={T.bad} />
+                  <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13, lineHeight: 1.6 }}>{replayError}</p>
+                  <button onClick={startPaste} style={{ background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 700, fontSize: 13 }}>
+                    Colar outra mão
+                  </button>
+                </div>
+              ))}
           </div>
 
           <div style={{ overflowY: "auto" }}>
-            {chosen && hand && result ? (
-              <GtoFeedback
-                pot={hand.pot}
-                stack={hand.effectiveStack}
-                spr={tableHand?.spr ?? null}
-                heroLabel={heroCardsParsed.filter(Boolean).join(" ")}
-                gtoNodes={hand.gtoNodes}
-                heroCards={hand.heroCards}
-                chosenRawAction={result.chosenAction}
-                result={result}
-                chosenLabel={chosen.label}
-              />
-            ) : (
+            {viewMode === "drill" &&
+              (chosen && hand && result ? (
+                <GtoFeedback
+                  pot={hand.pot}
+                  stack={hand.effectiveStack}
+                  spr={tableHand?.spr ?? null}
+                  heroLabel={heroCardsParsed.filter(Boolean).join(" ")}
+                  gtoNodes={hand.gtoNodes}
+                  heroCards={hand.heroCards}
+                  chosenRawAction={result.chosenAction}
+                  result={result}
+                  chosenLabel={chosen.label}
+                />
+              ) : (
+                <aside
+                  style={{
+                    fontFamily: F,
+                    padding: "16px 14px",
+                    borderRadius: 14,
+                    background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+                    border: "1px solid rgba(255,255,255,0.08)",
+                    display: "flex",
+                    flexDirection: "column",
+                    gap: 14,
+                  }}
+                >
+                  <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+                    Sessão
+                  </span>
+                  <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
+                    <StatRow label="Acertos GTO" value={stats.total > 0 ? `${stats.hits}/${stats.total}` : "—"} accent={stats.hits > 0 ? T.ok : null} />
+                    <StatRow label="Aproveitamento" value={stats.total > 0 ? `${sessionPct}%` : "—"} />
+                  </div>
+                  <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+                    {hand ? "Escolha uma ação na barra abaixo — o feedback GTO aparece aqui." : emptyMessage}
+                  </div>
+                </aside>
+              ))}
+
+            {viewMode === "paste" && (
+              <aside
+                style={{
+                  fontFamily: F,
+                  padding: "16px 14px",
+                  borderRadius: 14,
+                  background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+                  border: "1px solid rgba(255,255,255,0.08)",
+                  fontSize: 11.5,
+                  color: "rgba(255,255,255,0.45)",
+                  lineHeight: 1.6,
+                }}
+              >
+                Hoje só reconhecemos hand history do PokerStars. Cole o texto completo, sem edições — o parser precisa do cabeçalho e do SUMMARY inteiros pra montar a mesa certa.
+              </aside>
+            )}
+
+            {viewMode === "replay" && parsedHand && (
               <aside
                 style={{
                   fontFamily: F,
@@ -463,18 +821,35 @@ function TreinoPageInner() {
                   border: "1px solid rgba(255,255,255,0.08)",
                   display: "flex",
                   flexDirection: "column",
-                  gap: 14,
+                  gap: 12,
                 }}
               >
                 <span style={{ fontSize: 10, fontWeight: 800, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-                  Sessão
+                  Detalhes da mão
                 </span>
-                <div style={{ display: "flex", flexDirection: "column", gap: 12 }}>
-                  <StatRow label="Acertos GTO" value={stats.total > 0 ? `${stats.hits}/${stats.total}` : "—"} accent={stats.hits > 0 ? T.ok : null} />
-                  <StatRow label="Aproveitamento" value={stats.total > 0 ? `${sessionPct}%` : "—"} />
-                </div>
-                <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-                  {hand ? "Escolha uma ação na barra abaixo — o feedback GTO aparece aqui." : emptyMessage}
+                <StatRow label="Blinds" value={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`} />
+                <StatRow label="Mesa" value={`${parsedHand.seats.length}-max`} />
+                {replayState && <StatRow label="Rua" value={`${replayState.streetIndex + 1}/${replayState.streetCount}`} />}
+
+                <div style={{ marginTop: "auto", paddingTop: 12, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", alignItems: "center", gap: 6, fontSize: 11 }}>
+                  {saveState === "saving" && (
+                    <>
+                      <Loader2 size={12} color="rgba(255,255,255,0.5)" />
+                      <span style={{ color: "rgba(255,255,255,0.5)" }}>Salvando no Revisor de Mãos...</span>
+                    </>
+                  )}
+                  {saveState === "saved" && (
+                    <>
+                      <CheckCircle2 size={12} color={T.ok} />
+                      <span style={{ color: T.ok }}>Salvo no Revisor de Mãos</span>
+                    </>
+                  )}
+                  {saveState === "error" && (
+                    <>
+                      <AlertTriangle size={12} color={T.bad} />
+                      <span style={{ color: T.bad }}>Não salvou no Revisor — pode revisar aqui mesmo assim</span>
+                    </>
+                  )}
                 </div>
               </aside>
             )}
@@ -482,8 +857,8 @@ function TreinoPageInner() {
         </div>
 
         <div style={{ minHeight: 72, display: "flex", alignItems: "center", padding: "0 4px" }}>
-          {hand && !chosen && <ActionBar actions={actions} onAct={onAct} />}
-          {hand && chosen && (
+          {viewMode === "drill" && hand && !chosen && seatLayout && <ActionBar actions={actions} onAct={onAct} />}
+          {viewMode === "drill" && hand && chosen && (
             <div
               style={{
                 fontFamily: F,
@@ -498,6 +873,54 @@ function TreinoPageInner() {
               }}
             >
               Ação registrada — leia o feedback à direita e siga pra próxima mão.
+            </div>
+          )}
+
+          {viewMode === "replay" && replayState && (
+            <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "center", gap: 10 }}>
+              <button
+                onClick={prevStreet}
+                disabled={replayState.streetIndex === 0}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  background: "transparent",
+                  border: "1px solid rgba(255,255,255,0.14)",
+                  color: replayState.streetIndex === 0 ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.75)",
+                  borderRadius: 10,
+                  padding: "9px 14px",
+                  cursor: replayState.streetIndex === 0 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  fontSize: 12,
+                }}
+              >
+                <ChevronLeft size={14} /> Rua anterior
+              </button>
+
+              <span style={{ fontSize: 11.5, fontWeight: 700, color: "rgba(255,255,255,0.5)", minWidth: 90, textAlign: "center" }}>
+                {replayState.tableHand.history[replayState.streetIndex]?.street} ({replayState.streetIndex + 1}/{replayState.streetCount})
+              </span>
+
+              <button
+                onClick={nextStreet}
+                disabled={replayState.streetIndex >= replayState.streetCount - 1}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 4,
+                  background: replayState.streetIndex >= replayState.streetCount - 1 ? "transparent" : "#FFFFFF",
+                  border: replayState.streetIndex >= replayState.streetCount - 1 ? "1px solid rgba(255,255,255,0.14)" : "0",
+                  color: replayState.streetIndex >= replayState.streetCount - 1 ? "rgba(255,255,255,0.25)" : "#111111",
+                  borderRadius: 10,
+                  padding: "9px 14px",
+                  cursor: replayState.streetIndex >= replayState.streetCount - 1 ? "not-allowed" : "pointer",
+                  fontWeight: 700,
+                  fontSize: 12,
+                }}
+              >
+                Próxima rua <ChevronRight size={14} />
+              </button>
             </div>
           )}
         </div>
