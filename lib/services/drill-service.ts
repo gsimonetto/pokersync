@@ -58,17 +58,23 @@ function dealHeroCombo(strategy: Record<string, number[]>): string {
   return combos[idx];
 }
 
-async function queryDrills(size: number, filters: CompleteDrillFilters): Promise<DrillHand[]> {
+// Aceita filtro parcial de proposito: o caminho manual sempre passa os 3
+// eixos (garantido por hasCompleteFilters antes de chamar), mas o caminho
+// de sugestao do Revisor so consegue traduzir a rua. Quem garante que
+// nunca ha busca "sem criterio nenhum" sao os dois callers abaixo.
+async function queryDrills(size: number, filters: DrillFilters): Promise<DrillHand[]> {
   const supabase = createClient();
   const clampedSize = Math.min(Math.max(size, 1), 50);
 
-  const { data, error } = await supabase
+  let query = supabase
     .from("drills")
-    .select("spot_id, board, pot, effective_stack, gto_nodes, position")
-    .eq("position", filters.position)
-    .eq("action", filters.action)
-    .eq("street", filters.street)
-    .limit(clampedSize * 3); // margem para os que forem filtrados por gto_nodes invalido
+    .select("spot_id, board, pot, effective_stack, gto_nodes, position");
+
+  if (filters.position) query = query.eq("position", filters.position);
+  if (filters.action) query = query.eq("action", filters.action);
+  if (filters.street) query = query.eq("street", filters.street);
+
+  const { data, error } = await query.limit(clampedSize * 3); // margem para os que forem filtrados por gto_nodes invalido
 
   if (error) throw error;
 
@@ -97,9 +103,41 @@ export async function fetchDrillBatch(size = 20, filters: DrillFilters = {}): Pr
   return queryDrills(size, filters);
 }
 
+// O filter_config das sugestoes NAO usa o mesmo vocabulario dos drills:
+//   sugestao: { action: "cbet", street: "flop", board_texture: [...] }
+//             { street: "preflop", scenario: "3bet_defense" }
+//   drills:   position BB|BTN|SB, action "vs Open"|"3-Bet", street Flop|Turn|River
+// Nenhuma sugestao traz position, e o vocabulario de action nao tem
+// correspondencia confiavel ("cbet" nao e' "vs Open" nem "3-Bet").
+// Traduzir so a rua e' o unico mapeamento honesto hoje — inventar o
+// resto geraria drill errado, que e' pior que drill nenhum.
+const SUGGESTION_STREET_MAP: Record<string, string> = {
+  flop: "Flop",
+  turn: "Turn",
+  river: "River",
+  // "preflop" fica de fora de proposito: nao existe nenhum drill de
+  // preflop na base hoje (confirmado — todos sao Flop/Turn/River).
+};
+
+export function resolveSuggestionStreet(filterConfig: unknown): string | null {
+  if (!filterConfig || typeof filterConfig !== "object") return null;
+  const street = (filterConfig as Record<string, unknown>).street;
+  if (typeof street !== "string") return null;
+  return SUGGESTION_STREET_MAP[street.toLowerCase()] ?? null;
+}
+
+// Uma sugestao so e' "treinavel" se a rua dela existir na base de drills.
+// Usado pelo card de leaks pra so mostrar o botao quando ha mao de verdade.
+export function suggestionHasDrills(filterConfig: unknown, facets: DrillFacet[]): boolean {
+  const street = resolveSuggestionStreet(filterConfig);
+  if (!street) return false;
+  return facets.some((f) => f.street === street && f.n > 0);
+}
+
 // Caminho do Revisor de Maos: resolve o filter_config de uma sugestao ativa
-// e busca os drills correspondentes. Se a sugestao nao tiver os 3 campos
-// preenchidos, tambem nao busca nada — mesma regra de precisao do caminho manual.
+// e busca os drills correspondentes. Se a rua da sugestao nao existir na
+// base de drills (ex: leaks de preflop), retorna vazio em vez de trazer
+// mao aleatoria — mesma regra de precisao do caminho manual.
 export async function fetchDrillBatchBySuggestion(suggestionId: string, size = 20): Promise<DrillHand[]> {
   const supabase = createClient();
 
@@ -113,10 +151,10 @@ export async function fetchDrillBatchBySuggestion(suggestionId: string, size = 2
   if (error) throw error;
   if (!suggestion) throw new Error("SUGGESTION_NOT_FOUND");
 
-  const config = (suggestion.filter_config ?? {}) as DrillFilters;
-  if (!hasCompleteFilters(config)) return [];
+  const street = resolveSuggestionStreet(suggestion.filter_config);
+  if (!street) return [];
 
-  return queryDrills(size, config);
+  return queryDrills(size, { street });
 }
 
 export interface DrillFacet {
