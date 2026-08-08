@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { listReviews, getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
@@ -26,6 +27,7 @@ export function RevisorFila({
   onNova: () => void;
   onOpen: (id: string) => void;
 }) {
+  const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [filter, setFilter] = useState("todas");
   const [items, setItems] = useState<ReviewListItem[]>([]);
@@ -78,6 +80,15 @@ export function RevisorFila({
     }
   }
 
+  // Leva pro Modo Treino ja filtrado pela sugestao vinculada ao leak.
+  // drill_id aqui e' o id de hand_review_drill_suggestions (confirmado na
+  // definicao da RPC suggest_drills_for_user) — e' o que /treino espera.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  function handlePractice(leak: any) {
+    if (!leak?.drill_id) return;
+    router.push(`/treino?suggestionId=${leak.drill_id}`);
+  }
+
   const counts = useMemo(() => {
     const acc: Record<string, number> = { pendente: 0, em_revisao: 0, concluida: 0 };
     items.forEach((r) => {
@@ -121,7 +132,7 @@ export function RevisorFila({
         </div>
       )}
 
-      <LeaksCard />
+      <LeaksCard onPractice={handlePractice} />
 
       {loading ? (
         <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
