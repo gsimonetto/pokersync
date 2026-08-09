@@ -23,6 +23,8 @@ import {
   type Street,
   type ManualTicket,
 } from "@/lib/services/hand-review-service";
+import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
+import { RevisorHandTable } from "./revisor-hand-table";
 
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
@@ -43,6 +45,11 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [error, setError] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [xpFeedback, setXpFeedback] = useState<{ xp: number; missions: any[] } | null>(null);
+
+  // ---- Mesa persistente (Revisor) — so existe quando ha hand history
+  // valido pra parsear. Mao manual/print nao tem mesa (usa a Ficha rapida
+  // abaixo). Parse acontece uma vez ao carregar a review.
+  const [parsedHandForTable, setParsedHandForTable] = useState<ParsedHand | null>(null);
 
   // ---- Ficha minima: so aparece quando a mao nao veio de import parseado ----
   const [ticket, setTicket] = useState<ManualTicket>({ format: "", street: "preflop" as Street, action: "" });
@@ -65,6 +72,28 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       setReview(r);
       setLearning(r.learning_note || "");
       setDrill(r.drill_suggestion || "");
+
+      // Tenta montar a mesa a partir do hand_history bruto. Se a mao veio
+      // de import ja parseado (parsed_data.kind === "parsed"), usa esse
+      // dado direto — evita reparsear a toa. Senao, tenta parsear o texto
+      // cru (fluxo de colagem direta). Falha de parse e' silenciosa aqui:
+      // a mesa so nao aparece, o resto da tela (perguntas, etc.) funciona
+      // igual — nunca bloqueia a revisao por causa da mesa.
+      if (r.parsed_data?.kind === "parsed") {
+        setParsedHandForTable(r.parsed_data as ParsedHand);
+      } else if (r.hand_history) {
+        try {
+          const parsed = parseHand(r.hand_history);
+          setParsedHandForTable(parsed);
+        } catch (e) {
+          setParsedHandForTable(null);
+          if (!(e instanceof HandParseError)) {
+            console.warn("[RevisorDetalhe] hand history nao parseavel:", e);
+          }
+        }
+      } else {
+        setParsedHandForTable(null);
+      }
 
       const existing = r.answers || [];
       const questions = existing.length
@@ -196,6 +225,12 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           ))}
         </div>
       </div>
+
+      {parsedHandForTable && (
+        <section className="mb-3.5">
+          <RevisorHandTable parsedHand={parsedHandForTable} />
+        </section>
+      )}
 
       {(review.free_text || review.hand_history) && (
         <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
