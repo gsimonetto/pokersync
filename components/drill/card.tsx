@@ -4,29 +4,112 @@ import { T, F, SUITS, num } from "@/lib/poker/drill-theme";
    <Card card={null} />          slot vazio (board nao distribuido)
    <Card card="7s" size="hero"/> carta do heroi (maior)
    card: string RANK+NAIPE minusculo — "Ah", "Td", "5c", "Ks".
-   Figuras (J/Q/K) exibem naipe, sem ilustracao — regra do projeto. */
+
+   Layout (2026-08 v4): UM unico padrao pra todas as cartas — naipe grande
+   centralizado + rank+naipe empilhados no canto top-left e rotado 180 no
+   bottom-right. Sem pips arranjados, sem ilustracao de figura. Escolha
+   deliberada:
+   - Consistencia: 2 e A tem o mesmo tratamento visual, so muda a letra
+     no canto — leitura instantanea, sem "modos" diferentes na mesma mao.
+   - Cabimento: cartas do board tem so 50x71px; pips espremidos tinham
+     ma legibilidade a distancia, o naipe grande e' visivel de longe.
+   - Alinhamento com design system do PokerSync ("componentes minimalistas
+     com naipe central"). */
 
 const SIZES = {
-  board: { w: 50, h: 71, rank: 18, suit: 27 },
-  hero: { w: 58, h: 82, rank: 21, suit: 32 },
-  mini: { w: 34, h: 48, rank: 13, suit: 18 },
+  board: { w: 50, h: 71, rank: 15, cornerSuit: 11, bigCenter: 34 },
+  // Hero maior — pedido explicito de aumentar mais uma vez. De 58x82
+  // pra 72x100: quase 40% maior que a carta comunitaria, destaque de
+  // "essas sao as suas cartas" sem precisar de rotacao ou selo extra.
+  hero: { w: 72, h: 100, rank: 22, cornerSuit: 16, bigCenter: 48 },
+  mini: { w: 34, h: 48, rank: 11, cornerSuit: 8, bigCenter: 22 },
 };
 
-export function Card({ card, size = "board" }: { card: string | null; size?: keyof typeof SIZES }) {
-  const s = SIZES[size] || SIZES.board;
+type Size = keyof typeof SIZES;
 
+function SuitCenter({ suitGlyph, size }: { suitGlyph: string; size: number }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        inset: 0,
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        pointerEvents: "none",
+      }}
+    >
+      <span style={{ fontSize: size, lineHeight: 1, fontFamily: F }}>{suitGlyph}</span>
+    </div>
+  );
+}
+
+function CornerMark({
+  rank, suitGlyph, rankSize, suitSize, position,
+}: {
+  rank: string;
+  suitGlyph: string;
+  rankSize: number;
+  suitSize: number;
+  position: "tl" | "br";
+}) {
+  const style: React.CSSProperties =
+    position === "tl"
+      ? { top: 4, left: 5, alignItems: "flex-start" }
+      : { bottom: 4, right: 5, alignItems: "flex-end", transform: "rotate(180deg)" };
+  return (
+    <div
+      style={{
+        position: "absolute",
+        display: "flex",
+        flexDirection: "column",
+        lineHeight: 1,
+        fontFamily: F,
+        ...style,
+      }}
+    >
+      {/* rank == "T" e' 10 no vocabulario interno (parser usa 1 char). No
+          canto exibimos "10" mesmo pra caber e ser reconhecivel. */}
+      <span style={{ fontSize: rankSize, fontWeight: 500, ...num }}>{rank === "T" ? "10" : rank}</span>
+      <span style={{ fontSize: suitSize, marginTop: 1 }}>{suitGlyph}</span>
+    </div>
+  );
+}
+
+export function Card({ card, size = "board" }: { card: string | null; size?: Size }) {
+  const s = SIZES[size] || SIZES.board;
   if (!card) {
     return (
       <div
         aria-hidden="true"
-        style={{ width: s.w, height: s.h, borderRadius: 9, border: `1px dashed ${T.line}`, background: "rgba(255,255,255,.02)" }}
+        style={{
+          width: s.w,
+          height: s.h,
+          borderRadius: 6,
+          border: `1px dashed ${T.line}`,
+          background: "rgba(255,255,255,.02)",
+        }}
       />
     );
   }
-
   const rank = card.slice(0, -1);
-  const su = SUITS[card.slice(-1).toLowerCase()];
+  const suitKey = card.slice(-1).toLowerCase();
+  const su = SUITS[suitKey];
   if (!su) return null;
+
+  // Baralho 4 cores (four-color deck) — padrao em replayers e clients
+  // online (PokerStars, GGPoker, Hand2Note, PokerTracker). Pedido
+  // explicito (2026-08 v5): fundo da carta na cor do naipe, naipe e
+  // numero em BRANCO — inverte o padrao anterior (fundo claro + texto
+  // colorido). Tons mantidos escuros o suficiente pra branco ter
+  // contraste confortavel (WCAG AA) em todos os 4.
+  const FOUR_COLOR: Record<string, string> = {
+    s: "#1A1A1A", // espadas — quase preto
+    h: "#B91C1C", // copas — vermelho
+    d: "#1D4E89", // ouros — azul marinho escuro
+    c: "#1E6B45", // paus — verde floresta escuro
+  };
+  const bgColor = FOUR_COLOR[suitKey] ?? "#1A1A1A";
 
   return (
     <div
@@ -35,26 +118,25 @@ export function Card({ card, size = "board" }: { card: string | null; size?: key
       style={{
         width: s.w,
         height: s.h,
-        borderRadius: 9,
+        borderRadius: 6,
         position: "relative",
         overflow: "hidden",
         fontFamily: F,
-        color: su.c,
-        background: "linear-gradient(160deg,#FFFFFF 0%,#F2F6FA 55%,#E4EBF2 100%)",
-        boxShadow: "0 8px 18px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.9) inset",
+        color: "#FFFFFF",
+        background: bgColor,
+        boxShadow: "0 8px 18px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.12) inset",
       }}
     >
-      <span style={{ position: "absolute", top: 4, left: 6, fontSize: s.rank, fontWeight: 800, lineHeight: 1, ...num }}>
-        {rank}
-      </span>
-      <span style={{ position: "absolute", top: s.rank + 5, left: 7, fontSize: Math.round(s.rank * 0.66) }}>{su.g}</span>
-      <span style={{ position: "absolute", right: 6, bottom: 5, fontSize: s.suit, opacity: 0.9 }}>{su.g}</span>
+      <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />
+      <SuitCenter suitGlyph={su.g} size={s.bigCenter} />
+      <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />
     </div>
   );
 }
 
-// Par virado em leque. O wrapper tem padding proprio e usa drop-shadow
-// em vez de overflow, entao a rotacao nunca corta a carta.
+// Par virado em leque. Mantido — o design do verso ja e' bom e nao foi
+// alvo do redesign. O wrapper tem padding proprio e usa drop-shadow em
+// vez de overflow, entao a rotacao nunca corta a carta.
 export function CardBackPair({ side = "right" }: { side?: "left" | "right" }) {
   const back = (rot: number, overlap: boolean, key: number) => (
     <div
