@@ -66,6 +66,18 @@ export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
   }, [parsedHand]);
 
   const { replayState, replayError } = useMemo((): { replayState: ReplayState | null; replayError: string | null } => {
+    // Guarda defensiva pra maos importadas ANTES do parser ganhar
+    // seats/buttonSeat/maxSeats (campos adicionados depois, pro motor de
+    // replay). Sem isso, computeRealSeatLayout quebra tentando ler
+    // .length de undefined e o erro cru do JS aparece pro usuario. Mao
+    // antiga sem esses campos: mensagem clara, resto da review continua
+    // funcionando normal (nunca bloqueia por causa da mesa).
+    if (!parsedHand.seats || parsedHand.seats.length === 0 || parsedHand.buttonSeat == null || parsedHand.maxSeats == null) {
+      return {
+        replayState: null,
+        replayError: "Essa mão foi importada antes do suporte à mesa completa e não tem dados de assentos suficientes pra montar o replay. Mãos importadas a partir de agora já vêm com esses dados.",
+      };
+    }
     try {
       return { replayState: projectHandAtStep(parsedHand, stepIndex, previousStepRef.current), replayError: null };
     } catch (e) {
