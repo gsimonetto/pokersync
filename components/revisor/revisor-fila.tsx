@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { listReviews, getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
+import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { LeaksCard } from "./leaks-card";
 
@@ -91,7 +91,33 @@ export function RevisorFila({
     setError("");
     try {
       const status = FILTERS.find((f) => f.id === filter)?.status;
-      const rows = await listReviews(userId!, { status: status || undefined });
+      // Bug corrigido (2026-08): listReviews trazia TODAS as maos do
+      // usuario, inclusive as ja vinculadas a um torneio/sessao — mao
+      // importada aparecia duplicada aqui E na aba Sessoes. "Avulsas"
+      // agora exclui explicitamente qualquer review com hand_session_id
+      // preenchido, via query direta (listReviews nao expoe esse filtro).
+      const supabase = createClient();
+      let q = supabase
+        .from("hand_reviews")
+        .select(
+          `
+          id, title, free_text, status, created_at, updated_at, concluded_at,
+          hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
+          hand_review_images ( id, storage_path, position )
+        `
+        )
+        .eq("user_id", userId!)
+        .is("hand_session_id", null)
+        .order("created_at", { ascending: false });
+      if (status) q = q.eq("status", status);
+      const { data, error: qErr } = await q;
+      if (qErr) throw qErr;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows: ReviewListItem[] = (data ?? []).map((r: any) => ({
+        ...r,
+        tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
+        thumb: r.hand_review_images?.[0]?.storage_path || null,
+      }));
       setItems(rows);
       const urls: Record<string, string | null> = {};
       await Promise.all(
