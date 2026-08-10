@@ -1,0 +1,309 @@
+"use client";
+
+import { useCallback, useEffect, useMemo, useState } from "react";
+import { AlertTriangle, Loader2, DollarSign, Trophy, ChevronRight } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
+import { RevisorHandTable } from "./revisor-hand-table";
+import { updateSessionBounty, type HandSession } from "@/lib/services/hand-session-service";
+import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
+import { F, T } from "@/lib/poker/drill-theme";
+
+// Tela nova (2026-08): abre uma sessao/torneio e mostra o master-detail —
+// coluna esquerda com lista de MAOS daquela sessao (clicaveis), coluna
+// direita com a mesa grande da mao selecionada. Pedido explicito:
+// "mesa mais em evidencia ao lado direito, as acoes do lado esquerdo em
+// lista daquele torneio". "Acoes" = maos, confirmado.
+//
+// Nao substitui RevisorDetalhe (que tem perguntas guiadas, self-eval por
+// street, learning note, drill suggestion). Clicar em "Analisar mao" leva
+// pra la; essa tela e' pra NAVEGAR/consultar mesas do torneio rapido.
+
+interface HandInListing {
+  id: string;
+  title: string | null;
+  hand_history: string | null;
+  parsed_data: { kind?: string } | null;
+  created_at: string;
+  status: string;
+}
+
+export function RevisorSessao({
+  sessionId,
+  onOpenHand,
+}: {
+  sessionId: string;
+  onOpenHand: (reviewId: string) => void;
+}) {
+  const [session, setSession] = useState<HandSession | null>(null);
+  const [hands, setHands] = useState<HandInListing[]>([]);
+  const [selectedId, setSelectedId] = useState<string | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [editingBounty, setEditingBounty] = useState(false);
+  const [bountyInput, setBountyInput] = useState("");
+
+  useEffect(() => {
+    let cancelled = false;
+    async function load() {
+      setLoading(true);
+      setError(null);
+      try {
+        const supabase = createClient();
+        const [{ data: s, error: sErr }, { data: hs, error: hErr }] = await Promise.all([
+          supabase.from("hand_sessions").select("*").eq("id", sessionId).single(),
+          supabase
+            .from("hand_reviews")
+            .select("id, title, hand_history, parsed_data, created_at, status")
+            .eq("hand_session_id", sessionId)
+            .order("created_at", { ascending: true }),
+        ]);
+        if (cancelled) return;
+        if (sErr) throw sErr;
+        if (hErr) throw hErr;
+        setSession(s as HandSession);
+        setHands((hs as HandInListing[]) ?? []);
+        setSelectedId(hs && hs.length > 0 ? (hs[0] as HandInListing).id : null);
+        setBountyInput(s?.bounty_current != null ? String(s.bounty_current) : "");
+      } catch (e) {
+        if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao carregar a sessão.");
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+    load();
+    return () => {
+      cancelled = true;
+    };
+  }, [sessionId]);
+
+  // Parse da mao selecionada — feito lazy (so quando o usuario seleciona).
+  // Cacheia por id pra nao reparsear ao trocar de volta.
+  const [parsedCache, setParsedCache] = useState<Record<string, ParsedHand | null>>({});
+  const selectedHand = useMemo(() => hands.find((h) => h.id === selectedId) ?? null, [hands, selectedId]);
+  const parsedForSelected: ParsedHand | null | undefined = selectedId ? parsedCache[selectedId] : null;
+
+  useEffect(() => {
+    if (!selectedHand || selectedId == null) return;
+    if (selectedId in parsedCache) return; // ja resolvido
+    let parsed: ParsedHand | null = null;
+    // Se ja veio parseado do import (parsed_data.kind === "parsed"), usa
+    // direto — evita reparsear texto. Fluxo de colagem manual, precisa
+    // parsear do hand_history bruto.
+    if (selectedHand.parsed_data && (selectedHand.parsed_data as { kind?: string }).kind === "parsed") {
+      parsed = selectedHand.parsed_data as unknown as ParsedHand;
+    } else if (selectedHand.hand_history) {
+      try {
+        parsed = parseHand(selectedHand.hand_history);
+      } catch (e) {
+        if (!(e instanceof HandParseError)) console.warn("[RevisorSessao] parse falhou:", e);
+        parsed = null;
+      }
+    }
+    setParsedCache((prev) => ({ ...prev, [selectedId]: parsed }));
+  }, [selectedHand, selectedId, parsedCache]);
+
+  const saveBounty = useCallback(async () => {
+    if (!session) return;
+    const val = bountyInput.trim() ? Number(bountyInput.replace(",", ".")) : null;
+    if (val != null && !Number.isFinite(val)) return;
+    try {
+      await updateSessionBounty(session.id, val);
+      setSession({ ...session, bounty_current: val });
+      setEditingBounty(false);
+    } catch (e) {
+      console.error("[RevisorSessao] bounty save failed:", e);
+    }
+  }, [session, bountyInput]);
+
+  if (loading) {
+    return (
+      <div style={{ fontFamily: F, padding: 24, display: "flex", justifyContent: "center", color: "rgba(255,255,255,0.4)" }}>
+        <Loader2 size={20} style={{ animation: "spin 1s linear infinite" }} />
+      </div>
+    );
+  }
+
+  if (error || !session) {
+    return (
+      <div style={{ fontFamily: F, padding: 24, display: "flex", flexDirection: "column", alignItems: "center", gap: 10 }}>
+        <AlertTriangle size={22} color={T.bad} />
+        <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 13 }}>{error ?? "Sessão não encontrada."}</p>
+      </div>
+    );
+  }
+
+  const isTournament = session.kind === "tournament";
+  const showsBounty = isTournament && (session.format_type === "pko" || session.format_type === "mystery");
+
+  return (
+    <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14 }}>
+      {/* Cabecalho da sessao — nome, tipo, buy-in, bounty (se PKO/Mystery) */}
+      <div
+        style={{
+          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
+          padding: "14px 16px", borderRadius: 14,
+          background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+          border: "1px solid rgba(255,255,255,0.08)",
+        }}
+      >
+        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
+          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 500, color: "#FFFFFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+            {session.label}
+          </h2>
+          <div style={{ display: "flex", gap: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+            {isTournament && session.format_type && (
+              <span style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
+                {session.format_type === "pko" ? "PKO" : session.format_type === "mystery" ? "Mystery Bounty" : "Regular"}
+              </span>
+            )}
+            {!isTournament && session.stakes && <span>{session.stakes}</span>}
+            <span>· {hands.length} mão{hands.length === 1 ? "" : "s"}</span>
+          </div>
+        </div>
+
+        {showsBounty && (
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <Trophy size={14} color="#FBBF24" />
+            {editingBounty ? (
+              <>
+                <input
+                  type="number"
+                  step="0.01"
+                  value={bountyInput}
+                  onChange={(e) => setBountyInput(e.target.value)}
+                  onBlur={saveBounty}
+                  onKeyDown={(e) => e.key === "Enter" && saveBounty()}
+                  autoFocus
+                  style={{
+                    background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.2)",
+                    color: "#FFFFFF", borderRadius: 8, padding: "4px 8px",
+                    fontSize: 13, fontFamily: F, width: 80, outline: "none",
+                  }}
+                />
+              </>
+            ) : (
+              <button
+                onClick={() => setEditingBounty(true)}
+                style={{
+                  all: "unset", cursor: "pointer", display: "flex", alignItems: "center", gap: 3,
+                  fontSize: 13, fontWeight: 500, color: "#FBBF24",
+                }}
+                title="Editar bounty atual"
+              >
+                <DollarSign size={12} />
+                <span>{session.bounty_current != null ? session.bounty_current : "—"}</span>
+              </button>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Master-detail: coluna esquerda com maos, coluna direita com mesa */}
+      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 12, minHeight: 500 }}>
+        <aside
+          style={{
+            borderRadius: 14,
+            background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            overflow: "hidden",
+            display: "flex",
+            flexDirection: "column",
+          }}
+        >
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+            <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+              Mãos ({hands.length})
+            </span>
+          </div>
+          <div style={{ overflowY: "auto", flex: 1 }}>
+            {hands.length === 0 && (
+              <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão nessa sessão ainda.</p>
+            )}
+            {hands.map((h, i) => {
+              const active = selectedId === h.id;
+              return (
+                <button
+                  key={h.id}
+                  onClick={() => setSelectedId(h.id)}
+                  style={{
+                    all: "unset", cursor: "pointer", display: "block", width: "100%",
+                    padding: "10px 14px",
+                    borderBottom: i < hands.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                    background: active ? "rgba(168,85,247,0.12)" : "transparent",
+                    borderLeft: active ? "2px solid #A855F7" : "2px solid transparent",
+                  }}
+                >
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    <div style={{ minWidth: 0, flex: 1 }}>
+                      <div style={{ fontSize: 12.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                        {h.title || `Mão ${i + 1}`}
+                      </div>
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2, display: "flex", gap: 6 }}>
+                        {h.status === "concluida" && <span style={{ color: T.ok }}>✓</span>}
+                        <span>{new Date(h.created_at).toLocaleDateString()}</span>
+                      </div>
+                    </div>
+                    {active && <ChevronRight size={12} color="rgba(255,255,255,0.4)" />}
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </aside>
+
+        <section style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+          {selectedId && parsedForSelected ? (
+            <RevisorHandTable parsedHand={parsedForSelected} />
+          ) : selectedId && parsedForSelected === null ? (
+            <div
+              style={{
+                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+                gap: 10, padding: 40, borderRadius: 14,
+                background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+                border: "1px solid rgba(255,255,255,0.08)", minHeight: 400,
+              }}
+            >
+              <AlertTriangle size={22} color={T.warn} />
+              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12.5, textAlign: "center", maxWidth: 380 }}>
+                Essa mão não tem hand history parseável — abra em "Analisar mão" pra revisar sem a mesa visual.
+              </p>
+              <button
+                onClick={() => selectedId && onOpenHand(selectedId)}
+                style={{ background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 12.5 }}
+              >
+                Abrir análise
+              </button>
+            </div>
+          ) : (
+            <div
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", padding: 40,
+                borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+                border: "1px solid rgba(255,255,255,0.08)", minHeight: 400,
+                color: "rgba(255,255,255,0.4)", fontSize: 12.5,
+              }}
+            >
+              Selecione uma mão na lista.
+            </div>
+          )}
+
+          {selectedId && parsedForSelected && (
+            <button
+              onClick={() => onOpenHand(selectedId)}
+              style={{
+                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.4)",
+                color: "#C4B5FD", borderRadius: 10, padding: "10px 16px",
+                fontFamily: F, fontSize: 13, fontWeight: 500, cursor: "pointer",
+              }}
+            >
+              Analisar essa mão em detalhe
+            </button>
+          )}
+        </section>
+      </div>
+
+      <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+    </div>
+  );
+}
