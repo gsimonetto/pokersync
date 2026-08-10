@@ -90,7 +90,11 @@ export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
     if (!replayState) return null;
     const ev = replayState.currentEvent;
     if (!ev || ev.kind !== "action" || ev.chipsAdded <= 0 || !replayState.isAdvancing) return null;
-    return { fromPosLabel: ev.posLabel, amount: ev.chipsAdded, key: `${stepIndex}-${ev.posLabel}` };
+    // chipsAdded vem em fichas cruas (raw) — bbUnit converte pro mesmo
+    // padrao de stack/pot exibido no resto da mesa (bug corrigido: antes
+    // a ficha voadora mostrava valor de ficha bruta rotulado como "bb").
+    const amountBB = Math.round((ev.chipsAdded / replayState.bbUnit) * 10) / 10;
+    return { fromPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-${ev.posLabel}` };
   }, [replayState, stepIndex]);
 
   const nextStep = useCallback(() => {
@@ -163,7 +167,13 @@ export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
           padding: 10,
         }}
       >
-        <div style={{ height: 320 }}>
+        {/* Altura da mesa aumentada de 320 -> 500 (pedido explicito):
+            "como e' pra revisao precisa ser maior". Com 320 os seats do
+            topo (y:12%) empurravam o chip de nome pra cima do board
+            (top:44%), criando sobreposicao visual. Em 500 cada 1% =
+            5px em vez de 3.2px, o gap vertical entre seat e board dobra
+            e a informacao respira. */}
+        <div style={{ height: 500 }}>
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
         </div>
 
