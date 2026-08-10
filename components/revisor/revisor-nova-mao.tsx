@@ -27,6 +27,7 @@ import {
   findExistingCashSession,
   createCashSession,
   attachReviewsToSession,
+  updateSessionBounty,
   type FormatType,
   type HandSession,
 } from "@/lib/services/hand-session-service";
@@ -42,12 +43,14 @@ interface ImageDraft {
 // "checking": consultando se ja existe torneio/cash com esse id/stakes.
 // "attach_or_new": torneio ja existe pro usuario — pergunta anexar ou criar novo.
 // "new_tournament_form": torneio novo — pede tipo (Regular/PKO/Mystery) + bounty.
+//   suggestedBounty/suggestedFormat vem do HH (2026-08, "ler automatico") —
+//   pre-preenchem o form mas continuam editaveis, o jogador confirma antes de salvar.
 // "done": sessao resolvida, import finalizado.
 type SessionFlowStep =
   | { kind: "idle" }
   | { kind: "checking" }
-  | { kind: "attach_or_new"; existing: HandSession; tournamentIdPs: string; label: string; buyin: number | null }
-  | { kind: "new_tournament_form"; tournamentIdPs: string | null; label: string; buyin: number | null };
+  | { kind: "attach_or_new"; existing: HandSession; tournamentIdPs: string; label: string; buyin: number | null; suggestedBounty: number | null }
+  | { kind: "new_tournament_form"; tournamentIdPs: string | null; label: string; buyin: number | null; suggestedBounty: number | null; suggestedFormat: FormatType };
 
 const FORMAT_OPTIONS: { value: FormatType; label: string }[] = [
   { value: "regular", label: "Regular" },
@@ -167,9 +170,11 @@ export function RevisorNovaMao({
   }
 
   // Passo 1 do import: salva as maos (sem sessao ainda) e decide o proximo
-  // passo do fluxo de sessao a partir da PRIMEIRA mao selecionada — assume-se
-  // que um HH colado de uma vez pertence a um unico torneio/mesa de cash
-  // (premissa razoavel; multi-torneio no mesmo paste e' caso raro nao coberto).
+  // passo do fluxo de sessao. Torneio/buy-in/plataforma vem da PRIMEIRA mao
+  // selecionada (constante durante o torneio inteiro). Bounty do heroi vem
+  // da ULTIMA mao selecionada — o bounty cresce hand a hand conforme o
+  // jogador elimina gente, entao a mao mais recente do lote tem o valor
+  // mais atual (2026-08, "ler automatico do HH").
   async function confirmImport() {
     if (!userId || !batch || selectedHands.length === 0) return;
     setImporting(true);
@@ -178,8 +183,13 @@ export function RevisorNovaMao({
       const ids = await importSelectedHands(batch.id, userId, selectedHands);
       setPendingReviewIds(ids);
 
-      const firstHand = batch.parsed_hands[selectedHands[0]];
+      const sortedSelected = [...selectedHands].sort((a, b) => a - b);
+      const firstHand = batch.parsed_hands[sortedSelected[0]];
+      const lastHand = batch.parsed_hands[sortedSelected[sortedSelected.length - 1]];
       const tournInfo = extractTournamentInfo(firstHand);
+      const lastHandBounty = extractTournamentInfo(lastHand).heroBountyFromHand;
+      const suggestedBounty = lastHandBounty ?? tournInfo.heroBountyFromHand;
+      const suggestedFormat: FormatType = tournInfo.looksLikeBounty ? "pko" : "regular";
 
       if (tournInfo.tournamentIdPs) {
         setSessionFlow({ kind: "checking" });
@@ -191,6 +201,7 @@ export function RevisorNovaMao({
             tournamentIdPs: tournInfo.tournamentIdPs,
             label: tournInfo.tournamentName ?? `Torneio #${tournInfo.tournamentIdPs}`,
             buyin: tournInfo.buyin,
+            suggestedBounty,
           });
         } else {
           setSessionFlow({
@@ -198,7 +209,11 @@ export function RevisorNovaMao({
             tournamentIdPs: tournInfo.tournamentIdPs,
             label: tournInfo.tournamentName ?? `Torneio #${tournInfo.tournamentIdPs}`,
             buyin: tournInfo.buyin,
+            suggestedBounty,
+            suggestedFormat,
           });
+          setFormatChoice(suggestedFormat);
+          setBountyInput(suggestedBounty != null ? String(suggestedBounty) : "");
         }
         return; // espera resolucao do modal antes de finalizar
       }
@@ -239,6 +254,16 @@ export function RevisorNovaMao({
     if (sessionFlow.kind !== "attach_or_new" || !pendingReviewIds) return;
     try {
       await attachReviewsToSession(pendingReviewIds, sessionFlow.existing.id);
+      // Bounty lido do HH mais recente atualiza a sessao automaticamente
+      // quando maior que o valor ja salvo — bounty so cresce ao longo do
+      // torneio, entao um valor menor aqui seria dado desatualizado (ex:
+      // reimportando mao antiga), nunca sobrescreve pra baixo.
+      if (
+        sessionFlow.suggestedBounty != null &&
+        (sessionFlow.existing.bounty_current == null || sessionFlow.suggestedBounty > sessionFlow.existing.bounty_current)
+      ) {
+        await updateSessionBounty(sessionFlow.existing.id, sessionFlow.suggestedBounty).catch(() => {});
+      }
       finishImport(pendingReviewIds);
     } catch (e) {
       setSessionError(e instanceof Error ? e.message : "Erro ao anexar ao torneio.");
@@ -247,12 +272,17 @@ export function RevisorNovaMao({
 
   function handleStartNewFromExisting() {
     if (sessionFlow.kind !== "attach_or_new") return;
+    const suggestedFormat: FormatType = sessionFlow.suggestedBounty != null ? "pko" : "regular";
     setSessionFlow({
       kind: "new_tournament_form",
       tournamentIdPs: sessionFlow.tournamentIdPs,
       label: sessionFlow.label,
       buyin: sessionFlow.buyin,
+      suggestedBounty: sessionFlow.suggestedBounty,
+      suggestedFormat,
     });
+    setFormatChoice(suggestedFormat);
+    setBountyInput(sessionFlow.suggestedBounty != null ? String(sessionFlow.suggestedBounty) : "");
   }
 
   async function handleCreateTournamentSession() {
@@ -410,7 +440,11 @@ export function RevisorNovaMao({
             <Trophy size={16} className="text-review" />
             <label className="text-sm font-semibold text-ink">{sessionFlow.label}</label>
           </div>
-          <p className="mb-3 text-xs text-muted">Que tipo de torneio é esse?</p>
+          <p className="mb-3 text-xs text-muted">
+            {sessionFlow.suggestedFormat === "pko"
+              ? "Detectei bounty no hand history — já marquei PKO. Confirma ou ajusta se for Mystery Bounty."
+              : "Que tipo de torneio é esse?"}
+          </p>
 
           <div className="mb-3 flex flex-wrap gap-1.5">
             {FORMAT_OPTIONS.map((f) => (
@@ -428,7 +462,12 @@ export function RevisorNovaMao({
 
           {(formatChoice === "pko" || formatChoice === "mystery") && (
             <div className="mb-3">
-              <label className="mb-1.5 block text-[13px] text-muted">Bounty atual (opcional, dá pra atualizar depois)</label>
+              <label className="mb-1.5 block text-[13px] text-muted">
+                Bounty atual
+                {sessionFlow.suggestedBounty != null && (
+                  <span className="ml-1.5 text-positive">· lido automaticamente do hand history</span>
+                )}
+              </label>
               <input
                 type="number"
                 step="0.01"
