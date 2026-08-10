@@ -60,6 +60,10 @@ export type ReplayState = {
   // animacao de chipAnimation, que e' so o "voo" momentaneo. Sem isso o
   // jogador via a ficha voar e sumir sem nunca "pousar" na mesa.
   streetCommitments: Record<string, number>;
+  // Fichas grandes (X blind) usadas pra converter fichas cruas pra BB fora
+  // desse arquivo — ex: chipAnimation na UI, que usa currentEvent.chipsAdded
+  // (raw) e precisa do mesmo fator de conversao pra mostrar o valor certo.
+  bbUnit: number;
 };
 
 export class HandReplayError extends Error {
@@ -324,7 +328,14 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
     }
   }
 
-  // Monta seats
+  // Monta seats. Stack vem em FICHAS CRUAS do parser (hand.seats[].
+  // startingChips) — precisa converter pra BB antes de exibir, senao a UI
+  // mostra "77472 bb" (bug reportado: "esta puxando por valor de ficha").
+  // bbUnit=1 quando bigBlind nao foi identificado (fallback: mostra fichas
+  // cruas mesmo, melhor que dividir por zero/undefined).
+  const bbUnit = hand.bigBlind && hand.bigBlind > 0 ? hand.bigBlind : 1;
+  const toBB = (chips: number) => Math.round((chips / bbUnit) * 10) / 10;
+
   const seats: Record<string, SeatState> = {};
   const actingPlayer = getActingPlayer(events, clampedIndex, folded);
   for (const slot of seatLayout) {
@@ -338,18 +349,21 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
 
     seats[slot.posLabel] = {
       status: isFolded ? "folded" : isActing ? "acting" : "live",
-      stack: seatData.startingChips,
+      stack: toBB(seatData.startingChips),
       cards: slot.isHero ? hand.heroCards ?? undefined : revealedForVillain,
     };
   }
 
-  // History bar: mostra rua atual + a\u00e7\u00f5es J\u00c1 executadas. A\u00e7\u00f5es futuras
+  // History bar: mostra rua atual + acoes JA executadas. Acoes futuras
   // ficam ocultas (opcao escolhida: "acoes ja executadas ate o step").
   const currentStreet = computeCurrentStreet(events, clampedIndex);
   const history = buildHistoryUpToStep(events, clampedIndex, currentStreet);
 
   const tableHand: TableHand = {
-    pot,
+    // pot ate aqui e' RAW (fichas cruas) — usado na checagem de sanidade
+    // acima contra hand.pot (tambem raw). So converte pra BB no ultimo
+    // instante, na hora de montar o objeto exibido.
+    pot: toBB(pot),
     // SPR por rua exigiria simular stacks remanescentes por rua — nao
     // implementado ainda; melhor omitir do que calcular errado.
     spr: null,
@@ -357,6 +371,13 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
     history,
     seats,
   };
+
+  // streetCommitted tambem esta em fichas cruas (acumulado no loop acima)
+  // — converte pra BB no mesmo padrao de stack/pot.
+  const streetCommitmentsBB: Record<string, number> = {};
+  for (const [pos, chips] of streetCommitted.entries()) {
+    streetCommitmentsBB[pos] = toBB(chips);
+  }
 
   return {
     tableHand,
@@ -366,7 +387,12 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
     currentStreetLabel: STREET_LABELS[currentStreet],
     currentEvent,
     isAdvancing,
-    streetCommitments: Object.fromEntries(streetCommitted),
+    streetCommitments: streetCommitmentsBB,
+    // Exposto pra quem consome o replay converter valores AVULSOS que nao
+    // passam por aqui — ex: o valor exibido na ficha voando (chipAnimation),
+    // derivado de currentEvent.chipsAdded, que fica em fichas cruas de proposito
+    // (mantem a logica interna de contabilidade intacta).
+    bbUnit,
   };
 }
 
