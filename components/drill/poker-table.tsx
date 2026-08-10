@@ -173,13 +173,13 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = SEAT_OPACITY[status];
 
-  // Gap aumentado de 2 -> 10/12px: com gap:2 a carta virada do vilao
-  // (CardBackPair, ~24-30px de largura) encostava no bloco de texto
-  // (avatar + stack + "NA AÇÃO"), cobrindo parte do label. Vilao ganhou
-  // mais respiro que hero pq o layout dele e' lateral (cardSide left/right),
-  // mais sensivel a colisao horizontal do que o hero (linha unica).
+  // Hero agora usa o MESMO padrao vertical dos demais seats na parte de
+  // baixo da mesa (cardSide "below": cartas em cima, seatInfo embaixo) —
+  // pedido explicito: "cartas em cima e nome em baixo como as outras
+  // posicoes". Antes era row (cartas do lado, tamanho "hero" grande);
+  // ficou maior e mais dissonante do resto da mesa do que o necessario.
   const layout: React.CSSProperties = hero
-    ? { flexDirection: "row", alignItems: "center", gap: 10 }
+    ? { flexDirection: "column", alignItems: "center", gap: 6 }
     : (
         {
           below: { flexDirection: "column", gap: 6 },
@@ -204,23 +204,6 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
       <div style={{ position: "relative", width: 46, height: 46 }}>
-        {acting && (
-          <svg width="46" height="46" style={{ position: "absolute", inset: 0, transform: "rotate(-90deg)" }}>
-            <circle cx="23" cy="23" r="21" fill="none" stroke="rgba(255,255,255,.12)" strokeWidth="3" />
-            <circle
-              cx="23"
-              cy="23"
-              r="21"
-              fill="none"
-              stroke={col.glow}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray="132"
-              strokeDashoffset="34"
-              style={{ filter: `drop-shadow(0 0 8px ${col.glow})` }}
-            />
-          </svg>
-        )}
         <div
           style={{
             position: "absolute",
@@ -252,26 +235,31 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
       </div>
 
       {/* Chip com nome do jogador — so existe em modo replay (Revisor),
-          onde SeatLayoutSlot.playerName vem do hand history real. No
-          Treino (mesa estilizada, vilao decorativo) playerName e' sempre
-          undefined, entao esse chip nao aparece la — pedido explicito:
-          "hoje so temos uma bola da posicao... nome do player precisa
-          ter o nome dos outros jogadores". */}
+          onde SeatLayoutSlot.playerName vem do hand history real. Brilho
+          (glow) no proprio nome quando o jogador esta agindo — pedido
+          explicito: "nao precisa ter timer... apenas o brilho no nome do
+          jogador". O anel de contagem regressiva foi removido do avatar
+          (ver acima) porque numa REVISAO nao existe tempo real passando;
+          o unico sinal de "quem age" agora vive aqui. */}
       {!empty && seat.playerName && (
         <div
           style={{
             fontFamily: F,
-            fontSize: 9.5,
+            fontSize: 8.5,
             fontWeight: 500,
-            color: "rgba(255,255,255,.65)",
-            background: "rgba(0,0,0,.45)",
-            border: "1px solid rgba(255,255,255,.10)",
+            color: acting ? "#FFFFFF" : "rgba(255,255,255,.55)",
+            background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
+            border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
             borderRadius: 999,
-            padding: "1px 7px",
-            maxWidth: 72,
+            padding: "1px 6px",
+            maxWidth: 60,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
+            lineHeight: 1.2,
+            boxShadow: acting ? `0 0 10px ${col.glow}` : "none",
+            textShadow: acting ? `0 0 6px ${col.glow}` : "none",
+            transition: "all 200ms ease",
           }}
           title={seat.playerName}
         >
@@ -317,14 +305,14 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
         {hero ? (
           <>
             {cards && cards.length > 0 && (
-              // Cards do hero: tamanho "hero" (maior que board) e SEM
-              // rotacao — pedido explicito de manter retas. Antes usava
-              // size="board" (mesmo tamanho de carta comunitaria) com
-              // rotate(+-4deg) em leque, o que ficava pequeno e torto.
-              <div style={{ display: "flex", gap: 6 }}>
+              // Cards do hero: tamanho "board" (mesmo das cartas comunitarias),
+              // sem rotacao. Antes usava size="hero" (bem maior) em layout
+              // row — pedido explicito: diminuir e trocar pro mesmo padrao
+              // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
+              <div style={{ display: "flex", gap: 5 }}>
                 {cards.map((c, i) => (
                   <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
-                    <Card card={c} size="hero" />
+                    <Card card={c} size="board" />
                   </div>
                 ))}
               </div>
@@ -349,7 +337,7 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
         )}
       </div>
       {!!committed && (
-        <div style={{ display: "flex", justifyContent: "center", marginTop: hero ? 4 : 2 }}>
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 2 }}>
           <CommittedChips amount={committed} />
         </div>
       )}
@@ -398,6 +386,46 @@ function ChipAnimation({
           +{amount}
         </span>
       </div>
+    </div>
+  );
+}
+
+// Icone do dealer button — disco branco com "D", padrao universal de
+// replayer de poker. Estava faltando (pedido explicito) — antes so o
+// texto "BTN" no proprio avatar indicava a posicao, sem o marcador
+// fisico do botao que normalmente fica um pouco pra dentro da mesa,
+// entre o assento e o centro.
+function DealerButtonIcon({ x, y }: { x: number; y: number }) {
+  // Desloca o marcador ~12% na direcao do centro da mesa (50,44) a partir
+  // da coordenada do seat, pra nao ficar exatamente em cima do avatar.
+  const dx = 50 - x;
+  const dy = 44 - y;
+  const offsetX = x + dx * 0.22;
+  const offsetY = y + dy * 0.22;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: `${offsetX}%`,
+        top: `${offsetY}%`,
+        transform: "translate(-50%,-50%)",
+        width: 20,
+        height: 20,
+        borderRadius: "50%",
+        background: "linear-gradient(160deg, #FFFFFF, #D8D8D8)",
+        border: "1px solid rgba(0,0,0,.3)",
+        boxShadow: "0 2px 6px rgba(0,0,0,.5)",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        fontFamily: F,
+        fontSize: 10,
+        fontWeight: 700,
+        color: "#111111",
+        zIndex: 4,
+      }}
+    >
+      D
     </div>
   );
 }
@@ -619,6 +647,11 @@ export function PokerTable({
         {seats.map((s) => (
           <Seat key={s.posLabel} seat={s} state={seatData(s.posLabel)} committed={streetCommitments?.[s.posLabel]} />
         ))}
+
+        {(() => {
+          const btnSeat = seats.find((s) => s.posLabel === "BTN");
+          return btnSeat ? <DealerButtonIcon x={btnSeat.x} y={btnSeat.y} /> : null;
+        })()}
 
         {chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
           <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} />
