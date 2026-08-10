@@ -537,12 +537,16 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         <ShareButton review={review} parsedHand={parsedHandForTable} />
       </div>
 
+      {/* Ordem trocada (pedido explicito): perguntas/conteudo secundario
+          na coluna ESQUERDA, mesa/replay na coluna DIREITA — mesmo padrao
+          de RevisorSessao (lista de maos a esquerda, mesa a direita).
+          Antes estava invertido (mesa esquerda, perguntas direita). */}
       {parsedHandForTable ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.3fr]">
+          <div>{secondaryContent}</div>
           <div>
             <RevisorHandTable parsedHand={parsedHandForTable} />
           </div>
-          <div>{secondaryContent}</div>
         </div>
       ) : (
         <>
