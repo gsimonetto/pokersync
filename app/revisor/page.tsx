@@ -76,7 +76,9 @@ export default function RevisorPage() {
       </header>
 
       {screen === "fila" && <RevisorFila onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />}
-      {screen === "nova" && <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onCancel={goFila} />}
+      {screen === "nova" && (
+        <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
+      )}
       {screen === "sessao" && selectedSessionId && (
         <RevisorSessao sessionId={selectedSessionId} onOpenHand={goDetalhe} />
       )}
