@@ -165,15 +165,19 @@ export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
           borderRadius: 14,
           border: "1px solid rgba(255,255,255,0.08)",
           padding: 10,
+          // overflow:hidden — bug corrigido: sem isso, conteudo de seat
+          // (chip de nome, fichas paradas) que se acumula conforme a acao
+          // avanca podia vazar visualmente pra fora da caixa de 500px,
+          // dando a impressao de "a mesa vai crescendo". Agora fica
+          // sempre travada no tamanho definido, clipando qualquer excesso.
+          overflow: "hidden",
         }}
       >
-        {/* Altura da mesa aumentada de 320 -> 500 (pedido explicito):
-            "como e' pra revisao precisa ser maior". Com 320 os seats do
-            topo (y:12%) empurravam o chip de nome pra cima do board
-            (top:44%), criando sobreposicao visual. Em 500 cada 1% =
-            5px em vez de 3.2px, o gap vertical entre seat e board dobra
-            e a informacao respira. */}
-        <div style={{ height: 500 }}>
+        {/* Altura responsiva por breakpoint (className, nao inline) — fixa
+            e diferente por formato: menor no celular, media no tablet,
+            maior no desktop. Pedido explicito: "precisa ser fixa pro
+            desktop e se ajustar em outro formato (cel, tablet)". */}
+        <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px]">
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
         </div>
 
