@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale } from "lucide-react";
+import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getReview,
@@ -29,6 +29,101 @@ import { RevisorHandTable } from "./revisor-hand-table";
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
 
+function ShareButton({ review, parsedHand }: { review: ReviewDetail; parsedHand: ParsedHand | null }) {
+  const [copied, setCopied] = useState(false);
+
+  function buildShareText(): string {
+    const lines: string[] = [];
+    lines.push(review.title || "Mão de poker — PokerSync");
+    if (parsedHand) {
+      if (parsedHand.heroPosition) lines.push(`Posição: ${parsedHand.heroPosition}`);
+      if (parsedHand.smallBlind && parsedHand.bigBlind) lines.push(`Blinds: ${parsedHand.smallBlind}/${parsedHand.bigBlind}`);
+      if (parsedHand.board.length) lines.push(`Board: ${parsedHand.board.join(" ")}`);
+      if (parsedHand.pot != null) lines.push(`Pote: ${parsedHand.pot}`);
+    }
+    if (review.learning_note) lines.push(`\nAprendizado: ${review.learning_note}`);
+    lines.push("\nRevisado no PokerSync");
+    return lines.join("\n");
+  }
+
+  async function handleShare() {
+    const text = buildShareText();
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const nav = navigator as any;
+    if (nav.share) {
+      try {
+        await nav.share({ title: review.title || "Mão de poker", text });
+        return;
+      } catch {
+        return;
+      }
+    }
+    try {
+      await navigator.clipboard.writeText(text);
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // silencioso
+    }
+  }
+
+  return (
+    <button
+      onClick={handleShare}
+      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink"
+    >
+      {copied ? <CheckIcon size={14} className="text-positive" /> : <Share2 size={14} />}
+      {copied ? "Copiado" : "Compartilhar"}
+    </button>
+  );
+}
+
+function GuidedQuestionChip({
+  index,
+  question,
+  answer,
+  onChange,
+}: {
+  index: number;
+  question: string;
+  answer: string;
+  onChange: (val: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const answered = answer.trim().length > 0;
+
+  return (
+    <div>
+      <button
+        type="button"
+        onClick={() => setOpen((v) => !v)}
+        className={`flex w-full items-center gap-2 rounded-full border px-3 py-2 text-left text-[12.5px] transition-colors ${
+          answered ? "border-review/50 bg-review/10 text-ink" : "border-hairline bg-void text-ink/85"
+        }`}
+      >
+        <span
+          className={`grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] font-bold ${
+            answered ? "bg-review text-void" : "border border-hairline text-muted"
+          }`}
+        >
+          {answered ? "✓" : index + 1}
+        </span>
+        <span className="flex-1 truncate">{question}</span>
+      </button>
+      {open && (
+        <textarea
+          value={answer}
+          onChange={(e) => onChange(e.target.value)}
+          rows={3}
+          autoFocus
+          placeholder="Sua análise…"
+          className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[13px] text-ink outline-none focus:border-review"
+        />
+      )}
+    </div>
+  );
+}
+
 export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack: () => void }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [review, setReview] = useState<ReviewDetail | null>(null);
@@ -46,12 +141,8 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [xpFeedback, setXpFeedback] = useState<{ xp: number; missions: any[] } | null>(null);
 
-  // ---- Mesa persistente (Revisor) — so existe quando ha hand history
-  // valido pra parsear. Mao manual/print nao tem mesa (usa a Ficha rapida
-  // abaixo). Parse acontece uma vez ao carregar a review.
   const [parsedHandForTable, setParsedHandForTable] = useState<ParsedHand | null>(null);
 
-  // ---- Ficha minima: so aparece quando a mao nao veio de import parseado ----
   const [ticket, setTicket] = useState<ManualTicket>({ format: "", street: "preflop" as Street, action: "" });
   const [ticketSaved, setTicketSaved] = useState(false);
 
@@ -73,12 +164,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       setLearning(r.learning_note || "");
       setDrill(r.drill_suggestion || "");
 
-      // Tenta montar a mesa a partir do hand_history bruto. Se a mao veio
-      // de import ja parseado (parsed_data.kind === "parsed"), usa esse
-      // dado direto — evita reparsear a toa. Senao, tenta parsear o texto
-      // cru (fluxo de colagem direta). Falha de parse e' silenciosa aqui:
-      // a mesa so nao aparece, o resto da tela (perguntas, etc.) funciona
-      // igual — nunca bloqueia a revisao por causa da mesa.
       if (r.parsed_data?.kind === "parsed") {
         setParsedHandForTable(r.parsed_data as ParsedHand);
       } else if (r.hand_history) {
@@ -151,7 +236,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       await saveMinimalTicket(reviewId, next);
       setTicketSaved(true);
     } catch {
-      // silencioso: nao bloqueia o resto da revisao
+      // silencioso
     }
   }
 
@@ -213,37 +298,8 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const canConclude = learning.trim().length > 0;
   const isPrintOnly = review.source === "print" || (!review.hand_history && review.parsed_data?.kind !== "parsed");
 
-  return (
-    <div>
-      <div className="mb-4">
-        <h2 className="m-0 text-lg text-ink">{review.title || "Mão sem título"}</h2>
-        <div className="mt-1.5 flex flex-wrap gap-1">
-          {review.tags.map((t) => (
-            <span key={t.id} className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
-              {t.label}
-            </span>
-          ))}
-        </div>
-      </div>
-
-      {parsedHandForTable && (
-        <section className="mb-3.5">
-          <RevisorHandTable parsedHand={parsedHandForTable} />
-        </section>
-      )}
-
-      {(review.free_text || review.hand_history) && (
-        <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
-          <h3 className="m-0 text-sm font-semibold text-ink">Contexto</h3>
-          {review.free_text && <p className="mt-2 text-[13px] leading-relaxed text-ink/85">{review.free_text}</p>}
-          {review.hand_history && (
-            <pre className="mt-2.5 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-void p-2.5 font-mono text-[11px] text-muted">
-              {review.hand_history}
-            </pre>
-          )}
-        </section>
-      )}
-
+  const secondaryContent = (
+    <>
       {imgUrls.length > 0 && (
         <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
           <h3 className="m-0 text-sm font-semibold text-ink">Prints</h3>
@@ -336,21 +392,16 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             {answeredCount}/{qas.length} respondidas
           </span>
         </div>
-        <p className="mb-3 mt-1 text-xs text-muted">Responda com calma. O foco é pensar, não acertar.</p>
-        <div className="flex flex-col gap-3">
+        <p className="mb-3 mt-1 text-xs text-muted">Toque numa pergunta pra responder. O foco é pensar, não acertar.</p>
+        <div className="flex flex-col gap-2">
           {qas.map((q, i) => (
-            <div key={i}>
-              <label className="mb-1.5 block text-[13px] font-medium text-ink/90">
-                {i + 1}. {q.question}
-              </label>
-              <textarea
-                value={q.answer}
-                onChange={(e) => updateAnswer(i, e.target.value)}
-                rows={3}
-                placeholder="Sua análise…"
-                className="w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[13px] text-ink outline-none focus:border-review"
-              />
-            </div>
+            <GuidedQuestionChip
+              key={i}
+              index={i}
+              question={q.question}
+              answer={q.answer}
+              onChange={(val) => updateAnswer(i, val)}
+            />
           ))}
         </div>
       </section>
@@ -467,6 +518,48 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           Concluir revisão
         </button>
       </footer>
+    </>
+  );
+
+  return (
+    <div>
+      <div className="mb-4 flex items-start justify-between gap-3">
+        <div>
+          <h2 className="m-0 text-lg text-ink">{review.title || "Mão sem título"}</h2>
+          <div className="mt-1.5 flex flex-wrap gap-1">
+            {review.tags.map((t) => (
+              <span key={t.id} className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
+                {t.label}
+              </span>
+            ))}
+          </div>
+        </div>
+        <ShareButton review={review} parsedHand={parsedHandForTable} />
+      </div>
+
+      {parsedHandForTable ? (
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1.3fr_1fr]">
+          <div>
+            <RevisorHandTable parsedHand={parsedHandForTable} />
+          </div>
+          <div>{secondaryContent}</div>
+        </div>
+      ) : (
+        <>
+          {(review.free_text || review.hand_history) && (
+            <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+              <h3 className="m-0 text-sm font-semibold text-ink">Contexto</h3>
+              {review.free_text && <p className="mt-2 text-[13px] leading-relaxed text-ink/85">{review.free_text}</p>}
+              {review.hand_history && (
+                <pre className="mt-2.5 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-void p-2.5 font-mono text-[11px] text-muted">
+                  {review.hand_history}
+                </pre>
+              )}
+            </section>
+          )}
+          {secondaryContent}
+        </>
+      )}
 
       {xpFeedback && (
         <div className="fixed bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 flex-col items-center gap-1 rounded-xl bg-gradient-to-br from-review to-[#7c3aed] px-5 py-3 font-semibold text-white shadow-[0_8px_24px_rgba(168,85,247,0.4)]">
