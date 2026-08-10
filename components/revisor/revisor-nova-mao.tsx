@@ -61,9 +61,16 @@ const FORMAT_OPTIONS: { value: FormatType; label: string }[] = [
 export function RevisorNovaMao({
   onSaved,
   onSavedAndReview,
+  onSavedToSession,
 }: {
   onSaved: () => void;
   onSavedAndReview: (id: string) => void;
+  // Novo (2026-08): apos importar VARIAS maos de uma vez pra um torneio/cash
+  // ja resolvido, leva direto pra tela da sessao (lista de maos daquele
+  // torneio) em vez de deixar o jogador parado na tela de import com uma
+  // mensagem estatica — pedido explicito: "ao importar, precisa ir direto
+  // pra fila com as maos".
+  onSavedToSession: (sessionId: string) => void;
   onCancel?: () => void;
 }) {
   const [userId, setUserId] = useState<string | null>(null);
@@ -73,7 +80,6 @@ export function RevisorNovaMao({
   const [batch, setBatch] = useState<ImportBatch | null>(null);
   const [selectedHands, setSelectedHands] = useState<number[]>([]);
   const [importing, setImporting] = useState(false);
-  const [importedOk, setImportedOk] = useState<number | null>(null);
 
   // ---- Resolucao de sessao (novo) ----
   const [sessionFlow, setSessionFlow] = useState<SessionFlowStep>({ kind: "idle" });
@@ -148,7 +154,6 @@ export function RevisorNovaMao({
     if (!userId || !importText.trim() || importing) return;
     setImporting(true);
     setError("");
-    setImportedOk(null);
     try {
       const b = await createImportBatch(userId, importText);
       if (b.parsed_hands.length === 0) {
@@ -228,6 +233,8 @@ export function RevisorNovaMao({
           stakes: firstHand.stakes,
         }));
         await attachReviewsToSession(ids, cashSession.id);
+        finishImport(ids, cashSession.id);
+        return;
       }
 
       finishImport(ids);
@@ -237,17 +244,28 @@ export function RevisorNovaMao({
     }
   }
 
-  function finishImport(ids: string[]) {
+  // Sempre navega pra longe da tela de import ao terminar — antes, com
+  // mais de 1 mao, ficava parado aqui so mostrando "X maos importadas".
+  // Pedido explicito: "ao importar, precisa ir direto pra fila com as
+  // maos". Prioridade: 1 mao -> direto pro detalhe dela; varias maos com
+  // sessao resolvida -> direto pra tela daquele torneio/cash (ja mostra
+  // a lista); varias maos sem sessao (nao deveria acontecer no fluxo
+  // normal, mas por seguranca) -> fila geral.
+  function finishImport(ids: string[], sessionId?: string) {
     setImporting(false);
     setSessionFlow({ kind: "idle" });
     setPendingReviewIds(null);
+    setBatch(null);
+    setImportText("");
     if (ids.length === 1) {
       onSavedAndReview(ids[0]);
       return;
     }
-    setImportedOk(ids.length);
-    setBatch(null);
-    setImportText("");
+    if (sessionId) {
+      onSavedToSession(sessionId);
+    } else {
+      onSaved();
+    }
   }
 
   async function handleAttachToExisting() {
@@ -264,7 +282,7 @@ export function RevisorNovaMao({
       ) {
         await updateSessionBounty(sessionFlow.existing.id, sessionFlow.suggestedBounty).catch(() => {});
       }
-      finishImport(pendingReviewIds);
+      finishImport(pendingReviewIds, sessionFlow.existing.id);
     } catch (e) {
       setSessionError(e instanceof Error ? e.message : "Erro ao anexar ao torneio.");
     }
@@ -305,7 +323,7 @@ export function RevisorNovaMao({
       await attachReviewsToSession(pendingReviewIds, created.id);
       setFormatChoice("regular");
       setBountyInput("");
-      finishImport(pendingReviewIds);
+      finishImport(pendingReviewIds, created.id);
     } catch (e) {
       setSessionError(e instanceof Error ? e.message : "Erro ao criar o torneio.");
     }
@@ -594,12 +612,6 @@ export function RevisorNovaMao({
                 </button>
               </div>
             </div>
-          )}
-
-          {importedOk !== null && (
-            <p className="mt-2 text-xs text-positive">
-              {importedOk} mão{importedOk === 1 ? "" : "s"} importada{importedOk === 1 ? "" : "s"} para a fila.
-            </p>
           )}
         </section>
       )}
