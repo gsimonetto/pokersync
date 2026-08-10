@@ -52,7 +52,7 @@ export default function RevisorPage() {
   }
 
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
       <header className="mb-4 flex items-center gap-3">
         {screen === "fila" ? (
           <Link
