@@ -37,30 +37,53 @@ export interface ParsedTournamentInfo {
   tournamentName: string | null;
   buyin: number | null;
   platform: string | null;
+  // Bounty do heroi lido diretamente do hand history (seat do heroi tem
+  // sufixo ", Bounty de $ X" em torneios PKO/Mystery) — "ler automatico"
+  // em vez de pedir digitado. Null quando o formato nao tem bounty visivel
+  // no HH (regular) ou o heroi nao foi identificado na mao.
+  heroBountyFromHand: number | null;
+  // true quando QUALQUER assento da mao tem valor de bounty — sinal forte
+  // de torneio PKO (Mystery Bounty tambem pode aparecer assim dependendo
+  // do formato exato do HH). Usado pra pre-selecionar "PKO" no modal em
+  // vez de "Regular", o jogador ainda pode trocar pra Mystery se for o caso.
+  looksLikeBounty: boolean;
 }
 
-// Extrai id do torneio + buy-in + plataforma + nome do cabecalho.
-// PokerStars: "PokerStars Hand #X: Tournament #Y, $5+$0.50 USD Hold'em No Limit"
-// - id do torneio = Y
-// - buy-in = 5.5 (soma das duas partes)
-// - plataforma = "PokerStars" (unica suportada hoje; GGPoker/etc. detectados
-//   quando o parser passar a reconhece-los).
+// Extrai id do torneio + buy-in + plataforma + bounty do cabecalho e dos
+// assentos. Bilingue (2026-08): "Tournament #" (EN) e "Torneio #" (PT-BR)
+// — hand-parser.ts ja normaliza o resto, mas essa extracao roda direto no
+// rawText pra pegar detalhes que ParsedHand nao guarda em campo proprio
+// (buy-in, nome do torneio).
 export function extractTournamentInfo(hand: ParsedHand): ParsedTournamentInfo {
   const text = hand.rawText;
-  const tournM = text.match(/Tournament\s+#(\d+)/i);
+  const tournM = text.match(/(?:Tournament|Torneio)\s+#(\d+)/i);
   const tournamentIdPs = tournM ? tournM[1] : null;
 
-  // Buy-in aparece como "$X+$Y USD" logo apos o "Tournament #N,". Soma
-  // as partes (buy-in + fee).
+  // Buy-in aparece como "$X+$Y USD" (2 partes, formato comum) ou "$X+$Y+$Z
+  // USD" (3 partes — buy-in + bounty pool + rake, tipico de PKO em PT-BR:
+  // "$ 50+$ 50+$ 9 USD"). Soma todas as partes presentes = custo total de
+  // entrada. Aceita "$" com espaco depois (client PT-BR insere: "$ 50").
   let buyin: number | null = null;
-  const buyinM = text.match(/Tournament\s+#\d+,\s+\$?([\d.,]+)\+\$?([\d.,]+)/i);
+  const buyinM = text.match(
+    /(?:Tournament|Torneio)\s+#\d+,\s+\$?\s?([\d.,]+)\+\$?\s?([\d.,]+)(?:\+\$?\s?([\d.,]+))?\s+USD/i
+  );
   if (buyinM) {
-    const a = Number(buyinM[1].replace(",", "."));
-    const b = Number(buyinM[2].replace(",", "."));
-    if (Number.isFinite(a) && Number.isFinite(b)) buyin = Math.round((a + b) * 100) / 100;
+    const parts = [buyinM[1], buyinM[2], buyinM[3]]
+      .filter(Boolean)
+      .map((p) => Number(p!.replace(",", ".")))
+      .filter((n) => Number.isFinite(n));
+    if (parts.length > 0) buyin = Math.round(parts.reduce((s, n) => s + n, 0) * 100) / 100;
   }
 
   const platform = hand.site === "pokerstars" ? "PokerStars" : hand.site ?? null;
+
+  // Bounty do heroi: procura o assento do heroi (isHero) e le bountyValue,
+  // ja capturado pelo hand-parser.ts a partir do sufixo "Bounty de $ X" /
+  // "Bounty of $ X" junto do stack. Se o heroi nao foi identificado ou o
+  // formato nao tem bounty visivel, fica null — modal pede digitado nesse caso.
+  const heroSeat = hand.seats.find((s) => s.isHero);
+  const heroBountyFromHand = heroSeat?.bountyValue ?? null;
+  const looksLikeBounty = hand.seats.some((s) => s.bountyValue != null);
 
   // Nome curto do card do torneio — formato "Plataforma / Buy-in", pedido
   // explicito pra dar contexto imediato na fila. Fallback pra "Torneio #ID"
@@ -71,7 +94,7 @@ export function extractTournamentInfo(hand: ParsedHand): ParsedTournamentInfo {
       ? `Torneio #${tournamentIdPs}`
       : null;
 
-  return { tournamentIdPs, tournamentName, buyin, platform };
+  return { tournamentIdPs, tournamentName, buyin, platform, heroBountyFromHand, looksLikeBounty };
 }
 
 export async function findExistingTournamentSession(
