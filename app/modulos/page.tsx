@@ -1,4 +1,3 @@
-import { TopNav } from "@/components/top-nav";
 import { WelcomeHero } from "@/components/welcome-hero";
 import { StatCards } from "@/components/stat-cards";
 import { ProgressSection } from "@/components/progress-section";
@@ -30,11 +29,9 @@ function rowToSession(r: any): Session {
 
 export default async function ModulosPage() {
   const supabase = await createClient();
-
   const {
     data: { user },
   } = await supabase.auth.getUser();
-
   const meta = (user?.user_metadata ?? {}) as { nome?: string; apelido?: string };
   const displayName = meta.apelido || meta.nome || "Jogador";
 
@@ -56,11 +53,9 @@ export default async function ModulosPage() {
 
   return (
     <div className="min-h-screen bg-void">
-      <TopNav />
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
         <div className="space-y-6">
           <WelcomeHero name={displayName} plan={plan} team={team} />
-
           <StatCards
             bankrollAtual={fmtMoney(agg.profit)}
             resultado={fmtSignedMoney(agg.profit)}
@@ -70,7 +65,6 @@ export default async function ModulosPage() {
             tourneyCount={tourneyCount}
             resultadoPositivo={agg.profit >= 0}
           />
-
           <section aria-labelledby="modules-heading">
             <div className="mb-3 flex items-center justify-between">
               <h2 id="modules-heading" className="text-sm font-medium text-muted">
@@ -84,7 +78,6 @@ export default async function ModulosPage() {
               ))}
             </div>
           </section>
-
           <ProgressSection />
           <BrandValues />
         </div>
