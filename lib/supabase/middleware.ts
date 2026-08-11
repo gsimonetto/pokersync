@@ -3,8 +3,16 @@ import { NextResponse, type NextRequest } from "next/server";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
-const INACTIVITY_LIMIT_MS = 60 * 60 * 1000;
+const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 horas
 const LAST_ACTIVITY_COOKIE = "pokersync_last_activity";
+
+const PUBLIC_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha"];
+
+function isPublicRoute(pathname: string) {
+  return PUBLIC_ROUTES.some(
+    (route) => pathname === route || pathname.startsWith(`${route}/`)
+  );
+}
 
 export async function updateSession(request: NextRequest) {
   let response = NextResponse.next({ request });
@@ -34,11 +42,19 @@ export async function updateSession(request: NextRequest) {
     data: { user },
   } = await supabase.auth.getUser();
 
+  const pathname = request.nextUrl.pathname;
+  const publicRoute = isPublicRoute(pathname);
+
+  // Bloqueio: sem sessão tentando acessar rota protegida
+  if (!user && !publicRoute) {
+    const redirect = NextResponse.redirect(new URL("/login", request.url));
+    return redirect;
+  }
+
   if (user) {
     const last = Number(
       request.cookies.get(LAST_ACTIVITY_COOKIE)?.value ?? 0
     );
-
     if (last && Date.now() - last > INACTIVITY_LIMIT_MS) {
       await supabase.auth.signOut();
       const redirect = NextResponse.redirect(
@@ -47,7 +63,6 @@ export async function updateSession(request: NextRequest) {
       redirect.cookies.delete(LAST_ACTIVITY_COOKIE);
       return redirect;
     }
-
     response.cookies.set(LAST_ACTIVITY_COOKIE, String(Date.now()), {
       httpOnly: true,
       sameSite: "lax",
