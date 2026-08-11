@@ -86,8 +86,6 @@ export function TopNav() {
             );
           })}
 
-          <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
-
           <div className="relative">
             <button
               type="button"
