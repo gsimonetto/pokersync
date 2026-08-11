@@ -62,7 +62,7 @@ export function TopNav() {
   }
 
   return (
-    <header className="sticky top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
+    <header className="relative sm:sticky sm:top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
       <div className="mx-auto flex h-24 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Logo className="h-14 w-auto sm:h-16" />
 
