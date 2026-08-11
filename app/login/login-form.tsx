@@ -208,14 +208,14 @@ export default function LoginForm() {
               />
             </div>
 
-          {!isSignup && (
-  
-    href="/esqueci-senha"
-    className="self-end text-xs text-muted transition hover:text-ink"
-  >
-    Esqueci minha senha
-  </a>
-)}
+            {!isSignup && (
+              <a
+                href="/esqueci-senha"
+                className="self-end text-xs text-muted transition hover:text-ink"
+              >
+                Esqueci minha senha
+              </a>
+            )}
 
             {err && <p className="text-sm text-negative">{err}</p>}
             {ok && <p className="text-sm text-positive">{ok}</p>}
