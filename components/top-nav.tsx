@@ -78,7 +78,7 @@ export function TopNav() {
                 aria-label={tab.label}
                 title={tab.label}
                 className={`grid size-9 place-items-center rounded-lg transition-colors ${
-                  isActive ? "bg-white/[0.08] text-ink" : "text-muted hover:bg-white/5 hover:text-ink"
+                  isActive ? "bg-white/[0.08] text-ink" : "text-muted hover:bg-white hover:text-void"
                 }`}
               >
                 <Icon className="size-[18px]" />
@@ -90,7 +90,7 @@ export function TopNav() {
             <button
               type="button"
               onClick={() => toggle("notifications")}
-              className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-ink"
+              className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
               aria-label="Notificações"
             >
               <Bell className="size-[18px]" />
@@ -107,7 +107,7 @@ export function TopNav() {
             <button
               type="button"
               onClick={() => toggle("help")}
-              className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white/5 hover:text-ink"
+              className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
               aria-label="Ajuda"
             >
               <CircleHelp className="size-[18px]" />
