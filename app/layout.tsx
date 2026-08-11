@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
+import { TopNav } from "@/components/top-nav";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -21,6 +22,7 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`dark ${spaceGrotesk.variable}`}>
       <body className="min-h-screen bg-void text-ink antialiased">
+        <TopNav />
         {children}
       </body>
     </html>
