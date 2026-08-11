@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CircleHelp } from "lucide-react";
+import { Bell, CircleHelp, House, ListChecks } from "lucide-react";
 import { Logo } from "./logo";
 import { Avatar } from "./avatar";
 import { ProfileMenu } from "./profile-menu";
@@ -14,8 +14,8 @@ import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
 
 const TABS = [
-  { label: "Início", href: "/modulos" },
-  { label: "Tarefas", href: "/hub" },
+  { label: "Início", href: "/modulos", icon: House },
+  { label: "Tarefas", href: "/hub", icon: ListChecks },
 ] as const;
 
 type OpenMenu = "profile" | "notifications" | "help" | null;
@@ -66,30 +66,28 @@ export function TopNav() {
       <div className="mx-auto flex h-24 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
         <Logo className="h-14 w-auto sm:h-16" />
 
-        <nav className="absolute left-1/2 hidden -translate-x-1/2 items-center gap-1 md:flex">
+        <div className="flex items-center gap-1.5">
           {TABS.map((tab) => {
             const isActive = pathname === tab.href;
+            const Icon = tab.icon;
             return (
               <Link
                 key={tab.href}
                 href={tab.href}
                 aria-current={isActive ? "page" : undefined}
-                className={`relative rounded-md px-3 py-2 text-xs font-semibold uppercase tracking-[0.14em] transition-colors ${
-                  isActive ? "text-ink" : "text-muted hover:text-ink"
+                aria-label={tab.label}
+                title={tab.label}
+                className={`grid size-9 place-items-center rounded-lg transition-colors ${
+                  isActive ? "bg-white/[0.08] text-ink" : "text-muted hover:bg-white/5 hover:text-ink"
                 }`}
               >
-                {tab.label}
-                <span
-                  className={`absolute inset-x-2 -bottom-[9px] h-0.5 rounded-full bg-ink transition-opacity ${
-                    isActive ? "opacity-100" : "opacity-0"
-                  }`}
-                />
+                <Icon className="size-[18px]" />
               </Link>
             );
           })}
-        </nav>
 
-        <div className="flex items-center gap-1.5">
+          <span className="mx-1 h-5 w-px bg-hairline" aria-hidden="true" />
+
           <div className="relative">
             <button
               type="button"
