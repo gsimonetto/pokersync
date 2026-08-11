@@ -20,6 +20,8 @@ const TABS = [
 
 type OpenMenu = "profile" | "notifications" | "help" | null;
 
+const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha"];
+
 export function TopNav() {
   const pathname = usePathname();
   const [profile, setProfile] = useState<Profile | null>(null);
@@ -59,6 +61,10 @@ export function TopNav() {
     fetchUnreadCount()
       .then(setUnread)
       .catch(() => {});
+  }
+
+  if (HIDDEN_ROUTES.includes(pathname)) {
+    return null;
   }
 
   return (
