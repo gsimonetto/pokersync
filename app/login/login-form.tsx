@@ -50,6 +50,7 @@ export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
   const expirado = searchParams.get("expirado") === "1";
+  const senhaRedefinida = searchParams.get("senha_redefinida") === "1";
 
   const [mode, setMode] = useState<Mode>("signin");
   const [name, setName] = useState("");
@@ -61,7 +62,9 @@ export default function LoginForm() {
   const [err, setErr] = useState(
     expirado ? "Sua sessao expirou por inatividade." : ""
   );
-  const [ok, setOk] = useState("");
+  const [ok, setOk] = useState(
+    senhaRedefinida ? "Senha redefinida com sucesso! Faca login." : ""
+  );
   const [loading, setLoading] = useState(false);
 
   const isSignup = mode === "signup";
@@ -204,6 +207,15 @@ export default function LoginForm() {
                 }
               />
             </div>
+
+            {!isSignup && (
+              
+                href="/esqueci-senha"
+                className="self-end text-xs text-muted transition hover:text-ink"
+              >
+                Esqueci minha senha
+              </a>
+            )}
 
             {err && <p className="text-sm text-negative">{err}</p>}
             {ok && <p className="text-sm text-positive">{ok}</p>}
