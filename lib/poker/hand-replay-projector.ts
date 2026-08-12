@@ -21,8 +21,8 @@ export type StepEvent =
       kind: "action";
       player: string;
       posLabel: string; // rotulo real da posicao (BB/CO/BTN...) apos rotacao
-      label: string; // "raise to 3", "call 8", "fold" — texto pra history bar
-      chipsAdded: number; // dinheiro que ENTROU no pote nesse step (0 pra fold/check)
+      label: string; // "raise to 3bb", "call 8bb", "fold" — texto pra history bar (ja em BB)
+      chipsAdded: number; // dinheiro que ENTROU no pote nesse step (0 pra fold/check) — RAW, nao bb
       isFold: boolean; // afeta status do seat pro proximo step em diante
     }
   | { kind: "deal"; street: Exclude<StreetName, "preflop">; newCards: string[] }
@@ -87,20 +87,31 @@ function getNewCardsForStreet(hand: ParsedHand, street: Exclude<StreetName, "pre
   return [];
 }
 
-function actionLabel(a: ParsedAction): string {
+// Converte fichas cruas pra BB, arredondado em 1 casa — mesmo criterio
+// usado no resto do replay (stack, pote, streetCommitments).
+function toBBAmount(raw: number, bbUnit: number): number {
+  return Math.round((raw / bbUnit) * 10) / 10;
+}
+
+// Timeline em BB (pedido explicito: "o historico na linha do tempo
+// precisa ser as apostas em bb" — antes mostrava o valor cru do hand
+// history, ex: "call 300"; agora "call 6bb"). Recebe bbUnit pra nao
+// depender de estado global — cada mao pode ter blind diferente.
+function actionLabel(a: ParsedAction, bbUnit: number): string {
+  const bb = (raw: number | undefined) => toBBAmount(raw ?? 0, bbUnit);
   switch (a.action) {
     case "posts":
-      return `posts ${a.amount}`;
+      return `posts ${bb(a.amount)}bb`;
     case "folds":
       return "fold";
     case "checks":
       return "check";
     case "bets":
-      return `bet ${a.amount}`;
+      return `bet ${bb(a.amount)}bb`;
     case "calls":
-      return `call ${a.amount}`;
+      return `call ${bb(a.amount)}bb`;
     case "raises":
-      return `raise to ${a.raiseTo}`;
+      return `raise to ${bb(a.raiseTo)}bb`;
     default:
       return a.action;
   }
@@ -134,7 +145,11 @@ function computeChipsAddedInStreet(
 // blinds NAO viram events — eles entram automaticamente no estado do
 // step 0 (mesa "pronta pra jogar"). Steps sao so eventos que o jogador
 // tomaria manualmente ou visuais (deal/showdown/award).
-function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[]): StepEvent[] {
+// bbUnit e' repassado pro actionLabel converter os valores exibidos na
+// history bar pra BB — chipsAdded continua RAW de proposito (contabilidade
+// interna do pote usa fichas cruas ate o ultimo instante, ver comentario
+// mais abaixo em projectHandAtStep).
+function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: number): StepEvent[] {
   const events: StepEvent[] = [];
   const posByName = new Map(layout.filter((s) => s.playerName).map((s) => [s.playerName as string, s.posLabel]));
   const streetOrder: StreetName[] = ["preflop", "flop", "turn", "river"];
@@ -182,7 +197,7 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[]): StepEvent[]
         kind: "action",
         player: a.player,
         posLabel,
-        label: actionLabel(a),
+        label: actionLabel(a, bbUnit),
         chipsAdded,
         isFold: a.action === "folds",
       });
@@ -253,7 +268,11 @@ function computeCurrentStreet(events: StepEvent[], throughStep: number): StreetN
 
 export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousStepIndex?: number): ReplayState {
   const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat ?? 0, hand.maxSeats ?? hand.seats.length);
-  const events = buildEventList(hand, seatLayout);
+  // bbUnit calculado ANTES de montar a lista de eventos — precisa estar
+  // disponivel pra actionLabel converter os valores da history bar pra BB
+  // no momento em que cada evento e' criado.
+  const bbUnit = hand.bigBlind && hand.bigBlind > 0 ? hand.bigBlind : 1;
+  const events = buildEventList(hand, seatLayout, bbUnit);
   const stepCount = events.length + 1; // +1 pro step 0 (estado inicial)
 
   if (stepCount === 1) {
@@ -318,7 +337,9 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
 
   // Checagem de sanidade so no ultimo step (a mao inteira processada):
   // se o pote reconstruido nao bate com o do SUMMARY, algo esta errado —
-  // melhor sinalizar do que exibir numero silenciosamente incorreto.
+  // melhor sinalizar do que exibir numero silenciosamente incorreto. A UI
+  // (RevisorHandTable) trata esse erro avancando pra proxima mao da fila
+  // em vez de bloquear a tela.
   if (clampedIndex === stepCount - 1 && hand.pot != null && hand.pot > 0) {
     const diff = Math.abs(pot - hand.pot);
     if (diff > 0.01) {
@@ -333,8 +354,7 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
   // mostra "77472 bb" (bug reportado: "esta puxando por valor de ficha").
   // bbUnit=1 quando bigBlind nao foi identificado (fallback: mostra fichas
   // cruas mesmo, melhor que dividir por zero/undefined).
-  const bbUnit = hand.bigBlind && hand.bigBlind > 0 ? hand.bigBlind : 1;
-  const toBB = (chips: number) => Math.round((chips / bbUnit) * 10) / 10;
+  const toBB = (chips: number) => toBBAmount(chips, bbUnit);
 
   const seats: Record<string, SeatState> = {};
   const actingPlayer = getActingPlayer(events, clampedIndex, folded);
@@ -455,7 +475,8 @@ function buildHistoryUpToStep(events: StepEvent[], throughStep: number, currentS
 // depois de 1-2 releases, remover). O novo caminho e' projectHandAtStep.
 export function projectHandAtStreet(hand: ParsedHand, streetIndex: number): ReplayState {
   const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat ?? 0, hand.maxSeats ?? hand.seats.length);
-  const events = buildEventList(hand, seatLayout);
+  const bbUnit = hand.bigBlind && hand.bigBlind > 0 ? hand.bigBlind : 1;
+  const events = buildEventList(hand, seatLayout, bbUnit);
   const targetStreetName = (["preflop", "flop", "turn", "river"] as StreetName[])[streetIndex] ?? "preflop";
 
   let stepAtEndOfStreet = 0;
