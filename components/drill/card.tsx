@@ -104,7 +104,7 @@ function CornerMark({
   );
 }
 
-export function Card({ card, size = "board" }: { card: string | null; size?: Size }) {
+export function Card({ card, size = "board", hideCenterSuit = false }: { card: string | null; size?: Size; hideCenterSuit?: boolean }) {
   const s = SIZES[size] || SIZES.board;
   if (!card) {
     return (
@@ -156,7 +156,7 @@ export function Card({ card, size = "board" }: { card: string | null; size?: Siz
       }}
     >
       <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />
-      <SuitCenter suitGlyph={su.g} size={s.bigCenter} />
+      {!hideCenterSuit && <SuitCenter suitGlyph={su.g} size={s.bigCenter} />}
       <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />
     </div>
   );
@@ -211,7 +211,10 @@ export function HalfCard({ card }: { card: string }) {
   const s = SIZES.mini;
   return (
     <div style={{ width: s.w, height: Math.round(s.h * 0.52), overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
-      <Card card={card} size="mini" />
+      {/* Naipe central escondido nas miniaturas — pedido explicito:
+          "esta muita informacao, apenas o menorzinho proximo do numero".
+          So o canto (rank + naipe pequeno) fica visivel. */}
+      <Card card={card} size="mini" hideCenterSuit />
     </div>
   );
 }
