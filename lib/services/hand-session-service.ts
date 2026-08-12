@@ -19,6 +19,19 @@ export interface HandSession {
   bounty_current: number | null;
   buyin: number | null;
   stakes: string | null;
+  // Campeao automatico (2026-08): true quando alguma mao anexada a essa
+  // sessao e' a mao final do torneio vencida pelo heroi (ver
+  // ParsedHand.wonTournament em hand-parser.ts). Alimenta o icone de
+  // taca na lista de torneios — nunca setado manualmente pelo jogador.
+  champion: boolean;
+  // 2 ou 3 quando a posicao final do heroi no torneio foi detectada
+  // (ver ParsedHand.heroFinishPlace) e for top-3 sem ser campeao. Null
+  // caso contrario (nao detectado, ou fora do podio).
+  final_place: number | null;
+  // true quando o heroi foi eliminado dentro do tamanho da mesa final
+  // (heuristica: heroFinishPlace <= maxSeats da mao de eliminacao) mas
+  // NAO ficou entre os 3 primeiros. Selo "FT" na lista de torneios.
+  reached_ft: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -223,7 +236,10 @@ export async function touchSession(sessionId: string) {
 // conhece sessao) a uma hand_sessions ja resolvida (criada ou existente).
 // Chamado logo apos o import batch confirmar — update em lote pelos ids
 // retornados, sem precisar tocar em hand-review-service.ts.
-export async function attachReviewsToSession(reviewIds: string[], sessionId: string) {
+// `hands` (opcional): as ParsedHand correspondentes aos reviewIds, ja
+// disponiveis no batch de import — usadas so pra checar campeao
+// automatico, sem precisar reparsear nada.
+export async function attachReviewsToSession(reviewIds: string[], sessionId: string, hands?: ParsedHand[]) {
   if (reviewIds.length === 0) return;
   const supabase = createClient();
   const { error } = await supabase
@@ -231,5 +247,36 @@ export async function attachReviewsToSession(reviewIds: string[], sessionId: str
     .update({ hand_session_id: sessionId })
     .in("id", reviewIds);
   if (error) throw error;
+
+  // Campeao automatico: qualquer mao do lote sendo a mao final do
+  // torneio vencida pelo heroi marca a sessao inteira como campeao.
+  // So promove pra true (nunca reverte aqui) — reimportar maos de um
+  // torneio ja vencido nao deveria "desmarcar" a taca.
+  const isChampion = (hands ?? []).some((h) => h.wonTournament && !!h.heroName && h.winner === h.heroName);
+  if (isChampion) {
+    const { error: champErr } = await supabase.from("hand_sessions").update({ champion: true }).eq("id", sessionId);
+    if (champErr) throw champErr;
+  }
+
+  // 2o/3o lugar e FT: procura a mao de eliminacao do heroi no lote (a
+  // que tem heroFinishPlace preenchido). So 1 mao deveria ter isso (a
+  // ultima que ele jogou no torneio). Heuristica de FT: eliminado dentro
+  // do tamanho da mesa final da propria mao (maxSeats) sem ser top-3 —
+  // ver comentario em ParsedHand.heroFinishPlace sobre a cautela aqui.
+  const finishHand = (hands ?? []).find((h) => h.heroFinishPlace != null);
+  if (finishHand?.heroFinishPlace != null && !isChampion) {
+    const place = finishHand.heroFinishPlace;
+    const patch =
+      place === 2 || place === 3
+        ? { final_place: place }
+        : finishHand.maxSeats != null && place <= finishHand.maxSeats
+          ? { reached_ft: true }
+          : null;
+    if (patch) {
+      const { error: placeErr } = await supabase.from("hand_sessions").update(patch).eq("id", sessionId);
+      if (placeErr) throw placeErr;
+    }
+  }
+
   await touchSession(sessionId);
 }
