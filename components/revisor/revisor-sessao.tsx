@@ -1,9 +1,10 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, DollarSign, Trophy, ChevronRight } from "lucide-react";
+import { AlertTriangle, Loader2, Target, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
+import { HalfCard } from "@/components/drill/card";
 import { updateSessionBounty, type HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { F, T } from "@/lib/poker/drill-theme";
@@ -17,14 +18,37 @@ import { F, T } from "@/lib/poker/drill-theme";
 // Nao substitui RevisorDetalhe (que tem perguntas guiadas, self-eval por
 // street, learning note, drill suggestion). Clicar em "Analisar mao" leva
 // pra la; essa tela e' pra NAVEGAR/consultar mesas do torneio rapido.
+//
+// Layout (2026-08 v2, pedido explicito):
+// - Lista mais estreita (220px, era 260px) / mesa ganha o espaco restante.
+// - Coluna da lista tem scroll PROPRIO — a mesa nao some quando o usuario
+//   rola a lista pra ver maos mais antigas. Isso exige o grid ter altura
+//   travada (nao so minHeight) e cada coluna gerenciar seu proprio overflow.
+const GRID_HEIGHT = "calc(100vh - 240px)"; // aproximado — depende do header
+// fixo da pagina (fora deste componente). Se ainda sobrar scroll da
+// pagina inteira ao abrir a tela, o ajuste fino de altura do
+// header/breadcrumb fica no componente pai (nao presente neste arquivo).
 
 interface HandInListing {
   id: string;
   title: string | null;
   hand_history: string | null;
-  parsed_data: { kind?: string } | null;
+  // heroCards so existe quando parsed_data.kind === "parsed" (import via
+  // hand history). Usado so pra miniatura na lista — nunca reparseia o
+  // hand_history inteiro so pra isso (custo desnecessario pra 147+ maos).
+  parsed_data: { kind?: string; heroCards?: string[] } | null;
   created_at: string;
   status: string;
+}
+
+function HeroCardsPreview({ cards }: { cards: string[] }) {
+  return (
+    <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+      {cards.map((c, i) => (
+        <HalfCard key={i} card={c} />
+      ))}
+    </div>
+  );
 }
 
 export function RevisorSessao({
@@ -102,6 +126,22 @@ export function RevisorSessao({
     setParsedCache((prev) => ({ ...prev, [selectedId]: parsed }));
   }, [selectedHand, selectedId, parsedCache]);
 
+  // Avança pra próxima mão da fila quando o replay da mão atual falha
+  // (ex: checagem de pote do projector) — pedido explicito (2026-08):
+  // "ao finalizar de ver a ação daquela mão... preciso que vá para a
+  // próxima mão ao invés de sair ou aparecer essa info", confirmado pra
+  // valer "independente do que causou o erro". Se já é a última mão da
+  // lista, não tem pra onde avançar — mantém a seleção (RevisorHandTable
+  // mostra o indicador de transição, mas sem próxima mão real ele fica
+  // parado; aceitável, é o fim da fila).
+  const goToNextHand = useCallback(() => {
+    setSelectedId((current) => {
+      const idx = hands.findIndex((h) => h.id === current);
+      if (idx === -1 || idx >= hands.length - 1) return current;
+      return hands[idx + 1].id;
+    });
+  }, [hands]);
+
   const saveBounty = useCallback(async () => {
     if (!session) return;
     const val = bountyInput.trim() ? Number(bountyInput.replace(",", ".")) : null;
@@ -163,24 +203,27 @@ export function RevisorSessao({
 
         {showsBounty && (
           <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            <Trophy size={14} color="#FBBF24" />
+            {/* Ícone trocado de cifrão/troféu pra alvo (Target) — pedido
+                explicito: "quero que apareça o icone de um alvo, que é
+                de fato o bounty nas mesas". Alvo e' o simbolo universal
+                de bounty em torneios PKO/Mystery, mais reconhecivel que
+                cifrao pra esse contexto especifico. */}
+            <Target size={14} color="#FBBF24" />
             {editingBounty ? (
-              <>
-                <input
-                  type="number"
-                  step="0.01"
-                  value={bountyInput}
-                  onChange={(e) => setBountyInput(e.target.value)}
-                  onBlur={saveBounty}
-                  onKeyDown={(e) => e.key === "Enter" && saveBounty()}
-                  autoFocus
-                  style={{
-                    background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.2)",
-                    color: "#FFFFFF", borderRadius: 8, padding: "4px 8px",
-                    fontSize: 13, fontFamily: F, width: 80, outline: "none",
-                  }}
-                />
-              </>
+              <input
+                type="number"
+                step="0.01"
+                value={bountyInput}
+                onChange={(e) => setBountyInput(e.target.value)}
+                onBlur={saveBounty}
+                onKeyDown={(e) => e.key === "Enter" && saveBounty()}
+                autoFocus
+                style={{
+                  background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.2)",
+                  color: "#FFFFFF", borderRadius: 8, padding: "4px 8px",
+                  fontSize: 13, fontFamily: F, width: 80, outline: "none",
+                }}
+              />
             ) : (
               <button
                 onClick={() => setEditingBounty(true)}
@@ -190,16 +233,20 @@ export function RevisorSessao({
                 }}
                 title="Editar bounty atual"
               >
-                <DollarSign size={12} />
-                <span>{session.bounty_current != null ? session.bounty_current : "—"}</span>
+                <span>{session.bounty_current != null ? `$${session.bounty_current}` : "—"}</span>
               </button>
             )}
           </div>
         )}
       </div>
 
-      {/* Master-detail: coluna esquerda com maos, coluna direita com mesa */}
-      <div style={{ display: "grid", gridTemplateColumns: "260px 1fr", gap: 12, minHeight: 500 }}>
+      {/* Master-detail: coluna esquerda com maos, coluna direita com mesa.
+          Altura TRAVADA (nao so minHeight) — pedido explicito: "a mesa
+          some quando desce a listagem". Com altura fixa + overflow proprio
+          em cada coluna, a lista rola por dentro e a mesa nunca sai da
+          tela. Colunas 220px / 1fr (era 260px) — mesa ganha mais espaco,
+          "precisa ser maior, ocupar mais espaço". */}
+      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 12, height: GRID_HEIGHT, minHeight: 480 }}>
         <aside
           style={{
             borderRadius: 14,
@@ -208,19 +255,21 @@ export function RevisorSessao({
             overflow: "hidden",
             display: "flex",
             flexDirection: "column",
+            minHeight: 0,
           }}
         >
-          <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)" }}>
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
             <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
               Mãos ({hands.length})
             </span>
           </div>
-          <div style={{ overflowY: "auto", flex: 1 }}>
+          <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
             {hands.length === 0 && (
               <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão nessa sessão ainda.</p>
             )}
             {hands.map((h, i) => {
               const active = selectedId === h.id;
+              const heroCards = h.parsed_data?.heroCards;
               return (
                 <button
                   key={h.id}
@@ -234,6 +283,7 @@ export function RevisorSessao({
                   }}
                 >
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                    {heroCards && heroCards.length > 0 && <HeroCardsPreview cards={heroCards} />}
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {h.title || `Mão ${i + 1}`}
@@ -251,9 +301,9 @@ export function RevisorSessao({
           </div>
         </aside>
 
-        <section style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 10 }}>
+        <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "hidden" }}>
           {selectedId && parsedForSelected ? (
-            <RevisorHandTable parsedHand={parsedForSelected} />
+            <RevisorHandTable parsedHand={parsedForSelected} onFatalError={goToNextHand} />
           ) : selectedId && parsedForSelected === null ? (
             <div
               style={{
