@@ -315,14 +315,15 @@ export function RevisorSessao({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
                     {heroCards && heroCards.length > 0 && <HeroCardsPreview cards={heroCards} />}
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      {/* Titulo (formato/stakes, ex: "MTT · 250/500") e
-                          data removidos (pedido explicito: "a informacao
-                          de mtt tambem pode tirar" / "nao precisa mostrar
-                          a data"). Fica so status + posicao do hero +
-                          indicador de entrou-ou-nao. Blind (SB/BB)
-                          tambem removido: "nao quero saber quando for
-                          big blind ou small blind". */}
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 6 }}>
+                      {/* Numero da mao (sequencial na sessao) — pedido
+                          explicito: "quero nesta tela tambem qual o
+                          numero da mao... isso e bom para filtros
+                          depois". Titulo (formato/stakes) e data
+                          continuam removidos. */}
+                      <div style={{ fontSize: 11.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)" }}>
+                        Mão {i + 1}
+                      </div>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
                         {h.status === "concluida" && <span style={{ color: T.ok }}>✓</span>}
                         {heroPosition && <span>{heroPosition}</span>}
                         {heroEntered !== null && (
