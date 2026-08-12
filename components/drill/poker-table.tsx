@@ -210,14 +210,12 @@ function Seat({
     ? { flexDirection: "column", alignItems: "center", gap: 6 }
     : (
         {
-          // Gap reduzido pra "above" (6 -> 2) — pedido explicito: "o
-          // vilao de cima esta com as cartas quase no meio da mesa".
-          // Direcao trocada de column-reverse pra column simples — a
-          // ordem visual agora e' controlada explicitamente no JSX
-          // (cardsBlock antes de seatInfo pra "above"), mais previsivel
-          // que depender da inversao do flex-direction.
-          below: { flexDirection: "column", gap: 6 },
-          above: { flexDirection: "column", gap: 2 },
+          // Gap zerado pra "above" — pedido explicito: "cartas muito
+          // afastadas da posicao, dando a impressao de soltas". O
+          // padding interno do CardBackPair (card.tsx) ja da respiro
+          // suficiente, nao precisa de gap extra aqui tambem.
+          below: { flexDirection: "column", gap: 4 },
+          above: { flexDirection: "column", gap: 0 },
           left: { flexDirection: "row-reverse", alignItems: "center", gap: 12 },
           right: { flexDirection: "row", alignItems: "center", gap: 12 },
         } as const
