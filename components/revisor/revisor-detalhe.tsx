@@ -97,12 +97,12 @@ function GuidedQuestionChip({
       <button
         type="button"
         onClick={() => setOpen((v) => !v)}
-        className={`flex w-full items-center gap-2 rounded-full border px-3 py-2 text-left text-[12.5px] transition-colors ${
+        className={`flex w-full items-center gap-2 rounded-full border px-3 py-1.5 text-left text-[12px] transition-colors ${
           answered ? "border-review/50 bg-review/10 text-ink" : "border-hairline bg-void text-ink/85"
         }`}
       >
         <span
-          className={`grid h-4 w-4 shrink-0 place-items-center rounded-full text-[9px] font-bold ${
+          className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full text-[8.5px] font-bold ${
             answered ? "bg-review text-void" : "border border-hairline text-muted"
           }`}
         >
@@ -114,10 +114,10 @@ function GuidedQuestionChip({
         <textarea
           value={answer}
           onChange={(e) => onChange(e.target.value)}
-          rows={3}
+          rows={2}
           autoFocus
           placeholder="Sua análise…"
-          className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[13px] text-ink outline-none focus:border-review"
+          className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
         />
       )}
     </div>
@@ -298,10 +298,14 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const canConclude = learning.trim().length > 0;
   const isPrintOnly = review.source === "print" || (!review.hand_history && review.parsed_data?.kind !== "parsed");
 
+  // Secoes mais compactas (pedido explicito: "diminua as perguntas") —
+  // padding p-4->p-3, margens mb-3.5->mb-2.5, chips e textarea menores
+  // (ver GuidedQuestionChip acima). Objetivo: sobrar mais espaco visual
+  // pra coluna da mesa, que ficou maior (ver grid abaixo).
   const secondaryContent = (
     <>
       {imgUrls.length > 0 && (
-        <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+        <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
           <h3 className="m-0 text-sm font-semibold text-ink">Prints</h3>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {imgUrls.map(
@@ -318,7 +322,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       )}
 
       {isPrintOnly && (
-        <section className="mb-3.5 rounded-xl border border-evolution/40 bg-evolution/[0.06] p-4">
+        <section className="mb-2.5 rounded-xl border border-evolution/40 bg-evolution/[0.06] p-3">
           <h3 className="m-0 text-sm font-semibold text-ink">Ficha rápida</h3>
           <p className="mb-3 mt-1 text-xs text-muted">
             Sem hand history pra ancorar o contexto — classifique em 3 toques pra essa mão entrar nas suas
@@ -382,18 +386,17 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </section>
       )}
 
-      <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-1 flex items-center justify-between">
           <div className="flex items-center gap-2">
-            <HelpCircle size={16} className="text-review" />
+            <HelpCircle size={15} className="text-review" />
             <h3 className="m-0 text-sm font-semibold text-ink">Perguntas guiadas</h3>
           </div>
           <span className="text-[11px] text-muted">
-            {answeredCount}/{qas.length} respondidas
+            {answeredCount}/{qas.length}
           </span>
         </div>
-        <p className="mb-3 mt-1 text-xs text-muted">Toque numa pergunta pra responder. O foco é pensar, não acertar.</p>
-        <div className="flex flex-col gap-2">
+        <div className="flex flex-col gap-1.5">
           {qas.map((q, i) => (
             <GuidedQuestionChip
               key={i}
@@ -406,17 +409,16 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </div>
       </section>
 
-      <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
-          <Scale size={16} className="text-review" />
+          <Scale size={15} className="text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Auto-avaliação por street</h3>
         </div>
-        <p className="mb-3 text-xs text-muted">Como você joga a mão em cada street? Essa é a base para detectar seus leaks.</p>
 
-        <div className="flex flex-col gap-2.5">
+        <div className="flex flex-col gap-2">
           {streetEvals.map((ev, idx) => (
-            <div key={ev.street} className="rounded-lg border border-hairline bg-void p-2.5">
-              <div className="mb-2 flex items-center justify-between">
+            <div key={ev.street} className="rounded-lg border border-hairline bg-void p-2">
+              <div className="mb-1.5 flex items-center justify-between">
                 <span className="text-xs font-semibold uppercase text-ink/85">{ev.street}</span>
                 <div className="flex gap-1">
                   {RATINGS.map((r) => {
@@ -428,7 +430,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                         onClick={() =>
                           setStreetEvals((prev) => prev.map((e, i) => (i === idx ? { ...e, self_rating: r.code } : e)))
                         }
-                        className="rounded-md border px-2 py-1 text-[11px] transition-colors"
+                        className="rounded-md border px-1.5 py-0.5 text-[10.5px] transition-colors"
                         style={{
                           borderColor: active ? r.color : "#2a2a2a",
                           background: active ? r.color : "transparent",
@@ -449,7 +451,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   onChange={(e) =>
                     setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: e.target.value } : x)))
                   }
-                  className="w-full rounded-lg border border-hairline bg-void px-2.5 py-2 text-xs text-ink outline-none"
+                  className="w-full rounded-lg border border-hairline bg-void px-2 py-1.5 text-[11.5px] text-ink outline-none"
                 >
                   <option value="">Motivo do erro…</option>
                   {reasons.map((r) => (
@@ -464,33 +466,31 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </div>
       </section>
 
-      <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
-          <Lightbulb size={16} className="text-review" />
+          <Lightbulb size={15} className="text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Registro de aprendizado</h3>
         </div>
-        <p className="mb-3 text-xs text-muted">Resuma em 1–2 frases o que ficou dessa mão.</p>
         <textarea
           value={learning}
           onChange={(e) => setLearning(e.target.value)}
-          rows={3}
+          rows={2}
           placeholder="Ex.: Subestimei blockers do vilão no river em spot 3B pot OOP."
-          className="w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[13px] text-ink outline-none focus:border-review"
+          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
         />
       </section>
 
-      <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
-          <Target size={16} className="text-review" />
+          <Target size={15} className="text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Sugestão de drill</h3>
         </div>
-        <p className="mb-3 text-xs text-muted">O que treinar para não repetir o erro?</p>
         <textarea
           value={drill}
           onChange={(e) => setDrill(e.target.value)}
           rows={2}
           placeholder="Ex.: BB defense vs BTN open — 20–30bb."
-          className="w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[13px] text-ink outline-none focus:border-review"
+          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
         />
       </section>
 
@@ -500,7 +500,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </div>
       )}
 
-      <footer className="mt-5 flex gap-2.5">
+      <footer className="mt-4 flex gap-2.5">
         <button
           onClick={() => persist("em_revisao")}
           disabled={saving}
@@ -537,12 +537,12 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         <ShareButton review={review} parsedHand={parsedHandForTable} />
       </div>
 
-      {/* Ordem trocada (pedido explicito): perguntas/conteudo secundario
-          na coluna ESQUERDA, mesa/replay na coluna DIREITA — mesmo padrao
-          de RevisorSessao (lista de maos a esquerda, mesa a direita).
-          Antes estava invertido (mesa esquerda, perguntas direita). */}
+      {/* Coluna da mesa aumentada (pedido explicito: "aumente a tela
+          aqui") — era 1fr/1.3fr, agora 0.8fr/1.5fr. Perguntas ficaram
+          mais compactas (ver secondaryContent) pra compensar o espaco
+          menor. */}
       {parsedHandForTable ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[1fr_1.3fr]">
+        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[0.8fr_1.5fr]">
           <div>{secondaryContent}</div>
           <div>
             <RevisorHandTable parsedHand={parsedHandForTable} />
