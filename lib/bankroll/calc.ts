@@ -112,6 +112,37 @@ export function groupStats(sessions: Session[], dimension: "format" | "weekday" 
     .sort((a, b) => a.net - b.net);
 }
 
+// --- Leak comportamental: tilt/mood (diario pos-sessao) -------------------
+// Cruza o diario (mood registrado na sessao) com o resultado — pra
+// responder "eu realmente jogo pior quando marco tilt?" com numero, nao
+// so intuicao. So considera sessoes que tem mood preenchido.
+export interface TiltImpact {
+  tiltN: number;
+  tiltRoi: number;
+  tiltNet: number;
+  otherN: number;
+  otherRoi: number;
+  otherNet: number;
+}
+
+export function tiltImpact(sessions: Session[]): TiltImpact | null {
+  const withMood = (sessions || []).filter((s) => s.mood);
+  if (withMood.length === 0) return null;
+  const tilt = withMood.filter((s) => s.mood === "tilt");
+  const other = withMood.filter((s) => s.mood !== "tilt");
+  if (tilt.length === 0) return null;
+  const aTilt = aggregate(tilt);
+  const aOther = aggregate(other);
+  return {
+    tiltN: tilt.length,
+    tiltRoi: aTilt.roi,
+    tiltNet: aTilt.profit,
+    otherN: other.length,
+    otherRoi: aOther.roi,
+    otherNet: aOther.profit,
+  };
+}
+
 export type RangeOption = "7D" | "30D" | "1Y" | "all";
 
 export function filterSeriesByRange(series: SeriesPoint[], range: RangeOption): SeriesPoint[] {
