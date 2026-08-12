@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { Session } from "@/lib/bankroll/types";
+import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog } from "@/lib/bankroll/types";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToSession(r: any): Session {
@@ -15,6 +15,9 @@ function rowToSession(r: any): Session {
     hours: r.hours != null ? Number(r.hours) : undefined,
     venue: r.venue || "",
     notes: r.notes || "",
+    mood: r.mood || undefined,
+    tilt: r.tilt != null ? Number(r.tilt) : undefined,
+    diaryNote: r.diary_note || undefined,
   };
 }
 
@@ -31,6 +34,9 @@ function sessionToRow(s: Partial<Session>, userId: string) {
     hours: s.hours != null && String(s.hours) !== "" ? Number(s.hours) : null,
     venue: s.venue || null,
     notes: s.notes || null,
+    mood: s.mood || null,
+    tilt: s.tilt != null ? Number(s.tilt) : null,
+    diary_note: s.diaryNote || null,
   };
 }
 
@@ -82,6 +88,27 @@ export async function deleteSession(id: string) {
   if (error) throw error;
 }
 
+// Fechamento de sessao / diario pos-sessao: edita uma sessao ja salva com
+// os campos de reflexao. Nao mexe em resultado/buy-in — so o diario.
+export async function updateSessionDiary(
+  id: string,
+  diary: { mood?: string; tilt?: number; diaryNote?: string }
+): Promise<Session> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("bankroll_sessions")
+    .update({
+      mood: diary.mood || null,
+      tilt: diary.tilt != null ? Number(diary.tilt) : null,
+      diary_note: diary.diaryNote || null,
+    })
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToSession(data);
+}
+
 export async function fetchSettings() {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -102,4 +129,109 @@ export async function saveSettings({ bankroll, profile }: { bankroll: number; pr
     { onConflict: "user_id" }
   );
   if (error) throw error;
+}
+
+// --- Transacoes (deposito/saque/caixinha) --------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToTransaction(r: any): Transaction {
+  return { id: r.id, date: r.date, type: r.type, amount: Number(r.amount) || 0, note: r.note || undefined };
+}
+
+export async function fetchTransactions(): Promise<Transaction[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("bankroll_transactions")
+    .select("*")
+    .order("date", { ascending: true });
+  if (error) throw error;
+  return (data || []).map(rowToTransaction);
+}
+
+export async function addTransaction(t: {
+  date: string;
+  type: TransactionType;
+  amount: number;
+  note?: string;
+}): Promise<Transaction> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("bankroll_transactions")
+    .insert({ user_id: userId, date: t.date, type: t.type, amount: Number(t.amount) || 0, note: t.note || null })
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToTransaction(data);
+}
+
+export async function deleteTransaction(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("bankroll_transactions").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// --- Metas (volume/estudo) ------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToGoal(r: any): Goal {
+  return { id: r.id, type: r.type, period: r.period, target: Number(r.target) || 0, unit: r.unit, active: !!r.active };
+}
+
+export async function fetchGoals(): Promise<Goal[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("bankroll_goals")
+    .select("*")
+    .eq("active", true)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  return (data || []).map(rowToGoal);
+}
+
+export async function addGoal(g: { type: GoalType; period: GoalPeriod; target: number; unit: string }): Promise<Goal> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("bankroll_goals")
+    .insert({ user_id: userId, type: g.type, period: g.period, target: Number(g.target) || 0, unit: g.unit })
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToGoal(data);
+}
+
+export async function deleteGoal(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("bankroll_goals").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// --- Log de estudo (alimenta meta de estudo) ------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToStudyLog(r: any): StudyLog {
+  return { id: r.id, date: r.date, minutes: Number(r.minutes) || 0, note: r.note || undefined };
+}
+
+export async function fetchStudyLogs(): Promise<StudyLog[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("bankroll_study_logs")
+    .select("*")
+    .order("date", { ascending: true });
+  if (error) throw error;
+  return (data || []).map(rowToStudyLog);
+}
+
+export async function addStudyLog(l: { date: string; minutes: number; note?: string }): Promise<StudyLog> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("bankroll_study_logs")
+    .insert({ user_id: userId, date: l.date, minutes: Number(l.minutes) || 0, note: l.note || null })
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToStudyLog(data);
 }
