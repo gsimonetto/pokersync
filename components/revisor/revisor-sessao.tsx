@@ -297,9 +297,6 @@ export function RevisorSessao({
               const heroCards = h.parsed_data?.heroCards;
               const heroPosition = h.parsed_data?.heroPosition;
               const heroEntered = didHeroEnterHand(h.parsed_data?.heroName, h.parsed_data?.streets);
-              // Aposta obrigatoria (blind) — derivavel com seguranca so
-              // pela posicao do hero (SB/BB sempre postam blind).
-              const postedBlind = heroPosition === "SB" || heroPosition === "BB";
               return (
                 <button
                   key={h.id}
@@ -318,13 +315,14 @@ export function RevisorSessao({
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
                     {heroCards && heroCards.length > 0 && <HeroCardsPreview cards={heroCards} />}
                     <div style={{ minWidth: 0, flex: 1 }}>
-                      <div style={{ fontSize: 12.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                        {h.title || `Mão ${i + 1}`}
-                      </div>
-                      {/* Data removida (pedido explicito: "nao precisa
-                          mostrar a data do torneio nas maos") — fica so
-                          o status e a posicao/blind do hero. */}
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                      {/* Titulo (formato/stakes, ex: "MTT · 250/500") e
+                          data removidos (pedido explicito: "a informacao
+                          de mtt tambem pode tirar" / "nao precisa mostrar
+                          a data"). Fica so status + posicao do hero +
+                          indicador de entrou-ou-nao. Blind (SB/BB)
+                          tambem removido: "nao quero saber quando for
+                          big blind ou small blind". */}
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", display: "flex", alignItems: "center", gap: 6 }}>
                         {h.status === "concluida" && <span style={{ color: T.ok }}>✓</span>}
                         {heroPosition && <span>{heroPosition}</span>}
                         {heroEntered !== null && (
@@ -339,14 +337,6 @@ export function RevisorSessao({
                               flexShrink: 0,
                             }}
                           />
-                        )}
-                        {postedBlind && (
-                          <span
-                            title="Hero postou blind obrigatório nessa mão"
-                            style={{ display: "flex", alignItems: "center", gap: 2, color: "#FBBF24" }}
-                          >
-                            <Target size={9} /> blind
-                          </span>
                         )}
                       </div>
                     </div>
