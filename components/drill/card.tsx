@@ -66,10 +66,16 @@ function CornerMark({
   suitSize: number;
   position: "tl" | "br";
 }) {
+  // Fix (2026-08 v2): ranks de 2 digitos ("10") ficavam visualmente mais
+  // "pesados" que ranks de 1 char (K, A, Q, J) no mesmo tamanho de fonte —
+  // em cartas pequenas isso reduzia o respiro ate o naipe central e dava
+  // impressao de canto "colado". Encolhe soh o "10" um pouco (14%) e
+  // aperta o letter-spacing, igualando o peso visual aos demais ranks.
+  const isDoubleDigit = rank === "T";
   const style: React.CSSProperties =
     position === "tl"
-      ? { top: 4, left: 5, alignItems: "flex-start" }
-      : { bottom: 4, right: 5, alignItems: "flex-end", transform: "rotate(180deg)" };
+      ? { top: 5, left: 6, alignItems: "flex-start" }
+      : { bottom: 5, right: 6, alignItems: "flex-end", transform: "rotate(180deg)" };
   return (
     <div
       style={{
@@ -83,8 +89,17 @@ function CornerMark({
     >
       {/* rank == "T" e' 10 no vocabulario interno (parser usa 1 char). No
           canto exibimos "10" mesmo pra caber e ser reconhecivel. */}
-      <span style={{ fontSize: rankSize, fontWeight: 500, ...num }}>{rank === "T" ? "10" : rank}</span>
-      <span style={{ fontSize: suitSize, marginTop: 1, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
+      <span
+        style={{
+          fontSize: isDoubleDigit ? rankSize * 0.86 : rankSize,
+          fontWeight: 500,
+          letterSpacing: isDoubleDigit ? -0.4 : 0,
+          ...num,
+        }}
+      >
+        {rank === "T" ? "10" : rank}
+      </span>
+      <span style={{ fontSize: suitSize, marginTop: 2, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
     </div>
   );
 }
