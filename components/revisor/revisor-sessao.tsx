@@ -33,10 +33,18 @@ interface HandInListing {
   id: string;
   title: string | null;
   hand_history: string | null;
-  // heroCards so existe quando parsed_data.kind === "parsed" (import via
-  // hand history). Usado so pra miniatura na lista — nunca reparseia o
-  // hand_history inteiro so pra isso (custo desnecessario pra 147+ maos).
-  parsed_data: { kind?: string; heroCards?: string[] } | null;
+  // heroCards/heroPosition/heroName/streets so existem quando parsed_data.
+  // kind === "parsed" (import via hand history). Usado so pra preview na
+  // lista — nunca reparseia o hand_history inteiro so pra isso (custo
+  // desnecessario pra 147+ maos). streets/heroName servem so pra derivar
+  // "hero entrou na mao?" — nao guardamos a acao exata, so o booleano.
+  parsed_data: {
+    kind?: string;
+    heroCards?: string[];
+    heroPosition?: string;
+    heroName?: string;
+    streets?: { actions: { player: string; action: string }[] }[];
+  } | null;
   created_at: string;
   status: string;
 }
@@ -49,6 +57,23 @@ function HeroCardsPreview({ cards }: { cards: string[] }) {
       ))}
     </div>
   );
+}
+
+// "Hero entrou na mao?" — pedido explicito: "nao quero saber ela exata,
+// so precisamos saber se o hero entrou na mao ou nao". Entrou = fez
+// alguma acao voluntaria alem dos blinds/ante obrigatorios (call, raise,
+// bet, all-in, ou ate um check em rua postflop conta como "seguiu
+// jogando"). So "posts" (blind/ante) e "folds" como unica acao = nao
+// entrou (largou a mao assim que teve que decidir).
+function didHeroEnterHand(
+  heroName: string | undefined,
+  streets: { actions: { player: string; action: string }[] }[] | undefined
+): boolean | null {
+  if (!heroName || !streets) return null;
+  const heroActions = streets.flatMap((s) => s.actions).filter((a) => a.player === heroName);
+  const decisions = heroActions.filter((a) => a.action !== "posts");
+  if (decisions.length === 0) return null; // sem dados suficientes pra afirmar
+  return decisions.some((a) => a.action !== "folds");
 }
 
 export function RevisorSessao({
@@ -270,6 +295,11 @@ export function RevisorSessao({
             {hands.map((h, i) => {
               const active = selectedId === h.id;
               const heroCards = h.parsed_data?.heroCards;
+              const heroPosition = h.parsed_data?.heroPosition;
+              const heroEntered = didHeroEnterHand(h.parsed_data?.heroName, h.parsed_data?.streets);
+              // Aposta obrigatoria (blind) — derivavel com seguranca so
+              // pela posicao do hero (SB/BB sempre postam blind).
+              const postedBlind = heroPosition === "SB" || heroPosition === "BB";
               return (
                 <button
                   key={h.id}
@@ -282,15 +312,42 @@ export function RevisorSessao({
                     borderLeft: active ? "2px solid #A855F7" : "2px solid transparent",
                   }}
                 >
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 8 }}>
+                  {/* alignItems "flex-end" (era "center") — pedido
+                      explicito: "deixe as imagens grudadas na parte de
+                      baixo do card". */}
+                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
                     {heroCards && heroCards.length > 0 && <HeroCardsPreview cards={heroCards} />}
                     <div style={{ minWidth: 0, flex: 1 }}>
                       <div style={{ fontSize: 12.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                         {h.title || `Mão ${i + 1}`}
                       </div>
-                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2, display: "flex", gap: 6 }}>
+                      {/* Data removida (pedido explicito: "nao precisa
+                          mostrar a data do torneio nas maos") — fica so
+                          o status e a posicao/blind do hero. */}
+                      <div style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
                         {h.status === "concluida" && <span style={{ color: T.ok }}>✓</span>}
-                        <span>{new Date(h.created_at).toLocaleDateString()}</span>
+                        {heroPosition && <span>{heroPosition}</span>}
+                        {heroEntered !== null && (
+                          <span
+                            title={heroEntered ? "Hero entrou na mão (fez alguma ação)" : "Hero foldou assim que teve que decidir"}
+                            style={{
+                              display: "inline-block",
+                              width: 6,
+                              height: 6,
+                              borderRadius: "50%",
+                              background: heroEntered ? "#34D399" : "rgba(255,255,255,0.25)",
+                              flexShrink: 0,
+                            }}
+                          />
+                        )}
+                        {postedBlind && (
+                          <span
+                            title="Hero postou blind obrigatório nessa mão"
+                            style={{ display: "flex", alignItems: "center", gap: 2, color: "#FBBF24" }}
+                          >
+                            <Target size={9} /> blind
+                          </span>
+                        )}
                       </div>
                     </div>
                     {active && <ChevronRight size={12} color="rgba(255,255,255,0.4)" />}
