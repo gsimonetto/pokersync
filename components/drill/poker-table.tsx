@@ -157,8 +157,15 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
 // confirmado). Refinada (2026-08): saiu o pill dourado com bolinha dentro
 // (lido como "cartoon"); entra o icone de ficha real + numero solto, sem
 // container colorido.
+// Limite minimo pra exibir a pilha — pedido explicito: "pode tirar o
+// rake (0.1 de fichas no pre flop), desnecessario na nossa mesa". 0.1bb
+// e' tipicamente o ante de MTT, postado por todos os jogadores igual —
+// nao carrega informacao de decisao, so poluia a mesa. Apostas/calls/
+// raises reais (>= 0.5bb) continuam aparecendo normalmente.
+const MIN_COMMITTED_TO_SHOW = 0.5;
+
 function CommittedChips({ amount }: { amount: number }) {
-  if (amount <= 0) return null;
+  if (amount < MIN_COMMITTED_TO_SHOW) return null;
   return (
     <div style={{ animation: "fadeInUp 220ms ease-out both" }}>
       <ChipValueLabel amount={amount} size="sm" />
@@ -292,64 +299,88 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
     </div>
   );
 
+  // Ponto pra pilha de fichas paradas: puxado ~26% em direcao ao centro
+  // da mesa (50,44 — mesmo ponto de referencia do ChipAnimation e do
+  // DealerButtonIcon) a partir do assento. Fix (pedido explicito: "as
+  // fichas estao fora da mesa") — antes a pilha nascia dentro do proprio
+  // bloco do assento (marginTop logo abaixo do nome/stack), e como os
+  // assentos ficam posicionados fora da elipse por design, a ficha
+  // tambem saia fora do tapete. Renderizada como elemento IRMAO,
+  // independente do bloco do assento, com sua propria coordenada.
+  const chipDx = 50 - seat.x;
+  const chipDy = 44 - seat.y;
+  const chipX = seat.x + chipDx * 0.26;
+  const chipY = seat.y + chipDy * 0.26;
+
   return (
-    <div
-      style={{
-        position: "absolute",
-        left: `${seat.x}%`,
-        top: `${seat.y}%`,
-        transform: "translate(-50%,-50%)",
-        opacity,
-        // Dessaturacao leve no fold — reforca "fora da mao" so com
-        // tratamento visual (opacidade + cinza), sem precisar de texto
-        // "FOLD". Acompanha o pedido de manter so o estado visual.
-        filter: status === "folded" ? "grayscale(0.5)" : "none",
-        transition: "opacity 220ms ease, filter 220ms ease",
-        zIndex: acting ? 5 : 2,
-        animation: acting ? "seatPulse 2s ease-in-out infinite" : "none",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", ...layout }}>
-        {hero ? (
-          <>
-            {cards && cards.length > 0 && (
-              // Cards do hero: tamanho "board" (mesmo das cartas comunitarias),
-              // sem rotacao. Antes usava size="hero" (bem maior) em layout
-              // row — pedido explicito: diminuir e trocar pro mesmo padrao
-              // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
-              <div style={{ display: "flex", gap: 5 }}>
-                {cards.map((c, i) => (
-                  <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
-                    <Card card={c} size="board" />
-                  </div>
-                ))}
-              </div>
-            )}
-            {seatInfo}
-          </>
-        ) : (
-          <>
-            {seatInfo}
-            {revealedVillainCards ? (
-              <div style={{ display: "flex", gap: 5 }}>
-                {cards!.map((c, i) => (
-                  <div key={i} style={{ transform: `rotate(${i ? 4 : -4}deg)`, animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
-                    <Card card={c} size="board" />
-                  </div>
-                ))}
-              </div>
-            ) : (
-              facedown && <CardBackPair side={seat.cardSide === "left" ? "left" : "right"} />
-            )}
-          </>
-        )}
+    <>
+      <div
+        style={{
+          position: "absolute",
+          left: `${seat.x}%`,
+          top: `${seat.y}%`,
+          transform: "translate(-50%,-50%)",
+          opacity,
+          // Dessaturacao leve no fold — reforca "fora da mao" so com
+          // tratamento visual (opacidade + cinza), sem precisar de texto
+          // "FOLD". Acompanha o pedido de manter so o estado visual.
+          filter: status === "folded" ? "grayscale(0.5)" : "none",
+          transition: "opacity 220ms ease, filter 220ms ease",
+          zIndex: acting ? 5 : 2,
+          animation: acting ? "seatPulse 2s ease-in-out infinite" : "none",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", ...layout }}>
+          {hero ? (
+            <>
+              {cards && cards.length > 0 && (
+                // Cards do hero: tamanho "board" (mesmo das cartas comunitarias),
+                // sem rotacao. Antes usava size="hero" (bem maior) em layout
+                // row — pedido explicito: diminuir e trocar pro mesmo padrao
+                // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
+                <div style={{ display: "flex", gap: 5 }}>
+                  {cards.map((c, i) => (
+                    <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+                      <Card card={c} size="board" />
+                    </div>
+                  ))}
+                </div>
+              )}
+              {seatInfo}
+            </>
+          ) : (
+            <>
+              {seatInfo}
+              {revealedVillainCards ? (
+                <div style={{ display: "flex", gap: 5 }}>
+                  {cards!.map((c, i) => (
+                    <div key={i} style={{ transform: `rotate(${i ? 4 : -4}deg)`, animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+                      <Card card={c} size="board" />
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                facedown && <CardBackPair side={seat.cardSide === "left" ? "left" : "right"} />
+              )}
+            </>
+          )}
+        </div>
       </div>
-      {!!committed && (
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 2 }}>
+
+      {!!committed && committed >= MIN_COMMITTED_TO_SHOW && (
+        <div
+          style={{
+            position: "absolute",
+            left: `${chipX}%`,
+            top: `${chipY}%`,
+            transform: "translate(-50%,-50%)",
+            zIndex: 3,
+          }}
+        >
           <CommittedChips amount={committed} />
         </div>
       )}
-    </div>
+    </>
   );
 }
 
