@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, brmReading, type RangeOption, type SeriesPoint } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, brmReading, groupStats, tiltImpact, type RangeOption, type SeriesPoint, type GroupStat } from "@/lib/bankroll/calc";
 import { buildCoachTips, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO } from "@/lib/bankroll/format";
 import {
@@ -45,6 +45,7 @@ export default function BankrollPage() {
   const [studyLogs, setStudyLogs] = useState<StudyLog[]>([]);
   const [brmThresholds, setBrmThresholds] = useState<BrmThreshold[]>([]);
   const [showBrmEdit, setShowBrmEdit] = useState(false);
+  const [leakDimension, setLeakDimension] = useState<"format" | "weekday" | "time">("format");
   const [bankroll, setBankroll] = useState(0);
   const [range, setRange] = useState<RangeOption>("all");
   const [view, setView] = useState<"jogo" | "patrimonio">("jogo");
@@ -126,6 +127,8 @@ export default function BankrollPage() {
     () => brmReading(sessions, nw.playingBankroll, brmThresholds),
     [sessions, nw.playingBankroll, brmThresholds]
   );
+  const leakStats = useMemo(() => groupStats(sessions, leakDimension), [sessions, leakDimension]);
+  const tiltStats = useMemo(() => tiltImpact(sessions), [sessions]);
   const recent = [...sessions].reverse().slice(0, 8);
   const recentTx = [...transactions].reverse().slice(0, 6);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
@@ -283,27 +286,9 @@ export default function BankrollPage() {
         <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
 
-      {/* Atalho de registro rapido — a acao mais frequente do jogador
-          (bater a sessao assim que sai da mesa) nao pode depender de
-          rolar a tela. Fica logo abaixo do header, sempre visivel, do
-          lado esquerdo — toggle Banca/Patrimonio fica a direita, na
-          mesma linha (nao empilhado). */}
+      {/* Atalho de registro rapido do lado direito; toggle Banca/Patrimonio
+          do lado esquerdo — mesma linha, nao empilhados. */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2.5">
-          <button
-            onClick={() => setSessionModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
-          >
-            <Plus size={15} /> Registrar sessao
-          </button>
-          <button
-            onClick={() => setTxModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-ink transition-colors hover:border-ink/40"
-          >
-            <Plus size={15} /> Deposito / saque
-          </button>
-        </div>
-
         <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
           <button
             onClick={() => setView("jogo")}
@@ -320,6 +305,21 @@ export default function BankrollPage() {
             }`}
           >
             Patrimonio total
+          </button>
+        </div>
+
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            onClick={() => setSessionModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
+          >
+            <Plus size={15} /> Registrar sessao
+          </button>
+          <button
+            onClick={() => setTxModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-ink transition-colors hover:border-ink/40"
+          >
+            <Plus size={15} /> Deposito / saque
           </button>
         </div>
       </div>
@@ -738,7 +738,88 @@ export default function BankrollPage() {
         )}
       </section>
 
-      <p className="mt-6 text-xs text-muted">Calculadora de BRM e painel de leaks ficam para a proxima leva desta fase.</p>
+      {/* Painel de leaks financeiro/comportamental — reusa groupStats
+          (ja calculado, nunca tinha sido visualizado) agrupando por
+          formato, dia da semana ou horario. Ordenado do pior pro melhor
+          (groupStats ja devolve nessa ordem). Leak TECNICO (spot a spot)
+          continua no Revisor de Maos — isso aqui e' leak financeiro. */}
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Painel de leaks</h2>
+          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+            {[
+              { value: "format" as const, label: "Formato" },
+              { value: "weekday" as const, label: "Dia" },
+              { value: "time" as const, label: "Horario" },
+            ].map((d) => (
+              <button
+                key={d.value}
+                onClick={() => setLeakDimension(d.value)}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-colors ${
+                  leakDimension === d.value ? "bg-ink text-void" : "text-muted hover:text-ink"
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {leakStats.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
+        ) : (
+          <div className="mt-4 flex flex-col gap-2">
+            {leakStats.map((g: GroupStat) => {
+              const maxAbs = Math.max(...leakStats.map((x) => Math.abs(x.net)), 1);
+              const width = Math.max(4, (Math.abs(g.net) / maxAbs) * 100);
+              const negative = g.net < 0;
+              return (
+                <div key={g.key} className="rounded-lg border border-hairline bg-elevated p-3 transition-colors hover:border-ink/30">
+                  <div className="flex items-center justify-between">
+                    <p className="text-sm font-semibold">{g.key}</p>
+                    <p className="text-xs text-muted">
+                      {g.n} {g.n === 1 ? "sessao" : "sessoes"} · ROI {fmtPct(g.roi)}
+                    </p>
+                  </div>
+                  <div className="mt-1.5 flex items-center gap-2">
+                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-void/40">
+                      <div
+                        className={`h-full rounded-full ${negative ? "bg-negative" : "bg-positive"}`}
+                        style={{ width: `${width}%` }}
+                      />
+                    </div>
+                    <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
+                      {fmtSignedMoney(g.net)}
+                    </span>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tiltStats && tiltStats.tiltN > 0 && (
+          <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Sessoes com tilt vs demais</p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
+                <p className={`text-sm font-bold ${tiltStats.tiltNet >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSignedMoney(tiltStats.tiltNet)} · ROI {fmtPct(tiltStats.tiltRoi)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted">Demais ({tiltStats.otherN})</p>
+                <p className={`text-sm font-bold ${tiltStats.otherNet >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSignedMoney(tiltStats.otherNet)} · ROI {fmtPct(tiltStats.otherRoi)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
+      </section>
+
+      <p className="mt-6 text-xs text-muted">Calculadora de BRM fica para a proxima leva desta fase.</p>
     </main>
   );
 }
