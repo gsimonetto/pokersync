@@ -311,9 +311,12 @@ export async function deleteAnnotation(id: string) {
 
 // --- Alerta de BRM via notificacao ----------------------------------------
 // Dispara uma notificacao (Hub de Evolucao ja tem o sino/lista) quando o
-// status de moveup/movedown muda pra algo accionavel. Dedupe simples:
-// nao duplica se ja existe notificacao com o mesmo titulo criada nas
-// ultimas 20h (evita spam a cada reload da tela).
+// status de moveup/movedown muda pra algo accionavel. Passa pela RPC
+// notify_user (security definer) em vez de insert direto — a tabela
+// notifications nao tinha policy de INSERT nenhuma antes disso, entao o
+// insert direto falhava silenciosamente (bug corrigido aqui). Dedupe
+// simples: nao duplica se ja existe notificacao com o mesmo titulo
+// criada nas ultimas 20h (evita spam a cada reload da tela).
 export async function notifyBrmAlert(title: string, body: string) {
   const supabase = createClient();
   const userId = await getUserId();
@@ -327,11 +330,12 @@ export async function notifyBrmAlert(title: string, body: string) {
     .limit(1);
   if (checkErr) throw checkErr;
   if (existing && existing.length > 0) return;
-  const { error } = await supabase.from("notifications").insert({
-    user_id: userId,
-    title,
-    body,
-    kind: "warning",
+  const { error } = await supabase.rpc("notify_user", {
+    p_user_id: userId,
+    p_title: title,
+    p_body: body,
+    p_kind: "warning",
+    p_action_url: "/banca",
   });
   if (error) throw error;
 }

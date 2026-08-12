@@ -6,6 +6,9 @@ export interface Notification {
   body: string | null;
   kind: "info" | "success" | "warning" | string;
   read: boolean;
+  // Deep-link opcional (ex: "/revisor?shared=<reviewId>") — clicar na
+  // notificacao navega pra ca, alem de marcar como lida.
+  action_url: string | null;
   created_at: string;
 }
 
@@ -13,7 +16,7 @@ export async function fetchNotifications(limit = 20): Promise<Notification[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("notifications")
-    .select("id, title, body, kind, read, created_at")
+    .select("id, title, body, kind, read, action_url, created_at")
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;

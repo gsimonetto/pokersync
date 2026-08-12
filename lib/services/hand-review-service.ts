@@ -124,6 +124,21 @@ export async function createUserTag(userId: string, label: string): Promise<Tag>
   return data;
 }
 
+// Marcadores totalmente editaveis DEPOIS da mao ja salva (pedido
+// explicito) — antes so dava pra escolher tag na criacao (Mãos avulsas).
+// Estrategia replace-all: apaga os vinculos atuais e recria com o set
+// novo — mais simples e seguro que diff incremental pra uma lista curta
+// de tags, e evita ficar com vinculo orfao se o id mudar de dono no meio.
+export async function updateReviewTags(reviewId: string, userId: string, tagIds: string[]) {
+  const supabase = createClient();
+  const { error: delErr } = await supabase.from("hand_review_tag_links").delete().eq("review_id", reviewId);
+  if (delErr) throw delErr;
+  if (tagIds.length === 0) return;
+  const links = tagIds.map((tag_id) => ({ review_id: reviewId, tag_id, user_id: userId }));
+  const { error: insErr } = await supabase.from("hand_review_tag_links").insert(links);
+  if (insErr) throw insErr;
+}
+
 // ============================================================
 // Reviews CRUD
 // ============================================================
@@ -529,4 +544,76 @@ export async function linkReviewToSession(reviewId: string, sessionId: string | 
   const supabase = createClient();
   const { error } = await supabase.from("hand_reviews").update({ session_id: sessionId }).eq("id", reviewId);
   if (error) throw error;
+}
+
+// ============================================================
+// Compartilhar mao com o coach do time
+// ============================================================
+// Base minima de Times (role coach/jogador em team_members) — mao
+// continua pertencendo ao jogador, o coach so ganha leitura (RLS
+// aditiva: hr_select_shared e as demais *_select_shared). O coach abre
+// no MESMO RevisorDetalhe (mao, tags e perguntas guiadas), nao uma tela
+// separada — e' o pedido explicito de "abrir o replayer do mesmo
+// formato".
+export interface TeamCoach {
+  userId: string;
+  name: string;
+}
+
+export async function fetchTeamCoaches(userId: string): Promise<TeamCoach[]> {
+  const supabase = createClient();
+  const { data: myTeams, error: teamErr } = await supabase
+    .from("team_members")
+    .select("team_id")
+    .eq("user_id", userId);
+  if (teamErr) throw teamErr;
+  const teamIds = (myTeams ?? []).map((t) => t.team_id);
+  if (teamIds.length === 0) return [];
+
+  const { data: coachRows, error } = await supabase
+    .from("team_members")
+    .select("user_id")
+    .in("team_id", teamIds)
+    .eq("role", "coach")
+    .neq("user_id", userId);
+  if (error) throw error;
+
+  const coachIds = [...new Set((coachRows ?? []).map((r) => r.user_id))];
+  if (coachIds.length === 0) return [];
+
+  // Sem FK entre team_members e profiles — busca separada em vez de
+  // embed do PostgREST, junta no client.
+  const { data: profileRows, error: profErr } = await supabase
+    .from("profiles")
+    .select("id, nome, apelido")
+    .in("id", coachIds);
+  if (profErr) throw profErr;
+
+  return coachIds.map((id) => {
+    const p = (profileRows ?? []).find((row) => row.id === id);
+    return { userId: id, name: p?.apelido || p?.nome || "Coach" };
+  });
+}
+
+export async function shareReviewWithCoach(reviewId: string, coachUserId: string, reviewTitle: string) {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const sharedBy = userData.user?.id;
+  if (!sharedBy) throw new Error("NO_SESSION");
+
+  const { error: shareErr } = await supabase
+    .from("hand_review_shares")
+    .insert({ review_id: reviewId, shared_by: sharedBy, shared_with: coachUserId });
+  if (shareErr) throw shareErr;
+
+  // notify_user (RPC security definer) — insert direto em notifications
+  // pra outro usuario nao passaria pela RLS de qualquer forma.
+  const { error: notifyErr } = await supabase.rpc("notify_user", {
+    p_user_id: coachUserId,
+    p_title: "Mão pra revisar",
+    p_body: `${reviewTitle || "Uma mão"} foi compartilhada com você pra revisão.`,
+    p_kind: "info",
+    p_action_url: `/revisor?shared=${reviewId}`,
+  });
+  if (notifyErr) throw notifyErr;
 }
