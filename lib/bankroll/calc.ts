@@ -1,5 +1,5 @@
 import { weekdayName, hourOf, timeBucket } from "./format";
-import type { Session, Transaction, Goal, StudyLog } from "./types";
+import type { Session, Transaction, Goal, StudyLog, BrmThreshold, BrmFormat } from "./types";
 
 const TOURNEY = new Set(["MTT", "SNG", "Spin"]);
 
@@ -189,4 +189,59 @@ export function goalProgress(goal: Goal, sessions: Session[], studyLogs: StudyLo
   }
   const pct = goal.target > 0 ? Math.min(100, (current / goal.target) * 100) : 0;
   return { goal, current: +current.toFixed(1), pct };
+}
+
+// --- BRM: moveup / movedown por formato ----------------------------------
+// Padrao de mercado: cash tem variancia menor (30 buy-ins cobre bem, sobe
+// de limite acima disso, desce abaixo de 15). Torneio (MTT/SNG/Spin) tem
+// variancia bem maior — 100 buy-ins e o piso recomendado, desce abaixo de
+// 50. Sao so os valores INICIAIS; o jogador pode editar cada um.
+export const DEFAULT_BRM_THRESHOLDS: BrmThreshold[] = [
+  { format: "Cash", moveupBuyins: 30, movedownBuyins: 15 },
+  { format: "MTT", moveupBuyins: 100, movedownBuyins: 50 },
+  { format: "SNG", moveupBuyins: 100, movedownBuyins: 50 },
+  { format: "Spin", moveupBuyins: 100, movedownBuyins: 50 },
+];
+
+export function thresholdFor(thresholds: BrmThreshold[], format: string): BrmThreshold {
+  return (
+    thresholds.find((t) => t.format === format) ||
+    DEFAULT_BRM_THRESHOLDS.find((t) => t.format === format) ||
+    DEFAULT_BRM_THRESHOLDS[0]
+  );
+}
+
+export type BrmStatus = "movedown" | "hold" | "moveup";
+
+export interface BrmReading {
+  format: BrmFormat;
+  avgBuyIn: number;
+  buyInsCovered: number;
+  threshold: BrmThreshold;
+  status: BrmStatus;
+}
+
+// Le' o formato/stake mais jogado recentemente (ultimas `lookback`
+// sessoes) e calcula quantos buy-ins desse formato a banca atual cobre,
+// comparando com o threshold configurado — usado tanto na UI quanto no
+// Coach.
+export function brmReading(
+  sessions: Session[],
+  bankroll: number,
+  thresholds: BrmThreshold[],
+  lookback = 15
+): BrmReading | null {
+  const recent = [...(sessions || [])].slice(-lookback);
+  if (recent.length === 0) return null;
+  const count: Record<string, number> = {};
+  for (const s of recent) count[s.format] = (count[s.format] || 0) + 1;
+  const format = Object.entries(count).sort((a, b) => b[1] - a[1])[0][0] as BrmFormat;
+  const sameFormat = recent.filter((s) => s.format === format);
+  const avgBuyIn = sameFormat.reduce((sum, s) => sum + (Number(s.buyIn) || 0), 0) / sameFormat.length;
+  if (avgBuyIn <= 0) return null;
+  const buyInsCovered = bankroll / avgBuyIn;
+  const threshold = thresholdFor(thresholds, format);
+  const status: BrmStatus =
+    buyInsCovered >= threshold.moveupBuyins ? "moveup" : buyInsCovered < threshold.movedownBuyins ? "movedown" : "hold";
+  return { format, avgBuyIn, buyInsCovered: +buyInsCovered.toFixed(1), threshold, status };
 }
