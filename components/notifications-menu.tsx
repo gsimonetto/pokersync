@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Bell, CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle } from "lucide-react";
 import { fetchNotifications, markAsRead, markAllAsRead, deleteNotification, type Notification } from "@/lib/services/notification-service";
 
@@ -19,6 +20,7 @@ const KIND_ICON = {
 } as const;
 
 export function NotificationsMenu({ onClose }: { onClose: () => void }) {
+  const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -51,12 +53,17 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
   }, [onClose]);
 
   async function handleItemClick(n: Notification) {
-    if (n.read) return;
-    setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
-    try {
-      await markAsRead(n.id);
-    } catch {
-      load();
+    if (!n.read) {
+      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+      try {
+        await markAsRead(n.id);
+      } catch {
+        load();
+      }
+    }
+    if (n.action_url) {
+      onClose();
+      router.push(n.action_url);
     }
   }
 
@@ -106,7 +113,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
               <div
                 key={n.id}
                 onClick={() => handleItemClick(n)}
-                className={`flex cursor-pointer gap-2.5 border-b border-hairline px-4 py-3 ${n.read ? "" : "bg-evolution/[0.06]"}`}
+                className={`flex cursor-pointer gap-2.5 border-b border-hairline px-4 py-3 transition-colors ${n.read ? "" : "bg-evolution/[0.06]"} ${n.action_url ? "hover:bg-review/[0.08]" : ""}`}
               >
                 <Icon size={16} color={meta.color} className="mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
