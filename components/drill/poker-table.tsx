@@ -12,6 +12,16 @@ export interface SeatState {
   cards?: (string | null)[];
 }
 
+// Trunca por CONTAGEM de caracteres (nao so por CSS text-overflow em px) —
+// pedido explicito: nomes longos estouram o chip antes do ellipsis de CSS
+// conseguir cortar de forma previsivel em telas menores. Corta em 12
+// chars fixos + "..." (o title="" no elemento mantem o nome completo
+// disponivel via tooltip/hover pra quem precisar conferir).
+const NAME_MAX_CHARS = 12;
+function truncateName(name: string): string {
+  return name.length > NAME_MAX_CHARS ? `${name.slice(0, NAME_MAX_CHARS)}...` : name;
+}
+
 export interface HistoryStep {
   street: string;
   current?: boolean;
@@ -161,20 +171,23 @@ function CommittedPill({ amount }: { amount: number }) {
       style={{
         display: "flex",
         alignItems: "center",
-        gap: 4,
+        gap: 5,
         background: "#0A0A0A",
         border: "1px solid rgba(255,255,255,.18)",
         borderRadius: 999,
-        padding: "2px 8px 2px 4px",
+        padding: "3px 10px 3px 5px",
         boxShadow: "0 3px 8px rgba(0,0,0,.5)",
         animation: "fadeInUp 220ms ease-out both",
         whiteSpace: "nowrap",
       }}
     >
-      <ChipStackIcon size={11} />
-      <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: TEXT.critical, ...num }}>
+      <ChipStackIcon size={13} />
+      {/* Valor aumentado (pedido explicito): estava pequeno demais pra
+          ler de relance durante o replay. "bb" agora sempre no final,
+          em tamanho proximo do numero (nao mais um detalhe minusculo). */}
+      <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>
         {amount}
-        <span style={{ fontSize: 9, fontWeight: 500, color: TEXT.secondary, marginLeft: 2 }}>bb</span>
+        <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>bb</span>
       </span>
     </div>
   );
@@ -289,26 +302,26 @@ function Seat({
         </div>
       </div>
 
-      {/* Chip unico com nome + stack — so existe em modo replay
-          (Revisor), onde SeatLayoutSlot.playerName vem do hand history
-          real. Brilho (glow) quando o jogador esta agindo, mesmo padrao
-          que ja existia no chip de nome antigo. */}
+      {/* Chip unico com nome + stack, empilhados verticalmente (pedido
+          explicito): nome na linha de cima, stack OBRIGATORIAMENTE
+          embaixo — mesmo tratamento visual do hero (posicao separada
+          em cima, um unico chip abaixo). Antes nome e stack ficavam
+          lado a lado na mesma linha, separados por "·". */}
       {!empty && (
         <div
           style={{
             display: "flex",
+            flexDirection: "column",
             alignItems: "center",
-            gap: 5,
+            gap: 1,
             fontFamily: F,
-            fontSize: 11,
-            fontWeight: 500,
             color: acting ? "#FFFFFF" : "rgba(255,255,255,.72)",
             background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
             border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
-            borderRadius: 999,
-            padding: "3px 9px",
+            borderRadius: 10,
+            padding: "4px 10px",
             maxWidth: 118,
-            lineHeight: 1.3,
+            lineHeight: 1.25,
             boxShadow: acting ? `0 0 10px ${col.glow}` : "none",
             textShadow: acting ? `0 0 6px ${col.glow}` : "none",
             transition: "all 200ms ease",
@@ -318,14 +331,13 @@ function Seat({
               cartas (nameplate estilo GG, ver bloco do hero abaixo). */}
           {seat.playerName && !hero && (
             <span
-              style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}
               title={seat.playerName}
             >
-              {seat.playerName}
+              {truncateName(seat.playerName)}
             </span>
           )}
-          {seat.playerName && !hero && <span style={{ opacity: 0.4 }}>·</span>}
-          <span style={{ whiteSpace: "nowrap", ...num }}>{stack} bb</span>
+          <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack} bb</span>
         </div>
       )}
 
@@ -413,7 +425,7 @@ function Seat({
                     }}
                     title={seat.playerName}
                   >
-                    {seat.playerName}
+                    {truncateName(seat.playerName)}
                   </div>
                 )}
               </div>
