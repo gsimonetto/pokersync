@@ -49,3 +49,14 @@ export interface StudyLog {
   minutes: number;
   note?: string;
 }
+
+// BRM: threshold de moveup/movedown em buy-ins, por formato. Alimenta o
+// Coach (saude de banca deixa de ser um numero fixo unico pra todos os
+// formatos) e fica visivel/editavel pro jogador.
+export type BrmFormat = "Cash" | "MTT" | "SNG" | "Spin";
+
+export interface BrmThreshold {
+  format: BrmFormat;
+  moveupBuyins: number;
+  movedownBuyins: number;
+}
