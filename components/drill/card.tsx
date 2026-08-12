@@ -104,7 +104,22 @@ function CornerMark({
   );
 }
 
-export function Card({ card, size = "board", hideCenterSuit = false, hideCorners = false }: { card: string | null; size?: Size; hideCenterSuit?: boolean; hideCorners?: boolean }) {
+export function Card({
+  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false,
+}: {
+  card: string | null;
+  size?: Size;
+  hideCenterSuit?: boolean;
+  hideCorners?: boolean;
+  // So esconde o canto inferior-direito, mantendo o superior-esquerdo
+  // (com rank+naipe) visivel. Usado na miniatura cortada pela metade —
+  // o canto inferior-direito fica perto da borda de baixo do card,
+  // que e' exatamente onde o corte acontece, sobrando um fragmento
+  // rotacionado 180deg (bug reportado: "rei de ponta cabeca"). O canto
+  // superior-esquerdo nao tem esse problema (esta todo dentro da area
+  // visivel), entao mantem-lo devolve o valor da carta pro usuario.
+  hideBottomRightCorner?: boolean;
+}) {
   const s = SIZES[size] || SIZES.board;
   if (!card) {
     return (
@@ -157,7 +172,9 @@ export function Card({ card, size = "board", hideCenterSuit = false, hideCorners
     >
       {!hideCorners && <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />}
       {!hideCenterSuit && <SuitCenter suitGlyph={su.g} size={s.bigCenter} />}
-      {!hideCorners && <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />}
+      {!hideCorners && !hideBottomRightCorner && (
+        <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />
+      )}
     </div>
   );
 }
@@ -211,14 +228,13 @@ export function HalfCard({ card }: { card: string }) {
   const s = SIZES.mini;
   return (
     <div style={{ width: s.w, height: Math.round(s.h * 0.52), overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
-      {/* Invertido de volta (pedido explicito): "vou preferir o naipe
-          grande cortado no meio do que o naipe pequeno". Escondendo so
-          os CANTOS agora (hideCorners) — o canto inferior-direito, ao
-          ficar cortado pela metade do card, sobrava um fragmento
-          rotacionado 180deg que parecia "carta de ponta cabeca" (bug
-          reportado com o rei). Mostrando so o naipe central grande,
-          cortado pela metade, esse artefato some. */}
-      <Card card={card} size="mini" hideCorners />
+      {/* Pedido explicito: "o valor das cartas sumiram, corrija" — volta
+          o canto superior-esquerdo (rank+naipe pequeno), que fica dentro
+          da area visivel do corte. So o inferior-direito continua
+          escondido (era o que causava o artefato de "carta de ponta
+          cabeca"). Naipe central grande tambem continua, cortado pela
+          metade. */}
+      <Card card={card} size="mini" hideBottomRightCorner />
     </div>
   );
 }
