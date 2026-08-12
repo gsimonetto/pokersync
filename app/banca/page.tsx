@@ -3,8 +3,8 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X } from "lucide-react";
-import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, type RangeOption, type SeriesPoint } from "@/lib/bankroll/calc";
+import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat } from "@/lib/bankroll/types";
+import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, brmReading, type RangeOption, type SeriesPoint } from "@/lib/bankroll/calc";
 import { buildCoachTips, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO } from "@/lib/bankroll/format";
 import {
@@ -21,6 +21,8 @@ import {
   deleteGoal as apiDeleteGoal,
   fetchStudyLogs,
   addStudyLog as apiAddStudyLog,
+  fetchBrmThresholds,
+  saveBrmThreshold as apiSaveBrmThreshold,
 } from "@/lib/services/bankroll-service";
 
 const RANGES: { value: RangeOption; label: string }[] = [
@@ -41,6 +43,8 @@ export default function BankrollPage() {
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [goals, setGoals] = useState<Goal[]>([]);
   const [studyLogs, setStudyLogs] = useState<StudyLog[]>([]);
+  const [brmThresholds, setBrmThresholds] = useState<BrmThreshold[]>([]);
+  const [showBrmEdit, setShowBrmEdit] = useState(false);
   const [bankroll, setBankroll] = useState(0);
   const [range, setRange] = useState<RangeOption>("all");
   const [view, setView] = useState<"jogo" | "patrimonio">("jogo");
@@ -82,12 +86,13 @@ export default function BankrollPage() {
     let alive = true;
     (async () => {
       try {
-        const [s, cfg, tx, gl, sl] = await Promise.all([
+        const [s, cfg, tx, gl, sl, brm] = await Promise.all([
           fetchSessions(),
           fetchSettings(),
           fetchTransactions(),
           fetchGoals(),
           fetchStudyLogs(),
+          fetchBrmThresholds(),
         ]);
         if (!alive) return;
         setSessions(s);
@@ -95,6 +100,7 @@ export default function BankrollPage() {
         setTransactions(tx);
         setGoals(gl);
         setStudyLogs(sl);
+        setBrmThresholds(brm);
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : "Falha ao carregar sua banca.");
       } finally {
@@ -112,7 +118,14 @@ export default function BankrollPage() {
   const currentBankroll = view === "jogo" ? nw.playingBankroll : nw.netWorth;
   const series = useMemo(() => evolutionSeries(sessions, base), [sessions, base]);
   const filteredSeries = useMemo(() => filterSeriesByRange(series, range), [series, range]);
-  const tips = useMemo(() => buildCoachTips(sessions, { bankroll: nw.playingBankroll }), [sessions, nw.playingBankroll]);
+  const tips = useMemo(
+    () => buildCoachTips(sessions, { bankroll: nw.playingBankroll, brmThresholds }),
+    [sessions, nw.playingBankroll, brmThresholds]
+  );
+  const currentBrm = useMemo(
+    () => brmReading(sessions, nw.playingBankroll, brmThresholds),
+    [sessions, nw.playingBankroll, brmThresholds]
+  );
   const recent = [...sessions].reverse().slice(0, 8);
   const recentTx = [...transactions].reverse().slice(0, 6);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
@@ -236,6 +249,17 @@ export default function BankrollPage() {
     }
   }
 
+  async function handleSaveBrmThreshold(format: BrmFormat, moveupBuyins: number, movedownBuyins: number) {
+    const backup = brmThresholds;
+    setBrmThresholds((prev) => prev.map((t) => (t.format === format ? { format, moveupBuyins, movedownBuyins } : t)));
+    try {
+      await apiSaveBrmThreshold({ format, moveupBuyins, movedownBuyins });
+    } catch {
+      setErr("Nao foi possivel salvar o threshold de BRM.");
+      setBrmThresholds(backup);
+    }
+  }
+
   if (loading) {
     return <main className="p-10 text-center text-sm text-muted">Carregando sua banca...</main>;
   }
@@ -261,23 +285,25 @@ export default function BankrollPage() {
 
       {/* Atalho de registro rapido — a acao mais frequente do jogador
           (bater a sessao assim que sai da mesa) nao pode depender de
-          rolar a tela. Fica logo abaixo do header, sempre visivel. */}
-      <div className="mt-6 flex flex-wrap gap-2.5">
-        <button
-          onClick={() => setSessionModalOpen(true)}
-          className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
-        >
-          <Plus size={15} /> Registrar sessao
-        </button>
-        <button
-          onClick={() => setTxModalOpen(true)}
-          className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-ink transition-colors hover:border-ink/40"
-        >
-          <Plus size={15} /> Deposito / saque
-        </button>
-      </div>
+          rolar a tela. Fica logo abaixo do header, sempre visivel, do
+          lado esquerdo — toggle Banca/Patrimonio fica a direita, na
+          mesma linha (nao empilhado). */}
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap gap-2.5">
+          <button
+            onClick={() => setSessionModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
+          >
+            <Plus size={15} /> Registrar sessao
+          </button>
+          <button
+            onClick={() => setTxModalOpen(true)}
+            className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-ink transition-colors hover:border-ink/40"
+          >
+            <Plus size={15} /> Deposito / saque
+          </button>
+        </div>
 
-      <div className="mt-6 flex items-center justify-between">
         <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
           <button
             onClick={() => setView("jogo")}
@@ -443,6 +469,55 @@ export default function BankrollPage() {
                   </div>
                 )}
               </div>
+            ))}
+          </div>
+        )}
+      </section>
+
+      {/* BRM: moveup/movedown por formato — leitura atual sempre visivel
+          (compacta, 1 linha), edicao dos thresholds fica atras de um
+          "Editar" pra nao pesar a tela. */}
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <div className="flex items-center justify-between">
+          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">BRM — moveup / movedown</h2>
+          <button
+            onClick={() => setShowBrmEdit((v) => !v)}
+            className="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase text-muted transition-colors hover:text-ink"
+          >
+            {showBrmEdit ? "Fechar" : "Editar"}
+          </button>
+        </div>
+
+        {currentBrm ? (
+          <div className="mt-3 flex items-center gap-3 rounded-lg border border-hairline bg-elevated p-3">
+            <span
+              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${
+                currentBrm.status === "moveup"
+                  ? "bg-positive/15 text-positive"
+                  : currentBrm.status === "movedown"
+                    ? "bg-negative/15 text-negative"
+                    : "bg-void/40 text-muted"
+              }`}
+            >
+              {currentBrm.status === "moveup" ? "Pode subir" : currentBrm.status === "movedown" ? "Desca de stake" : "Mantenha"}
+            </span>
+            <p className="text-sm text-muted">
+              <span className="font-semibold text-ink">{currentBrm.format}</span> · banca cobre{" "}
+              <span className="font-semibold text-ink">{currentBrm.buyInsCovered}</span> buy-ins de{" "}
+              {fmtMoney(currentBrm.avgBuyIn)}{" "}
+              <span className="text-muted">
+                (moveup {currentBrm.threshold.moveupBuyins} · movedown {currentBrm.threshold.movedownBuyins})
+              </span>
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted">Registre sessoes pra ver sua leitura de BRM aqui.</p>
+        )}
+
+        {showBrmEdit && (
+          <div className="mt-3 flex flex-col gap-2">
+            {brmThresholds.map((t) => (
+              <BrmThresholdRow key={t.format} threshold={t} onSave={handleSaveBrmThreshold} />
             ))}
           </div>
         )}
@@ -702,6 +777,52 @@ function StatCard({
         {label}
       </p>
       <p className={`relative mt-1.5 text-lg font-bold tabular-nums ${color}`}>{value}</p>
+    </div>
+  );
+}
+
+// Linha editavel de threshold por formato — salva no blur (sem botao de
+// "salvar" por linha, pra manter a secao compacta como pedido).
+function BrmThresholdRow({
+  threshold,
+  onSave,
+}: {
+  threshold: BrmThreshold;
+  onSave: (format: BrmFormat, moveupBuyins: number, movedownBuyins: number) => void;
+}) {
+  const [moveup, setMoveup] = useState(String(threshold.moveupBuyins));
+  const [movedown, setMovedown] = useState(String(threshold.movedownBuyins));
+
+  function commit() {
+    const u = Number(moveup) || threshold.moveupBuyins;
+    const d = Number(movedown) || threshold.movedownBuyins;
+    if (u !== threshold.moveupBuyins || d !== threshold.movedownBuyins) {
+      onSave(threshold.format, u, d);
+    }
+  }
+
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2">
+      <span className="w-14 shrink-0 text-xs font-semibold">{threshold.format}</span>
+      <label className="flex items-center gap-1.5 text-[11px] text-muted">
+        Moveup
+        <input
+          value={moveup}
+          onChange={(e) => setMoveup(e.target.value)}
+          onBlur={commit}
+          className="w-14 rounded-md border border-hairline bg-surface px-1.5 py-1 text-xs tabular-nums text-ink"
+        />
+      </label>
+      <label className="flex items-center gap-1.5 text-[11px] text-muted">
+        Movedown
+        <input
+          value={movedown}
+          onChange={(e) => setMovedown(e.target.value)}
+          onBlur={commit}
+          className="w-14 rounded-md border border-hairline bg-surface px-1.5 py-1 text-xs tabular-nums text-ink"
+        />
+      </label>
+      <span className="text-[11px] text-muted">buy-ins</span>
     </div>
   );
 }
