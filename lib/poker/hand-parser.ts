@@ -77,6 +77,19 @@ export interface ParsedHand {
   smallBlind: number | null;
   bigBlind: number | null;
   showdown: ParsedShowdown[];
+  // Detectado direto do texto da mao (PokerStars escreve essa frase na
+  // ultima mao do torneio, quando so sobra 1 jogador com fichas). Usado
+  // pra disparar a animacao de campeao no Revisor — nao e' um calculo
+  // nosso de stacks remanescentes (nao confiavel sem o historico
+  // completo de eliminacoes do torneio), e' o proprio site confirmando.
+  wonTournament: boolean;
+  // Posicao final do heroi no torneio, quando a mao em questao e' a mao
+  // em que ele foi eliminado ("PlayerX finished the tournament in Nth
+  // place"). Null quando a mao nao e' uma eliminacao do heroi (imensa
+  // maioria das maos) ou quando ele venceu (nesse caso o sinal e'
+  // wonTournament, nao essa frase). Usado pra badge de 2o/3o lugar e "FT"
+  // na lista de torneios.
+  heroFinishPlace: number | null;
 }
 
 export class HandParseError extends Error {
@@ -243,6 +256,36 @@ function extractWinner(text: string): string | null {
   return m ? m[1] : null;
 }
 
+// PokerStars escreve essa linha SO na ultima mao de um torneio, quando
+// um unico jogador fica com todas as fichas ("PlayerX wins the
+// tournament"). Nao calculamos isso a partir de stacks — nao da pra
+// confiar sem o historico completo de eliminacoes do torneio (mao
+// avulsa nao mostra quem ja tinha sido eliminado antes). O client PT-BR
+// nao teve essa frase especifica confirmada ainda contra um hand
+// history real (mesma cautela ja aplicada ao parser do GGPoker) — a
+// variante em portugues abaixo e' uma melhor-tentativa e deve ser
+// validada assim que aparecer um exemplo real.
+function extractWonTournament(text: string): boolean {
+  return /wins the tournament|ganhou o torneio/i.test(text);
+}
+
+// Extrai a posicao final do HEROI quando a mao em questao e' a mao da
+// eliminacao dele ("PlayerX finished the tournament in 4th place").
+// MESMA CAUTELA do wonTournament acima: a variante em portugues e' uma
+// melhor-tentativa (nao validada contra hand history real em PT-BR) —
+// confirmar assim que aparecer um exemplo real, mesmo padrao ja aplicado
+// ao parser do GGPoker. So retorna algo quando o nome capturado bate
+// EXATAMENTE com heroName (eliminacao de outro jogador nao interessa
+// aqui, ja aparece como oponente sumindo da mesa nas maos seguintes).
+function extractHeroFinishPlace(text: string, heroName: string | null): number | null {
+  if (!heroName) return null;
+  const re = /(\S+) (?:finished the tournament in|terminou o torneio em) (\d+)(?:st|nd|rd|th|[ºª°])? (?:place|lugar)/i;
+  const m = text.match(re);
+  if (!m || m[1] !== heroName) return null;
+  const place = Number(m[2]);
+  return Number.isFinite(place) ? place : null;
+}
+
 function extractStakes(text: string): string | null {
   const m = text.match(/\(\$?([\d.,]+\/\$?[\d.,]+)\)/);
   return m ? m[1] : null;
@@ -389,6 +432,8 @@ export function parseHand(rawText: string): ParsedHand {
     board,
     pot: extractPot(rawText),
     winner: extractWinner(rawText),
+    wonTournament: extractWonTournament(rawText),
+    heroFinishPlace: extractHeroFinishPlace(rawText, heroName),
     streets,
     rawText,
     seats,
