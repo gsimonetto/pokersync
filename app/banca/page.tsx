@@ -375,16 +375,16 @@ export default function BankrollPage() {
         <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
           <button
             onClick={() => setView("jogo")}
-            className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${
-              view === "jogo" ? "bg-ink text-void" : "text-muted hover:text-ink"
+            className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
+              view === "jogo" ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
             }`}
           >
             Banca de jogo
           </button>
           <button
             onClick={() => setView("patrimonio")}
-            className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-colors ${
-              view === "patrimonio" ? "bg-ink text-void" : "text-muted hover:text-ink"
+            className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
+              view === "patrimonio" ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
             }`}
           >
             Patrimonio total
@@ -464,22 +464,21 @@ export default function BankrollPage() {
         <StatCard
           label="ROI"
           value={fmtPct(agg.roi)}
-          tone="training"
-          accent="#3b82f6"
+          accent="#22d3ee"
           delta={
             comparison.previous.n > 0
               ? { text: `${fmtPct(roiDelta)} vs mês passado`, positive: roiDelta >= 0 }
               : undefined
           }
         />
-        <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} tone="evolution" accent="#f59e0b" />
+        <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
       </div>
 
       {/* Volume, ritmo e risco atual — segunda linha de cards (pedido
           explicito: mais informacoes rapidas junto das que ja existiam). */}
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#a855f7" />
-        <StatCard label="Buy-in médio" value={fmtMoney(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#3b82f6" />
+        <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
+        <StatCard label="Buy-in médio" value={fmtMoney(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
         <StatCard
           label="Drawdown atual"
           value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
@@ -492,7 +491,7 @@ export default function BankrollPage() {
       {(nw.withdrawn > 0 || nw.caixinha > 0) && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
           <StatCard label="Sacado" value={fmtMoney(nw.withdrawn)} icon={<Wallet size={13} />} accent="#e0555a" />
-          <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={13} />} accent="#a855f7" />
+          <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={13} />} accent="#ec4899" />
         </div>
       )}
 
@@ -506,8 +505,8 @@ export default function BankrollPage() {
                   <button
                     key={r.value}
                     onClick={() => setRange(r.value)}
-                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-colors ${
-                      range === r.value ? "bg-ink text-void" : "text-muted hover:text-ink"
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
+                      range === r.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
                     }`}
                   >
                     {r.label}
@@ -584,7 +583,7 @@ export default function BankrollPage() {
             <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">AI Coach</h2>
             <div className="mt-2 flex flex-col gap-1.5 overflow-y-auto">
               {tips.slice(0, coachExpanded ? tips.length : 1).map((tip: CoachTip) => (
-                <div key={tip.id} className={`rounded-lg border p-2 text-[11px] ${toneClasses(tip.level)}`}>
+                <div key={tip.id} className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(tip.level)}`}>
                   <p className="font-semibold leading-snug">{tip.title}</p>
                   <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{tip.text}</p>
                 </div>
@@ -622,14 +621,14 @@ export default function BankrollPage() {
                         <span className="text-[10px] text-muted">
                           {current}/{goal.target}
                         </span>
-                        <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-colors hover:text-negative">
+                        <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
                           <Trash2 size={11} />
                         </button>
                       </div>
                     </div>
                     <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-void/40">
                       <div
-                        className="h-full rounded-full bg-gradient-to-r from-review to-evolution transition-[width]"
+                        className="h-full rounded-full bg-gradient-to-r from-review to-evolution transition-[width] duration-500 ease-out"
                         style={{ width: `${pct}%` }}
                       />
                     </div>
@@ -639,7 +638,7 @@ export default function BankrollPage() {
                           <button
                             key={m}
                             onClick={() => handleQuickStudy(m)}
-                            className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                            className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-all duration-150 hover:scale-110 hover:border-evolution/50 hover:text-evolution"
                           >
                             +{m}min
                           </button>
@@ -705,7 +704,7 @@ export default function BankrollPage() {
           />
           <button
             onClick={handleAddGoal}
-            className="col-span-2 rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90 sm:col-span-4"
+            className="col-span-2 rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98] sm:col-span-4"
           >
             Criar meta
           </button>
@@ -810,7 +809,7 @@ export default function BankrollPage() {
         </div>
         <button
           onClick={handleAddAnnotation}
-          className="mt-2 w-full rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
+          className="mt-2 w-full rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
         >
           Adicionar
         </button>
@@ -822,7 +821,7 @@ export default function BankrollPage() {
                 <p className="text-xs text-ink">
                   <span className="text-muted">{a.date}</span> · {a.note}
                 </p>
-                <button onClick={() => handleRemoveAnnotation(a.id)} className="shrink-0 text-muted transition-colors hover:text-negative">
+                <button onClick={() => handleRemoveAnnotation(a.id)} className="shrink-0 text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -922,7 +921,7 @@ export default function BankrollPage() {
 
         <button
           onClick={handleAddSession}
-          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-opacity hover:opacity-90"
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
         >
           Salvar sessao
         </button>
@@ -939,7 +938,7 @@ export default function BankrollPage() {
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-colors first:border-t-0 hover:bg-elevated"
+                  className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-all duration-200 first:border-t-0 hover:translate-x-1 hover:bg-elevated"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">
@@ -956,7 +955,7 @@ export default function BankrollPage() {
                     <span className={`text-sm font-bold ${result >= 0 ? "text-positive" : "text-negative"}`}>
                       {fmtSignedMoney(result)}
                     </span>
-                    <button onClick={() => handleRemove(s.id)} className="text-muted transition-colors hover:text-negative">
+                    <button onClick={() => handleRemove(s.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -1001,7 +1000,7 @@ export default function BankrollPage() {
         </div>
         <button
           onClick={handleAddTransaction}
-          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-opacity hover:opacity-90"
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
         >
           Registrar
         </button>
@@ -1016,7 +1015,7 @@ export default function BankrollPage() {
             {recentTx.map((t) => (
               <div
                 key={t.id}
-                className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-colors first:border-t-0 hover:bg-elevated"
+                className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-all duration-200 first:border-t-0 hover:translate-x-1 hover:bg-elevated"
               >
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-void/40">
                   {t.type === "deposito" ? (
@@ -1037,7 +1036,7 @@ export default function BankrollPage() {
                   {t.type === "deposito" ? "+" : "-"}
                   {fmtMoney(t.amount)}
                 </span>
-                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-colors hover:text-negative">
+                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -1063,8 +1062,8 @@ export default function BankrollPage() {
               <button
                 key={d.value}
                 onClick={() => setLeakDimension(d.value)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-colors ${
-                  leakDimension === d.value ? "bg-ink text-void" : "text-muted hover:text-ink"
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
+                  leakDimension === d.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
                 }`}
               >
                 {d.label}
@@ -1082,7 +1081,7 @@ export default function BankrollPage() {
               const width = Math.max(4, (Math.abs(g.net) / maxAbs) * 100);
               const negative = g.net < 0;
               return (
-                <div key={g.key} className="rounded-lg border border-hairline bg-elevated p-3 transition-colors hover:border-ink/30">
+                <div key={g.key} className="rounded-lg border border-hairline bg-elevated p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
                   <div className="flex items-center justify-between">
                     <p className="text-sm font-semibold">{g.key}</p>
                     <p className="text-xs text-muted">
@@ -1092,7 +1091,7 @@ export default function BankrollPage() {
                   <div className="mt-1.5 flex items-center gap-2">
                     <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-void/40">
                       <div
-                        className={`h-full rounded-full ${negative ? "bg-negative" : "bg-positive"}`}
+                        className={`h-full rounded-full transition-[width] duration-500 ease-out ${negative ? "bg-negative" : "bg-positive"}`}
                         style={{ width: `${width}%` }}
                       />
                     </div>
@@ -1161,16 +1160,16 @@ function StatCard({
   return (
     <div
       style={{ "--acc": accent } as React.CSSProperties}
-      className="acc-card acc-lift group relative cursor-pointer overflow-hidden rounded-xl border border-hairline bg-surface p-4"
+      className="acc-card acc-lift group relative cursor-pointer overflow-hidden rounded-xl border border-hairline bg-surface p-3.5"
     >
       <div aria-hidden="true" className="acc-glow pointer-events-none absolute -right-6 -top-6 size-20 rounded-full blur-2xl" />
       <p className="relative flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
         {icon}
         {label}
       </p>
-      <p className={`relative mt-1.5 text-lg font-bold tabular-nums ${color}`}>{value}</p>
+      <p className={`relative mt-1 text-2xl font-bold tabular-nums ${color}`}>{value}</p>
       {delta && (
-        <p className={`relative mt-0.5 text-[10px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
+        <p className={`relative mt-1 text-[11px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
           {delta.positive ? "▲" : "▼"} {delta.text}
         </p>
       )}
@@ -1199,7 +1198,7 @@ function BrmThresholdRow({
   }
 
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2">
+    <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 transition-colors hover:border-training/40">
       <span className="w-14 shrink-0 text-xs font-semibold">{threshold.format}</span>
       <label className="flex items-center gap-1.5 text-[11px] text-muted">
         Moveup
