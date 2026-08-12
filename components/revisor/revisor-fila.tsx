@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
@@ -44,6 +44,13 @@ export function RevisorFila({
   // ---- Sessões ----
   const [sessionsList, setSessionsList] = useState<HandSessionWithCount[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
+  // Filtros da lista de torneios/sessoes (pedido explicito): chips
+  // nao-exclusivos ("campeão" + "PKO" ativos ao mesmo tempo mostra
+  // torneios que casam com QUALQUER um dos dois) + busca por texto no
+  // nome do torneio/sessao.
+  const [sessionChipFilters, setSessionChipFilters] = useState<Set<"campeao" | "pko" | "mystery">>(new Set());
+  const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
+  const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [sessionsError, setSessionsError] = useState("");
 
   // ---- Mãos avulsas (comportamento antigo) ----
@@ -152,6 +159,30 @@ export function RevisorFila({
     router.push(`/treino?suggestionId=${leak.drill_id}`);
   }
 
+  function toggleSessionChip(chip: "campeao" | "pko" | "mystery") {
+    setSessionChipFilters((prev) => {
+      const next = new Set(prev);
+      if (next.has(chip)) next.delete(chip);
+      else next.add(chip);
+      return next;
+    });
+  }
+
+  const filteredSessions = useMemo(() => {
+    const q = sessionSearchQuery.trim().toLowerCase();
+    return sessionsList.filter((s) => {
+      if (sessionChipFilters.size > 0) {
+        const matches =
+          (sessionChipFilters.has("campeao") && s.champion) ||
+          (sessionChipFilters.has("pko") && s.format_type === "pko") ||
+          (sessionChipFilters.has("mystery") && s.format_type === "mystery");
+        if (!matches) return false;
+      }
+      if (q && !s.label.toLowerCase().includes(q)) return false;
+      return true;
+    });
+  }, [sessionsList, sessionChipFilters, sessionSearchQuery]);
+
   const counts = useMemo(() => {
     const acc: Record<string, number> = { pendente: 0, em_revisao: 0, concluida: 0 };
     items.forEach((r) => {
@@ -192,6 +223,74 @@ export function RevisorFila({
 
       {tab === "sessoes" && (
         <>
+          <div className="mb-3 flex flex-wrap items-center gap-2">
+            <button
+              onClick={() => toggleSessionChip("campeao")}
+              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
+                sessionChipFilters.has("campeao")
+                  ? "border-evolution bg-evolution/15 text-evolution"
+                  : "border-hairline bg-transparent text-muted"
+              }`}
+            >
+              <Trophy size={12} /> Campeão
+            </button>
+            <button
+              onClick={() => toggleSessionChip("pko")}
+              className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
+                sessionChipFilters.has("pko")
+                  ? "border-review bg-review/15 text-review"
+                  : "border-hairline bg-transparent text-muted"
+              }`}
+            >
+              PKO
+            </button>
+            <button
+              onClick={() => toggleSessionChip("mystery")}
+              className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
+                sessionChipFilters.has("mystery")
+                  ? "border-review bg-review/15 text-review"
+                  : "border-hairline bg-transparent text-muted"
+              }`}
+            >
+              Mystery
+            </button>
+
+            <button
+              onClick={() => {
+                setSessionSearchOpen((v) => !v);
+                if (sessionSearchOpen) setSessionSearchQuery("");
+              }}
+              title="Buscar torneios/sessões"
+              className={`ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-colors ${
+                sessionSearchOpen ? "border-review bg-review/15 text-review" : "border-hairline text-muted"
+              }`}
+            >
+              <Search size={13} />
+            </button>
+          </div>
+
+          {sessionSearchOpen && (
+            <div className="mb-3 flex items-center gap-2 rounded-lg border border-hairline bg-void px-3 py-2">
+              <Search size={13} className="shrink-0 text-muted" />
+              <input
+                autoFocus
+                value={sessionSearchQuery}
+                onChange={(e) => setSessionSearchQuery(e.target.value)}
+                placeholder="Buscar pelo nome do torneio ou sessão"
+                className="flex-1 bg-transparent text-[13px] text-ink outline-none"
+              />
+              {sessionSearchQuery && (
+                <button onClick={() => setSessionSearchQuery("")}>
+                  <X size={13} className="text-muted" />
+                </button>
+              )}
+            </div>
+          )}
+        </>
+      )}
+
+      {tab === "sessoes" && (
+        <>
           {sessionsError && (
             <div className="mb-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">
               {sessionsError}
@@ -217,9 +316,13 @@ export function RevisorFila({
                 Importar primeira mão
               </button>
             </div>
+          ) : filteredSessions.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+              Nenhum torneio/sessão encontrado pra esse filtro.
+            </div>
           ) : (
             <ul className="flex flex-col gap-2.5">
-              {sessionsList.map((s) => {
+              {filteredSessions.map((s) => {
                 const showsBounty = s.kind === "tournament" && (s.format_type === "pko" || s.format_type === "mystery");
                 return (
                   <li
@@ -227,11 +330,54 @@ export function RevisorFila({
                     onClick={() => onOpenSession(s.id)}
                     className="flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-review/40"
                   >
-                    <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-void">
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-void">
+                      {/* Icone generico de torneio virou "Flag" (pedido
+                          explicito): a taca deixou de ser automatica pra
+                          TODO torneio — agora so aparece (selo no canto)
+                          quando a sessao realmente foi vencida pelo
+                          heroi (s.champion, setado automaticamente ao
+                          detectar ParsedHand.wonTournament no import). */}
                       {s.kind === "tournament" ? (
-                        <Trophy size={18} className="text-review" />
+                        <Flag size={18} className="text-review" />
                       ) : (
                         <Coins size={18} className="text-evolution" />
+                      )}
+                      {s.champion && (
+                        <span
+                          title="Campeão do torneio"
+                          className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-evolution shadow-[0_0_8px_rgba(245,158,11,.65)]"
+                        >
+                          <Trophy size={11} className="text-void" />
+                        </span>
+                      )}
+                      {!s.champion && s.final_place === 2 && (
+                        <span
+                          title="2º lugar"
+                          className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-[#C0C6CC] shadow-[0_0_8px_rgba(192,198,204,.55)]"
+                        >
+                          <Medal size={11} className="text-void" />
+                        </span>
+                      )}
+                      {!s.champion && s.final_place === 3 && (
+                        <span
+                          title="3º lugar"
+                          className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-[#CD7F32] shadow-[0_0_8px_rgba(205,127,50,.55)]"
+                        >
+                          <Medal size={11} className="text-void" />
+                        </span>
+                      )}
+                      {/* FT (mesa final): heroi eliminado dentro do tamanho
+                          da mesa final da propria mao, mas fora do podio —
+                          ver heuristica/cautela em heroFinishPlace no
+                          hand-parser.ts. Selo em texto (nao tem icone
+                          universal pra "final table"). */}
+                      {!s.champion && s.final_place == null && s.reached_ft && (
+                        <span
+                          title="Chegou na mesa final"
+                          className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-review px-1 shadow-[0_0_8px_rgba(168,85,247,.55)]"
+                        >
+                          <span className="text-[8.5px] font-bold text-void">FT</span>
+                        </span>
                       )}
                     </div>
 
