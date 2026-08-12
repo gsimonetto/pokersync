@@ -104,7 +104,7 @@ function CornerMark({
   );
 }
 
-export function Card({ card, size = "board", hideCenterSuit = false }: { card: string | null; size?: Size; hideCenterSuit?: boolean }) {
+export function Card({ card, size = "board", hideCenterSuit = false, hideCorners = false }: { card: string | null; size?: Size; hideCenterSuit?: boolean; hideCorners?: boolean }) {
   const s = SIZES[size] || SIZES.board;
   if (!card) {
     return (
@@ -155,9 +155,9 @@ export function Card({ card, size = "board", hideCenterSuit = false }: { card: s
         boxShadow: "0 8px 18px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.12) inset",
       }}
     >
-      <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />
+      {!hideCorners && <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />}
       {!hideCenterSuit && <SuitCenter suitGlyph={su.g} size={s.bigCenter} />}
-      <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />
+      {!hideCorners && <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />}
     </div>
   );
 }
@@ -211,10 +211,14 @@ export function HalfCard({ card }: { card: string }) {
   const s = SIZES.mini;
   return (
     <div style={{ width: s.w, height: Math.round(s.h * 0.52), overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
-      {/* Naipe central escondido nas miniaturas — pedido explicito:
-          "esta muita informacao, apenas o menorzinho proximo do numero".
-          So o canto (rank + naipe pequeno) fica visivel. */}
-      <Card card={card} size="mini" hideCenterSuit />
+      {/* Invertido de volta (pedido explicito): "vou preferir o naipe
+          grande cortado no meio do que o naipe pequeno". Escondendo so
+          os CANTOS agora (hideCorners) — o canto inferior-direito, ao
+          ficar cortado pela metade do card, sobrava um fragmento
+          rotacionado 180deg que parecia "carta de ponta cabeca" (bug
+          reportado com o rei). Mostrando so o naipe central grande,
+          cortado pela metade, esse artefato some. */}
+      <Card card={card} size="mini" hideCorners />
     </div>
   );
 }
