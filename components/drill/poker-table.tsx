@@ -80,12 +80,16 @@ function ChipStackIcon({ size = 13 }: { size?: number }) {
 // monoespacada usada no stack/pot), sem pill colorida ao redor — o
 // numero fica solto, igual HUD de replayer profissional em vez de "badge"
 // de app mobile.
+// Fonte aumentada (pedido explicito: "valor da aposta esta muito pequeno,
+// precisa aumentar") — sm 11->14, md 12.5->16. Icone acompanha o aumento
+// pra manter a proporcao entre ficha e numero.
 function ChipValueLabel({ amount, size = "sm" }: { amount: number; size?: "sm" | "md" }) {
-  const fontSize = size === "md" ? 12.5 : 11;
+  const fontSize = size === "md" ? 16 : 14;
+  const iconSize = size === "md" ? 17 : 15;
   return (
-    <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-      <ChipStackIcon size={size === "md" ? 14 : 12} />
-      <span style={{ fontFamily: F, fontSize, fontWeight: 500, color: TEXT.critical, ...num, textShadow: "0 1px 2px rgba(0,0,0,.8)" }}>
+    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+      <ChipStackIcon size={iconSize} />
+      <span style={{ fontFamily: F, fontSize, fontWeight: 600, color: TEXT.critical, ...num, textShadow: "0 1px 2px rgba(0,0,0,.8)" }}>
         {amount}
       </span>
     </div>
@@ -149,9 +153,10 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
 
 // Pilha de fichas PARADA em frente ao seat, representando quanto esse
 // jogador ja colocou na rua atual. Diferente de ChipAnimation (que voa e
-// some) — essa fica visivel ate a rua terminar. Refinada (2026-08): saiu
-// o pill dourado com bolinha dentro (lido como "cartoon"); entra o icone
-// de ficha real + numero solto, sem container colorido.
+// some) — essa fica visivel ate a rua terminar (fixo durante toda a rua,
+// confirmado). Refinada (2026-08): saiu o pill dourado com bolinha dentro
+// (lido como "cartoon"); entra o icone de ficha real + numero solto, sem
+// container colorido.
 function CommittedChips({ amount }: { amount: number }) {
   if (amount <= 0) return null;
   return (
@@ -235,7 +240,10 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
       </div>
 
       {/* Chip com nome do jogador — so existe em modo replay (Revisor),
-          onde SeatLayoutSlot.playerName vem do hand history real. Brilho
+          onde SeatLayoutSlot.playerName vem do hand history real. Fonte
+          aumentada (pedido explicito: "o nome esta muito pequeno") de
+          8.5 pra 11, com padding e largura maxima acompanhando o
+          aumento pra nao truncar nomes curtos sem necessidade. Brilho
           (glow) no proprio nome quando o jogador esta agindo — pedido
           explicito: "nao precisa ter timer... apenas o brilho no nome do
           jogador". O anel de contagem regressiva foi removido do avatar
@@ -245,18 +253,18 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
         <div
           style={{
             fontFamily: F,
-            fontSize: 8.5,
+            fontSize: 11,
             fontWeight: 500,
             color: acting ? "#FFFFFF" : "rgba(255,255,255,.55)",
             background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
             border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
             borderRadius: 999,
-            padding: "1px 6px",
-            maxWidth: 60,
+            padding: "2px 8px",
+            maxWidth: 82,
             overflow: "hidden",
             textOverflow: "ellipsis",
             whiteSpace: "nowrap",
-            lineHeight: 1.2,
+            lineHeight: 1.3,
             boxShadow: acting ? `0 0 10px ${col.glow}` : "none",
             textShadow: acting ? `0 0 6px ${col.glow}` : "none",
             transition: "all 200ms ease",
@@ -349,6 +357,11 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
 // Renderizada uma unica vez por step (key = stepIndex do replay) — quando
 // o step muda, o componente remonta e a animacao dispara do zero. Nao
 // altera o estado da mesa; e' puramente visual, coordenada por CSS.
+// O destino (50,44) e' o mesmo ponto onde o pote e' desenhado (ver
+// PokerTable abaixo) — a animacao ja converge pro centro, nunca pra fora
+// da mesa; se algum seat aparentar "jogar fichas pra fora" o problema
+// esta nas coordenadas x/y desse seat especifico (seat-layout.ts), nao
+// aqui no vetor de destino.
 function ChipAnimation({
   fromSeat,
   amount,
@@ -488,7 +501,10 @@ export function PokerTable({
           {/* Resumo de acao — rolavel horizontalmente, ocupa o espaco
               disponivel. Antes essa barra so aparecia com historico
               (hasHistory); agora aparece sempre que a mao esta ativa,
-              com placeholder quando ainda nao ha nenhuma acao (step 0). */}
+              com placeholder quando ainda nao ha nenhuma acao (step 0).
+              Valores em BB (nao mais fichas cruas) — convertidos ja no
+              hand-replay-projector.ts, esse componente so exibe o label
+              pronto (ex: "call 6bb"). */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, overflowX: "auto", flex: 1, minWidth: 0 }}>
             {hasHistory ? (
               history.map((h, i) => (
