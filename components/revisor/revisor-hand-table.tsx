@@ -235,7 +235,7 @@ export function RevisorHandTable({
             deixava pouca folga vertical pros nomes de cima/baixo; 560px
             a partir de xl (1280px+) da mais espaco sem forcar rolagem
             em telas medias. */}
-        <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px] xl:h-[560px]">
+        <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px] xl:h-[520px]">
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
         </div>
 
