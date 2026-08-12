@@ -40,14 +40,23 @@ function textGlyph(glyph: string): string {
   return `${glyph}\uFE0E`;
 }
 
-function SuitCenter({ suitGlyph, size }: { suitGlyph: string; size: number }) {
+// Fix (2026-08 v6): "valor da carta sumiu" no HalfCard. Causa: o naipe
+// central sempre centralizava no meio da altura TOTAL da carta (48px no
+// tamanho "mini"), mas o HalfCard corta visualmente o container pra so
+// 52% dessa altura (~25px) via overflow:hidden — o naipe ficava bem na
+// linha de corte, sobrando so um fiapo de 1px visivel (parecia ter
+// sumido). Agora o centro vertical do naipe e' configuravel (`top`) pra
+// cada contexto poder centralizar dentro da area de fato visivel.
+function SuitCenter({ suitGlyph, size, top = "50%" }: { suitGlyph: string; size: number; top?: string }) {
   return (
     <div
       style={{
         position: "absolute",
-        inset: 0,
+        left: 0,
+        right: 0,
+        top,
+        transform: "translateY(-50%)",
         display: "flex",
-        alignItems: "center",
         justifyContent: "center",
         pointerEvents: "none",
       }}
@@ -105,7 +114,7 @@ function CornerMark({
 }
 
 export function Card({
-  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false,
+  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false, centerSuitTop,
 }: {
   card: string | null;
   size?: Size;
@@ -119,6 +128,11 @@ export function Card({
   // superior-esquerdo nao tem esse problema (esta todo dentro da area
   // visivel), entao mantem-lo devolve o valor da carta pro usuario.
   hideBottomRightCorner?: boolean;
+  // Centro vertical do naipe grande, em % da altura TOTAL da carta.
+  // Default "50%" (meio da carta inteira). Contextos que cortam o card
+  // visualmente (ex: HalfCard) devem passar o centro da area VISIVEL,
+  // nao da carta inteira — ver HalfCard abaixo.
+  centerSuitTop?: string;
 }) {
   const s = SIZES[size] || SIZES.board;
   if (!card) {
@@ -171,7 +185,7 @@ export function Card({
       }}
     >
       {!hideCorners && <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />}
-      {!hideCenterSuit && <SuitCenter suitGlyph={su.g} size={s.bigCenter} />}
+      {!hideCenterSuit && <SuitCenter suitGlyph={su.g} size={s.bigCenter} top={centerSuitTop} />}
       {!hideCorners && !hideBottomRightCorner && (
         <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />
       )}
@@ -179,45 +193,10 @@ export function Card({
   );
 }
 
-// Par virado em leque. Mantido — o design do verso ja e' bom e nao foi
-// alvo do redesign. O wrapper tem padding proprio e usa drop-shadow em
-// vez de overflow, entao a rotacao nunca corta a carta.
-export function CardBackPair({ side = "right" }: { side?: "left" | "right" }) {
-  const back = (rot: number, overlap: boolean, key: number) => (
-    <div
-      key={key}
-      style={{
-        width: 24,
-        height: 34,
-        borderRadius: 5,
-        transform: `rotate(${rot}deg)`,
-        marginLeft: overlap ? -8 : 0,
-        position: "relative",
-        background: "linear-gradient(150deg,#1E3A5F,#16324F 50%,#0E2338)",
-        boxShadow: "0 4px 10px rgba(0,0,0,.6), 0 0 0 1px rgba(120,180,255,.28) inset",
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          inset: 4,
-          borderRadius: 3,
-          border: "1px solid rgba(120,180,255,.22)",
-          background: "repeating-linear-gradient(45deg,rgba(120,180,255,.10) 0 2px,transparent 2px 4px)",
-        }}
-      />
-    </div>
-  );
-  return (
-    <div style={{ display: "flex", alignItems: "center", padding: 2 }}>
-      {/* Angulo do leque reduzido — pedido explicito: "leque, mas mais
-          sutil (angulo bem menor que o atual)". Era 8/-6 graus, agora
-          3/-2 — ainda da a sensacao de leque, sem ficar exagerado. */}
-      {back(side === "left" ? 3 : -3, false, 0)}
-      {back(side === "left" ? -2 : 2, true, 1)}
-    </div>
-  );
-}
+// CardBackPair (imagem do verso das cartas viradas) removido a pedido
+// explicito (2026-08 v6): "esta gerando mais transtorno do que ajudando".
+// Vilao sem cartas reveladas agora simplesmente nao mostra nenhuma carta
+// (so o seatInfo), em vez de um placeholder de verso.
 
 // Mini-carta cortada pela metade (mostra so o topo) — usada em listagens
 // compactas (ex: preview do hero na lista de maos do Revisor) onde nao ha
@@ -226,13 +205,17 @@ export function CardBackPair({ side = "right" }: { side?: "left" | "right" }) {
 // overflow:hidden num container mais baixo — nao duplica estilo.
 export function HalfCard({ card }: { card: string }) {
   const s = SIZES.mini;
+  const visibleH = Math.round(s.h * 0.52);
   return (
-    <div style={{ width: s.w, height: Math.round(s.h * 0.52), overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
+    <div style={{ width: s.w, height: visibleH, overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
       {/* Voltou pra so o naipe central (pedido explicito): "mantenha
           apenas o naipe central, o menor pode tirar da visualizacao".
           hideCorners esconde os dois cantos (nao so o inferior-direito),
-          entao nao ha risco do artefato de "carta de ponta cabeca". */}
-      <Card card={card} size="mini" hideCorners />
+          entao nao ha risco do artefato de "carta de ponta cabeca".
+          centerSuitTop centraliza o naipe dentro da area VISIVEL
+          (visibleH/2), nao mais no meio da carta inteira — corrige o
+          "valor da carta sumiu" (ver SuitCenter em card.tsx). */}
+      <Card card={card} size="mini" hideCorners centerSuitTop={`${(visibleH / 2 / s.h) * 100}%`} />
     </div>
   );
 }
