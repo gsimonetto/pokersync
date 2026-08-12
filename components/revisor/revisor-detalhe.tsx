@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon } from "lucide-react";
+import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getReview,
@@ -140,6 +140,10 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [error, setError] = useState("");
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [xpFeedback, setXpFeedback] = useState<{ xp: number; missions: any[] } | null>(null);
+  // Ultima mao de torneio vencida pelo heroi (ParsedHand.wonTournament +
+  // heroi = quem levou o pote) — dispara a animacao de taca antes de
+  // voltar pra tabela de torneios.
+  const [showChampion, setShowChampion] = useState(false);
 
   const [parsedHandForTable, setParsedHandForTable] = useState<ParsedHand | null>(null);
 
@@ -282,7 +286,18 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       }
 
       if (nextStatus === "concluida") {
-        setTimeout(() => onBack(), missionsCompleted.length ? 2000 : 500);
+        const isChampion =
+          !!parsedHandForTable?.wonTournament &&
+          !!parsedHandForTable?.heroName &&
+          parsedHandForTable.winner === parsedHandForTable.heroName;
+        if (isChampion) {
+          // Espera o toast de XP sumir antes de cobrir a tela com a taca,
+          // pra nao competir visualmente com ele.
+          setTimeout(() => setShowChampion(true), missionsCompleted.length ? 2000 : 500);
+          setTimeout(() => onBack(), missionsCompleted.length ? 5200 : 3700);
+        } else {
+          setTimeout(() => onBack(), missionsCompleted.length ? 2000 : 500);
+        }
       }
     } catch (e) {
       setError(e instanceof Error ? e.message : "Erro ao salvar.");
@@ -575,6 +590,71 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           ))}
         </div>
       )}
+
+      {showChampion && <ChampionOverlay />}
+    </div>
+  );
+}
+
+// Animacao de taca — so dispara na ultima mao de um torneio vencida pelo
+// heroi (ver ParsedHand.wonTournament). Cobre a tela inteira por alguns
+// segundos antes de voltar pra tabela de torneios (onBack), como pedido.
+// Confete simples via divs posicionadas caindo (sem lib externa).
+function ChampionOverlay() {
+  const confetti = Array.from({ length: 24 }, (_, i) => i);
+  const colors = ["#f59e0b", "#22c55e", "#a855f7", "#3b82f6", "#e0555a"];
+  return (
+    <div className="fixed inset-0 z-[2000] flex flex-col items-center justify-center overflow-hidden bg-void/90 backdrop-blur-sm">
+      {confetti.map((i) => (
+        <span
+          key={i}
+          style={{
+            position: "absolute",
+            top: -20,
+            left: `${(i * 137) % 100}%`,
+            width: 7,
+            height: 12,
+            background: colors[i % colors.length],
+            borderRadius: 2,
+            animation: `championConfetti ${1.6 + (i % 5) * 0.25}s ease-in ${(i % 7) * 0.12}s forwards`,
+            opacity: 0.9,
+          }}
+        />
+      ))}
+      <div style={{ animation: "championPop 700ms cubic-bezier(.34,1.56,.64,1) both" }}>
+        <Trophy size={84} className="text-evolution" style={{ filter: "drop-shadow(0 0 24px rgba(245,158,11,.65))" }} />
+      </div>
+      <p
+        className="mt-4 text-2xl font-bold text-ink"
+        style={{ animation: "fadeInUp 500ms ease-out 300ms both" }}
+      >
+        Campeão do torneio!
+      </p>
+      <p className="mt-1 text-sm text-muted" style={{ animation: "fadeInUp 500ms ease-out 450ms both" }}>
+        Voltando pra tabela de torneios…
+      </p>
+      <style jsx global>{`
+        @keyframes championPop {
+          0% {
+            opacity: 0;
+            transform: scale(0.4) rotate(-8deg);
+          }
+          100% {
+            opacity: 1;
+            transform: scale(1) rotate(0deg);
+          }
+        }
+        @keyframes championConfetti {
+          0% {
+            transform: translateY(0) rotate(0deg);
+            opacity: 0.9;
+          }
+          100% {
+            transform: translateY(100vh) rotate(360deg);
+            opacity: 0;
+          }
+        }
+      `}</style>
     </div>
   );
 }
