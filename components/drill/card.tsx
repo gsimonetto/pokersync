@@ -193,8 +193,11 @@ export function CardBackPair({ side = "right" }: { side?: "left" | "right" }) {
   );
   return (
     <div style={{ display: "flex", alignItems: "center", padding: 4 }}>
-      {back(side === "left" ? 8 : -8, false, 0)}
-      {back(side === "left" ? -6 : 6, true, 1)}
+      {/* Angulo do leque reduzido — pedido explicito: "leque, mas mais
+          sutil (angulo bem menor que o atual)". Era 8/-6 graus, agora
+          3/-2 — ainda da a sensacao de leque, sem ficar exagerado. */}
+      {back(side === "left" ? 3 : -3, false, 0)}
+      {back(side === "left" ? -2 : 2, true, 1)}
     </div>
   );
 }
