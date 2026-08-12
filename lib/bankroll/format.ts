@@ -64,3 +64,33 @@ export function knownVenues(sessions: Session[]) {
 export function todayISO() {
   return new Date().toISOString().slice(0, 10);
 }
+
+// --- Exportar relatorio (CSV) ---------------------------------------------
+// CSV simples, direto do client (sem lib externa) — separador virgula,
+// campos entre aspas (escapa aspas internas dobrando, padrao RFC4180).
+// Cobre o pedido de "relatorio por periodo" — a UI ja filtra `sessions`
+// pelo range antes de chamar isso.
+export function sessionsToCSV(sessions: Session[]): string {
+  const header = ["Data", "Formato", "Buy-in", "Reentradas", "Cashout", "Resultado", "Stake", "Local", "Notas"];
+  const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+  const rows = sessions.map((s) => {
+    const invested = (Number(s.buyIn) || 0) * (1 + (Number(s.reentries) || 0));
+    const result = (Number(s.cashout) || 0) - invested;
+    return [s.date, s.format, s.buyIn, s.reentries, s.cashout, result.toFixed(2), s.stake || "", s.venue || "", s.notes || ""];
+  });
+  return [header, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+}
+
+export function downloadCSV(filename: string, csv: string) {
+  // BOM (\uFEFF) pra Excel PT-BR abrir acentuacao certo — sem isso "ROI"
+  // e afins ficam com encoding quebrado no Excel default do Windows.
+  const blob = new Blob(["\uFEFF" + csv], { type: "text/csv;charset=utf-8;" });
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  document.body.removeChild(a);
+  URL.revokeObjectURL(url);
+}
