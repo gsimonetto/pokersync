@@ -155,6 +155,20 @@ export function filterSeriesByRange(series: SeriesPoint[], range: RangeOption): 
   return series.filter((p) => new Date(p.date + "T12:00:00") >= cutoff);
 }
 
+// Mesmo corte de `filterSeriesByRange`, mas sobre Session[] cru — usado
+// pelo export CSV (que precisa dos campos originais da sessao, nao so o
+// ponto acumulado da serie).
+export function filterSessionsByRange(sessions: Session[], range: RangeOption): Session[] {
+  if (!sessions?.length || range === "all") return sessions;
+  const days = { "7D": 7, "30D": 30, "1Y": 365 }[range];
+  if (!days) return sessions;
+  const sorted = [...sessions].sort((a, b) => sortKey(a).localeCompare(sortKey(b)));
+  const ref = new Date(sorted[sorted.length - 1].date + "T12:00:00");
+  const cutoff = new Date(ref);
+  cutoff.setDate(ref.getDate() - days);
+  return sessions.filter((s) => new Date(s.date + "T12:00:00") >= cutoff);
+}
+
 // --- Patrimonio (banca de jogo vs total) --------------------------------
 // Banca de jogo = base + resultado das sessoes + depositos - saques - caixinha.
 // Patrimonio total = base + resultado das sessoes + depositos (ignora pra
@@ -220,6 +234,80 @@ export function goalProgress(goal: Goal, sessions: Session[], studyLogs: StudyLo
   }
   const pct = goal.target > 0 ? Math.min(100, (current / goal.target) * 100) : 0;
   return { goal, current: +current.toFixed(1), pct };
+}
+
+// --- Risco de ruina (Monte Carlo simplificado) ----------------------------
+// Bootstrap: reamostra os resultados HISTORICOS reais de sessao (nao
+// assume distribuicao normal — variancia de poker e' assimetrica,
+// principalmente em MTT) pra simular `horizonSessions` sessoes futuras,
+// repetido `simulations` vezes. % de simulacoes que zeram a banca antes
+// do fim do horizonte = risco de ruina estimado. Precisa de amostra
+// minima (15 sessoes) pra nao virar numero aleatorio sem base.
+export interface RiskOfRuinResult {
+  ruinPct: number;
+  simulations: number;
+  horizonSessions: number;
+  sampleSize: number;
+}
+
+const MIN_SAMPLE_FOR_RUIN = 15;
+
+export function riskOfRuin(
+  sessions: Session[],
+  startingBankroll: number,
+  horizonSessions = 100,
+  simulations = 500
+): RiskOfRuinResult | null {
+  const results = (sessions || []).map((s) => net(s));
+  if (results.length < MIN_SAMPLE_FOR_RUIN || startingBankroll <= 0) return null;
+  let ruinCount = 0;
+  for (let sim = 0; sim < simulations; sim++) {
+    let bankroll = startingBankroll;
+    for (let step = 0; step < horizonSessions; step++) {
+      const idx = Math.floor(Math.random() * results.length);
+      bankroll += results[idx];
+      if (bankroll <= 0) {
+        ruinCount++;
+        break;
+      }
+    }
+  }
+  return {
+    ruinPct: +((ruinCount / simulations) * 100).toFixed(1),
+    simulations,
+    horizonSessions,
+    sampleSize: results.length,
+  };
+}
+
+// --- Comparacao de periodos (mes atual vs mes anterior) -------------------
+export interface PeriodComparison {
+  current: Aggregate;
+  previous: Aggregate;
+  currentLabel: string;
+  previousLabel: string;
+}
+
+function inMonthRange(dateStr: string, start: Date, end: Date): boolean {
+  const dt = new Date(dateStr + "T12:00:00");
+  return dt >= start && dt < end;
+}
+
+export function compareMonths(sessions: Session[], ref = new Date()): PeriodComparison {
+  const y = ref.getFullYear(),
+    m = ref.getMonth();
+  const startCurrent = new Date(y, m, 1);
+  const startPrev = new Date(y, m - 1, 1);
+  const startNext = new Date(y, m + 1, 1);
+  const current = (sessions || []).filter((s) => inMonthRange(s.date, startCurrent, startNext));
+  const previous = (sessions || []).filter((s) => inMonthRange(s.date, startPrev, startCurrent));
+  const fmt = (d: Date) => d.toLocaleDateString("pt-BR", { month: "long", year: "numeric" });
+  return {
+    current: aggregate(current),
+    previous: aggregate(previous),
+    currentLabel: fmt(startCurrent),
+    previousLabel: fmt(startPrev),
+  };
 }
 
 // --- BRM: moveup / movedown por formato ----------------------------------
