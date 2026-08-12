@@ -79,27 +79,8 @@ function ChipStackIcon({ size = 13 }: { size?: number }) {
 // Rotulo de valor: icone de ficha + numero em texto puro (mesma fonte
 // monoespacada usada no stack/pot), sem pill colorida ao redor — o
 // numero fica solto, igual HUD de replayer profissional em vez de "badge"
-// de app mobile.
-// Fonte aumentada (pedido explicito: "valor da aposta esta muito pequeno,
-// precisa aumentar") — sm 11->14, md 12.5->16. Icone acompanha o aumento
-// pra manter a proporcao entre ficha e numero.
-function ChipValueLabel({ amount, size = "sm" }: { amount: number; size?: "sm" | "md" }) {
-  const fontSize = size === "md" ? 16 : 14;
-  const iconSize = size === "md" ? 17 : 15;
-  return (
-    <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-      <ChipStackIcon size={iconSize} />
-      <span style={{ fontFamily: F, fontSize, fontWeight: 600, color: TEXT.critical, ...num, textShadow: "0 1px 2px rgba(0,0,0,.8)" }}>
-        {amount}
-      </span>
-      {/* "bb" depois do valor — pedido explicito: "nas apostas, colocar
-          o bb depois da aposta". Antes so o pote grande no centro tinha
-          a unidade escrita; as pilhas paradas por assento mostravam so
-          o numero solto. */}
-      <span style={{ fontFamily: F, fontSize: fontSize * 0.72, fontWeight: 500, color: TEXT.secondary }}>bb</span>
-    </div>
-  );
-}
+// de app mobile. Usado so no pote/ficha voadora agora — a pilha parada
+// por assento virou um badge fixo ancorado no proprio avatar (ver Seat).
 
 // Pilha de fichas do POTE — 3 discos empilhados em verde (distinto do
 // dourado usado nos seats), pra leitura instantanea "essas fichas ja
@@ -169,16 +150,16 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
 // raises reais (>= 0.5bb) continuam aparecendo normalmente.
 const MIN_COMMITTED_TO_SHOW = 0.5;
 
-function CommittedChips({ amount }: { amount: number }) {
-  if (amount < MIN_COMMITTED_TO_SHOW) return null;
-  return (
-    <div style={{ animation: "fadeInUp 220ms ease-out both" }}>
-      <ChipValueLabel amount={amount} size="sm" />
-    </div>
-  );
-}
-
-function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatState; committed?: number }) {
+function Seat({
+  seat, state, committed, isDealer,
+}: {
+  seat: SeatLayoutSlot;
+  state: SeatState;
+  committed?: number;
+  // BTN — badge do dealer agora vive ANCORADO no proprio avatar (ver
+  // abaixo), nao mais como elemento flutuante calculado por x/y.
+  isDealer?: boolean;
+}) {
   const posCol = POS[seat.posLabel];
   const { status = "empty", stack, action, cards } = state;
   const hero = seat.isHero;
@@ -221,6 +202,66 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
       <div style={{ position: "relative", width: 46, height: 46 }}>
+        {/* Badge da ficha parada — ANCORADO no canto do proprio avatar,
+            posicao fixa (top/right) igual pra TODOS os assentos, em vez
+            de calcular um ponto "puxado pro centro" (que colidia com as
+            cartas do hero, com o board e com o botao do dealer — 3 bugs
+            reportados nesse mesmo calculo). Sugestao aplicada: espaco
+            uniforme por assento, sem matemática dinâmica frágil. */}
+        {!!committed && committed >= MIN_COMMITTED_TO_SHOW && (
+          <div
+            style={{
+              position: "absolute",
+              top: -9,
+              right: -16,
+              zIndex: 6,
+              display: "flex",
+              alignItems: "center",
+              gap: 3,
+              background: "#0A0A0A",
+              border: "1px solid rgba(255,255,255,.18)",
+              borderRadius: 999,
+              padding: "2px 7px 2px 3px",
+              boxShadow: "0 3px 8px rgba(0,0,0,.6)",
+              animation: "fadeInUp 220ms ease-out both",
+              whiteSpace: "nowrap",
+            }}
+          >
+            <ChipStackIcon size={11} />
+            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: TEXT.critical, ...num }}>
+              {committed}
+              <span style={{ fontSize: 9, fontWeight: 500, color: TEXT.secondary, marginLeft: 2 }}>bb</span>
+            </span>
+          </div>
+        )}
+
+        {/* Badge do dealer — mesmo raciocinio: ancorado no avatar do
+            assento BTN, canto oposto ao da ficha, nunca sobre as cartas. */}
+        {isDealer && (
+          <div
+            style={{
+              position: "absolute",
+              bottom: -6,
+              left: -10,
+              zIndex: 6,
+              width: 18,
+              height: 18,
+              borderRadius: "50%",
+              background: "linear-gradient(160deg, #FFFFFF, #D8D8D8)",
+              border: "1px solid rgba(0,0,0,.3)",
+              boxShadow: "0 2px 5px rgba(0,0,0,.5)",
+              display: "flex",
+              alignItems: "center",
+              justifyContent: "center",
+              fontFamily: F,
+              fontSize: 9,
+              fontWeight: 700,
+              color: "#111111",
+            }}
+          >
+            D
+          </div>
+        )}
         <div
           style={{
             position: "absolute",
@@ -304,102 +345,64 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
     </div>
   );
 
-  // Ponto pra pilha de fichas paradas: puxado em direcao ao centro da
-  // mesa (50,44 — mesmo ponto de referencia do ChipAnimation e do
-  // DealerButtonIcon) a partir do assento, mas com distancia MINIMA do
-  // centro garantida — pedido explicito: "quando eu sou o SB esta
-  // ficando em cima das cartas". Assentos ja proximos do centro (SB/BB
-  // na parte de baixo) tinham a ficha empurrada direto em cima do board.
-  // Clampa o ponto final pra nunca invadir o raio onde as cartas
-  // comunitarias ficam.
-  const rawDx = 50 - seat.x;
-  const rawDy = 44 - seat.y;
-  const distToCenter = Math.sqrt(rawDx * rawDx + rawDy * rawDy) || 1;
-  const PULL_FACTOR = 0.18;
-  const MIN_DIST_FROM_CENTER = 22; // raio livre pro board, em % da mesa
-  let chipX = seat.x + rawDx * PULL_FACTOR;
-  let chipY = seat.y + rawDy * PULL_FACTOR;
-  const resultDist = distToCenter * (1 - PULL_FACTOR);
-  if (resultDist < MIN_DIST_FROM_CENTER) {
-    const scale = (distToCenter - MIN_DIST_FROM_CENTER) / distToCenter;
-    chipX = seat.x + rawDx * Math.max(0, scale);
-    chipY = seat.y + rawDy * Math.max(0, scale);
-  }
-
   return (
-    <>
-      <div
-        style={{
-          position: "absolute",
-          left: `${seat.x}%`,
-          top: `${seat.y}%`,
-          transform: "translate(-50%,-50%)",
-          opacity,
-          // Dessaturacao leve no fold — reforca "fora da mao" so com
-          // tratamento visual (opacidade + cinza), sem precisar de texto
-          // "FOLD". Acompanha o pedido de manter so o estado visual.
-          filter: status === "folded" ? "grayscale(0.5)" : "none",
-          transition: "opacity 220ms ease, filter 220ms ease",
-          zIndex: acting ? 5 : 2,
-          animation: acting ? "seatPulse 2s ease-in-out infinite" : "none",
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", ...layout }}>
-          {hero ? (
-            <>
-              {cards && cards.length > 0 && (
-                // Cards do hero: tamanho "board" (mesmo das cartas comunitarias),
-                // sem rotacao. Antes usava size="hero" (bem maior) em layout
-                // row — pedido explicito: diminuir e trocar pro mesmo padrao
-                // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
-                <div style={{ display: "flex", gap: 5 }}>
-                  {cards.map((c, i) => (
-                    <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
-                      <Card card={c} size="board" />
-                    </div>
-                  ))}
-                </div>
-              )}
-              {seatInfo}
-            </>
-          ) : (
-            <>
-              {seatInfo}
-              {revealedVillainCards ? (
-                <div style={{ display: "flex", gap: 5 }}>
-                  {cards!.map((c, i) => (
-                    <div key={i} style={{ transform: `rotate(${i ? 4 : -4}deg)`, animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
-                      <Card card={c} size="board" />
-                    </div>
-                  ))}
-                </div>
-              ) : (
-                facedown && <CardBackPair side="left" />
+    <div
+      style={{
+        position: "absolute",
+        left: `${seat.x}%`,
+        top: `${seat.y}%`,
+        transform: "translate(-50%,-50%)",
+        opacity,
+        // Dessaturacao leve no fold — reforca "fora da mao" so com
+        // tratamento visual (opacidade + cinza), sem precisar de texto
+        // "FOLD". Acompanha o pedido de manter so o estado visual.
+        filter: status === "folded" ? "grayscale(0.5)" : "none",
+        transition: "opacity 220ms ease, filter 220ms ease",
+        zIndex: acting ? 5 : 2,
+        animation: acting ? "seatPulse 2s ease-in-out infinite" : "none",
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "center", ...layout }}>
+        {hero ? (
+          <>
+            {cards && cards.length > 0 && (
+              // Cards do hero: tamanho "board" (mesmo das cartas comunitarias),
+              // sem rotacao. Antes usava size="hero" (bem maior) em layout
+              // row — pedido explicito: diminuir e trocar pro mesmo padrao
+              // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
+              <div style={{ display: "flex", gap: 5 }}>
+                {cards.map((c, i) => (
+                  <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+                    <Card card={c} size="board" />
+                  </div>
+                ))}
+              </div>
+            )}
+            {seatInfo}
+          </>
+        ) : (
+          <>
+            {seatInfo}
+            {revealedVillainCards ? (
+              <div style={{ display: "flex", gap: 5 }}>
+                {cards!.map((c, i) => (
+                  <div key={i} style={{ transform: `rotate(${i ? 4 : -4}deg)`, animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+                    <Card card={c} size="board" />
+                  </div>
+                ))}
+              </div>
+            ) : (
+              facedown && <CardBackPair side="left" />
               // Sentido do verso padronizado (pedido explicito: "quero
               // todas viradas no mesmo sentido... do lado direito deixar
               // igual do lado esquerdo") — antes variava conforme o lado
               // da mesa (seat.cardSide), agora e' sempre "left" pra todo
               // mundo, independente de onde o assento fica.
-              )}
-            </>
-          )}
-        </div>
+            )}
+          </>
+        )}
       </div>
-
-      {!!committed && committed >= MIN_COMMITTED_TO_SHOW && (
-        <div
-          style={{
-            position: "absolute",
-            left: `${chipX}%`,
-            top: `${chipY}%`,
-            transform: "translate(-50%,-50%)",
-            zIndex: 3,
-          }}
-        >
-          <CommittedChips amount={committed} />
-        </div>
-      )}
-    </>
+    </div>
   );
 }
 
@@ -453,45 +456,11 @@ function ChipAnimation({
   );
 }
 
-// Icone do dealer button — disco branco com "D", padrao universal de
-// replayer de poker. Estava faltando (pedido explicito) — antes so o
-// texto "BTN" no proprio avatar indicava a posicao, sem o marcador
-// fisico do botao que normalmente fica um pouco pra dentro da mesa,
-// entre o assento e o centro.
-function DealerButtonIcon({ x, y }: { x: number; y: number }) {
-  // Desloca o marcador ~12% na direcao do centro da mesa (50,44) a partir
-  // da coordenada do seat, pra nao ficar exatamente em cima do avatar.
-  const dx = 50 - x;
-  const dy = 44 - y;
-  const offsetX = x + dx * 0.22;
-  const offsetY = y + dy * 0.22;
-  return (
-    <div
-      style={{
-        position: "absolute",
-        left: `${offsetX}%`,
-        top: `${offsetY}%`,
-        transform: "translate(-50%,-50%)",
-        width: 20,
-        height: 20,
-        borderRadius: "50%",
-        background: "linear-gradient(160deg, #FFFFFF, #D8D8D8)",
-        border: "1px solid rgba(0,0,0,.3)",
-        boxShadow: "0 2px 6px rgba(0,0,0,.5)",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        fontFamily: F,
-        fontSize: 10,
-        fontWeight: 700,
-        color: "#111111",
-        zIndex: 4,
-      }}
-    >
-      D
-    </div>
-  );
-}
+// Icone do dealer button (disco branco com "D") — agora renderizado
+// DENTRO do Seat, ancorado no avatar do assento BTN (ver isDealer no
+// Seat acima). Removida a versao antiga como elemento flutuante
+// calculado por x/y — colidia com as cartas do BTN quando puxado em
+// direcao ao centro (bug reportado com print).
 
 export function PokerTable({
   hand,
@@ -711,13 +680,14 @@ export function PokerTable({
         </div>
 
         {seats.map((s) => (
-          <Seat key={s.posLabel} seat={s} state={seatData(s.posLabel)} committed={streetCommitments?.[s.posLabel]} />
+          <Seat
+            key={s.posLabel}
+            seat={s}
+            state={seatData(s.posLabel)}
+            committed={streetCommitments?.[s.posLabel]}
+            isDealer={s.posLabel === "BTN"}
+          />
         ))}
-
-        {(() => {
-          const btnSeat = seats.find((s) => s.posLabel === "BTN");
-          return btnSeat ? <DealerButtonIcon x={btnSeat.x} y={btnSeat.y} /> : null;
-        })()}
 
         {chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
           <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} />
