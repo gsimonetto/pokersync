@@ -11,13 +11,43 @@ const PATENTES = [
   "Nosebleeds IV", "Nosebleeds V", "Nosebleeds VI", "Nosebleeds VII",
 ];
 
+export const MAX_LEVEL = 99;
+
+// Mesma formula da funcao xp_for_next_level no banco — recalibrada pro
+// teto de 99 (pedido explicito: "nao tao facil nem tao dificil"). A
+// formula antiga (100*level^1.5) levaria a casa dos 10 anos pra chegar
+// no 99 no ritmo novo de missoes (5 diarias+10 semanais+10 mensais).
+export function xpForNextLevel(level: number) {
+  return Math.round(60 * Math.pow(level, 1.3));
+}
+
+// Cor do nivel muda a cada 10 (pedido explicito) — 10 faixas cobrindo
+// 1-99. Progressao inspirada em "materiais" crescentes (bronze ->
+// lendario), reaproveitando cores ja usadas no resto do produto onde
+// fazia sentido (ex: dourado da faixa 3 e' o ACCENT padrao do Hub).
+const LEVEL_BAND_COLORS = [
+  "#B08D57", // 1-10  bronze
+  "#C0C6CC", // 11-20 prata
+  "#E0B24C", // 21-30 ouro
+  "#22c55e", // 31-40 esmeralda
+  "#3b82f6", // 41-50 safira
+  "#A855F7", // 51-60 ametista
+  "#e0555a", // 61-70 rubi
+  "#22d3ee", // 71-80 platina
+  "#f472b6", // 81-90 diamante
+  "#F5D48C", // 91-99 lendario
+];
+
+export function levelColor(level: number): string {
+  const band = Math.min(Math.ceil(level / 10), LEVEL_BAND_COLORS.length);
+  return LEVEL_BAND_COLORS[Math.max(0, band - 1)];
+}
+
+// Legado — nao usado mais na UI (nome de patente em ingles removido a
+// pedido explicito), mantido so pra nao quebrar quem ainda importa.
 export function getPatente(level: number) {
   if (level >= 25) return "Lenda do Poker";
   return PATENTES[level - 1] || "Micro Stakes I";
-}
-
-export function xpForNextLevel(level: number) {
-  return Math.round(100 * Math.pow(level, 1.5));
 }
 
 export interface Progress {
@@ -56,7 +86,7 @@ export async function fetchActiveMissions(): Promise<any[]> {
   const { data, error } = await supabase
     .from("user_missions")
     .select(
-      "id, progress, goal_value, status, period_start, completed_at, missions(code, title, description, kind, category, xp_reward, icon)"
+      "id, progress, goal_value, status, period_start, completed_at, missions(code, title, description, kind, category, xp_reward, icon, difficulty)"
     )
     .eq("status", "active")
     .order("period_start", { ascending: false });
@@ -69,7 +99,7 @@ export async function fetchMissionCatalog(): Promise<any[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("missions")
-    .select("code, title, description, kind, category, goal_base, xp_reward, icon")
+    .select("code, title, description, kind, category, goal_base, xp_reward, icon, difficulty")
     .order("kind", { ascending: true });
   if (error) throw error;
   return data || [];
