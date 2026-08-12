@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Target, ChevronRight } from "lucide-react";
+import { AlertTriangle, Loader2, Target, ChevronRight, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard } from "@/components/drill/card";
@@ -44,6 +44,10 @@ interface HandInListing {
     heroPosition?: string;
     heroName?: string;
     streets?: { actions: { player: string; action: string }[] }[];
+    // Presente quando kind === "parsed" (import de hand history) — usado
+    // so pra achar o stack inicial do heroi na busca da lista (nao
+    // reparseia a mao inteira so pra isso, ja vem no JSON salvo).
+    seats?: { playerName: string; startingChips: number; isHero: boolean }[];
   } | null;
   created_at: string;
   status: string;
@@ -90,6 +94,9 @@ export function RevisorSessao({
   const [error, setError] = useState<string | null>(null);
   const [editingBounty, setEditingBounty] = useState(false);
   const [bountyInput, setBountyInput] = useState("");
+  const [searchOpen, setSearchOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [onlyWithAction, setOnlyWithAction] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -150,6 +157,29 @@ export function RevisorSessao({
     }
     setParsedCache((prev) => ({ ...prev, [selectedId]: parsed }));
   }, [selectedHand, selectedId, parsedCache]);
+
+  // Busca (lupa): filtra por posicao do hero, stack inicial do hero, ou
+  // numero da mao ("Mão 5" casa com "5"). Um unico campo de texto livre
+  // pra cobrir os 3 casos pedidos ("stack ou posições") — mais simples
+  // pro jogador que 3 campos separados. "So com acao" e' um toggle a
+  // parte, e' booleano, nao cabe bem como texto livre.
+  const filteredHands = useMemo(() => {
+    return hands
+      .map((h, i) => ({ hand: h, index: i }))
+      .filter(({ hand, index }) => {
+        if (onlyWithAction) {
+          const entered = didHeroEnterHand(hand.parsed_data?.heroName, hand.parsed_data?.streets);
+          if (entered !== true) return false;
+        }
+        const q = searchQuery.trim().toLowerCase();
+        if (!q) return true;
+        const heroPosition = hand.parsed_data?.heroPosition?.toLowerCase() ?? "";
+        const heroSeat = hand.parsed_data?.seats?.find((s) => s.isHero);
+        const heroStack = heroSeat ? String(Math.round(heroSeat.startingChips)) : "";
+        const handNumber = String(index + 1);
+        return heroPosition.includes(q) || heroStack.includes(q) || handNumber === q;
+      });
+  }, [hands, searchQuery, onlyWithAction]);
 
   // Avança pra próxima mão da fila quando o replay da mão atual falha
   // (ex: checagem de pote do projector) — pedido explicito (2026-08):
@@ -283,16 +313,81 @@ export function RevisorSessao({
             minHeight: 0,
           }}
         >
-          <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
-            <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-              Mãos ({hands.length})
-            </span>
+          <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+              <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+                Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
+              </span>
+              <button
+                onClick={() => {
+                  setSearchOpen((v) => !v);
+                  if (searchOpen) setSearchQuery("");
+                }}
+                title="Buscar mãos"
+                style={{
+                  all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
+                  width: 22, height: 22, borderRadius: 6,
+                  background: searchOpen ? "rgba(168,85,247,0.18)" : "transparent",
+                  color: searchOpen ? "#C4B5FD" : "rgba(255,255,255,0.4)",
+                }}
+              >
+                <Search size={13} />
+              </button>
+            </div>
+
+            {searchOpen && (
+              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+                <div
+                  style={{
+                    flex: 1, display: "flex", alignItems: "center", gap: 5,
+                    background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)",
+                    borderRadius: 8, padding: "5px 8px",
+                  }}
+                >
+                  <Search size={11} color="rgba(255,255,255,0.35)" />
+                  <input
+                    autoFocus
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    placeholder="Posição, stack ou nº da mão"
+                    style={{
+                      all: "unset", flex: 1, fontFamily: F, fontSize: 11.5,
+                      color: "#FFFFFF", minWidth: 0,
+                    }}
+                  />
+                  {searchQuery && (
+                    <button onClick={() => setSearchQuery("")} style={{ all: "unset", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                      <X size={11} color="rgba(255,255,255,0.4)" />
+                    </button>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {searchOpen && (
+              <button
+                onClick={() => setOnlyWithAction((v) => !v)}
+                style={{
+                  all: "unset", cursor: "pointer", alignSelf: "flex-start",
+                  fontFamily: F, fontSize: 10.5, fontWeight: 500,
+                  padding: "4px 9px", borderRadius: 999,
+                  border: `1px solid ${onlyWithAction ? "#34D399" : "rgba(255,255,255,0.14)"}`,
+                  background: onlyWithAction ? "rgba(52,211,153,0.14)" : "transparent",
+                  color: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.5)",
+                }}
+              >
+                Só com ação
+              </button>
+            )}
           </div>
           <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
             {hands.length === 0 && (
               <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão nessa sessão ainda.</p>
             )}
-            {hands.map((h, i) => {
+            {hands.length > 0 && filteredHands.length === 0 && (
+              <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão encontrada pra essa busca.</p>
+            )}
+            {filteredHands.map(({ hand: h, index: i }) => {
               const active = selectedId === h.id;
               const heroCards = h.parsed_data?.heroCards;
               const heroPosition = h.parsed_data?.heroPosition;
@@ -304,7 +399,10 @@ export function RevisorSessao({
                   style={{
                     all: "unset", cursor: "pointer", display: "block", width: "100%",
                     padding: "10px 14px",
-                    borderBottom: i < hands.length - 1 ? "1px solid rgba(255,255,255,0.04)" : "none",
+                    borderBottom:
+                      filteredHands.findIndex((f) => f.hand.id === h.id) < filteredHands.length - 1
+                        ? "1px solid rgba(255,255,255,0.04)"
+                        : "none",
                     background: active ? "rgba(168,85,247,0.12)" : "transparent",
                     borderLeft: active ? "2px solid #A855F7" : "2px solid transparent",
                   }}
