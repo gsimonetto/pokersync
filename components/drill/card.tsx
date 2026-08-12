@@ -85,13 +85,14 @@ function SuitCenter({
 }
 
 function CornerMark({
-  rank, suitGlyph, rankSize, suitSize, position,
+  rank, suitGlyph, rankSize, suitSize, position, hideSuitGlyph = false,
 }: {
   rank: string;
   suitGlyph: string;
   rankSize: number;
   suitSize: number;
   position: "tl" | "br";
+  hideSuitGlyph?: boolean;
 }) {
   // Fix (2026-08 v2): ranks de 2 digitos ("10") ficavam visualmente mais
   // "pesados" que ranks de 1 char (K, A, Q, J) no mesmo tamanho de fonte —
@@ -126,13 +127,15 @@ function CornerMark({
       >
         {rank === "T" ? "10" : rank}
       </span>
-      <span style={{ fontSize: suitSize, marginTop: 2, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
+      {!hideSuitGlyph && (
+        <span style={{ fontSize: suitSize, marginTop: 2, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
+      )}
     </div>
   );
 }
 
 export function Card({
-  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false, centerSuitTop, showCenterRank = false,
+  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false, hideCornerSuitGlyph = false, centerSuitTop, showCenterRank = false,
 }: {
   card: string | null;
   size?: Size;
@@ -142,6 +145,10 @@ export function Card({
   // posicao (nao move o naipe). Usado quando os cantos estao ocultos
   // (hideCorners) mas ainda assim precisamos do valor visivel.
   showCenterRank?: boolean;
+  // Esconde so o naipe PEQUENO dentro do canto superior-esquerdo,
+  // mantendo o rank (numero/letra). Pedido: canto com valor mas sem
+  // o naipe menor, pra "nao poluir tanto" a miniatura cortada.
+  hideCornerSuitGlyph?: boolean;
   // So esconde o canto inferior-direito, mantendo o superior-esquerdo
   // (com rank+naipe) visivel. Usado na miniatura cortada pela metade —
   // o canto inferior-direito fica perto da borda de baixo do card,
@@ -206,7 +213,16 @@ export function Card({
         boxShadow: "0 8px 18px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.12) inset",
       }}
     >
-      {!hideCorners && <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />}
+      {!hideCorners && (
+        <CornerMark
+          rank={rank}
+          suitGlyph={su.g}
+          rankSize={s.rank}
+          suitSize={s.cornerSuit}
+          position="tl"
+          hideSuitGlyph={hideCornerSuitGlyph}
+        />
+      )}
       {!hideCenterSuit && (
         <SuitCenter
           suitGlyph={su.g}
@@ -238,16 +254,19 @@ export function HalfCard({ card }: { card: string }) {
   const visibleH = Math.round(s.h * 0.52);
   return (
     <div style={{ width: s.w, height: visibleH, overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
-      {/* Layout original (naipe central, cantos ocultos) + valor ao lado
-          do naipe via showCenterRank — nao mexe em centerSuitTop nem
-          reintroduz os cantos, entao a posicao do naipe fica igual a
-          antes da mudanca anterior. */}
+      {/* Ideia original: pegar o layout normal da carta e cortar pela
+          metade (overflow:hidden no container), sem reposicionar nada.
+          - Canto superior-esquerdo: mantido, mas SEM o naipe pequeno
+            (hideCornerSuitGlyph) — so o valor, pra nao poluir.
+          - Canto inferior-direito: oculto (hideBottomRightCorner) —
+            ficaria colado na linha de corte.
+          - Naipe central: fica na posicao NATURAL (nao passa
+            centerSuitTop) — nao sobe, so e' cortado pelo container. */}
       <Card
         card={card}
         size="mini"
-        hideCorners
-        showCenterRank
-        centerSuitTop={`${(visibleH / 2 / s.h) * 100}%`}
+        hideBottomRightCorner
+        hideCornerSuitGlyph
       />
     </div>
   );
