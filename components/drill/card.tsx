@@ -208,14 +208,20 @@ export function HalfCard({ card }: { card: string }) {
   const visibleH = Math.round(s.h * 0.52);
   return (
     <div style={{ width: s.w, height: visibleH, overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
-      {/* Voltou pra so o naipe central (pedido explicito): "mantenha
-          apenas o naipe central, o menor pode tirar da visualizacao".
-          hideCorners esconde os dois cantos (nao so o inferior-direito),
-          entao nao ha risco do artefato de "carta de ponta cabeca".
-          centerSuitTop centraliza o naipe dentro da area VISIVEL
-          (visibleH/2), nao mais no meio da carta inteira — corrige o
-          "valor da carta sumiu" (ver SuitCenter em card.tsx). */}
-      <Card card={card} size="mini" hideCorners centerSuitTop={`${(visibleH / 2 / s.h) * 100}%`} />
+      {/* Fix (valor da carta sumiu no HalfCard): trocado hideCorners por
+          hideBottomRightCorner. O canto superior-esquerdo (rank+naipe)
+          esta totalmente dentro da area visivel do corte (visibleH),
+          entao pode ficar visivel sem risco do artefato de "carta de
+          ponta cabeca" — esse artefato so acontecia com o canto
+          inferior-direito, que fica perto da linha de corte. Mantem
+          naipe central grande (SuitCenter) + rank/naipe do canto:
+          "valor da carta e naipe central, apenas isso". */}
+      <Card
+        card={card}
+        size="mini"
+        hideBottomRightCorner
+        centerSuitTop={`${(visibleH / 2 / s.h) * 100}%`}
+      />
     </div>
   );
 }
