@@ -230,7 +230,12 @@ export function RevisorHandTable({
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. Pedido explicito: "precisa ser fixa pro
             desktop e se ajustar em outro formato (cel, tablet)". */}
-        <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px]">
+        {/* Altura ganhou um breakpoint a mais (xl) — pedido: "notebook,
+            deveria ser responsivo". 500px em telas grandes (1280px+)
+            deixava pouca folga vertical pros nomes de cima/baixo; 560px
+            a partir de xl (1280px+) da mais espaco sem forcar rolagem
+            em telas medias. */}
+        <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px] xl:h-[560px]">
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
         </div>
 
