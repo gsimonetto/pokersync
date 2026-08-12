@@ -1,5 +1,5 @@
 import { weekdayName, hourOf, timeBucket } from "./format";
-import type { Session } from "./types";
+import type { Session, Transaction, Goal, StudyLog } from "./types";
 
 const TOURNEY = new Set(["MTT", "SNG", "Spin"]);
 
@@ -122,4 +122,71 @@ export function filterSeriesByRange(series: SeriesPoint[], range: RangeOption): 
   const cutoff = new Date(ref);
   cutoff.setDate(ref.getDate() - days);
   return series.filter((p) => new Date(p.date + "T12:00:00") >= cutoff);
+}
+
+// --- Patrimonio (banca de jogo vs total) --------------------------------
+// Banca de jogo = base + resultado das sessoes + depositos - saques - caixinha.
+// Patrimonio total = base + resultado das sessoes + depositos (ignora pra
+// onde o dinheiro foi depois de sair da mesa — saque/caixinha nao e' perda,
+// so muda de "em jogo" pra "reservado").
+export interface NetWorth {
+  playingBankroll: number;
+  netWorth: number;
+  withdrawn: number;
+  caixinha: number;
+  deposits: number;
+}
+
+export function netWorth(base: number, sessionsProfit: number, transactions: Transaction[]): NetWorth {
+  let deposits = 0,
+    withdrawn = 0,
+    caixinha = 0;
+  for (const t of transactions || []) {
+    const v = Number(t.amount) || 0;
+    if (t.type === "deposito") deposits += v;
+    else if (t.type === "saque") withdrawn += v;
+    else if (t.type === "caixinha") caixinha += v;
+  }
+  const totalIn = base + sessionsProfit + deposits;
+  return {
+    playingBankroll: totalIn - withdrawn - caixinha,
+    netWorth: totalIn,
+    withdrawn,
+    caixinha,
+    deposits,
+  };
+}
+
+// --- Metas (volume e estudo) --------------------------------------------
+function periodStart(period: "semanal" | "mensal", ref = new Date()): Date {
+  const d = new Date(ref);
+  if (period === "semanal") {
+    const day = d.getDay(); // 0=domingo
+    d.setDate(d.getDate() - day);
+  } else {
+    d.setDate(1);
+  }
+  d.setHours(0, 0, 0, 0);
+  return d;
+}
+
+export interface GoalProgress {
+  goal: Goal;
+  current: number;
+  pct: number;
+}
+
+export function goalProgress(goal: Goal, sessions: Session[], studyLogs: StudyLog[]): GoalProgress {
+  const start = periodStart(goal.period);
+  let current = 0;
+  if (goal.type === "volume") {
+    current = (sessions || []).filter((s) => new Date(s.date + "T12:00:00") >= start).length;
+  } else {
+    current =
+      (studyLogs || [])
+        .filter((l) => new Date(l.date + "T12:00:00") >= start)
+        .reduce((sum, l) => sum + (Number(l.minutes) || 0), 0) / 60;
+  }
+  const pct = goal.target > 0 ? Math.min(100, (current / goal.target) * 100) : 0;
+  return { goal, current: +current.toFixed(1), pct };
 }
