@@ -271,7 +271,11 @@ export function RevisorNovaMao({
   async function handleAttachToExisting() {
     if (sessionFlow.kind !== "attach_or_new" || !pendingReviewIds) return;
     try {
-      await attachReviewsToSession(pendingReviewIds, sessionFlow.existing.id);
+      await attachReviewsToSession(
+        pendingReviewIds,
+        sessionFlow.existing.id,
+        selectedHands.map((i) => batch!.parsed_hands[i])
+      );
       // Bounty lido do HH mais recente atualiza a sessao automaticamente
       // quando maior que o valor ja salvo — bounty so cresce ao longo do
       // torneio, entao um valor menor aqui seria dado desatualizado (ex:
@@ -320,7 +324,11 @@ export function RevisorNovaMao({
         bountyCurrent: formatChoice === "regular" ? null : bounty,
         buyin: sessionFlow.buyin,
       });
-      await attachReviewsToSession(pendingReviewIds, created.id);
+      await attachReviewsToSession(
+        pendingReviewIds,
+        created.id,
+        selectedHands.map((i) => batch!.parsed_hands[i])
+      );
       setFormatChoice("regular");
       setBountyInput("");
       finishImport(pendingReviewIds, created.id);
