@@ -1,16 +1,18 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft, Trophy, Flame, Zap, Target, TrendingUp,
-  CheckCircle2, Calendar, Shield, Circle,
+  CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
+  Clock, Spade, BookOpen, HelpCircle, Scale, X, Medal,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  getPatente, xpForNextLevel, type Progress,
+  fetchLeaderboard, xpForNextLevel, type Progress, type LeaderboardEntry,
 } from "@/lib/services/xp-service";
+import { createClient } from "@/lib/supabase/client";
 
 const ACCENT = "#E0B24C";
 const XP_GREEN = "#22c55e";
@@ -28,6 +30,12 @@ function accentFor(category?: string | null) {
   return (category && CATEGORY_ACCENT[category]) || ACCENT;
 }
 
+// Icones das missoes (pedido explicito: "nao pode ter icones que nao
+// existem, adicionar aos que nao existem") — mapeado 1:1 contra os
+// valores REAIS que existem hoje na tabela `missions.icon` (conferido
+// via SQL), nao so os que apareciam nas primeiras missoes cadastradas.
+// Antes disso, 7 dos 13 icones distintos usados no catalogo caiam no
+// fallback generico (Circle) por nao estarem mapeados aqui.
 const ICON_MAP: Record<string, LucideIcon> = {
   target: Target,
   "check-circle": CheckCircle2,
@@ -35,10 +43,19 @@ const ICON_MAP: Record<string, LucideIcon> = {
   flame: Flame,
   calendar: Calendar,
   shield: Shield,
+  notebook: Notebook,
+  "clipboard-list": ClipboardList,
+  clock: Clock,
+  spade: Spade,
+  "book-open": BookOpen,
+  "help-circle": HelpCircle,
+  scale: Scale,
 };
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMission = any;
+
+type MissionTab = "daily" | "weekly" | "monthly" | "challenge";
 
 export default function HubPage() {
   const [progress, setProgress] = useState<Progress | null>(null);
@@ -46,6 +63,15 @@ export default function HubPage() {
   const [catalog, setCatalog] = useState<AnyMission[]>([]);
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [tab, setTab] = useState<MissionTab>("daily");
+
+  // Ranking global (filtro lateral de Trofeu) — carregado so quando o
+  // painel abre pela primeira vez, nao no load inicial da tela (evita
+  // custo de RPC extra pra quem nunca abre o ranking).
+  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
+  const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [meId, setMeId] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -66,16 +92,30 @@ export default function HubPage() {
         if (alive) setLoading(false);
       }
     })();
+    const supabase = createClient();
+    supabase.auth.getUser().then(({ data }) => setMeId(data.user?.id ?? null));
     return () => {
       alive = false;
     };
   }, []);
 
+  async function openLeaderboard() {
+    setLeaderboardOpen(true);
+    if (leaderboard) return;
+    setLeaderboardLoading(true);
+    try {
+      setLeaderboard(await fetchLeaderboard(100));
+    } catch {
+      setLeaderboard([]);
+    } finally {
+      setLeaderboardLoading(false);
+    }
+  }
+
   if (loading) return <main className="p-10 text-center text-sm text-muted">Carregando Hub...</main>;
   if (err || !progress) return <main className="p-10 text-center text-sm text-negative">{err}</main>;
 
   const level = progress.level;
-  const patente = getPatente(level);
   const xpNeeded = xpForNextLevel(level);
   const xpCurrent = progress.xp_current;
   const pct = Math.min(100, (xpCurrent / xpNeeded) * 100);
@@ -85,48 +125,91 @@ export default function HubPage() {
     showingCatalog ? catalog.filter((m) => m.kind === kind) : missions.filter((m) => m.missions?.kind === kind);
   const dailyMissions = grp("daily");
   const weeklyMissions = grp("weekly");
+  const monthlyMissions = grp("monthly");
   const challengeMissions = grp("challenge");
 
+  const TABS: { key: MissionTab; label: string; icon: LucideIcon; items: AnyMission[] }[] = [
+    { key: "daily", label: "Diárias", icon: Calendar, items: dailyMissions },
+    { key: "weekly", label: "Semanais", icon: Flame, items: weeklyMissions },
+    { key: "monthly", label: "Mensais", icon: Trophy, items: monthlyMissions },
+    { key: "challenge", label: "Desafios", icon: Shield, items: challengeMissions },
+  ];
+  const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
+
   return (
-    <main className="mx-auto max-w-5xl px-6 py-10">
+    <main className="mx-auto max-w-7xl px-4 py-10">
       {/* Animacoes escopadas neste arquivo: nao depende do globals.css do restante do projeto. */}
       <style>{`
         @keyframes hubFlameFlicker {
           0%, 100% { transform: scale(1) rotate(0deg); opacity: .88; }
-          25%      { transform: scale(1.08) rotate(-2deg); opacity: 1; }
-          50%      { transform: scale(.97) rotate(1.5deg); opacity: .92; }
-          75%      { transform: scale(1.05) rotate(2deg); opacity: 1; }
+          25%      { transform: scale(1.1) rotate(-3deg); opacity: 1; }
+          50%      { transform: scale(.95) rotate(2deg); opacity: .9; }
+          75%      { transform: scale(1.08) rotate(3deg); opacity: 1; }
         }
         @keyframes hubFlameGlow {
-          0%, 100% { opacity: .25; transform: scale(1); }
-          50%      { opacity: .55; transform: scale(1.3); }
+          0%, 100% { opacity: .3; transform: scale(1); }
+          50%      { opacity: .65; transform: scale(1.45); }
+        }
+        @keyframes hubEmberRise {
+          0%   { transform: translateY(0) translateX(0) scale(1); opacity: .9; }
+          100% { transform: translateY(-26px) translateX(var(--ember-x, 4px)) scale(.2); opacity: 0; }
         }
         @keyframes hubXpPulse {
           0%, 100% { box-shadow: 0 0 0 0 rgba(34,197,94,0); }
           50%      { box-shadow: 0 0 12px 0 rgba(34,197,94,.4); }
         }
+        @keyframes hubFadeInUp {
+          from { opacity: 0; transform: translateY(6px); }
+          to   { opacity: 1; transform: translateY(0); }
+        }
+        @keyframes hubDrawerIn {
+          from { opacity: 0; transform: translateX(24px); }
+          to   { opacity: 1; transform: translateX(0); }
+        }
         .hub-flame-icon { animation: hubFlameFlicker var(--flame-speed, 2.4s) ease-in-out infinite; }
         .hub-flame-glow { animation: hubFlameGlow var(--flame-speed, 2.4s) ease-in-out infinite; }
+        .hub-ember { animation: hubEmberRise var(--ember-speed, 1.6s) ease-in infinite; }
         .hub-xp-chip { animation: hubXpPulse 2.6s ease-in-out infinite; }
-        .hub-mission-card { transition: border-color .2s ease, box-shadow .2s ease, transform .15s ease; }
-        .hub-mission-card:hover { transform: translateY(-2px); }
+        .hub-mission-card { transition: border-color .2s ease, box-shadow .2s ease, transform .18s ease; animation: hubFadeInUp .3s ease-out both; }
+        .hub-mission-card:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 10px 24px -12px rgba(0,0,0,.6); }
+        .hub-tab-btn { transition: all .2s ease; }
+        .hub-tab-btn:hover:not(.is-active) { transform: translateY(-1px); }
+        .hub-level-card { transition: box-shadow .3s ease, border-color .3s ease; }
+        .hub-level-card:hover { border-color: rgba(224,178,76,0.4); box-shadow: 0 0 30px -10px rgba(224,178,76,0.25); }
+        .hub-ministat { transition: transform .2s ease, background-color .2s ease; }
+        .hub-ministat:hover { transform: translateY(-2px); background-color: rgba(255,255,255,.06); }
+        .hub-trophy-btn { transition: all .2s ease; }
+        .hub-trophy-btn:hover { transform: scale(1.08) rotate(-4deg); box-shadow: 0 0 16px -4px rgba(224,178,76,.5); }
+        .hub-lb-row { animation: hubFadeInUp .25s ease-out both; transition: background-color .15s ease; }
         @media (prefers-reduced-motion: reduce) {
-          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip { animation: none !important; }
-          .hub-mission-card { transition: none !important; }
+          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn { animation: none !important; transition: none !important; }
         }
       `}</style>
 
-      <div className="flex items-center gap-3">
-        <Link href="/modulos" className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
-          <ArrowLeft size={18} />
-        </Link>
-        <div>
-          <h1 className="text-2xl font-semibold tracking-tight">Hub de Evolucao</h1>
-          <p className="mt-0.5 text-sm text-muted">Ganhe XP, mantenha a ofensiva e suba de patente.</p>
+      <div className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-3">
+          <Link href="/modulos" className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink">
+            <ArrowLeft size={18} />
+          </Link>
+          <div>
+            <h1 className="text-2xl font-semibold tracking-tight">Hub de Evolução</h1>
+            <p className="mt-0.5 text-sm text-muted">Ganhe XP, mantenha a ofensiva e suba de nível.</p>
+          </div>
         </div>
+
+        {/* Filtro lateral de Trofeu (pedido explicito): ranking de todos
+            os membros PokerSync, abre em drawer pela direita. */}
+        <button
+          onClick={openLeaderboard}
+          title="Ranking PokerSync"
+          className="hub-trophy-btn grid h-10 w-10 place-items-center rounded-xl border"
+          style={{ borderColor: `${ACCENT}55`, background: `${ACCENT}15`, color: ACCENT }}
+        >
+          <Trophy size={18} />
+        </button>
       </div>
 
-      <div className="relative mt-6 overflow-hidden rounded-xl border border-hairline bg-surface p-6">
+      <div className="hub-level-card relative mt-6 overflow-hidden rounded-xl border border-hairline bg-surface p-6">
         <div
           className="pointer-events-none absolute inset-0"
           style={{ background: `radial-gradient(ellipse at 100% 0%, ${ACCENT}12 0%, transparent 60%)` }}
@@ -147,8 +230,10 @@ export default function HubPage() {
           </div>
 
           <div className="min-w-0">
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted">Nivel {level}</p>
-            <h2 className="mt-0.5 text-xl font-bold">{patente}</h2>
+            {/* Nome de patente em ingles (Micro Stakes I etc) removido
+                (pedido explicito) — so o numero do nivel, sem rotulo por
+                baixo. */}
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted">Nível {level}</p>
             <div className="mt-3">
               <div className="h-2 overflow-hidden rounded-full border border-hairline bg-white/5">
                 <div
@@ -158,12 +243,14 @@ export default function HubPage() {
               </div>
               <div className="mt-1.5 flex justify-between text-[11px] text-muted">
                 <span>{xpCurrent} XP</span>
-                <span>{xpNeeded} XP para o proximo</span>
+                <span>{xpNeeded} XP para o próximo</span>
               </div>
             </div>
           </div>
 
-          {/* Fogo animado: intensidade escala com a ofensiva (0-2 apagado, 3-6 laranja, 7+ laranja/amarelo mais rapido) */}
+          {/* Fogo animado: intensidade escala com a ofensiva. Ganhou
+              particulas de brasa subindo (pedido explicito: "fogo de
+              streak mais animado"), alem do flicker que ja existia. */}
           <FlameStat days={progress.streak_days} />
         </div>
 
@@ -176,18 +263,57 @@ export default function HubPage() {
 
       {showingCatalog && (
         <p className="mt-5 rounded-lg border border-evolution/25 bg-evolution/10 px-4 py-3 text-xs" style={{ color: ACCENT }}>
-          As missoes abaixo sao um preview do catalogo. Em breve voce recebera missoes diarias personalizadas ao seu nivel.
+          As missões abaixo são um preview do catálogo. Em breve você receberá missões diárias personalizadas ao seu nível.
         </p>
       )}
 
-      {dailyMissions.length > 0 && (
-        <MissionSection title="Missoes diarias" icon={Calendar} missions={dailyMissions} preview={showingCatalog} />
-      )}
-      {weeklyMissions.length > 0 && (
-        <MissionSection title="Missoes semanais" icon={Flame} missions={weeklyMissions} preview={showingCatalog} />
-      )}
-      {challengeMissions.length > 0 && (
-        <MissionSection title="Desafios" icon={Shield} missions={challengeMissions} preview={showingCatalog} />
+      {/* Abas Diario/Semanal/Mensal/Desafios (pedido explicito: "separar
+          por diario, semanal e mensal") — Mensal ainda nao tem missoes
+          cadastradas no catalogo, aparece vazia ate existirem. */}
+      <div className="mt-6 flex flex-wrap gap-2">
+        {TABS.map((t) => {
+          const Icon = t.icon;
+          const active = tab === t.key;
+          return (
+            <button
+              key={t.key}
+              onClick={() => setTab(t.key)}
+              className={`hub-tab-btn flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold uppercase tracking-[0.08em] ${
+                active ? "is-active border-transparent text-void" : "border-hairline bg-elevated text-muted hover:text-ink"
+              }`}
+              style={active ? { background: ACCENT } : undefined}
+            >
+              <Icon size={13} />
+              {t.label}
+              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-void/20" : "bg-white/[0.06]"}`}>
+                {t.items.length}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
+      <div className="mt-4">
+        {activeTab.items.length === 0 ? (
+          <div className="rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-sm text-muted">
+            {tab === "monthly" ? "Missões mensais chegam em breve." : "Nenhuma missão aqui ainda."}
+          </div>
+        ) : (
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            {activeTab.items.map((item, idx) => (
+              <MissionCard key={idx} item={item} preview={showingCatalog} />
+            ))}
+          </div>
+        )}
+      </div>
+
+      {leaderboardOpen && (
+        <LeaderboardDrawer
+          onClose={() => setLeaderboardOpen(false)}
+          entries={leaderboard}
+          loading={leaderboardLoading}
+          meId={meId}
+        />
       )}
     </main>
   );
@@ -196,7 +322,11 @@ export default function HubPage() {
 function FlameStat({ days }: { days: number }) {
   const tier = days >= 7 ? 2 : days >= 3 ? 1 : 0;
   const color = tier === 2 ? "#FBBF24" : tier === 1 ? "#F97316" : "#6B6B6B";
-  const speed = tier === 2 ? "1.4s" : tier === 1 ? "2s" : "3.2s";
+  const speed = tier === 2 ? "1.2s" : tier === 1 ? "1.8s" : "3.2s";
+  const emberSpeed = tier === 2 ? "1.1s" : "1.6s";
+  // Brasas: pequenos pontos que sobem e desaparecem, atrasados entre si
+  // pra nao pulsarem em uníssono — so aparecem com streak ativo (tier>0).
+  const embers = tier > 0 ? [0, 1, 2] : [];
 
   return (
     <div className="min-w-[84px] rounded-xl border border-hairline bg-white/[0.03] px-3.5 py-2.5 text-center">
@@ -207,6 +337,18 @@ function FlameStat({ days }: { days: number }) {
             style={{ background: color, opacity: 0.35 }}
           />
         )}
+        {embers.map((i) => (
+          <span
+            key={i}
+            className="hub-ember absolute bottom-0 left-1/2 h-1 w-1 rounded-full"
+            style={{
+              background: color,
+              ["--ember-speed" as string]: emberSpeed,
+              ["--ember-x" as string]: `${(i - 1) * 5}px`,
+              animationDelay: `${i * 0.4}s`,
+            }}
+          />
+        ))}
         <Flame
           size={22}
           className={tier > 0 ? "hub-flame-icon relative" : "relative"}
@@ -222,7 +364,7 @@ function FlameStat({ days }: { days: number }) {
 
 function MiniStat({ icon: Icon, label, value }: { icon: LucideIcon; label: string; value: string }) {
   return (
-    <div className="flex items-center gap-2.5">
+    <div className="hub-ministat flex items-center gap-2.5 rounded-lg p-1">
       <div className="grid h-8 w-8 place-items-center rounded-lg border border-hairline bg-white/[0.04]">
         <Icon size={14} className="text-muted" />
       </div>
@@ -234,34 +376,11 @@ function MiniStat({ icon: Icon, label, value }: { icon: LucideIcon; label: strin
   );
 }
 
-function MissionSection({
-  title,
-  icon: Icon,
-  missions,
-  preview,
-}: {
-  title: string;
-  icon: LucideIcon;
-  missions: AnyMission[];
-  preview: boolean;
-}) {
-  return (
-    <div className="mt-6">
-      <div className="mb-3 flex items-center gap-2.5">
-        <Icon size={16} style={{ color: ACCENT }} />
-        <h3 className="text-xs font-extrabold uppercase tracking-[0.12em]">{title}</h3>
-      </div>
-      <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-        {missions.map((item, idx) => (
-          <MissionCard key={idx} item={item} preview={preview} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) {
   const m = preview ? item : item.missions;
+  // Fallback pra Circle so deveria acontecer com icone realmente
+  // desconhecido/futuro — todos os icones cadastrados hoje ja tem
+  // entrada valida em ICON_MAP (ver comentario acima do mapa).
   const Icon = ICON_MAP[m?.icon] || Circle;
   const goal = preview ? m.goal_base : item.goal_value;
   const prog = preview ? 0 : item.progress;
@@ -315,6 +434,90 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
               {prog} / {goal}
             </div>
           </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+// Ranking global (pedido explicito: "criar rankeamento de todos os
+// membros pokersync em um filtro lateral de Trofeu dentro do hub") —
+// drawer deslizando da direita, ordenado por XP total. Usa a RPC
+// get_leaderboard (security definer) pois user_progress e' privada por
+// RLS — a RPC expoe so o necessario pro ranking (nome, nivel, xp,
+// streak), nada sensivel.
+function LeaderboardDrawer({
+  onClose,
+  entries,
+  loading,
+  meId,
+}: {
+  onClose: () => void;
+  entries: LeaderboardEntry[] | null;
+  loading: boolean;
+  meId: string | null;
+}) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  return (
+    <div className="fixed inset-0 z-50 flex justify-end bg-void/70 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div
+        className="relative flex h-full w-full max-w-sm flex-col border-l border-hairline bg-surface p-5"
+        style={{ animation: "hubDrawerIn .22s ease-out both" }}
+      >
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
+            <Trophy size={16} /> Ranking PokerSync
+          </h2>
+          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="mt-4 flex-1 overflow-y-auto">
+          {loading ? (
+            <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
+          ) : !entries || entries.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted">Ninguém no ranking ainda.</p>
+          ) : (
+            <div className="flex flex-col gap-1.5">
+              {entries.map((e) => {
+                const isMe = e.userId === meId;
+                const medalColor = e.rank === 1 ? "#F5D48C" : e.rank === 2 ? "#C0C6CC" : e.rank === 3 ? "#CD7F32" : null;
+                return (
+                  <div
+                    key={e.userId}
+                    className={`hub-lb-row flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+                      isMe ? "border-review/50 bg-review/[0.08]" : "border-hairline bg-void/40 hover:bg-elevated"
+                    }`}
+                    style={{ animationDelay: `${Math.min(e.rank, 20) * 0.02}s` }}
+                  >
+                    <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
+                      {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
+                    </span>
+                    <div className="min-w-0 flex-1">
+                      <p className="truncate text-sm font-semibold">
+                        {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
+                      </p>
+                      <p className="text-[11px] text-muted">
+                        Nível {e.level} · {e.streakDays} dias de streak
+                      </p>
+                    </div>
+                    <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+                      {e.xpTotal.toLocaleString("pt-BR")} XP
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          )}
         </div>
       </div>
     </div>
