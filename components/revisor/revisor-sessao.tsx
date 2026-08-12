@@ -51,6 +51,8 @@ interface HandInListing {
   } | null;
   created_at: string;
   status: string;
+  // Marcadores da mao (pedido explicito: filtrar maos marcadas na lista).
+  hand_review_tag_links?: { tag_id: string; hand_review_tags: { id: string; label: string }[] | null }[];
 }
 
 function HeroCardsPreview({ cards }: { cards: string[] }) {
@@ -97,6 +99,7 @@ export function RevisorSessao({
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyWithAction, setOnlyWithAction] = useState(false);
+  const [tagFilter, setTagFilter] = useState<string | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -109,7 +112,7 @@ export function RevisorSessao({
           supabase.from("hand_sessions").select("*").eq("id", sessionId).single(),
           supabase
             .from("hand_reviews")
-            .select("id, title, hand_history, parsed_data, created_at, status")
+            .select("id, title, hand_history, parsed_data, created_at, status, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )")
             .eq("hand_session_id", sessionId)
             .order("created_at", { ascending: true }),
         ]);
@@ -163,6 +166,21 @@ export function RevisorSessao({
   // pra cobrir os 3 casos pedidos ("stack ou posições") — mais simples
   // pro jogador que 3 campos separados. "So com acao" e' um toggle a
   // parte, e' booleano, nao cabe bem como texto livre.
+  // Tags distintas presentes nas maos DESSA sessao — so mostra no filtro
+  // o que existe de fato aqui, nao a lista inteira de marcadores do
+  // sistema (a maioria nao se aplica a um torneio especifico).
+  const availableTags = useMemo(() => {
+    const map = new Map<string, string>();
+    for (const h of hands) {
+      for (const link of h.hand_review_tag_links ?? []) {
+        for (const t of link.hand_review_tags ?? []) {
+          map.set(t.id, t.label);
+        }
+      }
+    }
+    return [...map.entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
+  }, [hands]);
+
   const filteredHands = useMemo(() => {
     return hands
       .map((h, i) => ({ hand: h, index: i }))
@@ -170,6 +188,10 @@ export function RevisorSessao({
         if (onlyWithAction) {
           const entered = didHeroEnterHand(hand.parsed_data?.heroName, hand.parsed_data?.streets);
           if (entered !== true) return false;
+        }
+        if (tagFilter) {
+          const hasTag = (hand.hand_review_tag_links ?? []).some((l) => l.tag_id === tagFilter);
+          if (!hasTag) return false;
         }
         const q = searchQuery.trim().toLowerCase();
         if (!q) return true;
@@ -179,7 +201,7 @@ export function RevisorSessao({
         const handNumber = String(index + 1);
         return heroPosition.includes(q) || heroStack.includes(q) || handNumber === q;
       });
-  }, [hands, searchQuery, onlyWithAction]);
+  }, [hands, searchQuery, onlyWithAction, tagFilter]);
 
   // Avança pra próxima mão da fila quando o replay da mão atual falha
   // (ex: checagem de pote do projector) — pedido explicito (2026-08):
@@ -365,19 +387,43 @@ export function RevisorSessao({
             )}
 
             {searchOpen && (
-              <button
-                onClick={() => setOnlyWithAction((v) => !v)}
-                style={{
-                  all: "unset", cursor: "pointer", alignSelf: "flex-start",
-                  fontFamily: F, fontSize: 10.5, fontWeight: 500,
-                  padding: "4px 9px", borderRadius: 999,
-                  border: `1px solid ${onlyWithAction ? "#34D399" : "rgba(255,255,255,0.14)"}`,
-                  background: onlyWithAction ? "rgba(52,211,153,0.14)" : "transparent",
-                  color: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.5)",
-                }}
-              >
-                Só com ação
-              </button>
+              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+                <button
+                  onClick={() => setOnlyWithAction((v) => !v)}
+                  style={{
+                    all: "unset", cursor: "pointer",
+                    fontFamily: F, fontSize: 10.5, fontWeight: 500,
+                    padding: "4px 9px", borderRadius: 999,
+                    border: `1px solid ${onlyWithAction ? "#34D399" : "rgba(255,255,255,0.14)"}`,
+                    background: onlyWithAction ? "rgba(52,211,153,0.14)" : "transparent",
+                    color: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.5)",
+                  }}
+                >
+                  Só com ação
+                </button>
+
+                {/* Filtro por marcador (pedido explicito) — so lista tags
+                    que realmente aparecem em alguma mao dessa sessao. */}
+                {availableTags.map((t) => {
+                  const active = tagFilter === t.id;
+                  return (
+                    <button
+                      key={t.id}
+                      onClick={() => setTagFilter(active ? null : t.id)}
+                      style={{
+                        all: "unset", cursor: "pointer",
+                        fontFamily: F, fontSize: 10.5, fontWeight: 500,
+                        padding: "4px 9px", borderRadius: 999,
+                        border: `1px solid ${active ? "#C4B5FD" : "rgba(255,255,255,0.14)"}`,
+                        background: active ? "rgba(168,85,247,0.18)" : "transparent",
+                        color: active ? "#C4B5FD" : "rgba(255,255,255,0.5)",
+                      }}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
             )}
           </div>
           <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>

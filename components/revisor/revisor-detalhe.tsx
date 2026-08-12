@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy } from "lucide-react";
+import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import {
   getReview,
@@ -16,12 +16,19 @@ import {
   fetchStreetEvals,
   saveStreetEvals,
   registerReviewEvent,
+  fetchTags,
+  createUserTag,
+  updateReviewTags,
+  fetchTeamCoaches,
+  shareReviewWithCoach,
   type ReviewDetail,
   type ReviewAnswer,
   type StreetEval,
   type Reason,
   type Street,
   type ManualTicket,
+  type Tag,
+  type TeamCoach,
 } from "@/lib/services/hand-review-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { RevisorHandTable } from "./revisor-hand-table";
@@ -124,6 +131,96 @@ function GuidedQuestionChip({
   );
 }
 
+// Modal simples (fecha com Esc/backdrop/X) — mesmo padrao ja usado em
+// outras telas do produto (Bankroll), reimplementado aqui local pra nao
+// criar dependencia cruzada entre modulos por um componente tao pequeno.
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-lg rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold text-ink">{title}</h2>
+          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted hover:text-ink" aria-label="Fechar">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="mt-4">{children}</div>
+      </div>
+    </div>
+  );
+}
+
+// Perguntas guiadas em modal (pedido explicito): as primeiras
+// `clickableCount` continuam no formato de chip que precisa clicar pra
+// abrir (GuidedQuestionChip, "da forma que ja e'" — nao mudou nada
+// nelas). As demais aparecem direto como texto livre — o jogador ja
+// respondeu as prioritarias, o resto e' aprofundamento opcional, nao
+// precisa do gesto extra de abrir uma por uma.
+function GuidedQuestionsModal({
+  open,
+  onClose,
+  qas,
+  onChange,
+  clickableCount,
+}: {
+  open: boolean;
+  onClose: () => void;
+  qas: ReviewAnswer[];
+  onChange: (idx: number, val: string) => void;
+  clickableCount: number;
+}) {
+  return (
+    <Modal open={open} onClose={onClose} title="Perguntas guiadas">
+      <div className="flex flex-col gap-2">
+        {qas.slice(0, clickableCount).map((q, i) => (
+          <GuidedQuestionChip key={i} index={i} question={q.question} answer={q.answer} onChange={(val) => onChange(i, val)} />
+        ))}
+
+        {qas.length > clickableCount && (
+          <div className="mt-1 flex flex-col gap-3 border-t border-hairline pt-3">
+            {qas.slice(clickableCount).map((q, i) => {
+              const idx = i + clickableCount;
+              return (
+                <div key={idx}>
+                  <p className="text-[12.5px] font-semibold text-ink/90">{q.question}</p>
+                  <textarea
+                    value={q.answer}
+                    onChange={(e) => onChange(idx, e.target.value)}
+                    rows={2}
+                    placeholder="Sua análise…"
+                    className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+      </div>
+    </Modal>
+  );
+}
+
 export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack: () => void }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [review, setReview] = useState<ReviewDetail | null>(null);
@@ -150,12 +247,45 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [ticket, setTicket] = useState<ManualTicket>({ format: "", street: "preflop" as Street, action: "" });
   const [ticketSaved, setTicketSaved] = useState(false);
 
+  // Marcadores editaveis (pedido explicito) — antes so' dava pra
+  // escolher na criacao da mao avulsa; agora edita direto na tela de
+  // revisao, reusando o mesmo padrao de chip.
+  const [allTags, setAllTags] = useState<Tag[]>([]);
+  const [reviewTagIds, setReviewTagIds] = useState<string[]>([]);
+  const [tagEditorOpen, setTagEditorOpen] = useState(false);
+  const [newTagLabel, setNewTagLabel] = useState("");
+  const [savingTags, setSavingTags] = useState(false);
+
+  // Perguntas guiadas em modal (pedido explicito): botao num lugar
+  // estrategico (cabecalho, sempre visivel) abre o modal — as primeiras
+  // continuam clicaveis pra abrir (GuidedQuestionChip, "da forma que ja
+  // e'"), as demais aparecem direto como texto livre (sem precisar
+  // clicar pra expandir).
+  const GUIDED_CLICKABLE_COUNT = 2;
+  const [guidedModalOpen, setGuidedModalOpen] = useState(false);
+
+  // Compartilhar com o coach do time (base minima de Times: role coach/
+  // jogador em team_members) — mesmo formato de replayer no lado do
+  // coach, via notificacao com deep-link.
+  const [teamCoaches, setTeamCoaches] = useState<TeamCoach[]>([]);
+  const [shareMenuOpen, setShareMenuOpen] = useState(false);
+  const [shareStatus, setShareStatus] = useState<"idle" | "sending" | "sent">("idle");
+
   useEffect(() => {
     (async () => {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
-      setUserId(data.user?.id || null);
+      const uid = data.user?.id || null;
+      setUserId(uid);
       await load();
+      if (uid) {
+        fetchTags()
+          .then(setAllTags)
+          .catch(() => {});
+        fetchTeamCoaches(uid)
+          .then(setTeamCoaches)
+          .catch(() => {});
+      }
     })();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [reviewId]);
@@ -192,6 +322,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             r.parsed_data?.kind === "parsed" ? { board: r.parsed_data.board, heroPosition: r.parsed_data.heroPosition } : null
           ).map((q) => ({ question: q, answer: "" }));
       setQas(questions);
+      setReviewTagIds(r.tags.map((t) => t.id));
 
       const [rs, existingEvals] = await Promise.all([fetchReasons(), fetchStreetEvals(reviewId)]);
       setReasons(rs);
@@ -231,6 +362,50 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
 
   function updateAnswer(idx: number, val: string) {
     setQas((prev) => prev.map((q, i) => (i === idx ? { ...q, answer: val } : q)));
+  }
+
+  async function toggleReviewTag(tagId: string) {
+    if (!userId) return;
+    const backup = reviewTagIds;
+    const next = reviewTagIds.includes(tagId) ? reviewTagIds.filter((id) => id !== tagId) : [...reviewTagIds, tagId];
+    setReviewTagIds(next);
+    setSavingTags(true);
+    try {
+      await updateReviewTags(reviewId, userId, next);
+      setReview((prev) => (prev ? { ...prev, tags: allTags.filter((t) => next.includes(t.id)) } : prev));
+    } catch {
+      setReviewTagIds(backup);
+      setError("Não foi possível salvar o marcador.");
+    } finally {
+      setSavingTags(false);
+    }
+  }
+
+  async function handleCreateTag() {
+    if (!userId || !newTagLabel.trim()) return;
+    try {
+      const tag = await createUserTag(userId, newTagLabel.trim());
+      setAllTags((prev) => [...prev, tag]);
+      setNewTagLabel("");
+      await toggleReviewTag(tag.id);
+    } catch {
+      setError("Não foi possível criar o marcador.");
+    }
+  }
+
+  async function handleShareWithCoach(coach: TeamCoach) {
+    setShareStatus("sending");
+    try {
+      await shareReviewWithCoach(reviewId, coach.userId, review?.title || "Mão sem título");
+      setShareStatus("sent");
+      setTimeout(() => {
+        setShareStatus("idle");
+        setShareMenuOpen(false);
+      }, 1600);
+    } catch {
+      setShareStatus("idle");
+      setError("Não foi possível compartilhar com o coach.");
+    }
   }
 
   async function saveTicket(next: ManualTicket) {
@@ -402,29 +577,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       )}
 
       <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
-        <div className="mb-1 flex items-center justify-between">
-          <div className="flex items-center gap-2">
-            <HelpCircle size={15} className="text-review" />
-            <h3 className="m-0 text-sm font-semibold text-ink">Perguntas guiadas</h3>
-          </div>
-          <span className="text-[11px] text-muted">
-            {answeredCount}/{qas.length}
-          </span>
-        </div>
-        <div className="flex flex-col gap-1.5">
-          {qas.map((q, i) => (
-            <GuidedQuestionChip
-              key={i}
-              index={i}
-              question={q.question}
-              answer={q.answer}
-              onChange={(val) => updateAnswer(i, val)}
-            />
-          ))}
-        </div>
-      </section>
-
-      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
           <Scale size={15} className="text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Auto-avaliação por street</h3>
@@ -539,18 +691,121 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   return (
     <div>
       <div className="mb-4 flex items-start justify-between gap-3">
-        <div>
+        <div className="min-w-0 flex-1">
           <h2 className="m-0 text-lg text-ink">{review.title || "Mão sem título"}</h2>
-          <div className="mt-1.5 flex flex-wrap gap-1">
+          <div className="mt-1.5 flex flex-wrap items-center gap-1">
             {review.tags.map((t) => (
               <span key={t.id} className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
                 {t.label}
               </span>
             ))}
+            {/* Marcadores totalmente editaveis (pedido explicito) — abre
+                o mesmo padrao de chip usado na criacao da mao avulsa,
+                agora tambem disponivel aqui na revisao. */}
+            <button
+              onClick={() => setTagEditorOpen((v) => !v)}
+              className="flex items-center gap-1 rounded border border-dashed border-hairline px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:border-review/50 hover:text-review"
+            >
+              <TagIcon size={10} /> {review.tags.length === 0 ? "Marcar" : "Editar"}
+            </button>
           </div>
+
+          {tagEditorOpen && (
+            <div className="mt-2 rounded-lg border border-hairline bg-void p-2.5">
+              <div className="flex flex-wrap gap-1.5">
+                {allTags.map((t) => {
+                  const active = reviewTagIds.includes(t.id);
+                  return (
+                    <button
+                      key={t.id}
+                      type="button"
+                      onClick={() => toggleReviewTag(t.id)}
+                      disabled={savingTags}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                        active ? "border-review bg-review text-void" : "border-hairline bg-transparent text-ink"
+                      }`}
+                    >
+                      {t.label}
+                    </button>
+                  );
+                })}
+              </div>
+              <div className="mt-2 flex items-center gap-1.5">
+                <input
+                  value={newTagLabel}
+                  onChange={(e) => setNewTagLabel(e.target.value)}
+                  onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                  placeholder="Criar marcador"
+                  className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-ink outline-none focus:border-review"
+                />
+                <button
+                  onClick={handleCreateTag}
+                  className="flex shrink-0 items-center gap-1 rounded-md bg-review px-2 py-1 text-[11px] font-semibold text-void"
+                >
+                  <Plus size={11} /> Criar
+                </button>
+              </div>
+            </div>
+          )}
         </div>
-        <ShareButton review={review} parsedHand={parsedHandForTable} />
+
+        <div className="flex shrink-0 items-center gap-1.5">
+          {/* Perguntas guiadas — lugar estrategico (cabecalho, sempre
+              visivel, nao precisa rolar) — abre modal em vez de ocupar
+              espaco fixo na coluna. */}
+          <button
+            onClick={() => setGuidedModalOpen(true)}
+            className="relative flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-review/40"
+          >
+            <HelpCircle size={14} className="text-review" />
+            Perguntas
+            <span className="text-[11px] text-muted">
+              {answeredCount}/{qas.length}
+            </span>
+          </button>
+
+          {teamCoaches.length > 0 && (
+            <div className="relative">
+              <button
+                onClick={() => setShareMenuOpen((v) => !v)}
+                className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-training/40"
+              >
+                <Users size={14} className="text-training" />
+                Coach
+              </button>
+              {shareMenuOpen && (
+                <div className="absolute right-0 top-[calc(100%+4px)] z-20 w-56 rounded-xl border border-hairline bg-surface p-2 shadow-2xl">
+                  {shareStatus === "sent" ? (
+                    <p className="p-2 text-center text-[12px] text-positive">Mão compartilhada!</p>
+                  ) : (
+                    teamCoaches.map((c) => (
+                      <button
+                        key={c.userId}
+                        onClick={() => handleShareWithCoach(c)}
+                        disabled={shareStatus === "sending"}
+                        className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[13px] text-ink transition-colors hover:bg-elevated disabled:opacity-50"
+                      >
+                        {c.name}
+                        <ChevronRight size={13} className="text-muted" />
+                      </button>
+                    ))
+                  )}
+                </div>
+              )}
+            </div>
+          )}
+
+          <ShareButton review={review} parsedHand={parsedHandForTable} />
+        </div>
       </div>
+
+      <GuidedQuestionsModal
+        open={guidedModalOpen}
+        onClose={() => setGuidedModalOpen(false)}
+        qas={qas}
+        onChange={updateAnswer}
+        clickableCount={GUIDED_CLICKABLE_COUNT}
+      />
 
       {/* Coluna da mesa aumentada (pedido explicito: "aumente a tela
           aqui") — era 1fr/1.3fr, agora 0.8fr/1.5fr. Perguntas ficaram
