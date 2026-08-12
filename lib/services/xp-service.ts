@@ -121,3 +121,28 @@ export async function awardXP({
   if (error) throw error;
   return data?.[0];
 }
+
+// --- Ranking global (todos os membros PokerSync) --------------------------
+export interface LeaderboardEntry {
+  userId: string;
+  name: string;
+  level: number;
+  xpTotal: number;
+  streakDays: number;
+  rank: number;
+}
+
+export async function fetchLeaderboard(limit = 100): Promise<LeaderboardEntry[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_leaderboard", { p_limit: limit });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    userId: r.user_id,
+    name: r.name,
+    level: r.level,
+    xpTotal: r.xp_total,
+    streakDays: r.streak_days,
+    rank: Number(r.rank),
+  }));
+}
