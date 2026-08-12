@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat } from "@/lib/bankroll/types";
+import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { DEFAULT_BRM_THRESHOLDS } from "@/lib/bankroll/calc";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -272,4 +272,66 @@ export async function saveBrmThreshold(t: { format: BrmFormat; moveupBuyins: num
     .single();
   if (error) throw error;
   return rowToBrmThreshold(data);
+}
+
+// --- Anotacoes no grafico --------------------------------------------------
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToAnnotation(r: any): Annotation {
+  return { id: r.id, date: r.date, note: r.note };
+}
+
+export async function fetchAnnotations(): Promise<Annotation[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("bankroll_annotations")
+    .select("*")
+    .order("date", { ascending: true });
+  if (error) throw error;
+  return (data || []).map(rowToAnnotation);
+}
+
+export async function addAnnotation(a: { date: string; note: string }): Promise<Annotation> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("bankroll_annotations")
+    .insert({ user_id: userId, date: a.date, note: a.note })
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToAnnotation(data);
+}
+
+export async function deleteAnnotation(id: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("bankroll_annotations").delete().eq("id", id);
+  if (error) throw error;
+}
+
+// --- Alerta de BRM via notificacao ----------------------------------------
+// Dispara uma notificacao (Hub de Evolucao ja tem o sino/lista) quando o
+// status de moveup/movedown muda pra algo accionavel. Dedupe simples:
+// nao duplica se ja existe notificacao com o mesmo titulo criada nas
+// ultimas 20h (evita spam a cada reload da tela).
+export async function notifyBrmAlert(title: string, body: string) {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const since = new Date(Date.now() - 20 * 60 * 60 * 1000).toISOString();
+  const { data: existing, error: checkErr } = await supabase
+    .from("notifications")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("title", title)
+    .gte("created_at", since)
+    .limit(1);
+  if (checkErr) throw checkErr;
+  if (existing && existing.length > 0) return;
+  const { error } = await supabase.from("notifications").insert({
+    user_id: userId,
+    title,
+    body,
+    kind: "warning",
+  });
+  if (error) throw error;
 }
