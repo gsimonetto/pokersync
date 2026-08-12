@@ -1,6 +1,6 @@
-import { aggregate, evolutionSeries, groupStats } from "./calc";
+import { aggregate, evolutionSeries, groupStats, brmReading } from "./calc";
 import { fmtMoney, fmtPct } from "./format";
-import type { Session } from "./types";
+import type { Session, BrmThreshold } from "./types";
 
 const MIN_SAMPLE = 12;
 const DD_WARN = 10;
@@ -25,7 +25,10 @@ export function drawdownBuyIns(sessions: Session[], avgBuyIn: number) {
   return avgBuyIn > 0 ? dd / avgBuyIn : 0;
 }
 
-export function buildCoachTips(sessions: Session[], opts: { bankroll?: number } = {}): CoachTip[] {
+export function buildCoachTips(
+  sessions: Session[],
+  opts: { bankroll?: number; brmThresholds?: BrmThreshold[] } = {}
+): CoachTip[] {
   const a = aggregate(sessions);
   if (a.n === 0) {
     return [
@@ -74,15 +77,31 @@ export function buildCoachTips(sessions: Session[], opts: { bankroll?: number } 
       text: `ROI de ${fmtPct(worst.roi)} em ${worst.n} sessoes. Reduza volume ou revise a estrategia.`,
     });
   }
-  if (opts.bankroll && a.avgBuyIn > 0) {
-    const buyIns = opts.bankroll / a.avgBuyIn;
-    if (buyIns < 30) {
-      tips.push({
-        id: "health",
-        level: "warn",
-        title: `Banca cobre ~${buyIns.toFixed(0)} buy-ins do seu stake medio`,
-        text: "Padrao recomenda 30+ para cash e 100+ para MTT. Reforce a banca ou reduza o buy-in.",
-      });
+  if (opts.bankroll) {
+    const reading = brmReading(sessions, opts.bankroll, opts.brmThresholds || []);
+    if (reading) {
+      if (reading.status === "movedown") {
+        tips.push({
+          id: "brm",
+          level: "bad",
+          title: `Banca abaixo do minimo pra ${reading.format} (${reading.buyInsCovered} buy-ins)`,
+          text: `Seu threshold de movedown em ${reading.format} e' ${reading.threshold.movedownBuyins} buy-ins. Considere descer de stake ate reforcar a banca.`,
+        });
+      } else if (reading.status === "moveup") {
+        tips.push({
+          id: "brm",
+          level: "good",
+          title: `Banca cobre ${reading.buyInsCovered} buy-ins em ${reading.format}`,
+          text: `Acima do seu threshold de moveup (${reading.threshold.moveupBuyins} buy-ins). Pode considerar subir de stake com disciplina.`,
+        });
+      } else {
+        tips.push({
+          id: "brm",
+          level: "info",
+          title: `Banca cobre ${reading.buyInsCovered} buy-ins em ${reading.format}`,
+          text: `Dentro da faixa (entre ${reading.threshold.movedownBuyins} e ${reading.threshold.moveupBuyins} buy-ins). Mantenha o stake atual.`,
+        });
+      }
     }
   }
   if (a.profit > 0 && ddBI < DD_WARN) {
