@@ -166,6 +166,15 @@ export default function BankrollPage() {
   const recentTx = [...transactions].reverse().slice(0, 6);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
 
+  // Coach nao e' mural fixo (pedido explicito): o tip em destaque (o que
+  // aparece sempre visivel, sem precisar expandir) roda com um TTL —
+  // fica ativo ate 1 dia se for algo accionavel (bad/warn), bem menos
+  // tempo se for so um "good/info" (que muda com mais frequencia natural
+  // de qualquer forma). Se o tip deixar de ser relevante (sumiu do
+  // calculo por causa de dado novo), roda pro proximo IMEDIATAMENTE, nao
+  // espera o TTL. Ver useFeaturedCoachTip no fim do arquivo.
+  const featuredTip = useFeaturedCoachTip(tips);
+
   // Alerta de BRM via notificacao (Hub de Evolucao ja tem sino/lista) —
   // dispara so quando o status muda pra algo accionavel (moveup/
   // movedown), com dedupe no service (nao duplica notificacao repetida).
@@ -351,7 +360,7 @@ export default function BankrollPage() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-7xl px-4 py-10">
       <div className="flex items-center gap-3">
         <Link
           href="/modulos"
@@ -582,12 +591,21 @@ export default function BankrollPage() {
           <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
             <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">AI Coach</h2>
             <div className="mt-2 flex flex-col gap-1.5 overflow-y-auto">
-              {tips.slice(0, coachExpanded ? tips.length : 1).map((tip: CoachTip) => (
-                <div key={tip.id} className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(tip.level)}`}>
-                  <p className="font-semibold leading-snug">{tip.title}</p>
-                  <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{tip.text}</p>
+              {featuredTip && (
+                <div className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(featuredTip.level)}`}>
+                  <p className="font-semibold leading-snug">{featuredTip.title}</p>
+                  <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{featuredTip.text}</p>
                 </div>
-              ))}
+              )}
+              {coachExpanded &&
+                tips
+                  .filter((t) => t.id !== featuredTip?.id)
+                  .map((tip: CoachTip) => (
+                    <div key={tip.id} className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(tip.level)}`}>
+                      <p className="font-semibold leading-snug">{tip.title}</p>
+                      <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{tip.text}</p>
+                    </div>
+                  ))}
             </div>
             {tips.length > 1 && (
               <button
@@ -1228,6 +1246,60 @@ function toneClasses(level: CoachTip["level"]) {
   if (level === "bad") return "border-negative/35 bg-negative/10";
   if (level === "warn") return "border-evolution/35 bg-evolution/10";
   return "border-hairline bg-elevated";
+}
+
+// Coach nao e' mural fixo (pedido explicito) — o tip em destaque roda
+// com um TTL guardado no localStorage do navegador:
+//  - bad/warn (accionavel, "desca de stake", "vazamento em X"): ate 24h.
+//  - good/info (menos urgente): bem menos tempo, precisa girar mais.
+// Se o tip guardado sumiu da lista atual (dado novo mudou o calculo —
+// ex: nao esta mais em downswing), roda pro proximo IMEDIATAMENTE, nao
+// espera o TTL vencer. Roda em ordem ciclica pela lista de tips atual.
+const COACH_TTL_MS: Record<CoachTip["level"], number> = {
+  bad: 24 * 60 * 60 * 1000,
+  warn: 24 * 60 * 60 * 1000,
+  good: 6 * 60 * 60 * 1000,
+  info: 3 * 60 * 60 * 1000,
+};
+const COACH_FEATURED_KEY = "pokersync_coach_featured_tip";
+
+function useFeaturedCoachTip(tips: CoachTip[]): CoachTip | null {
+  const [featuredId, setFeaturedId] = useState<string | null>(null);
+
+  useEffect(() => {
+    if (tips.length === 0) {
+      setFeaturedId(null);
+      return;
+    }
+    let stored: { id: string; since: number } | null = null;
+    try {
+      const raw = localStorage.getItem(COACH_FEATURED_KEY);
+      stored = raw ? JSON.parse(raw) : null;
+    } catch {
+      stored = null;
+    }
+
+    const storedTip = stored ? tips.find((t) => t.id === stored!.id) : undefined;
+    const ttl = storedTip ? COACH_TTL_MS[storedTip.level] : 0;
+    const expired = !stored || !storedTip || Date.now() - stored.since > ttl;
+
+    if (!expired) {
+      setFeaturedId(stored!.id);
+      return;
+    }
+
+    const currentIdx = storedTip ? tips.findIndex((t) => t.id === storedTip.id) : -1;
+    const next = tips[(currentIdx + 1) % tips.length];
+    try {
+      localStorage.setItem(COACH_FEATURED_KEY, JSON.stringify({ id: next.id, since: Date.now() }));
+    } catch {
+      // storage indisponivel (modo privado etc) — segue sem persistir,
+      // so nao rotaciona entre reloads.
+    }
+    setFeaturedId(next.id);
+  }, [tips]);
+
+  return tips.find((t) => t.id === featuredId) ?? tips[0] ?? null;
 }
 
 // Modal/drawer no topo (2026-08): usado pro registro rapido de sessao e
