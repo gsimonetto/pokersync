@@ -27,6 +27,19 @@ const SIZES = {
 
 type Size = keyof typeof SIZES;
 
+// Fix (2026-08): o glyph de ouros (♦) estava aparecendo "colado"/maior
+// que os demais naipes em algumas combinacoes de fonte/navegador. Causa:
+// caracteres de naipe (U+2660-2666) nao tem presentation definida — o
+// sistema pode escolher renderizar como emoji colorido (metricas maiores,
+// padding proprio) em vez de glifo de texto, dependendo da fonte
+// disponivel. Anexar o seletor de variacao de TEXTO (U+FE0E) forca a
+// apresentacao monocromatica/compacta em todos os naipes, igualando o
+// tamanho real entre eles — resolve o "grudamento" sem precisar tocar
+// no dicionario de naipes (drill-theme.ts).
+function textGlyph(glyph: string): string {
+  return `${glyph}\uFE0E`;
+}
+
 function SuitCenter({ suitGlyph, size }: { suitGlyph: string; size: number }) {
   return (
     <div
@@ -39,7 +52,7 @@ function SuitCenter({ suitGlyph, size }: { suitGlyph: string; size: number }) {
         pointerEvents: "none",
       }}
     >
-      <span style={{ fontSize: size, lineHeight: 1, fontFamily: F }}>{suitGlyph}</span>
+      <span style={{ fontSize: size, lineHeight: 1, fontFamily: F }}>{textGlyph(suitGlyph)}</span>
     </div>
   );
 }
@@ -71,7 +84,7 @@ function CornerMark({
       {/* rank == "T" e' 10 no vocabulario interno (parser usa 1 char). No
           canto exibimos "10" mesmo pra caber e ser reconhecivel. */}
       <span style={{ fontSize: rankSize, fontWeight: 500, ...num }}>{rank === "T" ? "10" : rank}</span>
-      <span style={{ fontSize: suitSize, marginTop: 1 }}>{suitGlyph}</span>
+      <span style={{ fontSize: suitSize, marginTop: 1, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
     </div>
   );
 }
@@ -167,6 +180,20 @@ export function CardBackPair({ side = "right" }: { side?: "left" | "right" }) {
     <div style={{ display: "flex", alignItems: "center", padding: 4 }}>
       {back(side === "left" ? 8 : -8, false, 0)}
       {back(side === "left" ? -6 : 6, true, 1)}
+    </div>
+  );
+}
+
+// Mini-carta cortada pela metade (mostra so o topo) — usada em listagens
+// compactas (ex: preview do hero na lista de maos do Revisor) onde nao ha
+// espaco pra carta inteira mas o rank+naipe do canto ja identifica a carta.
+// Reusa o mesmo Card (mesmas cores/glyphs), so corta visualmente via
+// overflow:hidden num container mais baixo — nao duplica estilo.
+export function HalfCard({ card }: { card: string }) {
+  const s = SIZES.mini;
+  return (
+    <div style={{ width: s.w, height: Math.round(s.h * 0.52), overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
+      <Card card={card} size="mini" />
     </div>
   );
 }
