@@ -47,7 +47,18 @@ function textGlyph(glyph: string): string {
 // linha de corte, sobrando so um fiapo de 1px visivel (parecia ter
 // sumido). Agora o centro vertical do naipe e' configuravel (`top`) pra
 // cada contexto poder centralizar dentro da area de fato visivel.
-function SuitCenter({ suitGlyph, size, top = "50%" }: { suitGlyph: string; size: number; top?: string }) {
+// rank/rankSize opcionais: quando presentes, mostra o valor ao lado do
+// naipe grande, na MESMA linha/posicao (nao mexe em `top`) — usado no
+// HalfCard pra trazer o valor de volta sem alterar o naipe central.
+function SuitCenter({
+  suitGlyph, size, top = "50%", rank, rankSize,
+}: {
+  suitGlyph: string;
+  size: number;
+  top?: string;
+  rank?: string;
+  rankSize?: number;
+}) {
   return (
     <div
       style={{
@@ -58,9 +69,16 @@ function SuitCenter({ suitGlyph, size, top = "50%" }: { suitGlyph: string; size:
         transform: "translateY(-50%)",
         display: "flex",
         justifyContent: "center",
+        alignItems: "center",
+        gap: 3,
         pointerEvents: "none",
       }}
     >
+      {rank && (
+        <span style={{ fontSize: rankSize, fontWeight: 500, lineHeight: 1, fontFamily: F, ...num }}>
+          {rank === "T" ? "10" : rank}
+        </span>
+      )}
       <span style={{ fontSize: size, lineHeight: 1, fontFamily: F }}>{textGlyph(suitGlyph)}</span>
     </div>
   );
@@ -114,12 +132,16 @@ function CornerMark({
 }
 
 export function Card({
-  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false, centerSuitTop,
+  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false, centerSuitTop, showCenterRank = false,
 }: {
   card: string | null;
   size?: Size;
   hideCenterSuit?: boolean;
   hideCorners?: boolean;
+  // Mostra o valor da carta ao lado do naipe central grande, na mesma
+  // posicao (nao move o naipe). Usado quando os cantos estao ocultos
+  // (hideCorners) mas ainda assim precisamos do valor visivel.
+  showCenterRank?: boolean;
   // So esconde o canto inferior-direito, mantendo o superior-esquerdo
   // (com rank+naipe) visivel. Usado na miniatura cortada pela metade —
   // o canto inferior-direito fica perto da borda de baixo do card,
@@ -185,7 +207,15 @@ export function Card({
       }}
     >
       {!hideCorners && <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="tl" />}
-      {!hideCenterSuit && <SuitCenter suitGlyph={su.g} size={s.bigCenter} top={centerSuitTop} />}
+      {!hideCenterSuit && (
+        <SuitCenter
+          suitGlyph={su.g}
+          size={s.bigCenter}
+          top={centerSuitTop}
+          rank={showCenterRank ? rank : undefined}
+          rankSize={s.rank}
+        />
+      )}
       {!hideCorners && !hideBottomRightCorner && (
         <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />
       )}
@@ -208,18 +238,15 @@ export function HalfCard({ card }: { card: string }) {
   const visibleH = Math.round(s.h * 0.52);
   return (
     <div style={{ width: s.w, height: visibleH, overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
-      {/* Fix (valor da carta sumiu no HalfCard): trocado hideCorners por
-          hideBottomRightCorner. O canto superior-esquerdo (rank+naipe)
-          esta totalmente dentro da area visivel do corte (visibleH),
-          entao pode ficar visivel sem risco do artefato de "carta de
-          ponta cabeca" — esse artefato so acontecia com o canto
-          inferior-direito, que fica perto da linha de corte. Mantem
-          naipe central grande (SuitCenter) + rank/naipe do canto:
-          "valor da carta e naipe central, apenas isso". */}
+      {/* Layout original (naipe central, cantos ocultos) + valor ao lado
+          do naipe via showCenterRank — nao mexe em centerSuitTop nem
+          reintroduz os cantos, entao a posicao do naipe fica igual a
+          antes da mudanca anterior. */}
       <Card
         card={card}
         size="mini"
-        hideBottomRightCorner
+        hideCorners
+        showCenterRank
         centerSuitTop={`${(visibleH / 2 / s.h) * 100}%`}
       />
     </div>
