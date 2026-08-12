@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X } from "lucide-react";
+import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Flame } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, brmReading, groupStats, tiltImpact, type RangeOption, type SeriesPoint, type GroupStat } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus } from "@/lib/bankroll/calc";
 import { buildCoachTips, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO } from "@/lib/bankroll/format";
 import {
@@ -82,6 +82,11 @@ export default function BankrollPage() {
   // precisa mais rolar a tela ate o fim pra bater o registro pos-sessao.
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [txModalOpen, setTxModalOpen] = useState(false);
+  const [goalsModalOpen, setGoalsModalOpen] = useState(false);
+  const [brmModalOpen, setBrmModalOpen] = useState(false);
+  const [leaksModalOpen, setLeaksModalOpen] = useState(false);
+  const [calcFormat, setCalcFormat] = useState<BrmFormat>("Cash");
+  const [calcBuyIn, setCalcBuyIn] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -129,6 +134,16 @@ export default function BankrollPage() {
   );
   const leakStats = useMemo(() => groupStats(sessions, leakDimension), [sessions, leakDimension]);
   const tiltStats = useMemo(() => tiltImpact(sessions), [sessions]);
+  const calcThreshold = useMemo(() => thresholdFor(brmThresholds, calcFormat), [brmThresholds, calcFormat]);
+  const calcBuyInsCovered = Number(calcBuyIn) > 0 ? nw.playingBankroll / Number(calcBuyIn) : null;
+  const calcStatus: BrmStatus | null =
+    calcBuyInsCovered == null
+      ? null
+      : calcBuyInsCovered >= calcThreshold.moveupBuyins
+        ? "moveup"
+        : calcBuyInsCovered < calcThreshold.movedownBuyins
+          ? "movedown"
+          : "hold";
   const recent = [...sessions].reverse().slice(0, 8);
   const recentTx = [...transactions].reverse().slice(0, 6);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
@@ -308,18 +323,52 @@ export default function BankrollPage() {
           </button>
         </div>
 
-        <div className="flex flex-wrap gap-2.5">
+        <div className="flex items-center gap-2.5">
+          {/* Registro/deposito em destaque — maior, com label, cor solida.
+              Metas/BRM viram icones menores ao lado, mesma funcao (abrem
+              modal), mas com peso visual secundario. */}
           <button
             onClick={() => setSessionModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
+            aria-label="Registrar sessao"
+            title="Registrar sessao"
+            className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform hover:scale-105 active:scale-95"
           >
-            <Plus size={15} /> Registrar sessao
+            <Plus size={20} strokeWidth={2.5} />
           </button>
           <button
             onClick={() => setTxModalOpen(true)}
-            className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-ink transition-colors hover:border-ink/40"
+            aria-label="Deposito / saque"
+            title="Deposito / saque"
+            className="flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-elevated text-ink shadow-lg shadow-black/20 transition-transform hover:scale-105 hover:border-ink/40 active:scale-95"
           >
-            <Plus size={15} /> Deposito / saque
+            <Wallet size={19} />
+          </button>
+
+          <div className="mx-1 h-7 w-px bg-hairline" />
+
+          <button
+            onClick={() => setGoalsModalOpen(true)}
+            aria-label="Metas"
+            title="Metas"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-review/40 hover:text-review"
+          >
+            <Target size={16} />
+          </button>
+          <button
+            onClick={() => setBrmModalOpen(true)}
+            aria-label="BRM — moveup / movedown"
+            title="BRM — moveup / movedown"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-training/40 hover:text-training"
+          >
+            <Gauge size={16} />
+          </button>
+          <button
+            onClick={() => setLeaksModalOpen(true)}
+            aria-label="Painel de leaks"
+            title="Painel de leaks"
+            className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-evolution/40 hover:text-evolution"
+          >
+            <Flame size={16} />
           </button>
         </div>
       </div>
@@ -396,12 +445,10 @@ export default function BankrollPage() {
         </section>
       </div>
 
-      {/* Metas de volume e estudo */}
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-xs font-bold uppercase tracking-[0.14em] text-muted">
-            <Target size={14} /> Metas
-          </h2>
+      {/* Metas de volume e estudo — agora em modal (icone Target no
+          atalho), a lista completa nao fica mais sempre visivel. */}
+      <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Metas">
+        <div className="flex items-center justify-end">
           <button
             onClick={() => setShowGoalForm((v) => !v)}
             className="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase text-muted transition-colors hover:text-ink"
@@ -472,14 +519,62 @@ export default function BankrollPage() {
             ))}
           </div>
         )}
-      </section>
+      </Modal>
 
       {/* BRM: moveup/movedown por formato — leitura atual sempre visivel
           (compacta, 1 linha), edicao dos thresholds fica atras de um
-          "Editar" pra nao pesar a tela. */}
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">BRM — moveup / movedown</h2>
+          "Editar" pra nao pesar a tela. Agora em modal (icone Gauge no
+          atalho) em vez de sempre visivel. */}
+      <Modal open={brmModalOpen} onClose={() => setBrmModalOpen(false)} title="BRM — moveup / movedown">
+        {/* Calculadora: o jogador digita um buy-in hipotetico (nao precisa
+            ser o que ele jogou de fato) e ve na hora quantos buy-ins a
+            banca atual cobre e se isso fica dentro/fora do threshold. */}
+        <div className="rounded-lg border border-hairline bg-elevated p-3">
+          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Calculadora</p>
+          <div className="mt-2 grid grid-cols-2 gap-2">
+            <select
+              value={calcFormat}
+              onChange={(e) => setCalcFormat(e.target.value as BrmFormat)}
+              className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
+            >
+              <option value="Cash">Cash</option>
+              <option value="MTT">MTT</option>
+              <option value="SNG">SNG</option>
+              <option value="Spin">Spin</option>
+            </select>
+            <input
+              placeholder="Buy-in (R$)"
+              value={calcBuyIn}
+              onChange={(e) => setCalcBuyIn(e.target.value)}
+              className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
+            />
+          </div>
+          {calcBuyInsCovered != null && (
+            <div className="mt-3 flex items-center gap-3">
+              <span
+                className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${
+                  calcStatus === "moveup"
+                    ? "bg-positive/15 text-positive"
+                    : calcStatus === "movedown"
+                      ? "bg-negative/15 text-negative"
+                      : "bg-void/40 text-muted"
+                }`}
+              >
+                {calcStatus === "moveup" ? "Pode subir" : calcStatus === "movedown" ? "Desca de stake" : "Mantenha"}
+              </span>
+              <p className="text-sm text-muted">
+                Sua banca cobre <span className="font-semibold text-ink">{calcBuyInsCovered.toFixed(1)}</span> buy-ins de{" "}
+                {fmtMoney(Number(calcBuyIn))} em {calcFormat}{" "}
+                <span className="text-muted">
+                  (moveup {calcThreshold.moveupBuyins} · movedown {calcThreshold.movedownBuyins})
+                </span>
+              </p>
+            </div>
+          )}
+        </div>
+
+        <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em] text-muted">Leitura automatica (baseada nas ultimas sessoes)</p>
+        <div className="flex items-center justify-end">
           <button
             onClick={() => setShowBrmEdit((v) => !v)}
             className="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase text-muted transition-colors hover:text-ink"
@@ -521,7 +616,7 @@ export default function BankrollPage() {
             ))}
           </div>
         )}
-      </section>
+      </Modal>
 
       <Modal open={sessionModalOpen} onClose={() => setSessionModalOpen(false)} title="Registrar sessao">
         <div className="grid grid-cols-2 gap-3">
@@ -742,10 +837,10 @@ export default function BankrollPage() {
           (ja calculado, nunca tinha sido visualizado) agrupando por
           formato, dia da semana ou horario. Ordenado do pior pro melhor
           (groupStats ja devolve nessa ordem). Leak TECNICO (spot a spot)
-          continua no Revisor de Maos — isso aqui e' leak financeiro. */}
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <div className="flex items-center justify-between">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Painel de leaks</h2>
+          continua no Revisor de Maos — isso aqui e' leak financeiro.
+          Agora em modal (icone Flame no atalho). */}
+      <Modal open={leaksModalOpen} onClose={() => setLeaksModalOpen(false)} title="Painel de leaks">
+        <div className="flex justify-end">
           <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
             {[
               { value: "format" as const, label: "Formato" },
@@ -817,9 +912,8 @@ export default function BankrollPage() {
             </div>
           </div>
         )}
-      </section>
+      </Modal>
 
-      <p className="mt-6 text-xs text-muted">Calculadora de BRM fica para a proxima leva desta fase.</p>
     </main>
   );
 }
