@@ -92,6 +92,11 @@ function ChipValueLabel({ amount, size = "sm" }: { amount: number; size?: "sm" |
       <span style={{ fontFamily: F, fontSize, fontWeight: 600, color: TEXT.critical, ...num, textShadow: "0 1px 2px rgba(0,0,0,.8)" }}>
         {amount}
       </span>
+      {/* "bb" depois do valor — pedido explicito: "nas apostas, colocar
+          o bb depois da aposta". Antes so o pote grande no centro tinha
+          a unidade escrita; as pilhas paradas por assento mostravam so
+          o numero solto. */}
+      <span style={{ fontFamily: F, fontSize: fontSize * 0.72, fontWeight: 500, color: TEXT.secondary }}>bb</span>
     </div>
   );
 }
@@ -299,18 +304,27 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
     </div>
   );
 
-  // Ponto pra pilha de fichas paradas: puxado ~26% em direcao ao centro
-  // da mesa (50,44 — mesmo ponto de referencia do ChipAnimation e do
-  // DealerButtonIcon) a partir do assento. Fix (pedido explicito: "as
-  // fichas estao fora da mesa") — antes a pilha nascia dentro do proprio
-  // bloco do assento (marginTop logo abaixo do nome/stack), e como os
-  // assentos ficam posicionados fora da elipse por design, a ficha
-  // tambem saia fora do tapete. Renderizada como elemento IRMAO,
-  // independente do bloco do assento, com sua propria coordenada.
-  const chipDx = 50 - seat.x;
-  const chipDy = 44 - seat.y;
-  const chipX = seat.x + chipDx * 0.26;
-  const chipY = seat.y + chipDy * 0.26;
+  // Ponto pra pilha de fichas paradas: puxado em direcao ao centro da
+  // mesa (50,44 — mesmo ponto de referencia do ChipAnimation e do
+  // DealerButtonIcon) a partir do assento, mas com distancia MINIMA do
+  // centro garantida — pedido explicito: "quando eu sou o SB esta
+  // ficando em cima das cartas". Assentos ja proximos do centro (SB/BB
+  // na parte de baixo) tinham a ficha empurrada direto em cima do board.
+  // Clampa o ponto final pra nunca invadir o raio onde as cartas
+  // comunitarias ficam.
+  const rawDx = 50 - seat.x;
+  const rawDy = 44 - seat.y;
+  const distToCenter = Math.sqrt(rawDx * rawDx + rawDy * rawDy) || 1;
+  const PULL_FACTOR = 0.18;
+  const MIN_DIST_FROM_CENTER = 22; // raio livre pro board, em % da mesa
+  let chipX = seat.x + rawDx * PULL_FACTOR;
+  let chipY = seat.y + rawDy * PULL_FACTOR;
+  const resultDist = distToCenter * (1 - PULL_FACTOR);
+  if (resultDist < MIN_DIST_FROM_CENTER) {
+    const scale = (distToCenter - MIN_DIST_FROM_CENTER) / distToCenter;
+    chipX = seat.x + rawDx * Math.max(0, scale);
+    chipY = seat.y + rawDy * Math.max(0, scale);
+  }
 
   return (
     <>
@@ -360,7 +374,12 @@ function Seat({ seat, state, committed }: { seat: SeatLayoutSlot; state: SeatSta
                   ))}
                 </div>
               ) : (
-                facedown && <CardBackPair side={seat.cardSide === "left" ? "left" : "right"} />
+                facedown && <CardBackPair side="left" />
+              // Sentido do verso padronizado (pedido explicito: "quero
+              // todas viradas no mesmo sentido... do lado direito deixar
+              // igual do lado esquerdo") — antes variava conforme o lado
+              // da mesa (seat.cardSide), agora e' sempre "left" pra todo
+              // mundo, independente de onde o assento fica.
               )}
             </>
           )}
@@ -427,7 +446,7 @@ function ChipAnimation({
       <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
         <ChipStackIcon size={13} />
         <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 500, color: TEXT.critical, ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-          +{amount}
+          +{amount}bb
         </span>
       </div>
     </div>
