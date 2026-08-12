@@ -228,13 +228,11 @@ export function HalfCard({ card }: { card: string }) {
   const s = SIZES.mini;
   return (
     <div style={{ width: s.w, height: Math.round(s.h * 0.52), overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
-      {/* Pedido explicito: "o valor das cartas sumiram, corrija" — volta
-          o canto superior-esquerdo (rank+naipe pequeno), que fica dentro
-          da area visivel do corte. So o inferior-direito continua
-          escondido (era o que causava o artefato de "carta de ponta
-          cabeca"). Naipe central grande tambem continua, cortado pela
-          metade. */}
-      <Card card={card} size="mini" hideBottomRightCorner />
+      {/* Voltou pra so o naipe central (pedido explicito): "mantenha
+          apenas o naipe central, o menor pode tirar da visualizacao".
+          hideCorners esconde os dois cantos (nao so o inferior-direito),
+          entao nao ha risco do artefato de "carta de ponta cabeca". */}
+      <Card card={card} size="mini" hideCorners />
     </div>
   );
 }
