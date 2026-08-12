@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, type RangeOption } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, type RangeOption, type SeriesPoint } from "@/lib/bankroll/calc";
 import { buildCoachTips, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO } from "@/lib/bankroll/format";
 import {
@@ -299,16 +299,26 @@ export default function BankrollPage() {
       </div>
 
       <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard label={view === "jogo" ? "Banca atual" : "Patrimonio total"} value={fmtMoney(currentBankroll)} />
-        <StatCard label="Resultado" value={fmtSignedMoney(agg.profit)} tone={agg.profit >= 0 ? "positive" : "negative"} />
-        <StatCard label="ROI" value={fmtPct(agg.roi)} tone={agg.roi >= 0 ? "positive" : "negative"} />
-        <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} />
+        <StatCard
+          label={view === "jogo" ? "Banca atual" : "Patrimonio total"}
+          value={fmtMoney(currentBankroll)}
+          tone={currentBankroll < 0 ? "negative" : undefined}
+          accent={currentBankroll < 0 ? "#e0555a" : "#22c55e"}
+        />
+        <StatCard
+          label="Resultado"
+          value={fmtSignedMoney(agg.profit)}
+          tone={agg.profit >= 0 ? "positive" : "negative"}
+          accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
+        />
+        <StatCard label="ROI" value={fmtPct(agg.roi)} tone="training" accent="#3b82f6" />
+        <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} tone="evolution" accent="#f59e0b" />
       </div>
 
       {(nw.withdrawn > 0 || nw.caixinha > 0) && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Sacado" value={fmtMoney(nw.withdrawn)} icon={<Wallet size={13} />} />
-          <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={13} />} />
+          <StatCard label="Sacado" value={fmtMoney(nw.withdrawn)} icon={<Wallet size={13} />} accent="#e0555a" />
+          <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={13} />} accent="#a855f7" />
         </div>
       )}
 
@@ -331,7 +341,7 @@ export default function BankrollPage() {
             </div>
           </div>
           <div className="mt-4">
-            <EvolutionSparkline points={filteredSeries.map((p) => p.value)} />
+            <EvolutionChart series={filteredSeries} />
           </div>
         </section>
 
@@ -663,20 +673,35 @@ function StatCard({
   value,
   tone,
   icon,
+  accent,
 }: {
   label: string;
   value: string;
-  tone?: "positive" | "negative";
+  tone?: "positive" | "negative" | "training" | "evolution";
   icon?: React.ReactNode;
+  accent: string;
 }) {
-  const color = tone === "positive" ? "text-positive" : tone === "negative" ? "text-negative" : "text-ink";
+  const color =
+    tone === "positive"
+      ? "text-positive"
+      : tone === "negative"
+        ? "text-negative"
+        : tone === "training"
+          ? "text-training"
+          : tone === "evolution"
+            ? "text-evolution"
+            : "text-ink";
   return (
-    <div className="rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-ink/30 hover:bg-elevated">
-      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+    <div
+      style={{ "--acc": accent } as React.CSSProperties}
+      className="acc-card acc-lift group relative cursor-pointer overflow-hidden rounded-xl border border-hairline bg-surface p-4"
+    >
+      <div aria-hidden="true" className="acc-glow pointer-events-none absolute -right-6 -top-6 size-20 rounded-full blur-2xl" />
+      <p className="relative flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
         {icon}
         {label}
       </p>
-      <p className={`mt-1.5 text-lg font-bold tabular-nums ${color}`}>{value}</p>
+      <p className={`relative mt-1.5 text-lg font-bold tabular-nums ${color}`}>{value}</p>
     </div>
   );
 }
@@ -741,27 +766,43 @@ function Modal({
   );
 }
 
-// Grafico com efeito LED (2026-08): glow via filtro SVG (feGaussianBlur +
-// feMerge) na propria linha, gradiente sutil preenchendo a area abaixo, e
-// um ponto pulsante marcando o valor mais recente — reforca a leitura de
-// "banca viva" sem virar excesso visual (so a linha brilha, nada mais).
-function EvolutionSparkline({ points }: { points: number[] }) {
-  if (points.length < 2) {
+// Grafico com eixos (2026-08 v7): antes era so uma linha solta (sparkline).
+// Pedido explicito de ter eixo X (dias) e eixo Y (valor) visiveis, como no
+// Sharkscope — grid horizontal com valores em R$ a esquerda, datas
+// abaixo do eixo X. Mantém o efeito LED (glow + ponto pulsante) so na
+// linha, os eixos ficam discretos (cor hairline/muted) pra nao competir
+// visualmente com o dado principal.
+const Y_TICKS = 4;
+
+function EvolutionChart({ series }: { series: SeriesPoint[] }) {
+  if (series.length < 2) {
     return <p className="text-sm text-muted">Registre ao menos 2 sessoes para ver o grafico.</p>;
   }
-  const w = 600,
-    h = 120,
-    pad = 8;
+  const points = series.map((p) => p.value);
+  const w = 640,
+    h = 220,
+    padL = 54,
+    padR = 12,
+    padT = 12,
+    padB = 26;
+  const plotW = w - padL - padR;
+  const plotH = h - padT - padB;
+
   const min = Math.min(...points),
     max = Math.max(...points);
-  const range = max - min || 1;
-  const stepX = (w - pad * 2) / (points.length - 1);
-  const coords = points.map((v, i) => ({
-    x: pad + i * stepX,
-    y: h - pad - ((v - min) / range) * (h - pad * 2),
-  }));
+  const spread = max - min || 1;
+  // Respiro de 8% acima/abaixo pra linha e pontos nao colarem no grid.
+  const yMin = min - spread * 0.08;
+  const yMax = max + spread * 0.08;
+  const yRange = yMax - yMin || 1;
+
+  const xAt = (i: number) => padL + (series.length === 1 ? 0 : (i / (series.length - 1)) * plotW);
+  const yAt = (v: number) => padT + plotH - ((v - yMin) / yRange) * plotH;
+
+  const coords = points.map((v, i) => ({ x: xAt(i), y: yAt(v) }));
   const path = coords.map((c, i) => `${i === 0 ? "M" : "L"}${c.x.toFixed(1)},${c.y.toFixed(1)}`).join(" ");
-  const areaPath = `${path} L${coords[coords.length - 1].x.toFixed(1)},${h - pad} L${coords[0].x.toFixed(1)},${h - pad} Z`;
+  const areaPath = `${path} L${coords[coords.length - 1].x.toFixed(1)},${padT + plotH} L${coords[0].x.toFixed(1)},${padT + plotH} Z`;
+
   const last = points[points.length - 1];
   const up = last >= (points[0] ?? 0);
   const color = up ? "#22c55e" : "#e0555a";
@@ -769,8 +810,18 @@ function EvolutionSparkline({ points }: { points: number[] }) {
   const gradId = "bankrollLedFill";
   const glowId = "bankrollLedGlow";
 
+  // Eixo Y: Y_TICKS+1 linhas igualmente espacadas entre yMin e yMax.
+  const yTicks = Array.from({ length: Y_TICKS + 1 }, (_, i) => yMin + (yRange * i) / Y_TICKS);
+
+  // Eixo X: no maximo 6 labels de data, igualmente espacados pelos pontos
+  // reais da serie (evita rotular todo ponto e poluir em series longas).
+  const xTickCount = Math.min(6, series.length);
+  const xTickIdx = Array.from({ length: xTickCount }, (_, i) =>
+    xTickCount === 1 ? 0 : Math.round((i / (xTickCount - 1)) * (series.length - 1))
+  );
+
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-32 w-full overflow-visible">
+    <svg viewBox={`0 0 ${w} ${h}`} className="h-56 w-full overflow-visible">
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.28" />
@@ -784,6 +835,34 @@ function EvolutionSparkline({ points }: { points: number[] }) {
           </feMerge>
         </filter>
       </defs>
+
+      {/* Grid + labels do eixo Y (valor) */}
+      {yTicks.map((v, i) => {
+        const y = yAt(v);
+        return (
+          <g key={i}>
+            <line x1={padL} y1={y} x2={w - padR} y2={y} stroke="var(--color-hairline)" strokeWidth={1} />
+            <text x={padL - 8} y={y} textAnchor="end" dominantBaseline="middle" fontSize={9} fill="var(--color-muted)">
+              {fmtMoney(v)}
+            </text>
+          </g>
+        );
+      })}
+
+      {/* Labels do eixo X (dias) */}
+      {xTickIdx.map((idx) => (
+        <text
+          key={idx}
+          x={xAt(idx)}
+          y={h - 8}
+          textAnchor="middle"
+          fontSize={9}
+          fill="var(--color-muted)"
+        >
+          {series[idx].label}
+        </text>
+      ))}
+
       <path d={areaPath} fill={`url(#${gradId})`} stroke="none" />
       <path d={path} fill="none" stroke={color} strokeWidth={2.25} filter={`url(#${glowId})`} strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={lastPoint.x} cy={lastPoint.y} r={5} fill={color} filter={`url(#${glowId})`} opacity={0.9}>
