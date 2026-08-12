@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
-import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog } from "@/lib/bankroll/types";
+import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat } from "@/lib/bankroll/types";
+import { DEFAULT_BRM_THRESHOLDS } from "@/lib/bankroll/calc";
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToSession(r: any): Session {
@@ -234,4 +235,41 @@ export async function addStudyLog(l: { date: string; minutes: number; note?: str
     .single();
   if (error) throw error;
   return rowToStudyLog(data);
+}
+
+// --- BRM thresholds (moveup/movedown por formato) -------------------------
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function rowToBrmThreshold(r: any): BrmThreshold {
+  return { format: r.format, moveupBuyins: Number(r.moveup_buyins) || 0, movedownBuyins: Number(r.movedown_buyins) || 0 };
+}
+
+// Se o jogador nunca editou, devolve os padroes (sem gravar nada ainda —
+// so grava quando ele efetivamente customiza um formato).
+export async function fetchBrmThresholds(): Promise<BrmThreshold[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("bankroll_brm_thresholds").select("*");
+  if (error) throw error;
+  const saved = (data || []).map(rowToBrmThreshold);
+  return DEFAULT_BRM_THRESHOLDS.map((d) => saved.find((s) => s.format === d.format) || d);
+}
+
+export async function saveBrmThreshold(t: { format: BrmFormat; moveupBuyins: number; movedownBuyins: number }): Promise<BrmThreshold> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { data, error } = await supabase
+    .from("bankroll_brm_thresholds")
+    .upsert(
+      {
+        user_id: userId,
+        format: t.format,
+        moveup_buyins: Number(t.moveupBuyins) || 0,
+        movedown_buyins: Number(t.movedownBuyins) || 0,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "user_id,format" }
+    )
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToBrmThreshold(data);
 }
