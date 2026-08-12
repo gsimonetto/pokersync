@@ -1,4 +1,4 @@
-import { aggregate, evolutionSeries, groupStats, brmReading } from "./calc";
+import { aggregate, evolutionSeries, groupStats, brmReading, tiltImpact } from "./calc";
 import { fmtMoney, fmtPct } from "./format";
 import type { Session, BrmThreshold } from "./types";
 
@@ -112,6 +112,20 @@ export function buildCoachTips(
       text: `ROI geral de ${fmtPct(a.roi)}. Mantenha a disciplina de BRM e o volume.`,
     });
   }
+  const MIN_TILT_SAMPLE = 5;
+  const tilt = tiltImpact(sessions);
+  if (tilt && tilt.tiltN >= MIN_TILT_SAMPLE) {
+    const gap = tilt.otherRoi - tilt.tiltRoi;
+    if (gap >= 15) {
+      tips.push({
+        id: "tilt",
+        level: "bad",
+        title: "Tilt esta custando caro",
+        text: `ROI de ${fmtPct(tilt.tiltRoi)} em sessoes marcadas como tilt (${tilt.tiltN}) contra ${fmtPct(tilt.otherRoi)} nas demais. Considere parar a sessao ao notar o padrao.`,
+      });
+    }
+  }
+
   if (a.n < LOW_VOLUME) {
     tips.push({
       id: "sample",
