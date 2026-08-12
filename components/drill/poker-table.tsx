@@ -649,7 +649,15 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "6% 6%",
+            // Inset vertical maior que o horizontal (9% vs 6%) — pedido:
+            // "esta cortando os nomes" em telas maiores (notebook 1080p).
+            // Os assentos de cima/baixo (posLabel proximo de y=0/100) tem
+            // o nome do jogador logo abaixo/acima do avatar; com inset
+            // simetrico a elipse chegava perto demais da borda do
+            // container (que tem overflow:hidden), cortando esse texto.
+            // Vertical maior da mais respiro sem encolher a largura da
+            // mesa.
+            inset: "9% 6%",
             borderRadius: "50%",
             background: "radial-gradient(65% 75% at 50% 40%, #0F5A42 0%, #0A4231 30%, #062E22 60%, #031810 100%)",
             border: "2px solid #000000",
