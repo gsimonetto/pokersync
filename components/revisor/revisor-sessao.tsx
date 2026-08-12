@@ -301,7 +301,13 @@ export function RevisorSessao({
           </div>
         </aside>
 
-        <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "hidden" }}>
+        {/* overflow "auto" (era "hidden") — pedido explicito: "botoes de
+            acao de apostas desaparecidos". Quando mesa+controles ficam
+            mais altos que o espaco disponivel nessa coluna, "hidden"
+            cortava os botoes (que ficam embaixo da mesa) junto com o
+            excesso. "auto" so cria uma rolagem interna nesse caso raro,
+            nunca esconde os controles. */}
+        <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
           {selectedId && parsedForSelected ? (
             <RevisorHandTable parsedHand={parsedForSelected} onFatalError={goToNextHand} />
           ) : selectedId && parsedForSelected === null ? (
