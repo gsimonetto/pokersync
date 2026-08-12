@@ -1,7 +1,7 @@
 "use client";
 
 import { Fragment } from "react";
-import { Card, CardBackPair } from "./card";
+import { Card } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
 
@@ -196,7 +196,6 @@ function Seat({
   const acting = status === "acting";
   const empty = status === "empty";
   const revealedVillainCards = !hero && !!cards && cards.length > 0 && cards.every(Boolean);
-  const facedown = !hero && !revealedVillainCards && (status === "live" || acting);
 
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = SEAT_OPACITY[status];
@@ -211,9 +210,7 @@ function Seat({
     : (
         {
           // Gap zerado pra "above" — pedido explicito: "cartas muito
-          // afastadas da posicao, dando a impressao de soltas". O
-          // padding interno do CardBackPair (card.tsx) ja da respiro
-          // suficiente, nao precisa de gap extra aqui tambem.
+          // afastadas da posicao, dando a impressao de soltas".
           below: { flexDirection: "column", gap: 4 },
           above: { flexDirection: "column", gap: 0 },
           left: { flexDirection: "row-reverse", alignItems: "center", gap: 12 },
@@ -233,20 +230,17 @@ function Seat({
     </div>
   ) : null;
 
+  // Redesenho estilo GG Poker (2026-08 v6, pedido explicito): saiu o
+  // avatar redondo com a posicao dentro. Agora sao 2 chips empilhados,
+  // os dois no MESMO formato pill (nunca redondos):
+  //  1) chip da posicao sozinha, em cima;
+  //  2) chip combinado nome + stack, embaixo — antes eram 2 elementos
+  //     separados (pill de nome + texto solto de stack).
+  // O badge do dealer ("D") continua ancorado, agora no canto do chip
+  // de posicao em vez do avatar circular que deixou de existir.
   const seatInfo = (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
-      <div style={{ position: "relative", width: 46, height: 46 }}>
-        {/* Ficha parada voltou pro fluxo normal (fora do avatar) — pedido
-            explicito: "nao quero as apostas grudadas na posicao, mantenha
-            do jeito que estava antes". So o dealer continua ancorado aqui;
-            a ficha parada agora e' renderizada perto das cartas de cada
-            assento (ver commitedChipsBlock mais abaixo, e o layout do
-            hero especifico). */}
-
-        {/* Badge do dealer — vermelho, "D" branco, mesmo formato/anel das
-            fichas de poker (ChipStackIcon), um pouco maior. Pedido
-            explicito: "cor do botao em vermelho com a escrita D em
-            branco... igual ao formato das fichas, so que um pouco maior". */}
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      <div style={{ position: "relative" }}>
         {isDealer && (
           <div
             style={{
@@ -254,8 +248,8 @@ function Seat({
               bottom: -6,
               left: -10,
               zIndex: 6,
-              width: 22,
-              height: 22,
+              width: 20,
+              height: 20,
               borderRadius: "50%",
               background: "#B91C1C",
               boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.55)",
@@ -263,7 +257,7 @@ function Seat({
               alignItems: "center",
               justifyContent: "center",
               fontFamily: F,
-              fontSize: 10.5,
+              fontSize: 10,
               fontWeight: 700,
               color: "#FFFFFF",
             }}
@@ -273,27 +267,21 @@ function Seat({
         )}
         <div
           style={{
-            position: "absolute",
-            inset: 6,
-            borderRadius: "50%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
+            padding: "3px 11px",
+            borderRadius: 6,
+            fontFamily: F,
+            fontWeight: 700,
+            fontSize: 11.5,
+            letterSpacing: 0.3,
+            textAlign: "center",
+            color: empty ? TEXT.disabled : "#FFFFFF",
             background: empty
               ? "rgba(255,255,255,.03)"
               : acting
-              ? `radial-gradient(120% 120% at 30% 25%, ${col.glow}, ${col.base} 60%, rgba(0,0,0,.4) 130%)`
-              : `linear-gradient(160deg, ${NEUTRAL} 0%, #22262C 100%)`,
-            border: empty ? "1px dashed rgba(255,255,255,.15)" : acting ? "1px solid rgba(255,255,255,.35)" : "1px solid rgba(255,255,255,.10)",
-            boxShadow: acting
-              ? `0 0 24px ${col.glow}, 0 0 0 2px rgba(255,255,255,.28) inset, 0 4px 12px #000`
-              : empty
-              ? "none"
-              : "0 3px 8px rgba(0,0,0,.55)",
-            color: empty ? TEXT.disabled : TEXT.critical,
-            fontFamily: F,
-            fontWeight: 500,
-            fontSize: 11.5,
+              ? `linear-gradient(160deg, ${col.glow}, ${col.base})`
+              : `${(posCol?.base ?? NEUTRAL)}CC`,
+            border: empty ? "1px dashed rgba(255,255,255,.15)" : acting ? "1px solid rgba(255,255,255,.4)" : "1px solid rgba(255,255,255,.14)",
+            boxShadow: acting ? `0 0 14px ${col.glow}` : "0 2px 6px rgba(0,0,0,.45)",
             transition: "all 200ms ease",
           }}
         >
@@ -301,54 +289,45 @@ function Seat({
         </div>
       </div>
 
-      {/* Chip com nome do jogador — so existe em modo replay (Revisor),
-          onde SeatLayoutSlot.playerName vem do hand history real. Fonte
-          aumentada (pedido explicito: "o nome esta muito pequeno") de
-          8.5 pra 11, com padding e largura maxima acompanhando o
-          aumento pra nao truncar nomes curtos sem necessidade. Brilho
-          (glow) no proprio nome quando o jogador esta agindo — pedido
-          explicito: "nao precisa ter timer... apenas o brilho no nome do
-          jogador". O anel de contagem regressiva foi removido do avatar
-          (ver acima) porque numa REVISAO nao existe tempo real passando;
-          o unico sinal de "quem age" agora vive aqui. */}
-      {!empty && seat.playerName && (
+      {/* Chip unico com nome + stack — so existe em modo replay
+          (Revisor), onde SeatLayoutSlot.playerName vem do hand history
+          real. Brilho (glow) quando o jogador esta agindo, mesmo padrao
+          que ja existia no chip de nome antigo. */}
+      {!empty && (
         <div
           style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 5,
             fontFamily: F,
             fontSize: 11,
             fontWeight: 500,
-            color: acting ? "#FFFFFF" : "rgba(255,255,255,.55)",
+            color: acting ? "#FFFFFF" : "rgba(255,255,255,.72)",
             background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
             border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
             borderRadius: 999,
-            padding: "2px 8px",
-            maxWidth: 82,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
+            padding: "3px 9px",
+            maxWidth: 118,
             lineHeight: 1.3,
             boxShadow: acting ? `0 0 10px ${col.glow}` : "none",
             textShadow: acting ? `0 0 6px ${col.glow}` : "none",
             transition: "all 200ms ease",
           }}
-          title={seat.playerName}
         >
-          {seat.playerName}
+          {/* Hero nao repete o nome aqui — ja aparece sobreposto nas
+              cartas (nameplate estilo GG, ver bloco do hero abaixo). */}
+          {seat.playerName && !hero && (
+            <span
+              style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+              title={seat.playerName}
+            >
+              {seat.playerName}
+            </span>
+          )}
+          {seat.playerName && !hero && <span style={{ opacity: 0.4 }}>·</span>}
+          <span style={{ whiteSpace: "nowrap", ...num }}>{stack} bb</span>
         </div>
       )}
-
-      <div
-        style={{
-          fontFamily: F,
-          fontSize: 11.5,
-          fontWeight: 500,
-          color: empty ? TEXT.disabled : TEXT.critical,
-          ...num,
-          textShadow: "0 1px 2px rgba(0,0,0,.8)",
-        }}
-      >
-        {empty ? "—" : `${stack} bb`}
-      </div>
 
       {badgeArea}
     </div>
@@ -390,12 +369,53 @@ function Seat({
               // sem rotacao. Antes usava size="hero" (bem maior) em layout
               // row — pedido explicito: diminuir e trocar pro mesmo padrao
               // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
-              <div style={{ display: "flex", gap: 5, marginTop: committed && committed >= MIN_COMMITTED_TO_SHOW ? 4 : 0 }}>
+              <div
+                style={{
+                  position: "relative",
+                  display: "flex",
+                  gap: 5,
+                  marginTop: committed && committed >= MIN_COMMITTED_TO_SHOW ? 4 : 0,
+                  // Espaco extra embaixo pra nameplate sobreposta nao
+                  // colidir com o seatInfo logo abaixo.
+                  marginBottom: seat.playerName ? 10 : 0,
+                }}
+              >
                 {cards.map((c, i) => (
                   <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
                     <Card card={c} size="board" />
                   </div>
                 ))}
+                {/* Nameplate sobreposta na base das cartas, estilo GG Poker
+                    (pedido explicito): "as cartas do hero podem vir tambem
+                    igual ao GG, com o nome um pouco sobreposto a parte de
+                    baixo da carta". */}
+                {seat.playerName && (
+                  <div
+                    style={{
+                      position: "absolute",
+                      left: "50%",
+                      bottom: 0,
+                      transform: "translate(-50%, 50%)",
+                      background: "rgba(0,0,0,.85)",
+                      border: "1px solid rgba(255,255,255,.18)",
+                      borderRadius: 999,
+                      padding: "2px 10px",
+                      fontFamily: F,
+                      fontSize: 10.5,
+                      fontWeight: 600,
+                      color: "#FFFFFF",
+                      whiteSpace: "nowrap",
+                      maxWidth: 110,
+                      overflow: "hidden",
+                      textOverflow: "ellipsis",
+                      boxShadow: "0 3px 8px rgba(0,0,0,.6)",
+                      zIndex: 2,
+                    }}
+                    title={seat.playerName}
+                  >
+                    {seat.playerName}
+                  </div>
+                )}
               </div>
             )}
             {seatInfo}
@@ -410,11 +430,8 @@ function Seat({
                   </div>
                 ))}
               </div>
-            ) : (
-              facedown && <CardBackPair side="right" />
-              // Leque mais sutil (pedido explicito) — angulo reduzido
-              // diretamente no card.tsx (CardBackPair), nao aqui.
-            );
+            ) : null; // Verso da carta removido (pedido explicito) — sem
+            // cartas reveladas, o assento so mostra o chip de posicao/nome.
             // Ordem trocada explicitamente por cardSide em vez de depender
             // de flex-direction reverso (mais previsivel) — pedido
             // explicito: "o vilao de cima esta com as cartas quase no
