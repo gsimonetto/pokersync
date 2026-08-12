@@ -50,6 +50,14 @@ export interface StudyLog {
   note?: string;
 }
 
+// Anotacao no grafico de evolucao ("subi pra NL100 aqui") — marcador
+// clicavel na timeline, so data + nota curta.
+export interface Annotation {
+  id: string;
+  date: string;
+  note: string;
+}
+
 // BRM: threshold de moveup/movedown em buy-ins, por formato. Alimenta o
 // Coach (saude de banca deixa de ser um numero fixo unico pra todos os
 // formatos) e fica visivel/editavel pro jogador.
