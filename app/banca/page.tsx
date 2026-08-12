@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown } from "lucide-react";
+import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, type RangeOption } from "@/lib/bankroll/calc";
 import { buildCoachTips, type CoachTip } from "@/lib/bankroll/coach";
@@ -71,6 +71,12 @@ export default function BankrollPage() {
   const [goalTarget, setGoalTarget] = useState("");
 
   const [coachExpanded, setCoachExpanded] = useState(false);
+
+  // Registro rapido (2026-08): "Registrar sessao" e "Deposito/saque" viram
+  // modais acionados por atalho logo abaixo do header — o jogador nao
+  // precisa mais rolar a tela ate o fim pra bater o registro pos-sessao.
+  const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  const [txModalOpen, setTxModalOpen] = useState(false);
 
   useEffect(() => {
     let alive = true;
@@ -142,6 +148,7 @@ export default function BankrollPage() {
     setDiaryNote("");
     setShowDiary(false);
     setErr("");
+    setSessionModalOpen(false);
     try {
       const saved = await apiAddSession(draft);
       setSessions((prev) => prev.map((x) => (x.id === draft.id ? saved : x)));
@@ -172,6 +179,7 @@ export default function BankrollPage() {
     setTxAmount("");
     setTxNote("");
     setErr("");
+    setTxModalOpen(false);
     try {
       const saved = await apiAddTransaction(draft);
       setTransactions((prev) => prev.map((x) => (x.id === draft.id ? saved : x)));
@@ -250,6 +258,24 @@ export default function BankrollPage() {
       {err && (
         <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
+
+      {/* Atalho de registro rapido — a acao mais frequente do jogador
+          (bater a sessao assim que sai da mesa) nao pode depender de
+          rolar a tela. Fica logo abaixo do header, sempre visivel. */}
+      <div className="mt-6 flex flex-wrap gap-2.5">
+        <button
+          onClick={() => setSessionModalOpen(true)}
+          className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
+        >
+          <Plus size={15} /> Registrar sessao
+        </button>
+        <button
+          onClick={() => setTxModalOpen(true)}
+          className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-4 py-2.5 text-xs font-bold uppercase tracking-[0.1em] text-ink transition-colors hover:border-ink/40"
+        >
+          <Plus size={15} /> Deposito / saque
+        </button>
+      </div>
 
       <div className="mt-6 flex items-center justify-between">
         <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
@@ -412,117 +438,115 @@ export default function BankrollPage() {
         )}
       </section>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Registrar sessao</h2>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <select
-              value={format}
-              onChange={(e) => setFormat(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            >
-              {FORMATS.map((f) => (
-                <option key={f} value={f}>
-                  {f}
+      <Modal open={sessionModalOpen} onClose={() => setSessionModalOpen(false)} title="Registrar sessao">
+        <div className="grid grid-cols-2 gap-3">
+          <select
+            value={format}
+            onChange={(e) => setFormat(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          >
+            {FORMATS.map((f) => (
+              <option key={f} value={f}>
+                {f}
+              </option>
+            ))}
+          </select>
+          <input
+            type="date"
+            value={date}
+            onChange={(e) => setDate(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Buy-in"
+            value={buyIn}
+            onChange={(e) => setBuyIn(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Reentradas"
+            value={reentries}
+            onChange={(e) => setReentries(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Cashout"
+            value={cashout}
+            onChange={(e) => setCashout(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Stake"
+            value={stake}
+            onChange={(e) => setStake(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Local"
+            value={venue}
+            onChange={(e) => setVenue(e.target.value)}
+            className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Notas"
+            value={notes}
+            onChange={(e) => setNotes(e.target.value)}
+            className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+        </div>
+
+        <button
+          onClick={() => setShowDiary((v) => !v)}
+          className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-muted transition-colors hover:text-ink"
+        >
+          <BookOpen size={13} /> Diario pos-sessao (opcional)
+          <ChevronDown size={13} className={`transition-transform ${showDiary ? "rotate-180" : ""}`} />
+        </button>
+        {showDiary && (
+          <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-hairline bg-elevated p-3">
+            <select value={mood} onChange={(e) => setMood(e.target.value)} className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm">
+              <option value="">Como foi?</option>
+              <option value="focado">Focado</option>
+              <option value="neutro">Neutro</option>
+              <option value="tilt">Tilt</option>
+            </select>
+            <select value={tilt} onChange={(e) => setTilt(e.target.value)} className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm">
+              <option value="">Nivel de tilt</option>
+              {[1, 2, 3, 4, 5].map((n) => (
+                <option key={n} value={n}>
+                  {n}/5
                 </option>
               ))}
             </select>
             <input
-              type="date"
-              value={date}
-              onChange={(e) => setDate(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Buy-in"
-              value={buyIn}
-              onChange={(e) => setBuyIn(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Reentradas"
-              value={reentries}
-              onChange={(e) => setReentries(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Cashout"
-              value={cashout}
-              onChange={(e) => setCashout(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Stake"
-              value={stake}
-              onChange={(e) => setStake(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Local"
-              value={venue}
-              onChange={(e) => setVenue(e.target.value)}
-              className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Notas"
-              value={notes}
-              onChange={(e) => setNotes(e.target.value)}
-              className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              placeholder="Principal aprendizado da sessao"
+              value={diaryNote}
+              onChange={(e) => setDiaryNote(e.target.value)}
+              className="col-span-2 rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
             />
           </div>
+        )}
 
-          <button
-            onClick={() => setShowDiary((v) => !v)}
-            className="mt-3 flex items-center gap-1.5 text-xs font-semibold text-muted transition-colors hover:text-ink"
-          >
-            <BookOpen size={13} /> Diario pos-sessao (opcional)
-            <ChevronDown size={13} className={`transition-transform ${showDiary ? "rotate-180" : ""}`} />
-          </button>
-          {showDiary && (
-            <div className="mt-2 grid grid-cols-2 gap-2 rounded-lg border border-hairline bg-elevated p-3">
-              <select value={mood} onChange={(e) => setMood(e.target.value)} className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm">
-                <option value="">Como foi?</option>
-                <option value="focado">Focado</option>
-                <option value="neutro">Neutro</option>
-                <option value="tilt">Tilt</option>
-              </select>
-              <select value={tilt} onChange={(e) => setTilt(e.target.value)} className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm">
-                <option value="">Nivel de tilt</option>
-                {[1, 2, 3, 4, 5].map((n) => (
-                  <option key={n} value={n}>
-                    {n}/5
-                  </option>
-                ))}
-              </select>
-              <input
-                placeholder="Principal aprendizado da sessao"
-                value={diaryNote}
-                onChange={(e) => setDiaryNote(e.target.value)}
-                className="col-span-2 rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
-              />
-            </div>
-          )}
+        <button
+          onClick={handleAddSession}
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-opacity hover:opacity-90"
+        >
+          Salvar sessao
+        </button>
+      </Modal>
 
-          <button
-            onClick={handleAddSession}
-            className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-opacity hover:opacity-90"
-          >
-            Salvar sessao
-          </button>
-        </section>
-
-        <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Sessoes recentes</h2>
-          {recent.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
-          ) : (
-            <div className="mt-2 flex flex-col">
-              {recent.map((s) => {
-                const result = net(s);
-                return (
-                  <div
-                    key={s.id}
-                    className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-colors first:border-t-0 hover:bg-elevated"
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Sessoes recentes</h2>
+        {recent.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
+        ) : (
+          <div className="mt-2 flex flex-col">
+            {recent.map((s) => {
+              const result = net(s);
+              return (
+                <div
+                  key={s.id}
+                  className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-colors first:border-t-0 hover:bg-elevated"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="truncate text-sm font-semibold">
@@ -548,90 +572,86 @@ export default function BankrollPage() {
             </div>
           )}
         </section>
-      </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Deposito / saque / caixinha</h2>
-          <p className="mt-1 text-xs text-muted">
-            Nao entra no resultado de jogo — so move dinheiro entre banca de jogo e patrimonio guardado.
-          </p>
-          <div className="mt-4 grid grid-cols-2 gap-3">
-            <select
-              value={txType}
-              onChange={(e) => setTxType(e.target.value as TransactionType)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            >
-              <option value="deposito">Deposito</option>
-              <option value="saque">Saque</option>
-              <option value="caixinha">Caixinha</option>
-            </select>
-            <input
-              type="date"
-              value={txDate}
-              onChange={(e) => setTxDate(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Valor"
-              value={txAmount}
-              onChange={(e) => setTxAmount(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-            <input
-              placeholder="Nota (opcional)"
-              value={txNote}
-              onChange={(e) => setTxNote(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-            />
-          </div>
-          <button
-            onClick={handleAddTransaction}
-            className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-opacity hover:opacity-90"
+      <Modal open={txModalOpen} onClose={() => setTxModalOpen(false)} title="Deposito / saque / caixinha">
+        <p className="text-xs text-muted">
+          Nao entra no resultado de jogo — so move dinheiro entre banca de jogo e patrimonio guardado.
+        </p>
+        <div className="mt-4 grid grid-cols-2 gap-3">
+          <select
+            value={txType}
+            onChange={(e) => setTxType(e.target.value as TransactionType)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
           >
-            Registrar
-          </button>
-        </section>
+            <option value="deposito">Deposito</option>
+            <option value="saque">Saque</option>
+            <option value="caixinha">Caixinha</option>
+          </select>
+          <input
+            type="date"
+            value={txDate}
+            onChange={(e) => setTxDate(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Valor"
+            value={txAmount}
+            onChange={(e) => setTxAmount(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
+            placeholder="Nota (opcional)"
+            value={txNote}
+            onChange={(e) => setTxNote(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+        </div>
+        <button
+          onClick={handleAddTransaction}
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-opacity hover:opacity-90"
+        >
+          Registrar
+        </button>
+      </Modal>
 
-        <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Historico de transacoes</h2>
-          {recentTx.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
-          ) : (
-            <div className="mt-2 flex flex-col">
-              {recentTx.map((t) => (
-                <div
-                  key={t.id}
-                  className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-colors first:border-t-0 hover:bg-elevated"
-                >
-                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-void/40">
-                    {t.type === "deposito" ? (
-                      <TrendingUp size={14} className="text-positive" />
-                    ) : t.type === "saque" ? (
-                      <TrendingDown size={14} className="text-negative" />
-                    ) : (
-                      <PiggyBank size={14} className="text-evolution" />
-                    )}
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold">
-                      {TX_LABELS[t.type]} · {t.date}
-                    </p>
-                    {t.note && <p className="truncate text-xs text-muted">{t.note}</p>}
-                  </div>
-                  <span className={`text-sm font-bold ${t.type === "deposito" ? "text-positive" : "text-negative"}`}>
-                    {t.type === "deposito" ? "+" : "-"}
-                    {fmtMoney(t.amount)}
-                  </span>
-                  <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-colors hover:text-negative">
-                    <Trash2 size={15} />
-                  </button>
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Historico de transacoes</h2>
+        {recentTx.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
+        ) : (
+          <div className="mt-2 flex flex-col">
+            {recentTx.map((t) => (
+              <div
+                key={t.id}
+                className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-colors first:border-t-0 hover:bg-elevated"
+              >
+                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-void/40">
+                  {t.type === "deposito" ? (
+                    <TrendingUp size={14} className="text-positive" />
+                  ) : t.type === "saque" ? (
+                    <TrendingDown size={14} className="text-negative" />
+                  ) : (
+                    <PiggyBank size={14} className="text-evolution" />
+                  )}
                 </div>
-              ))}
-            </div>
-          )}
-        </section>
-      </div>
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-sm font-semibold">
+                    {TX_LABELS[t.type]} · {t.date}
+                  </p>
+                  {t.note && <p className="truncate text-xs text-muted">{t.note}</p>}
+                </div>
+                <span className={`text-sm font-bold ${t.type === "deposito" ? "text-positive" : "text-negative"}`}>
+                  {t.type === "deposito" ? "+" : "-"}
+                  {fmtMoney(t.amount)}
+                </span>
+                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-colors hover:text-negative">
+                  <Trash2 size={15} />
+                </button>
+              </div>
+            ))}
+          </div>
+        )}
+      </section>
 
       <p className="mt-6 text-xs text-muted">Calculadora de BRM e painel de leaks ficam para a proxima leva desta fase.</p>
     </main>
@@ -666,6 +686,59 @@ function toneClasses(level: CoachTip["level"]) {
   if (level === "bad") return "border-negative/35 bg-negative/10";
   if (level === "warn") return "border-evolution/35 bg-evolution/10";
   return "border-hairline bg-elevated";
+}
+
+// Modal/drawer no topo (2026-08): usado pro registro rapido de sessao e
+// transacao. Fecha com Esc, clique no backdrop ou no X — nunca trava o
+// jogador sem saida. Entra deslizando do topo pra reforcar "isso e um
+// atalho rapido", nao uma pagina nova.
+function Modal({
+  open,
+  onClose,
+  title,
+  children,
+}: {
+  open: boolean;
+  onClose: () => void;
+  title: string;
+  children: React.ReactNode;
+}) {
+  useEffect(() => {
+    if (!open) return;
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [open, onClose]);
+
+  if (!open) return null;
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-lg animate-[modalIn_.16s_ease-out] rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-ink">{title}</h2>
+          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink" aria-label="Fechar">
+            <X size={16} />
+          </button>
+        </div>
+        <div className="mt-4">{children}</div>
+      </div>
+      <style jsx global>{`
+        @keyframes modalIn {
+          from {
+            opacity: 0;
+            transform: translateY(-10px);
+          }
+          to {
+            opacity: 1;
+            transform: translateY(0);
+          }
+        }
+      `}</style>
+    </div>
+  );
 }
 
 // Grafico com efeito LED (2026-08): glow via filtro SVG (feGaussianBlur +
