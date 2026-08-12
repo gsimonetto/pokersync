@@ -10,7 +10,7 @@ import {
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboard, xpForNextLevel, type Progress, type LeaderboardEntry,
+  fetchLeaderboard, xpForNextLevel, levelColor, MAX_LEVEL, type Progress, type LeaderboardEntry,
 } from "@/lib/services/xp-service";
 import { createClient } from "@/lib/supabase/client";
 
@@ -54,6 +54,15 @@ const ICON_MAP: Record<string, LucideIcon> = {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type AnyMission = any;
+
+// Selo de dificuldade nos cards (pedido explicito: "ter niveis de
+// dificuldade") — cor sobe em intensidade conforme fica mais dificil.
+const DIFFICULTY_META: Record<string, { label: string; color: string }> = {
+  facil: { label: "Fácil", color: "#22c55e" },
+  media: { label: "Média", color: "#f59e0b" },
+  dificil: { label: "Difícil", color: "#f97316" },
+  expert: { label: "Expert", color: "#e0555a" },
+};
 
 type MissionTab = "daily" | "weekly" | "monthly" | "challenge";
 
@@ -116,9 +125,11 @@ export default function HubPage() {
   if (err || !progress) return <main className="p-10 text-center text-sm text-negative">{err}</main>;
 
   const level = progress.level;
-  const xpNeeded = xpForNextLevel(level);
+  const isMaxLevel = level >= MAX_LEVEL;
+  const badgeColor = levelColor(level);
+  const xpNeeded = isMaxLevel ? 0 : xpForNextLevel(level);
   const xpCurrent = progress.xp_current;
-  const pct = Math.min(100, (xpCurrent / xpNeeded) * 100);
+  const pct = isMaxLevel ? 100 : Math.min(100, (xpCurrent / xpNeeded) * 100);
 
   const showingCatalog = missions.length === 0;
   const grp = (kind: string) =>
@@ -224,7 +235,7 @@ export default function HubPage() {
         <div className="relative grid grid-cols-[auto_1fr_auto] items-center gap-5">
           <div
             className="grid h-20 w-20 place-items-center rounded-2xl bg-void text-3xl font-extrabold"
-            style={{ border: `2px solid ${ACCENT}`, color: ACCENT, boxShadow: "0 0 0 4px rgba(224,178,76,0.08)" }}
+            style={{ border: `2px solid ${badgeColor}`, color: badgeColor, boxShadow: `0 0 0 4px ${badgeColor}18` }}
           >
             {level}
           </div>
@@ -232,18 +243,21 @@ export default function HubPage() {
           <div className="min-w-0">
             {/* Nome de patente em ingles (Micro Stakes I etc) removido
                 (pedido explicito) — so o numero do nivel, sem rotulo por
-                baixo. */}
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted">Nível {level}</p>
+                baixo. Cor do nivel muda a cada 10 (pedido explicito). */}
+            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
+              Nível {level}
+              {isMaxLevel && <span className="ml-1.5" style={{ color: badgeColor }}>· MÁXIMO</span>}
+            </p>
             <div className="mt-3">
               <div className="h-2 overflow-hidden rounded-full border border-hairline bg-white/5">
                 <div
                   className="h-full transition-all duration-500"
-                  style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${ACCENT}, #F5D48C)` }}
+                  style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${badgeColor}, #F5D48C)` }}
                 />
               </div>
               <div className="mt-1.5 flex justify-between text-[11px] text-muted">
                 <span>{xpCurrent} XP</span>
-                <span>{xpNeeded} XP para o próximo</span>
+                <span>{isMaxLevel ? "Nível máximo atingido" : `${xpNeeded} XP para o próximo`}</span>
               </div>
             </div>
           </div>
@@ -413,6 +427,14 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
         <div className="min-w-0 flex-1">
           <div className="flex items-baseline gap-2">
             <h4 className="flex-1 text-sm font-bold">{m.title}</h4>
+            {DIFFICULTY_META[m?.difficulty] && (
+              <span
+                className="rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-[0.06em]"
+                style={{ color: DIFFICULTY_META[m.difficulty].color, background: `${DIFFICULTY_META[m.difficulty].color}18` }}
+              >
+                {DIFFICULTY_META[m.difficulty].label}
+              </span>
+            )}
             {/* XP sempre em verde: forma propria (chip com brilho) para nao se confundir com o estado "concluida" */}
             <span
               className="hub-xp-chip flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] font-extrabold"
@@ -507,7 +529,7 @@ function LeaderboardDrawer({
                         {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
                       </p>
                       <p className="text-[11px] text-muted">
-                        Nível {e.level} · {e.streakDays} dias de streak
+                        <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span> · {e.streakDays} dias de streak
                       </p>
                     </div>
                     <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
