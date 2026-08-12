@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2 } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
@@ -39,7 +39,22 @@ function StatRow({ label, value }: { label: string; value: string }) {
   );
 }
 
-export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
+export function RevisorHandTable({
+  parsedHand,
+  onFatalError,
+}: {
+  parsedHand: ParsedHand;
+  // Chamado quando o replay dessa mao especifica nao pode ser montado
+  // (ex: pote calculado nao bate com o total da mao — sanity check do
+  // projector). Pedido explicito (2026-08): em vez de travar numa tela
+  // de erro, avancar automaticamente pra proxima mao da fila, "independente
+  // do que causou o erro". Quem sabe qual e' "a proxima mao" e' o
+  // consumidor (RevisorSessao tem a lista) — esse componente so avisa.
+  // Se omitido, mantem o comportamento antigo: mostra a caixa de erro
+  // (usado por quem chama RevisorHandTable fora de uma fila navegavel,
+  // ex: RevisorDetalhe).
+  onFatalError?: () => void;
+}) {
   const [stepIndex, setStepIndex] = useState(0);
   const previousStepRef = useRef(0);
   const [autoplay, setAutoplay] = useState(false);
@@ -85,6 +100,17 @@ export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
       return { replayState: null, replayError: e instanceof Error ? e.message : "Erro ao montar a mesa dessa mão." };
     }
   }, [parsedHand, stepIndex]);
+
+  // Dispara o callback pro consumidor (RevisorSessao) trocar de mao
+  // assim que um erro aparece — nao renderiza a caixa de erro nesse caso,
+  // so um indicador transitorio (ver return abaixo), porque a troca de
+  // mao e' quase instantanea e a caixa de erro pisca sem necessidade.
+  useEffect(() => {
+    if (replayError && onFatalError) {
+      onFatalError();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [replayError]);
 
   const chipAnimation = useMemo(() => {
     if (!replayState) return null;
@@ -133,6 +159,33 @@ export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
   }, [replayState, situationAction, parsedHand.heroPosition]);
 
   if (replayError || !replayState) {
+    // Consumidor com fila (RevisorSessao) trata o erro avancando pra
+    // proxima mao — mostra so um indicador leve de transicao em vez da
+    // caixa de erro, que ficaria piscando sem o usuario nem ler.
+    if (onFatalError) {
+      return (
+        <div
+          style={{
+            fontFamily: F,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 8,
+            padding: "24px 16px",
+            borderRadius: 14,
+            background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+            border: "1px solid rgba(255,255,255,0.08)",
+            minHeight: 200,
+            color: "rgba(255,255,255,0.4)",
+            fontSize: 12.5,
+          }}
+        >
+          <Loader2 size={16} style={{ animation: "spin 1s linear infinite" }} />
+          Avançando pra próxima mão…
+          <style>{`@keyframes spin { to { transform: rotate(360deg); } }`}</style>
+        </div>
+      );
+    }
     return (
       <div
         style={{
@@ -181,7 +234,11 @@ export function RevisorHandTable({ parsedHand }: { parsedHand: ParsedHand }) {
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
         </div>
 
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 10 }}>
+        {/* Espaçamento aumentado (10 -> 22) — pedido explicito: "a
+            velocidade esta em cima do stack do hero". O stack do hero
+            fica bem perto da borda inferior da mesa; sem folga suficiente
+            aqui o seletor de velocidade parecia colado/sobreposto nele. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 22 }}>
           <button
             onClick={prevStep}
             disabled={replayState.stepIndex === 0}
