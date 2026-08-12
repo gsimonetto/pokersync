@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Flame } from "lucide-react";
-import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus } from "@/lib/bankroll/calc";
-import { buildCoachTips, type CoachTip } from "@/lib/bankroll/coach";
-import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO } from "@/lib/bankroll/format";
+import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Flame, Download, StickyNote, GitCompare, ShieldAlert, Hash, History } from "lucide-react";
+import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
+import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus } from "@/lib/bankroll/calc";
+import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
+import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import {
   fetchSessions,
   fetchSettings,
@@ -23,6 +23,10 @@ import {
   addStudyLog as apiAddStudyLog,
   fetchBrmThresholds,
   saveBrmThreshold as apiSaveBrmThreshold,
+  fetchAnnotations,
+  addAnnotation as apiAddAnnotation,
+  deleteAnnotation as apiDeleteAnnotation,
+  notifyBrmAlert,
 } from "@/lib/services/bankroll-service";
 
 const RANGES: { value: RangeOption; label: string }[] = [
@@ -44,7 +48,6 @@ export default function BankrollPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [studyLogs, setStudyLogs] = useState<StudyLog[]>([]);
   const [brmThresholds, setBrmThresholds] = useState<BrmThreshold[]>([]);
-  const [showBrmEdit, setShowBrmEdit] = useState(false);
   const [leakDimension, setLeakDimension] = useState<"format" | "weekday" | "time">("format");
   const [bankroll, setBankroll] = useState(0);
   const [range, setRange] = useState<RangeOption>("all");
@@ -70,7 +73,6 @@ export default function BankrollPage() {
   const [txDate, setTxDate] = useState(todayISO());
   const [txNote, setTxNote] = useState("");
 
-  const [showGoalForm, setShowGoalForm] = useState(false);
   const [goalType, setGoalType] = useState<GoalType>("volume");
   const [goalPeriod, setGoalPeriod] = useState<GoalPeriod>("semanal");
   const [goalTarget, setGoalTarget] = useState("");
@@ -88,17 +90,27 @@ export default function BankrollPage() {
   const [calcFormat, setCalcFormat] = useState<BrmFormat>("Cash");
   const [calcBuyIn, setCalcBuyIn] = useState("");
 
+  // Anotacoes no grafico ("subi pra NL100 aqui")
+  const [annotations, setAnnotations] = useState<Annotation[]>([]);
+  const [annoModalOpen, setAnnoModalOpen] = useState(false);
+  const [annoDate, setAnnoDate] = useState(todayISO());
+  const [annoNote, setAnnoNote] = useState("");
+
+  // Comparar periodos (mes atual vs anterior)
+  const [compareOpen, setCompareOpen] = useState(false);
+
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [s, cfg, tx, gl, sl, brm] = await Promise.all([
+        const [s, cfg, tx, gl, sl, brm, annos] = await Promise.all([
           fetchSessions(),
           fetchSettings(),
           fetchTransactions(),
           fetchGoals(),
           fetchStudyLogs(),
           fetchBrmThresholds(),
+          fetchAnnotations(),
         ]);
         if (!alive) return;
         setSessions(s);
@@ -107,6 +119,7 @@ export default function BankrollPage() {
         setGoals(gl);
         setStudyLogs(sl);
         setBrmThresholds(brm);
+        setAnnotations(annos);
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : "Falha ao carregar sua banca.");
       } finally {
@@ -135,6 +148,11 @@ export default function BankrollPage() {
   const leakStats = useMemo(() => groupStats(sessions, leakDimension), [sessions, leakDimension]);
   const tiltStats = useMemo(() => tiltImpact(sessions), [sessions]);
   const calcThreshold = useMemo(() => thresholdFor(brmThresholds, calcFormat), [brmThresholds, calcFormat]);
+  const ruin = useMemo(() => riskOfRuin(sessions, nw.playingBankroll), [sessions, nw.playingBankroll]);
+  const comparison = useMemo(() => compareMonths(sessions), [sessions]);
+  const currentDrawdown = useMemo(() => drawdownBuyIns(sessions, agg.avgBuyIn), [sessions, agg.avgBuyIn]);
+  const profitDelta = comparison.current.profit - comparison.previous.profit;
+  const roiDelta = comparison.current.roi - comparison.previous.roi;
   const calcBuyInsCovered = Number(calcBuyIn) > 0 ? nw.playingBankroll / Number(calcBuyIn) : null;
   const calcStatus: BrmStatus | null =
     calcBuyInsCovered == null
@@ -147,6 +165,25 @@ export default function BankrollPage() {
   const recent = [...sessions].reverse().slice(0, 8);
   const recentTx = [...transactions].reverse().slice(0, 6);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
+
+  // Alerta de BRM via notificacao (Hub de Evolucao ja tem sino/lista) —
+  // dispara so quando o status muda pra algo accionavel (moveup/
+  // movedown), com dedupe no service (nao duplica notificacao repetida).
+  useEffect(() => {
+    if (loading || !currentBrm) return;
+    if (currentBrm.status === "moveup") {
+      notifyBrmAlert(
+        `Banca pronta pra subir em ${currentBrm.format}`,
+        `Sua banca cobre ${currentBrm.buyInsCovered} buy-ins — acima do seu threshold de moveup (${currentBrm.threshold.moveupBuyins}).`
+      ).catch(() => {});
+    } else if (currentBrm.status === "movedown") {
+      notifyBrmAlert(
+        `Banca abaixo do minimo em ${currentBrm.format}`,
+        `Sua banca cobre so ${currentBrm.buyInsCovered} buy-ins — abaixo do seu threshold de movedown (${currentBrm.threshold.movedownBuyins}). Considere descer de stake.`
+      ).catch(() => {});
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, currentBrm?.status, currentBrm?.format]);
 
   async function handleAddSession() {
     if (!buyIn || !cashout || !date) {
@@ -238,7 +275,7 @@ export default function BankrollPage() {
       const saved = await apiAddGoal({ type: goalType, period: goalPeriod, target: Number(goalTarget), unit });
       setGoals((prev) => [...prev, saved]);
       setGoalTarget("");
-      setShowGoalForm(false);
+      setGoalsModalOpen(false);
     } catch {
       setErr("Nao foi possivel criar a meta.");
     }
@@ -276,6 +313,37 @@ export default function BankrollPage() {
       setErr("Nao foi possivel salvar o threshold de BRM.");
       setBrmThresholds(backup);
     }
+  }
+
+  async function handleAddAnnotation() {
+    if (!annoNote.trim() || !annoDate) return;
+    const draft: Annotation = { id: `tmp-${Date.now()}`, date: annoDate, note: annoNote.trim() };
+    setAnnotations((prev) => [...prev, draft]);
+    setAnnoNote("");
+    try {
+      const saved = await apiAddAnnotation(draft);
+      setAnnotations((prev) => prev.map((a) => (a.id === draft.id ? saved : a)));
+    } catch {
+      setErr("Nao foi possivel salvar a anotacao.");
+      setAnnotations((prev) => prev.filter((a) => a.id !== draft.id));
+    }
+  }
+
+  async function handleRemoveAnnotation(id: string) {
+    const backup = annotations;
+    setAnnotations((prev) => prev.filter((a) => a.id !== id));
+    try {
+      await apiDeleteAnnotation(id);
+    } catch {
+      setErr("Nao foi possivel remover a anotacao. Restaurando.");
+      setAnnotations(backup);
+    }
+  }
+
+  function handleExportCSV() {
+    const inRange = filterSessionsByRange(sessions, range);
+    const csv = sessionsToCSV(inRange);
+    downloadCSV(`pokersync-sessoes-${range}-${todayISO()}.csv`, csv);
   }
 
   if (loading) {
@@ -325,50 +393,52 @@ export default function BankrollPage() {
 
         <div className="flex items-center gap-2.5">
           {/* Registro/deposito em destaque — maior, com label, cor solida.
-              Metas/BRM viram icones menores ao lado, mesma funcao (abrem
-              modal), mas com peso visual secundario. */}
+              Metas/BRM/Leaks viram icones menores ao lado, mesma funcao
+              (abrem modal), mas com peso visual secundario. Hovers mais
+              expressivos (pedido explicito): escala + leve rotacao do
+              icone + glow na cor de acento, nao so troca de cor. */}
           <button
             onClick={() => setSessionModalOpen(true)}
             aria-label="Registrar sessao"
             title="Registrar sessao"
-            className="flex h-11 w-11 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform hover:scale-105 active:scale-95"
+            className="group flex h-11 w-11 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform duration-200 hover:scale-110 active:scale-90"
           >
-            <Plus size={20} strokeWidth={2.5} />
+            <Plus size={20} strokeWidth={2.5} className="transition-transform duration-200 group-hover:rotate-90" />
           </button>
           <button
             onClick={() => setTxModalOpen(true)}
             aria-label="Deposito / saque"
             title="Deposito / saque"
-            className="flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-elevated text-ink shadow-lg shadow-black/20 transition-transform hover:scale-105 hover:border-ink/40 active:scale-95"
+            className="group flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-elevated text-ink shadow-lg shadow-black/20 transition-transform duration-200 hover:scale-110 hover:border-ink/40 active:scale-90"
           >
-            <Wallet size={19} />
+            <Wallet size={19} className="transition-transform duration-200 group-hover:-rotate-12" />
           </button>
 
           <div className="mx-1 h-7 w-px bg-hairline" />
 
           <button
             onClick={() => setGoalsModalOpen(true)}
-            aria-label="Metas"
-            title="Metas"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-review/40 hover:text-review"
+            aria-label="Nova meta"
+            title="Nova meta"
+            className="group flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-all duration-200 hover:scale-110 hover:border-review/50 hover:text-review hover:shadow-[0_0_12px_rgba(168,85,247,.35)] active:scale-90"
           >
-            <Target size={16} />
+            <Target size={16} className="transition-transform duration-200 group-hover:rotate-45" />
           </button>
           <button
             onClick={() => setBrmModalOpen(true)}
             aria-label="BRM — moveup / movedown"
             title="BRM — moveup / movedown"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-training/40 hover:text-training"
+            className="group flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-all duration-200 hover:scale-110 hover:border-training/50 hover:text-training hover:shadow-[0_0_12px_rgba(59,130,246,.35)] active:scale-90"
           >
-            <Gauge size={16} />
+            <Gauge size={16} className="transition-transform duration-200 group-hover:-rotate-12" />
           </button>
           <button
             onClick={() => setLeaksModalOpen(true)}
             aria-label="Painel de leaks"
             title="Painel de leaks"
-            className="flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-evolution/40 hover:text-evolution"
+            className="group flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-all duration-200 hover:scale-110 hover:border-evolution/50 hover:text-evolution hover:shadow-[0_0_12px_rgba(245,158,11,.35)] active:scale-90"
           >
-            <Flame size={16} />
+            <Flame size={16} className="transition-transform duration-200 group-hover:scale-110" />
           </button>
         </div>
       </div>
@@ -385,9 +455,38 @@ export default function BankrollPage() {
           value={fmtSignedMoney(agg.profit)}
           tone={agg.profit >= 0 ? "positive" : "negative"}
           accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
+          delta={
+            comparison.previous.n > 0
+              ? { text: `${fmtSignedMoney(profitDelta)} vs mês passado`, positive: profitDelta >= 0 }
+              : undefined
+          }
         />
-        <StatCard label="ROI" value={fmtPct(agg.roi)} tone="training" accent="#3b82f6" />
+        <StatCard
+          label="ROI"
+          value={fmtPct(agg.roi)}
+          tone="training"
+          accent="#3b82f6"
+          delta={
+            comparison.previous.n > 0
+              ? { text: `${fmtPct(roiDelta)} vs mês passado`, positive: roiDelta >= 0 }
+              : undefined
+          }
+        />
         <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} tone="evolution" accent="#f59e0b" />
+      </div>
+
+      {/* Volume, ritmo e risco atual — segunda linha de cards (pedido
+          explicito: mais informacoes rapidas junto das que ja existiam). */}
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
+        <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#a855f7" />
+        <StatCard label="Buy-in médio" value={fmtMoney(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#3b82f6" />
+        <StatCard
+          label="Drawdown atual"
+          value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+          tone={currentDrawdown >= 15 ? "negative" : undefined}
+          icon={<History size={11} />}
+          accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
+        />
       </div>
 
       {(nw.withdrawn > 0 || nw.caixinha > 0) && (
@@ -399,132 +498,224 @@ export default function BankrollPage() {
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
         <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20 lg:col-span-2">
-          <div className="flex items-center justify-between">
+          <div className="flex flex-wrap items-center justify-between gap-2">
             <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Evolucao da banca</h2>
-            <div className="flex gap-1">
-              {RANGES.map((r) => (
-                <button
-                  key={r.value}
-                  onClick={() => setRange(r.value)}
-                  className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-colors ${
-                    range === r.value ? "bg-ink text-void" : "text-muted hover:text-ink"
-                  }`}
-                >
-                  {r.label}
-                </button>
-              ))}
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex gap-1">
+                {RANGES.map((r) => (
+                  <button
+                    key={r.value}
+                    onClick={() => setRange(r.value)}
+                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-colors ${
+                      range === r.value ? "bg-ink text-void" : "text-muted hover:text-ink"
+                    }`}
+                  >
+                    {r.label}
+                  </button>
+                ))}
+              </div>
+              <button
+                onClick={() => setAnnoModalOpen(true)}
+                title="Anotar evento na timeline"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-all hover:scale-110 hover:border-review/50 hover:text-review"
+              >
+                <StickyNote size={13} />
+              </button>
+              <button
+                onClick={() => setCompareOpen((v) => !v)}
+                title="Comparar meses"
+                className={`grid h-7 w-7 place-items-center rounded-md border transition-all hover:scale-110 ${
+                  compareOpen ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
+                }`}
+              >
+                <GitCompare size={13} />
+              </button>
+              <button
+                onClick={handleExportCSV}
+                title="Exportar CSV do periodo"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-all hover:scale-110 hover:border-positive/50 hover:text-positive"
+              >
+                <Download size={13} />
+              </button>
             </div>
           </div>
           <div className="mt-4">
-            <EvolutionChart series={filteredSeries} />
+            <EvolutionChart series={filteredSeries} annotations={annotations} />
           </div>
-        </section>
 
-        {/* Coach compacto — espaco pequeno, nao domina a tela. Mostra o
-            tip mais relevante (primeiro da lista) sempre; o resto fica
-            atras de um "ver mais" pra nao empurrar o resto da pagina. */}
-        <section className="flex max-h-[320px] flex-col rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-ink/20">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">AI Coach</h2>
-          <div className="mt-3 flex flex-col gap-2 overflow-y-auto">
-            {tips.slice(0, coachExpanded ? tips.length : 1).map((tip: CoachTip) => (
-              <div key={tip.id} className={`rounded-lg border p-2.5 text-xs ${toneClasses(tip.level)}`}>
-                <p className="font-semibold leading-snug">{tip.title}</p>
-                <p className="mt-1 text-[11px] text-muted leading-snug">{tip.text}</p>
+          {compareOpen && (
+            <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
+              <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">
+                {comparison.currentLabel} vs {comparison.previousLabel}
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-3 text-center">
+                <div />
+                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.currentLabel.split(" ")[0]}</p>
+                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.previousLabel.split(" ")[0]}</p>
+
+                <p className="text-left text-[11px] text-muted">Resultado</p>
+                <p className={`text-sm font-bold ${comparison.current.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSignedMoney(comparison.current.profit)}
+                </p>
+                <p className={`text-sm font-bold ${comparison.previous.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSignedMoney(comparison.previous.profit)}
+                </p>
+
+                <p className="text-left text-[11px] text-muted">ROI</p>
+                <p className="text-sm font-bold text-training">{fmtPct(comparison.current.roi)}</p>
+                <p className="text-sm font-bold text-training">{fmtPct(comparison.previous.roi)}</p>
+
+                <p className="text-left text-[11px] text-muted">Sessões</p>
+                <p className="text-sm font-bold text-ink">{comparison.current.n}</p>
+                <p className="text-sm font-bold text-ink">{comparison.previous.n}</p>
               </div>
-            ))}
-          </div>
-          {tips.length > 1 && (
-            <button
-              onClick={() => setCoachExpanded((v) => !v)}
-              className="mt-2 flex items-center justify-center gap-1 rounded-md py-1.5 text-[11px] font-semibold text-muted transition-colors hover:text-ink"
-            >
-              {coachExpanded ? "Mostrar menos" : `+${tips.length - 1} insights`}
-              <ChevronDown size={13} className={`transition-transform ${coachExpanded ? "rotate-180" : ""}`} />
-            </button>
+            </div>
           )}
         </section>
+
+        {/* Coluna lateral (2026-08 v8, pedido explicito): os icones de
+            atalho agora SO abrem modal de criacao/edicao — o que ja foi
+            criado (metas ativas, leitura de BRM) precisa aparecer fixo
+            na tela, nao escondido atras de clique. Fica ao lado do
+            grafico, empilhado. Coach encolheu mais (max-h-[150px], texto
+            menor) pra abrir espaco pros outros dois widgets. */}
+        <div className="flex flex-col gap-3">
+          <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+            <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">AI Coach</h2>
+            <div className="mt-2 flex flex-col gap-1.5 overflow-y-auto">
+              {tips.slice(0, coachExpanded ? tips.length : 1).map((tip: CoachTip) => (
+                <div key={tip.id} className={`rounded-lg border p-2 text-[11px] ${toneClasses(tip.level)}`}>
+                  <p className="font-semibold leading-snug">{tip.title}</p>
+                  <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{tip.text}</p>
+                </div>
+              ))}
+            </div>
+            {tips.length > 1 && (
+              <button
+                onClick={() => setCoachExpanded((v) => !v)}
+                className="mt-1.5 flex items-center justify-center gap-1 rounded-md py-1 text-[10.5px] font-semibold text-muted transition-colors hover:text-ink"
+              >
+                {coachExpanded ? "Mostrar menos" : `+${tips.length - 1} insights`}
+                <ChevronDown size={12} className={`transition-transform ${coachExpanded ? "rotate-180" : ""}`} />
+              </button>
+            )}
+          </section>
+
+          {/* Widget de Metas — so leitura + progresso + excluir. Criar
+              nova meta e' so pelo icone Target (abre modal de criacao). */}
+          <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+            <div className="flex items-center gap-1.5">
+              <Target size={12} className="text-review" />
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Metas</h2>
+            </div>
+            {goalsProgress.length === 0 ? (
+              <p className="mt-2 text-[11px] text-muted">Nenhuma meta ativa. Use o icone de alvo pra criar.</p>
+            ) : (
+              <div className="mt-2 flex flex-col gap-2">
+                {goalsProgress.map(({ goal, current, pct }) => (
+                  <div key={goal.id}>
+                    <div className="flex items-center justify-between">
+                      <p className="text-[11px] font-semibold capitalize">
+                        {goal.type === "volume" ? "Volume" : "Estudo"} · {goal.period}
+                      </p>
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[10px] text-muted">
+                          {current}/{goal.target}
+                        </span>
+                        <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-colors hover:text-negative">
+                          <Trash2 size={11} />
+                        </button>
+                      </div>
+                    </div>
+                    <div className="mt-1 h-1 w-full overflow-hidden rounded-full bg-void/40">
+                      <div
+                        className="h-full rounded-full bg-gradient-to-r from-review to-evolution transition-[width]"
+                        style={{ width: `${pct}%` }}
+                      />
+                    </div>
+                    {goal.type === "estudo" && (
+                      <div className="mt-1.5 flex gap-1">
+                        {[30, 60, 90].map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => handleQuickStudy(m)}
+                            className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                          >
+                            +{m}min
+                          </button>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
+          </section>
+
+          {/* Widget de BRM — so a leitura automatica. Editar thresholds
+              e calculadora ficam no icone Gauge (modal de criacao). */}
+          <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+            <div className="flex items-center gap-1.5">
+              <Gauge size={12} className="text-training" />
+              <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">BRM</h2>
+            </div>
+            {currentBrm ? (
+              <div className="mt-2">
+                <span
+                  className={`rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.06em] ${
+                    currentBrm.status === "moveup"
+                      ? "bg-positive/15 text-positive"
+                      : currentBrm.status === "movedown"
+                        ? "bg-negative/15 text-negative"
+                        : "bg-void/40 text-muted"
+                  }`}
+                >
+                  {currentBrm.status === "moveup" ? "Pode subir" : currentBrm.status === "movedown" ? "Desca de stake" : "Mantenha"}
+                </span>
+                <p className="mt-1.5 text-[11px] text-muted">
+                  <span className="font-semibold text-ink">{currentBrm.format}</span> · cobre{" "}
+                  <span className="font-semibold text-ink">{currentBrm.buyInsCovered}</span> buy-ins
+                </p>
+              </div>
+            ) : (
+              <p className="mt-2 text-[11px] text-muted">Registre sessoes pra ver sua leitura de BRM.</p>
+            )}
+          </section>
+        </div>
       </div>
 
-      {/* Metas de volume e estudo — agora em modal (icone Target no
-          atalho), a lista completa nao fica mais sempre visivel. */}
-      <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Metas">
-        <div className="flex items-center justify-end">
+      {/* Metas — modal agora e' SO criacao (pedido explicito). O que ja
+          foi criado (progresso, excluir) mora no widget fixo ao lado do
+          grafico, nao aqui. */}
+      <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+          <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm">
+            <option value="volume">Volume (sessoes)</option>
+            <option value="estudo">Estudo (horas)</option>
+          </select>
+          <select value={goalPeriod} onChange={(e) => setGoalPeriod(e.target.value as GoalPeriod)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm">
+            <option value="semanal">Semanal</option>
+            <option value="mensal">Mensal</option>
+          </select>
+          <input
+            placeholder="Meta (numero)"
+            value={goalTarget}
+            onChange={(e) => setGoalTarget(e.target.value)}
+            className="col-span-2 rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm sm:col-span-1"
+          />
           <button
-            onClick={() => setShowGoalForm((v) => !v)}
-            className="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase text-muted transition-colors hover:text-ink"
+            onClick={handleAddGoal}
+            className="col-span-2 rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90 sm:col-span-4"
           >
-            {showGoalForm ? "Cancelar" : "+ Meta"}
+            Criar meta
           </button>
         </div>
-
-        {showGoalForm && (
-          <div className="mt-3 grid grid-cols-2 gap-2 rounded-lg border border-hairline bg-elevated p-3 sm:grid-cols-4">
-            <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm">
-              <option value="volume">Volume (sessoes)</option>
-              <option value="estudo">Estudo (horas)</option>
-            </select>
-            <select value={goalPeriod} onChange={(e) => setGoalPeriod(e.target.value as GoalPeriod)} className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm">
-              <option value="semanal">Semanal</option>
-              <option value="mensal">Mensal</option>
-            </select>
-            <input
-              placeholder="Meta (numero)"
-              value={goalTarget}
-              onChange={(e) => setGoalTarget(e.target.value)}
-              className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
-            />
-            <button onClick={handleAddGoal} className="rounded-lg bg-ink text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90">
-              Salvar
-            </button>
-          </div>
-        )}
-
-        {goalsProgress.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">Nenhuma meta ativa. Crie uma meta de volume ou estudo pra acompanhar aqui.</p>
-        ) : (
-          <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {goalsProgress.map(({ goal, current, pct }) => (
-              <div key={goal.id} className="rounded-lg border border-hairline bg-elevated p-3 transition-colors hover:border-ink/30">
-                <div className="flex items-center justify-between">
-                  <p className="text-sm font-semibold capitalize">
-                    {goal.type === "volume" ? "Volume" : "Estudo"} · {goal.period}
-                  </p>
-                  <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-colors hover:text-negative">
-                    <Trash2 size={13} />
-                  </button>
-                </div>
-                <p className="mt-0.5 text-xs text-muted">
-                  {current} / {goal.target} {goal.unit}
-                </p>
-                <div className="mt-2 h-1.5 w-full overflow-hidden rounded-full bg-void/40">
-                  <div
-                    className="h-full rounded-full bg-gradient-to-r from-review to-evolution transition-[width]"
-                    style={{ width: `${pct}%` }}
-                  />
-                </div>
-                {goal.type === "estudo" && (
-                  <div className="mt-2 flex gap-1.5">
-                    {[30, 60, 90].map((m) => (
-                      <button
-                        key={m}
-                        onClick={() => handleQuickStudy(m)}
-                        className="rounded-md border border-hairline px-2 py-1 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-                      >
-                        +{m}min
-                      </button>
-                    ))}
-                  </div>
-                )}
-              </div>
-            ))}
-          </div>
-        )}
       </Modal>
 
-      {/* BRM: moveup/movedown por formato — leitura atual sempre visivel
-          (compacta, 1 linha), edicao dos thresholds fica atras de um
-          "Editar" pra nao pesar a tela. Agora em modal (icone Gauge no
-          atalho) em vez de sempre visivel. */}
+      {/* BRM — modal agora e' so calculadora + edicao de thresholds
+          (pedido explicito: icones so pra criar/configurar). A leitura
+          automatica (o "resultado ja criado") mora no widget fixo ao
+          lado do grafico, nao aqui. */}
       <Modal open={brmModalOpen} onClose={() => setBrmModalOpen(false)} title="BRM — moveup / movedown">
         {/* Calculadora: o jogador digita um buy-in hipotetico (nao precisa
             ser o que ele jogou de fato) e ve na hora quantos buy-ins a
@@ -573,46 +764,68 @@ export default function BankrollPage() {
           )}
         </div>
 
-        <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em] text-muted">Leitura automatica (baseada nas ultimas sessoes)</p>
-        <div className="flex items-center justify-end">
-          <button
-            onClick={() => setShowBrmEdit((v) => !v)}
-            className="rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase text-muted transition-colors hover:text-ink"
-          >
-            {showBrmEdit ? "Fechar" : "Editar"}
-          </button>
+        <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em] text-muted">Thresholds por formato</p>
+        <div className="mt-2 flex flex-col gap-2">
+          {brmThresholds.map((t) => (
+            <BrmThresholdRow key={t.format} threshold={t} onSave={handleSaveBrmThreshold} />
+          ))}
         </div>
 
-        {currentBrm ? (
-          <div className="mt-3 flex items-center gap-3 rounded-lg border border-hairline bg-elevated p-3">
-            <span
-              className={`rounded-full px-2.5 py-1 text-[10px] font-bold uppercase tracking-[0.08em] ${
-                currentBrm.status === "moveup"
-                  ? "bg-positive/15 text-positive"
-                  : currentBrm.status === "movedown"
-                    ? "bg-negative/15 text-negative"
-                    : "bg-void/40 text-muted"
-              }`}
-            >
-              {currentBrm.status === "moveup" ? "Pode subir" : currentBrm.status === "movedown" ? "Desca de stake" : "Mantenha"}
-            </span>
-            <p className="text-sm text-muted">
-              <span className="font-semibold text-ink">{currentBrm.format}</span> · banca cobre{" "}
-              <span className="font-semibold text-ink">{currentBrm.buyInsCovered}</span> buy-ins de{" "}
-              {fmtMoney(currentBrm.avgBuyIn)}{" "}
-              <span className="text-muted">
-                (moveup {currentBrm.threshold.moveupBuyins} · movedown {currentBrm.threshold.movedownBuyins})
-              </span>
+        {/* Risco de ruina (Monte Carlo simplificado, bootstrap sobre os
+            resultados historicos reais) — so aparece com amostra minima
+            (15 sessoes), senao o numero nao significa nada. */}
+        {ruin && (
+          <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
+            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-muted">
+              <ShieldAlert size={13} className="text-negative" /> Risco de ruína
+            </p>
+            <p className="mt-1.5 text-sm text-muted">
+              <span className={`font-bold ${ruin.ruinPct >= 20 ? "text-negative" : ruin.ruinPct >= 8 ? "text-evolution" : "text-positive"}`}>
+                {ruin.ruinPct}%
+              </span>{" "}
+              de chance de zerar a banca em {ruin.horizonSessions} sessões, simulado {ruin.simulations}x a partir das
+              suas {ruin.sampleSize} sessões reais.
             </p>
           </div>
-        ) : (
-          <p className="mt-3 text-sm text-muted">Registre sessoes pra ver sua leitura de BRM aqui.</p>
         )}
+      </Modal>
 
-        {showBrmEdit && (
-          <div className="mt-3 flex flex-col gap-2">
-            {brmThresholds.map((t) => (
-              <BrmThresholdRow key={t.format} threshold={t} onSave={handleSaveBrmThreshold} />
+      {/* Anotacoes no grafico ("subi pra NL100 aqui") — criar + listar
+          (com excluir). Os marcadores ja aparecem direto no grafico. */}
+      <Modal open={annoModalOpen} onClose={() => setAnnoModalOpen(false)} title="Anotações no gráfico">
+        <div className="grid grid-cols-[auto_1fr] gap-2">
+          <input
+            type="date"
+            value={annoDate}
+            onChange={(e) => setAnnoDate(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm"
+          />
+          <input
+            placeholder="Ex: Subi pra NL100"
+            value={annoNote}
+            onChange={(e) => setAnnoNote(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && handleAddAnnotation()}
+            className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm"
+          />
+        </div>
+        <button
+          onClick={handleAddAnnotation}
+          className="mt-2 w-full rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-opacity hover:opacity-90"
+        >
+          Adicionar
+        </button>
+
+        {annotations.length > 0 && (
+          <div className="mt-4 flex flex-col gap-1.5">
+            {[...annotations].reverse().map((a) => (
+              <div key={a.id} className="flex items-center justify-between gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2">
+                <p className="text-xs text-ink">
+                  <span className="text-muted">{a.date}</span> · {a.note}
+                </p>
+                <button onClick={() => handleRemoveAnnotation(a.id)} className="shrink-0 text-muted transition-colors hover:text-negative">
+                  <Trash2 size={13} />
+                </button>
+              </div>
             ))}
           </div>
         )}
@@ -924,12 +1137,16 @@ function StatCard({
   tone,
   icon,
   accent,
+  delta,
 }: {
   label: string;
   value: string;
   tone?: "positive" | "negative" | "training" | "evolution";
   icon?: React.ReactNode;
   accent: string;
+  // Variacao vs periodo anterior (pedido explicito) — linha pequena
+  // abaixo do valor, so quando faz sentido comparar (Resultado/ROI).
+  delta?: { text: string; positive: boolean };
 }) {
   const color =
     tone === "positive"
@@ -952,6 +1169,11 @@ function StatCard({
         {label}
       </p>
       <p className={`relative mt-1.5 text-lg font-bold tabular-nums ${color}`}>{value}</p>
+      {delta && (
+        <p className={`relative mt-0.5 text-[10px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
+          {delta.positive ? "▲" : "▼"} {delta.text}
+        </p>
+      )}
     </div>
   );
 }
@@ -1070,7 +1292,7 @@ function Modal({
 // visualmente com o dado principal.
 const Y_TICKS = 4;
 
-function EvolutionChart({ series }: { series: SeriesPoint[] }) {
+function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; annotations?: Annotation[] }) {
   if (series.length < 2) {
     return <p className="text-sm text-muted">Registre ao menos 2 sessoes para ver o grafico.</p>;
   }
@@ -1116,6 +1338,18 @@ function EvolutionChart({ series }: { series: SeriesPoint[] }) {
     xTickCount === 1 ? 0 : Math.round((i / (xTickCount - 1)) * (series.length - 1))
   );
 
+  // Anotacoes ("subi pra NL100 aqui"): so plota as que caem numa data com
+  // ponto na serie visivel (o grafico so tem eixo X nos dias com sessao,
+  // nao e' uma escala continua de calendario). Cada anotacao vira uma
+  // linha vertical pontilhada + circulo pequeno, com o texto no title
+  // (tooltip nativo) pra nao precisar de um componente de tooltip custom.
+  const plottedAnnotations = annotations
+    .map((a) => {
+      const idx = series.findIndex((p) => p.date === a.date);
+      return idx === -1 ? null : { ...a, x: xAt(idx) };
+    })
+    .filter((a): a is Annotation & { x: number } => a !== null);
+
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-56 w-full overflow-visible">
       <defs>
@@ -1157,6 +1391,26 @@ function EvolutionChart({ series }: { series: SeriesPoint[] }) {
         >
           {series[idx].label}
         </text>
+      ))}
+
+      {/* Marcadores de anotacao — atras da linha principal (zIndex visual
+          via ordem no SVG), pra nao competir com o dado. */}
+      {plottedAnnotations.map((a) => (
+        <g key={a.id}>
+          <line
+            x1={a.x}
+            y1={padT}
+            x2={a.x}
+            y2={padT + plotH}
+            stroke="var(--color-review)"
+            strokeWidth={1}
+            strokeDasharray="3,3"
+            opacity={0.45}
+          />
+          <circle cx={a.x} cy={padT + 6} r={3.5} fill="var(--color-review)">
+            <title>{`${a.date} · ${a.note}`}</title>
+          </circle>
+        </g>
       ))}
 
       <path d={areaPath} fill={`url(#${gradId})`} stroke="none" />
