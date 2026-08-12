@@ -150,6 +150,36 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
 // raises reais (>= 0.5bb) continuam aparecendo normalmente.
 const MIN_COMMITTED_TO_SHOW = 0.5;
 
+// Pilha de fichas parada — "as apostas" — voltou pro fluxo normal do
+// layout do assento (nao mais ancorada no avatar). Pedido explicito:
+// "nao quero as apostas grudadas na posicao, mantenha do jeito que
+// estava antes". Componente pequeno reaproveitado tanto pro hero (ao
+// lado/acima das cartas) quanto pros demais assentos (abaixo do bloco).
+function CommittedPill({ amount }: { amount: number }) {
+  return (
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 4,
+        background: "#0A0A0A",
+        border: "1px solid rgba(255,255,255,.18)",
+        borderRadius: 999,
+        padding: "2px 8px 2px 4px",
+        boxShadow: "0 3px 8px rgba(0,0,0,.5)",
+        animation: "fadeInUp 220ms ease-out both",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <ChipStackIcon size={11} />
+      <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: TEXT.critical, ...num }}>
+        {amount}
+        <span style={{ fontSize: 9, fontWeight: 500, color: TEXT.secondary, marginLeft: 2 }}>bb</span>
+      </span>
+    </div>
+  );
+}
+
 function Seat({
   seat, state, committed, isDealer,
 }: {
@@ -180,8 +210,14 @@ function Seat({
     ? { flexDirection: "column", alignItems: "center", gap: 6 }
     : (
         {
+          // Gap reduzido pra "above" (6 -> 2) — pedido explicito: "o
+          // vilao de cima esta com as cartas quase no meio da mesa".
+          // Direcao trocada de column-reverse pra column simples — a
+          // ordem visual agora e' controlada explicitamente no JSX
+          // (cardsBlock antes de seatInfo pra "above"), mais previsivel
+          // que depender da inversao do flex-direction.
           below: { flexDirection: "column", gap: 6 },
-          above: { flexDirection: "column-reverse", gap: 6 },
+          above: { flexDirection: "column", gap: 2 },
           left: { flexDirection: "row-reverse", alignItems: "center", gap: 12 },
           right: { flexDirection: "row", alignItems: "center", gap: 12 },
         } as const
@@ -202,41 +238,17 @@ function Seat({
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 3 }}>
       <div style={{ position: "relative", width: 46, height: 46 }}>
-        {/* Badge da ficha parada — ANCORADO no canto do proprio avatar,
-            posicao fixa (top/right) igual pra TODOS os assentos, em vez
-            de calcular um ponto "puxado pro centro" (que colidia com as
-            cartas do hero, com o board e com o botao do dealer — 3 bugs
-            reportados nesse mesmo calculo). Sugestao aplicada: espaco
-            uniforme por assento, sem matemática dinâmica frágil. */}
-        {!!committed && committed >= MIN_COMMITTED_TO_SHOW && (
-          <div
-            style={{
-              position: "absolute",
-              top: -9,
-              right: -16,
-              zIndex: 6,
-              display: "flex",
-              alignItems: "center",
-              gap: 3,
-              background: "#0A0A0A",
-              border: "1px solid rgba(255,255,255,.18)",
-              borderRadius: 999,
-              padding: "2px 7px 2px 3px",
-              boxShadow: "0 3px 8px rgba(0,0,0,.6)",
-              animation: "fadeInUp 220ms ease-out both",
-              whiteSpace: "nowrap",
-            }}
-          >
-            <ChipStackIcon size={11} />
-            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: TEXT.critical, ...num }}>
-              {committed}
-              <span style={{ fontSize: 9, fontWeight: 500, color: TEXT.secondary, marginLeft: 2 }}>bb</span>
-            </span>
-          </div>
-        )}
+        {/* Ficha parada voltou pro fluxo normal (fora do avatar) — pedido
+            explicito: "nao quero as apostas grudadas na posicao, mantenha
+            do jeito que estava antes". So o dealer continua ancorado aqui;
+            a ficha parada agora e' renderizada perto das cartas de cada
+            assento (ver commitedChipsBlock mais abaixo, e o layout do
+            hero especifico). */}
 
-        {/* Badge do dealer — mesmo raciocinio: ancorado no avatar do
-            assento BTN, canto oposto ao da ficha, nunca sobre as cartas. */}
+        {/* Badge do dealer — vermelho, "D" branco, mesmo formato/anel das
+            fichas de poker (ChipStackIcon), um pouco maior. Pedido
+            explicito: "cor do botao em vermelho com a escrita D em
+            branco... igual ao formato das fichas, so que um pouco maior". */}
         {isDealer && (
           <div
             style={{
@@ -244,19 +256,18 @@ function Seat({
               bottom: -6,
               left: -10,
               zIndex: 6,
-              width: 18,
-              height: 18,
+              width: 22,
+              height: 22,
               borderRadius: "50%",
-              background: "linear-gradient(160deg, #FFFFFF, #D8D8D8)",
-              border: "1px solid rgba(0,0,0,.3)",
-              boxShadow: "0 2px 5px rgba(0,0,0,.5)",
+              background: "#B91C1C",
+              boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.55)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontFamily: F,
-              fontSize: 9,
+              fontSize: 10.5,
               fontWeight: 700,
-              color: "#111111",
+              color: "#FFFFFF",
             }}
           >
             D
@@ -365,12 +376,23 @@ function Seat({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", ...layout }}>
         {hero ? (
           <>
+            {/* Ficha da aposta acima das cartas do hero (nao mais grudada
+                no avatar) — pedido explicito: "as apostas serem
+                visualizadas ao lado ou em cima das cartas". Quando ha
+                aposta, empurra as cartas um pouco pra baixo (marginTop)
+                pra abrir espaco — "a carta do hero pode baixar um pouco
+                mais". */}
+            {!!committed && committed >= MIN_COMMITTED_TO_SHOW && (
+              <div style={{ marginBottom: 2 }}>
+                <CommittedPill amount={committed} />
+              </div>
+            )}
             {cards && cards.length > 0 && (
               // Cards do hero: tamanho "board" (mesmo das cartas comunitarias),
               // sem rotacao. Antes usava size="hero" (bem maior) em layout
               // row — pedido explicito: diminuir e trocar pro mesmo padrao
               // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
-              <div style={{ display: "flex", gap: 5 }}>
+              <div style={{ display: "flex", gap: 5, marginTop: committed && committed >= MIN_COMMITTED_TO_SHOW ? 4 : 0 }}>
                 {cards.map((c, i) => (
                   <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
                     <Card card={c} size="board" />
@@ -381,9 +403,8 @@ function Seat({
             {seatInfo}
           </>
         ) : (
-          <>
-            {seatInfo}
-            {revealedVillainCards ? (
+          (() => {
+            const cardsBlock = revealedVillainCards ? (
               <div style={{ display: "flex", gap: 5 }}>
                 {cards!.map((c, i) => (
                   <div key={i} style={{ transform: `rotate(${i ? 4 : -4}deg)`, animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
@@ -392,16 +413,43 @@ function Seat({
                 ))}
               </div>
             ) : (
-              facedown && <CardBackPair side="left" />
-              // Sentido do verso padronizado (pedido explicito: "quero
-              // todas viradas no mesmo sentido... do lado direito deixar
-              // igual do lado esquerdo") — antes variava conforme o lado
-              // da mesa (seat.cardSide), agora e' sempre "left" pra todo
-              // mundo, independente de onde o assento fica.
-            )}
-          </>
+              facedown && <CardBackPair side="right" />
+              // Leque mais sutil (pedido explicito) — angulo reduzido
+              // diretamente no card.tsx (CardBackPair), nao aqui.
+            );
+            // Ordem trocada explicitamente por cardSide em vez de depender
+            // de flex-direction reverso (mais previsivel) — pedido
+            // explicito: "o vilao de cima esta com as cartas quase no
+            // meio da mesa". Pra assentos "above" (topo da mesa), as
+            // cartas ficam ANTES do seatInfo no fluxo, ou seja, mais
+            // proximas da borda superior (longe do centro); pra "below"/
+            // "left"/"right", mantem a ordem original (seatInfo primeiro).
+            if (seat.cardSide === "above") {
+              return (
+                <>
+                  {cardsBlock}
+                  {seatInfo}
+                </>
+              );
+            }
+            return (
+              <>
+                {seatInfo}
+                {cardsBlock}
+              </>
+            );
+          })()
         )}
       </div>
+
+      {/* Ficha da aposta pros demais assentos — voltou pro fluxo normal,
+          abaixo do bloco inteiro do assento, do jeito que estava antes
+          da tentativa de ancorar no avatar. */}
+      {!hero && !!committed && committed >= MIN_COMMITTED_TO_SHOW && (
+        <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
+          <CommittedPill amount={committed} />
+        </div>
+      )}
     </div>
   );
 }
