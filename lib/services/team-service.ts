@@ -19,6 +19,58 @@ export interface Team {
   name: string;
   accent: string;
   ownerId: string | null;
+  description: string | null;
+  logoUrl: string | null;
+  createdAt: string | null;
+}
+
+export interface TeamLabel {
+  id: string;
+  name: string;
+  color: string;
+  sortOrder: number;
+}
+
+export interface TeamInfo extends Team {
+  totalJogadores: number;
+  totalCoaches: number;
+  totalPendentes: number;
+}
+
+export interface TeamStaff {
+  userId: string;
+  nome: string;
+  avatarId: number;
+  avatarUrl: string | null;
+  role: TeamRole;
+  isCoach: boolean;
+  joinedAt: string;
+  jogadores: number;
+}
+
+export interface PendingMember {
+  userId: string;
+  nome: string;
+  avatarId: number;
+  avatarUrl: string | null;
+  role: TeamRole;
+  requestedAt: string;
+}
+
+export interface FinancialDay {
+  dia: string;
+  resultado: number;
+  acumulado: number;
+  sessoes: number;
+}
+
+// Adesao do proprio usuario — inclui o estado 'pendente', que
+// my_team_id() esconde de proposito.
+export interface MyMembership {
+  teamId: string;
+  teamName: string;
+  role: TeamRole;
+  status: "pendente" | "ativo";
 }
 
 export interface TeamMember {
@@ -112,12 +164,17 @@ export async function fetchMyTeam(): Promise<MyTeam | null> {
     .from("team_members")
     .select("team_id, role")
     .eq("user_id", meId)
+    .eq("status", "ativo")
     .maybeSingle();
   if (eMine) throw eMine;
   if (!mine) return null;
 
   const [{ data: teamRow, error: eTeam }, { data: memberRows, error: eMembers }] = await Promise.all([
-    supabase.from("teams").select("id, name, accent, owner_id").eq("id", mine.team_id).maybeSingle(),
+    supabase
+      .from("teams")
+      .select("id, name, accent, owner_id, description, logo_url, created_at")
+      .eq("id", mine.team_id)
+      .maybeSingle(),
     supabase
       .from("team_members")
       .select("user_id, role, is_coach, coach_id, joined_at")
@@ -155,7 +212,15 @@ export async function fetchMyTeam(): Promise<MyTeam | null> {
     .sort((a, b) => ordem[a.role] - ordem[b.role] || a.name.localeCompare(b.name));
 
   return {
-    team: { id: teamRow.id, name: teamRow.name, accent: teamRow.accent, ownerId: teamRow.owner_id },
+    team: {
+      id: teamRow.id,
+      name: teamRow.name,
+      accent: teamRow.accent,
+      ownerId: teamRow.owner_id,
+      description: teamRow.description ?? null,
+      logoUrl: teamRow.logo_url ?? null,
+      createdAt: teamRow.created_at ?? null,
+    },
     role: mine.role as TeamRole,
     members,
   };
@@ -315,6 +380,12 @@ export interface TeamDashboardRow {
   // respeita o filtro de periodo do painel, e' contagem de vida no time.
   jogosNoTime: number;
   lucroNoTime: number;
+  avatarId: number;
+  avatarUrl: string | null;
+  joinedAt: string;
+  labelId: string | null;
+  labelName: string | null;
+  labelColor: string | null;
 }
 
 export interface TeamActivityDay {
@@ -326,9 +397,13 @@ export interface TeamActivityDay {
 
 export interface TeamLeak {
   reasonCode: string;
+  street: string;
   label: string;
   total: number;
   jogadores: number;
+  drillId: string | null;
+  drillTitle: string | null;
+  treinavel: boolean;
 }
 
 export async function fetchTeamDashboard(days = 30): Promise<TeamDashboardRow[]> {
@@ -352,6 +427,12 @@ export async function fetchTeamDashboard(days = 30): Promise<TeamDashboardRow[]>
     xpPeriodo: r.xp_periodo ?? 0,
     jogosNoTime: r.jogos_no_time ?? 0,
     lucroNoTime: Number(r.lucro_no_time ?? 0),
+    avatarId: r.avatar_id ?? 1,
+    avatarUrl: r.avatar_url ?? null,
+    joinedAt: r.joined_at,
+    labelId: r.label_id ?? null,
+    labelName: r.label_name ?? null,
+    labelColor: r.label_color ?? null,
   }));
 }
 
@@ -377,10 +458,34 @@ export async function fetchTeamLeaks(days = 30, limit = 8): Promise<TeamLeak[]> 
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return ((data ?? []) as any[]).map((r) => ({
     reasonCode: r.reason_code,
+    street: r.street,
     label: r.label,
     total: r.total ?? 0,
     jogadores: r.jogadores ?? 0,
+    drillId: r.drill_id ?? null,
+    drillTitle: r.drill_title ?? null,
+    treinavel: Boolean(r.treinavel),
   }));
+}
+
+// Atribui o drill de um leak a todos os jogadores afetados no escopo de
+// quem chama. Retorna quantos jogadores realmente receberam (alguns
+// podem ja estar no cooldown de 3 dias e ficam de fora silenciosamente).
+export async function assignTeamDrill(
+  reasonCode: string,
+  street: string,
+  drillId: string,
+  days = 30
+): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("assign_team_drill", {
+    p_reason_code: reasonCode,
+    p_street: street,
+    p_drill_id: drillId,
+    p_days: days,
+  });
+  if (error) throw error;
+  return (data as number) ?? 0;
 }
 
 // Atribui (ou remove) o coach responsavel por um jogador. O banco valida
@@ -408,6 +513,13 @@ export function diasSemAtividade(lastActivityAt: string | null): number | null {
 // Tudo passa por RPCs security definer que validam quem pode olhar:
 // admin do time, coach responsavel pelo jogador, ou o proprio jogador.
 
+export interface PeriodComparison {
+  treinosAtual: number; treinosAnterior: number;
+  acertosAtual: number; acertosAnterior: number;
+  revisadasAtual: number; revisadasAnterior: number;
+  xpAtual: number; xpAnterior: number;
+}
+
 export interface PlayerDetail {
   userId: string;
   nome: string;
@@ -430,6 +542,10 @@ export interface PlayerDetail {
   maosCompartilhadas: number;
   xpPeriodo: number;
   missoesConcluidas: number;
+  jogosNoTime: number;
+  lucroNoTime: number;
+  treinosPeriodoAnterior: number;
+  acertosGtoPeriodoAnterior: number;
 }
 
 export interface PlayerActivityDay {
@@ -478,6 +594,40 @@ export async function fetchPlayerDetail(playerId: string, days = 30): Promise<Pl
     maosCompartilhadas: r.maos_compartilhadas ?? 0,
     xpPeriodo: r.xp_periodo ?? 0,
     missoesConcluidas: r.missoes_concluidas ?? 0,
+    jogosNoTime: r.jogos_no_time ?? 0,
+    lucroNoTime: Number(r.lucro_no_time ?? 0),
+    treinosPeriodoAnterior: r.treinos_periodo_anterior ?? 0,
+    acertosGtoPeriodoAnterior: r.acertos_gto_periodo_anterior ?? 0,
+  };
+}
+
+export async function fetchPlayerFinancialSeries(playerId: string, days = 30): Promise<FinancialDay[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_player_financial_series", { p_player: playerId, p_days: days });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    dia: r.dia,
+    resultado: Number(r.resultado ?? 0),
+    acumulado: Number(r.acumulado ?? 0),
+    sessoes: r.sessoes ?? 0,
+  }));
+}
+
+export async function fetchPeriodComparison(days = 30): Promise<PeriodComparison> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_period_comparison", { p_days: days });
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  return {
+    treinosAtual: r?.treinos_atual ?? 0,
+    treinosAnterior: r?.treinos_anterior ?? 0,
+    acertosAtual: r?.acertos_atual ?? 0,
+    acertosAnterior: r?.acertos_anterior ?? 0,
+    revisadasAtual: r?.revisadas_atual ?? 0,
+    revisadasAnterior: r?.revisadas_anterior ?? 0,
+    xpAtual: r?.xp_atual ?? 0,
+    xpAnterior: r?.xp_anterior ?? 0,
   };
 }
 
@@ -494,7 +644,13 @@ export async function fetchPlayerActivity(playerId: string, days = 30): Promise<
   }));
 }
 
-export async function fetchPlayerLeaks(playerId: string, days = 30, limit = 6): Promise<TeamLeak[]> {
+export interface PlayerLeak {
+  reasonCode: string;
+  label: string;
+  total: number;
+}
+
+export async function fetchPlayerLeaks(playerId: string, days = 30, limit = 6): Promise<PlayerLeak[]> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("team_player_leaks", {
     p_player: playerId,
@@ -507,7 +663,6 @@ export async function fetchPlayerLeaks(playerId: string, days = 30, limit = 6): 
     reasonCode: r.reason_code,
     label: r.label,
     total: r.total ?? 0,
-    jogadores: 1,
   }));
 }
 
@@ -574,4 +729,225 @@ export async function fetchPlayerAlerts(playerId: string, limit = 10): Promise<T
     detail: r.detail,
     createdAt: r.created_at,
   }));
+}
+
+// ============================================================
+// Identidade do time, etiquetas e fila de aprovacao
+// ============================================================
+
+export async function fetchTeamInfo(): Promise<TeamInfo | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_info");
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) return null;
+  return {
+    id: r.id,
+    name: r.name,
+    accent: r.accent,
+    ownerId: r.owner_id ?? null,
+    description: r.description ?? null,
+    logoUrl: r.logo_url ?? null,
+    createdAt: r.created_at ?? null,
+    totalJogadores: r.total_jogadores ?? 0,
+    totalCoaches: r.total_coaches ?? 0,
+    totalPendentes: r.total_pendentes ?? 0,
+  };
+}
+
+export async function fetchTeamStaff(): Promise<TeamStaff[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_staff");
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    userId: r.user_id,
+    nome: r.nome,
+    avatarId: r.avatar_id ?? 1,
+    avatarUrl: r.avatar_url ?? null,
+    role: r.role as TeamRole,
+    isCoach: Boolean(r.is_coach),
+    joinedAt: r.joined_at,
+    jogadores: r.jogadores ?? 0,
+  }));
+}
+
+export async function updateTeamInfo(patch: {
+  name?: string;
+  description?: string | null;
+  accent?: string;
+  logoUrl?: string | null;
+}) {
+  const supabase = createClient();
+  const teamId = (await fetchTeamInfo())?.id;
+  if (!teamId) throw new Error("SEM_TIME");
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name;
+  if (patch.description !== undefined) row.description = patch.description;
+  if (patch.accent !== undefined) row.accent = patch.accent;
+  if (patch.logoUrl !== undefined) row.logo_url = patch.logoUrl;
+  const { error } = await supabase.from("teams").update(row).eq("id", teamId);
+  if (error) throw error;
+}
+
+// Logo vai pro bucket publico team-logos, sempre em <team_id>/ — a
+// policy de storage exige essa pasta e papel de admin/coach.
+export async function uploadTeamLogo(teamId: string, file: File): Promise<string> {
+  const supabase = createClient();
+  const ext = (file.name.split(".").pop() || "png").toLowerCase();
+  const path = `${teamId}/logo-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from("team-logos").upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from("team-logos").getPublicUrl(path);
+  await updateTeamInfo({ logoUrl: data.publicUrl });
+  return data.publicUrl;
+}
+
+export async function fetchTeamLabels(teamId: string): Promise<TeamLabel[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("team_labels")
+    .select("id, name, color, sort_order")
+    .eq("team_id", teamId)
+    .order("sort_order");
+  if (error) throw error;
+  return (data ?? []).map((r) => ({ id: r.id, name: r.name, color: r.color, sortOrder: r.sort_order }));
+}
+
+export async function createLabel(teamId: string, name: string, color: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_labels").insert({ team_id: teamId, name: name.trim(), color });
+  if (error) throw error;
+}
+
+export async function deleteLabel(labelId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_labels").delete().eq("id", labelId);
+  if (error) throw error;
+}
+
+// Uma etiqueta por jogador — passar null remove.
+export async function setMemberLabel(userId: string, labelId: string | null) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_members").update({ label_id: labelId }).eq("user_id", userId);
+  if (error) throw error;
+}
+
+export async function fetchPendingMembers(): Promise<PendingMember[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_pending_members");
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    userId: r.user_id,
+    nome: r.nome,
+    avatarId: r.avatar_id ?? 1,
+    avatarUrl: r.avatar_url ?? null,
+    role: r.role as TeamRole,
+    requestedAt: r.requested_at,
+  }));
+}
+
+export async function approveMember(userId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("approve_team_member", { p_user: userId });
+  if (error) throw error;
+}
+
+export async function rejectMember(userId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("reject_team_member", { p_user: userId });
+  if (error) throw error;
+}
+
+export async function fetchMyMembership(): Promise<MyMembership | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("my_membership");
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) return null;
+  return { teamId: r.team_id, teamName: r.team_name, role: r.role, status: r.status };
+}
+
+export async function fetchFinancialSeries(days = 30): Promise<FinancialDay[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_financial_series", { p_days: days });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    dia: r.dia,
+    resultado: Number(r.resultado ?? 0),
+    acumulado: Number(r.acumulado ?? 0),
+    sessoes: r.sessoes ?? 0,
+  }));
+}
+
+// ============================================================
+// Metas por jogador (definidas pelo coach/admin)
+// ============================================================
+// Janela rolante (7 ou 30 dias a partir de agora), nao calendario fixo
+// — meta "revisar 5 mãos por semana" e' um padrao continuo.
+
+export type GoalMetric = "treinos" | "maos_revisadas" | "maos_compartilhadas";
+export type GoalPeriod = "semana" | "mes";
+
+export const METRICA_LABEL: Record<GoalMetric, string> = {
+  treinos: "Treinos",
+  maos_revisadas: "Mãos revisadas",
+  maos_compartilhadas: "Mãos compartilhadas",
+};
+
+export interface PlayerGoal {
+  id: string;
+  metric: GoalMetric;
+  period: GoalPeriod;
+  target: number;
+  active: boolean;
+  createdAt: string;
+  createdBy: string;
+  progress: number;
+  janelaDias: number;
+  atingida: boolean;
+}
+
+export async function fetchPlayerGoals(playerId: string): Promise<PlayerGoal[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_player_goals_progress", { p_player: playerId });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    id: r.id,
+    metric: r.metric as GoalMetric,
+    period: r.period as GoalPeriod,
+    target: r.target,
+    active: r.active,
+    createdAt: r.created_at,
+    createdBy: r.created_by,
+    progress: r.progress ?? 0,
+    janelaDias: r.janela_dias,
+    atingida: Boolean(r.atingida),
+  }));
+}
+
+export async function createPlayerGoal(
+  playerId: string,
+  metric: GoalMetric,
+  period: GoalPeriod,
+  target: number
+): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("create_player_goal", {
+    p_player: playerId,
+    p_metric: metric,
+    p_period: period,
+    p_target: target,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function deactivatePlayerGoal(goalId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("deactivate_player_goal", { p_goal: goalId });
+  if (error) throw error;
 }
