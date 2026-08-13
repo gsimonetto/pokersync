@@ -160,7 +160,12 @@ const MIN_COMMITTED_TO_SHOW = 0.5;
 // mesa — sempre dentro do oval, bem proxima da posicao (pouco deslocamento,
 // pedido explicito), nunca colada no avatar/chip do jogador.
 const TABLE_CENTER = { x: 50, y: 44 }; // mesmo ponto onde o pote e' desenhado
-const COMMITTED_APPROACH_FRACTION = 0.16; // "bem proxima da posicao"
+// Deslocamento em PIXELS fixos (nao mais %) — o card de nome/stack tem
+// largura fixa em px, entao um deslocamento percentual encolhe em telas
+// menores e a ficha acaba caindo em cima do nome. Pixel fixo garante a
+// mesma folga real em qualquer tamanho de tela. ~62px limpa a altura do
+// chip de posicao + chip de nome/stack empilhados.
+const COMMITTED_OFFSET_PX = 62;
 
 function CommittedPill({ amount }: { amount: number }) {
   return (
@@ -194,15 +199,19 @@ function CommittedPill({ amount }: { amount: number }) {
 function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number }) {
   const dx = TABLE_CENTER.x - seat.x;
   const dy = TABLE_CENTER.y - seat.y;
-  const left = seat.x + dx * COMMITTED_APPROACH_FRACTION;
-  const top = seat.y + dy * COMMITTED_APPROACH_FRACTION;
+  const len = Math.sqrt(dx * dx + dy * dy) || 1;
+  const ux = dx / len;
+  const uy = dy / len;
   return (
     <div
       style={{
         position: "absolute",
-        left: `${left}%`,
-        top: `${top}%`,
-        transform: "translate(-50%,-50%)",
+        left: `${seat.x}%`,
+        top: `${seat.y}%`,
+        // Base no proprio ponto do assento, depois empurra um valor fixo
+        // em px na direcao do centro — nunca sobrepoe o card de nome/
+        // stack, independente do tamanho da tela.
+        transform: `translate(-50%,-50%) translate(${ux * COMMITTED_OFFSET_PX}px, ${uy * COMMITTED_OFFSET_PX}px)`,
         zIndex: 3,
         pointerEvents: "none",
       }}
