@@ -226,6 +226,77 @@ export function RevisorHandTable({
           overflow: "hidden",
         }}
       >
+        {/* Controles movidos pro TOPO da mesa (pedido explicito): antes
+            ficavam embaixo da mesa inteira, obrigando rolar a barra pra
+            baixo pra alcancar. Agora ficam logo no topo, sempre visiveis
+            junto com o resto da tela. So icone (sem "Anterior"/"Proximo"
+            escrito) — pedido explicito de local mais estrategico e
+            compacto. aria-label mantido pra acessibilidade. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10 }}>
+          <button
+            onClick={prevStep}
+            disabled={replayState.stepIndex === 0}
+            aria-label="Passo anterior"
+            title="Anterior"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center", background: "transparent",
+              border: "1px solid rgba(255,255,255,0.14)",
+              color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.75)",
+              borderRadius: 10, width: 34, height: 34, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
+            }}
+          >
+            <ChevronLeft size={15} />
+          </button>
+
+          <button
+            onClick={() => setAutoplay((v) => !v)}
+            disabled={replayState.stepIndex >= replayState.stepCount - 1}
+            aria-label={autoplay ? "Pausar" : "Reproduzir"}
+            title={autoplay ? "Pausar" : "Reproduzir"}
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: autoplay ? "rgba(52,211,153,0.15)" : "transparent",
+              border: `1px solid ${autoplay ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.14)"}`,
+              color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.25)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.75)",
+              borderRadius: 10, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+            }}
+          >
+            {autoplay ? <Pause size={13} /> : <Play size={13} />}
+          </button>
+
+          <button
+            onClick={nextStep}
+            disabled={replayState.stepIndex >= replayState.stepCount - 1}
+            aria-label="Próximo passo"
+            title="Próximo"
+            style={{
+              display: "flex", alignItems: "center", justifyContent: "center",
+              background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "#FFFFFF",
+              border: replayState.stepIndex >= replayState.stepCount - 1 ? "1px solid rgba(255,255,255,0.14)" : "0",
+              color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.25)" : "#111111",
+              borderRadius: 10, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+            }}
+          >
+            <ChevronRight size={15} />
+          </button>
+
+          <select
+            value={autoplaySpeed}
+            onChange={(e) => setAutoplaySpeed(Number(e.target.value))}
+            aria-label="Velocidade da reprodução automática"
+            title="Velocidade"
+            style={{ background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.75)", borderRadius: 10, padding: "7px 8px", fontSize: 11, fontFamily: F, cursor: "pointer", outline: "none", height: 34 }}
+          >
+            {AUTOPLAY_SPEEDS.map((s, i) => (
+              <option key={i} value={i}>{s.label}</option>
+            ))}
+          </select>
+
+          <span style={{ marginLeft: 2, fontSize: 11, color: "rgba(255,255,255,0.4)", ...num }}>
+            {replayState.stepIndex + 1}/{replayState.stepCount}
+          </span>
+        </div>
+
         {/* Altura responsiva por breakpoint (className, nao inline) — fixa
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. Pedido explicito: "precisa ser fixa pro
@@ -237,70 +308,6 @@ export function RevisorHandTable({
             em telas medias. */}
         <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px] xl:h-[520px]">
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
-        </div>
-
-        {/* Espaçamento aumentado (10 -> 22) — pedido explicito: "a
-            velocidade esta em cima do stack do hero". O stack do hero
-            fica bem perto da borda inferior da mesa; sem folga suficiente
-            aqui o seletor de velocidade parecia colado/sobreposto nele. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 8, marginTop: 22 }}>
-          <button
-            onClick={prevStep}
-            disabled={replayState.stepIndex === 0}
-            style={{
-              display: "flex", alignItems: "center", gap: 4, background: "transparent",
-              border: "1px solid rgba(255,255,255,0.14)",
-              color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.75)",
-              borderRadius: 10, padding: "8px 12px", cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
-              fontWeight: 500, fontSize: 12,
-            }}
-          >
-            <ChevronLeft size={13} /> Anterior
-          </button>
-
-          <button
-            onClick={() => setAutoplay((v) => !v)}
-            disabled={replayState.stepIndex >= replayState.stepCount - 1}
-            style={{
-              display: "flex", alignItems: "center", gap: 5,
-              background: autoplay ? "rgba(52,211,153,0.15)" : "transparent",
-              border: `1px solid ${autoplay ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.14)"}`,
-              color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.25)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.75)",
-              borderRadius: 10, padding: "8px 12px", cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-              fontWeight: 500, fontSize: 12,
-            }}
-          >
-            {autoplay ? <Pause size={12} /> : <Play size={12} />}
-          </button>
-
-          <select
-            value={autoplaySpeed}
-            onChange={(e) => setAutoplaySpeed(Number(e.target.value))}
-            style={{ background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.75)", borderRadius: 10, padding: "7px 8px", fontSize: 11, fontFamily: F, cursor: "pointer", outline: "none" }}
-          >
-            {AUTOPLAY_SPEEDS.map((s, i) => (
-              <option key={i} value={i}>{s.label}</option>
-            ))}
-          </select>
-
-          <button
-            onClick={nextStep}
-            disabled={replayState.stepIndex >= replayState.stepCount - 1}
-            style={{
-              display: "flex", alignItems: "center", gap: 4,
-              background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "#FFFFFF",
-              border: replayState.stepIndex >= replayState.stepCount - 1 ? "1px solid rgba(255,255,255,0.14)" : "0",
-              color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.25)" : "#111111",
-              borderRadius: 10, padding: "8px 12px", cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-              fontWeight: 500, fontSize: 12,
-            }}
-          >
-            Próximo <ChevronRight size={13} />
-          </button>
-
-          <span style={{ marginLeft: 4, fontSize: 11, color: "rgba(255,255,255,0.4)", ...num }}>
-            {replayState.stepIndex + 1}/{replayState.stepCount}
-          </span>
         </div>
       </div>
 
