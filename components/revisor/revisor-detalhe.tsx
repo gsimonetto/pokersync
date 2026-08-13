@@ -32,6 +32,7 @@ import {
 } from "@/lib/services/hand-review-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { RevisorHandTable } from "./revisor-hand-table";
+import { CoachThread } from "./coach-thread";
 
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
@@ -785,7 +786,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                         disabled={shareStatus === "sending"}
                         className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[13px] text-ink transition-colors hover:bg-elevated disabled:opacity-50"
                       >
-                        {c.name}
+                        <span className="min-w-0 truncate">{c.name}</span>
                         <ChevronRight size={13} className="text-muted" />
                       </button>
                     ))
@@ -806,6 +807,10 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         onChange={updateAnswer}
         clickableCount={GUIDED_CLICKABLE_COUNT}
       />
+
+      {/* Conversa do compartilhamento: so renderiza se existir share
+          envolvendo quem esta olhando (o proprio componente decide). */}
+      <CoachThread reviewId={reviewId} reviewTitle={review.title || "Mão sem título"} />
 
       {/* Coluna da mesa aumentada (pedido explicito: "aumente a tela
           aqui") — era 1fr/1.3fr, agora 0.8fr/1.5fr. Perguntas ficaram
