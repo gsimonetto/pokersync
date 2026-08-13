@@ -1,11 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { AlertTriangle, Loader2, Target, ChevronRight, Search, X } from "lucide-react";
+import { AlertTriangle, Loader2, ChevronRight, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard } from "@/components/drill/card";
-import { updateSessionBounty, type HandSession } from "@/lib/services/hand-session-service";
+import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { F, T } from "@/lib/poker/drill-theme";
 
@@ -24,6 +24,15 @@ import { F, T } from "@/lib/poker/drill-theme";
 // - Coluna da lista tem scroll PROPRIO — a mesa nao some quando o usuario
 //   rola a lista pra ver maos mais antigas. Isso exige o grid ter altura
 //   travada (nao so minHeight) e cada coluna gerenciar seu proprio overflow.
+//
+// Cabecalho da sessao REMOVIDO (2026-08 v3, pedido explicito): "tirar
+// essa barra, esta mais atrapalhando do que ajudando". Antes havia um
+// bloco no topo com nome/formato/bounty da sessao — a lista de maos (na
+// coluna esquerda) ja identifica a sessao pelo contexto de navegacao, o
+// bloco extra so ocupava espaco vertical sem ajudar. Edicao de bounty
+// (updateSessionBounty) removida junto — se precisar editar bounty de
+// novo, precisa de um lugar novo pra isso (ex: dentro da lista ou um
+// menu de opcoes da sessao).
 const GRID_HEIGHT = "calc(100vh - 240px)"; // aproximado — depende do header
 // fixo da pagina (fora deste componente). Se ainda sobrar scroll da
 // pagina inteira ao abrir a tela, o ajuste fino de altura do
@@ -94,8 +103,6 @@ export function RevisorSessao({
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [editingBounty, setEditingBounty] = useState(false);
-  const [bountyInput, setBountyInput] = useState("");
   const [searchOpen, setSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyWithAction, setOnlyWithAction] = useState(false);
@@ -122,7 +129,6 @@ export function RevisorSessao({
         setSession(s as HandSession);
         setHands((hs as HandInListing[]) ?? []);
         setSelectedId(hs && hs.length > 0 ? (hs[0] as HandInListing).id : null);
-        setBountyInput(s?.bounty_current != null ? String(s.bounty_current) : "");
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao carregar a sessão.");
       } finally {
@@ -219,19 +225,6 @@ export function RevisorSessao({
     });
   }, [hands]);
 
-  const saveBounty = useCallback(async () => {
-    if (!session) return;
-    const val = bountyInput.trim() ? Number(bountyInput.replace(",", ".")) : null;
-    if (val != null && !Number.isFinite(val)) return;
-    try {
-      await updateSessionBounty(session.id, val);
-      setSession({ ...session, bounty_current: val });
-      setEditingBounty(false);
-    } catch (e) {
-      console.error("[RevisorSessao] bounty save failed:", e);
-    }
-  }, [session, bountyInput]);
-
   if (loading) {
     return (
       <div style={{ fontFamily: F, padding: 24, display: "flex", justifyContent: "center", color: "rgba(255,255,255,0.4)" }}>
@@ -249,74 +242,8 @@ export function RevisorSessao({
     );
   }
 
-  const isTournament = session.kind === "tournament";
-  const showsBounty = isTournament && (session.format_type === "pko" || session.format_type === "mystery");
-
   return (
     <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14 }}>
-      {/* Cabecalho da sessao — nome, tipo, buy-in, bounty (se PKO/Mystery) */}
-      <div
-        style={{
-          display: "flex", alignItems: "center", justifyContent: "space-between", gap: 12,
-          padding: "14px 16px", borderRadius: 14,
-          background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
-          border: "1px solid rgba(255,255,255,0.08)",
-        }}
-      >
-        <div style={{ display: "flex", flexDirection: "column", gap: 4, minWidth: 0 }}>
-          <h2 style={{ margin: 0, fontSize: 17, fontWeight: 500, color: "#FFFFFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-            {session.label}
-          </h2>
-          <div style={{ display: "flex", gap: 10, fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-            {isTournament && session.format_type && (
-              <span style={{ textTransform: "uppercase", letterSpacing: 0.6 }}>
-                {session.format_type === "pko" ? "PKO" : session.format_type === "mystery" ? "Mystery Bounty" : "Regular"}
-              </span>
-            )}
-            {!isTournament && session.stakes && <span>{session.stakes}</span>}
-            <span>· {hands.length} mão{hands.length === 1 ? "" : "s"}</span>
-          </div>
-        </div>
-
-        {showsBounty && (
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-            {/* Ícone trocado de cifrão/troféu pra alvo (Target) — pedido
-                explicito: "quero que apareça o icone de um alvo, que é
-                de fato o bounty nas mesas". Alvo e' o simbolo universal
-                de bounty em torneios PKO/Mystery, mais reconhecivel que
-                cifrao pra esse contexto especifico. */}
-            <Target size={14} color="#FBBF24" />
-            {editingBounty ? (
-              <input
-                type="number"
-                step="0.01"
-                value={bountyInput}
-                onChange={(e) => setBountyInput(e.target.value)}
-                onBlur={saveBounty}
-                onKeyDown={(e) => e.key === "Enter" && saveBounty()}
-                autoFocus
-                style={{
-                  background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.2)",
-                  color: "#FFFFFF", borderRadius: 8, padding: "4px 8px",
-                  fontSize: 13, fontFamily: F, width: 80, outline: "none",
-                }}
-              />
-            ) : (
-              <button
-                onClick={() => setEditingBounty(true)}
-                style={{
-                  all: "unset", cursor: "pointer", display: "flex", alignItems: "center", gap: 3,
-                  fontSize: 13, fontWeight: 500, color: "#FBBF24",
-                }}
-                title="Editar bounty atual"
-              >
-                <span>{session.bounty_current != null ? `$${session.bounty_current}` : "—"}</span>
-              </button>
-            )}
-          </div>
-        )}
-      </div>
-
       {/* Master-detail: coluna esquerda com maos, coluna direita com mesa.
           Altura TRAVADA (nao so minHeight) — pedido explicito: "a mesa
           some quando desce a listagem". Com altura fixa + overflow proprio
