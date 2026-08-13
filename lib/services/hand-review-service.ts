@@ -558,40 +558,57 @@ export async function linkReviewToSession(reviewId: string, sessionId: string | 
 export interface TeamCoach {
   userId: string;
   name: string;
+  role: "admin" | "coach";
 }
 
 export async function fetchTeamCoaches(userId: string): Promise<TeamCoach[]> {
   const supabase = createClient();
-  const { data: myTeams, error: teamErr } = await supabase
+  const { data: me, error: teamErr } = await supabase
     .from("team_members")
-    .select("team_id")
-    .eq("user_id", userId);
+    .select("team_id, coach_id")
+    .eq("user_id", userId)
+    .maybeSingle();
   if (teamErr) throw teamErr;
-  const teamIds = (myTeams ?? []).map((t) => t.team_id);
-  if (teamIds.length === 0) return [];
+  if (!me) return [];
+
+  // Quem recebe mao e' quem ATUA como coach (is_coach). Admin puro nao
+  // entra aqui — revisar mao nao e' funcao dele; so aparece se acumular
+  // a funcao de coach.
+  // A mao vai APENAS pro coach responsavel pelo jogador. Sem coach
+  // atribuido, ninguem recebe — mesma regra da RLS (hrs_insert).
+  if (!me.coach_id) return [];
 
   const { data: coachRows, error } = await supabase
     .from("team_members")
-    .select("user_id")
-    .in("team_id", teamIds)
-    .eq("role", "coach")
-    .neq("user_id", userId);
+    .select("user_id, role")
+    .eq("team_id", me.team_id)
+    .eq("is_coach", true)
+    .eq("user_id", me.coach_id);
   if (error) throw error;
 
-  const coachIds = [...new Set((coachRows ?? []).map((r) => r.user_id))];
-  if (coachIds.length === 0) return [];
+  const rows = (coachRows ?? []).filter(
+    (r, idx, arr) => arr.findIndex((x) => x.user_id === r.user_id) === idx
+  );
+  if (rows.length === 0) return [];
 
   // Sem FK entre team_members e profiles — busca separada em vez de
   // embed do PostgREST, junta no client.
   const { data: profileRows, error: profErr } = await supabase
     .from("profiles")
     .select("id, nome, apelido")
-    .in("id", coachIds);
+    .in(
+      "id",
+      rows.map((r) => r.user_id)
+    );
   if (profErr) throw profErr;
 
-  return coachIds.map((id) => {
-    const p = (profileRows ?? []).find((row) => row.id === id);
-    return { userId: id, name: p?.apelido || p?.nome || "Coach" };
+  return rows.map((r) => {
+    const p = (profileRows ?? []).find((row) => row.id === r.user_id);
+    return {
+      userId: r.user_id,
+      name: p?.apelido || p?.nome || "Coach",
+      role: r.role as "admin" | "coach",
+    };
   });
 }
 
@@ -614,6 +631,149 @@ export async function shareReviewWithCoach(reviewId: string, coachUserId: string
     p_body: `${reviewTitle || "Uma mão"} foi compartilhada com você pra revisão.`,
     p_kind: "info",
     p_action_url: `/revisor?shared=${reviewId}`,
+    p_category: "team",
   });
   if (notifyErr) throw notifyErr;
+}
+
+// ============================================================
+// Conversa da mao compartilhada (jogador <-> coach)
+// ============================================================
+// Uma mao compartilhada vira uma linha em hand_review_shares. Os
+// comentarios ficam em hand_review_share_comments, visiveis so pelos
+// dois participantes daquele compartilhamento (RLS). Se a mesma mao foi
+// enviada pra mais de um coach, cada um tem a propria conversa — o
+// jogador ve todas.
+
+export interface ShareThread {
+  shareId: string;
+  counterpartId: string;
+  counterpartName: string;
+  iAmCoach: boolean;
+  createdAt: string;
+}
+
+export interface ShareComment {
+  id: string;
+  shareId: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+  isMine: boolean;
+}
+
+export async function fetchShareThreads(reviewId: string): Promise<ShareThread[]> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const meId = userData.user?.id;
+  if (!meId) return [];
+
+  const { data, error } = await supabase
+    .from("hand_review_shares")
+    .select("id, shared_by, shared_with, created_at")
+    .eq("review_id", reviewId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  const otherIds = rows.map((r) => (r.shared_by === meId ? r.shared_with : r.shared_by));
+  const { data: profileRows } = await supabase.from("profiles").select("id, nome, apelido").in("id", otherIds);
+
+  return rows.map((r) => {
+    const otherId = r.shared_by === meId ? r.shared_with : r.shared_by;
+    const p = (profileRows ?? []).find((row) => row.id === otherId);
+    return {
+      shareId: r.id,
+      counterpartId: otherId,
+      counterpartName: p?.apelido || p?.nome || "Membro do time",
+      iAmCoach: r.shared_with === meId,
+      createdAt: r.created_at,
+    };
+  });
+}
+
+// Marca como visto quando o coach abre a mao — usado depois no painel
+// do coach pra separar o que ja foi analisado do que esta na fila.
+export async function markShareViewed(shareId: string) {
+  const supabase = createClient();
+  await supabase
+    .from("hand_review_shares")
+    .update({ viewed_at: new Date().toISOString() })
+    .eq("id", shareId)
+    .is("viewed_at", null);
+}
+
+export async function fetchShareComments(shareId: string): Promise<ShareComment[]> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const meId = userData.user?.id ?? "";
+
+  const { data, error } = await supabase
+    .from("hand_review_share_comments")
+    .select("id, share_id, author_id, body, created_at")
+    .eq("share_id", shareId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const rows = data ?? [];
+  if (rows.length === 0) return [];
+
+  const ids = [...new Set(rows.map((r) => r.author_id))];
+  const { data: profileRows } = await supabase.from("profiles").select("id, nome, apelido").in("id", ids);
+
+  return rows.map((r) => {
+    const p = (profileRows ?? []).find((row) => row.id === r.author_id);
+    return {
+      id: r.id,
+      shareId: r.share_id,
+      authorId: r.author_id,
+      authorName: p?.apelido || p?.nome || "Membro do time",
+      body: r.body,
+      createdAt: r.created_at,
+      isMine: r.author_id === meId,
+    };
+  });
+}
+
+export async function addShareComment(
+  thread: ShareThread,
+  body: string,
+  reviewId: string,
+  reviewTitle: string
+): Promise<ShareComment> {
+  const text = body.trim();
+  if (!text) throw new Error("COMENTARIO_VAZIO");
+
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const meId = userData.user?.id;
+  if (!meId) throw new Error("NO_SESSION");
+
+  const { data, error } = await supabase
+    .from("hand_review_share_comments")
+    .insert({ share_id: thread.shareId, author_id: meId, body: text })
+    .select("id, share_id, author_id, body, created_at")
+    .single();
+  if (error) throw error;
+
+  // Avisa o outro lado — mesmo deep-link da mao compartilhada.
+  await supabase.rpc("notify_user", {
+    p_user_id: thread.counterpartId,
+    p_title: thread.iAmCoach ? "Comentário do coach" : "Resposta do jogador",
+    p_body: `Nova mensagem em "${reviewTitle || "uma mão"}".`,
+    p_kind: "info",
+    p_action_url: `/revisor?shared=${reviewId}`,
+    p_category: "team",
+  });
+
+  return {
+    id: data.id,
+    shareId: data.share_id,
+    authorId: data.author_id,
+    authorName: "Você",
+    body: data.body,
+    createdAt: data.created_at,
+    isMine: true,
+  };
 }
