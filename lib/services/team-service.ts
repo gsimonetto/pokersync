@@ -311,6 +311,17 @@ export interface TeamDashboardRow {
   maosRevisadas: number;
   maosCompartilhadas: number;
   xpPeriodo: number;
+  // Acumulado desde que o jogador ACEITOU O CONVITE do time — nao
+  // respeita o filtro de periodo do painel, e' contagem de vida no time.
+  jogosNoTime: number;
+  lucroNoTime: number;
+}
+
+export interface TeamActivityDay {
+  dia: string;
+  treinos: number;
+  revisoes: number;
+  xp: number;
 }
 
 export interface TeamLeak {
@@ -339,6 +350,23 @@ export async function fetchTeamDashboard(days = 30): Promise<TeamDashboardRow[]>
     maosRevisadas: r.maos_revisadas ?? 0,
     maosCompartilhadas: r.maos_compartilhadas ?? 0,
     xpPeriodo: r.xp_periodo ?? 0,
+    jogosNoTime: r.jogos_no_time ?? 0,
+    lucroNoTime: Number(r.lucro_no_time ?? 0),
+  }));
+}
+
+// Evolucao diaria do time inteiro (escopo do coach ou do admin) —
+// alimenta o grafico do painel geral.
+export async function fetchTeamActivity(days = 30): Promise<TeamActivityDay[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_activity", { p_days: days });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    dia: r.dia,
+    treinos: r.treinos ?? 0,
+    revisoes: r.revisoes ?? 0,
+    xp: r.xp ?? 0,
   }));
 }
 
