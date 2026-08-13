@@ -72,7 +72,7 @@ export default async function ModulosPage() {
               </h2>
               <span className="text-xs text-muted/60">{modules.length} módulos</span>
             </div>
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-5">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
               {modules.map(({ key, ...mod }) => (
                 <ModuleCard key={key} {...mod} />
               ))}
