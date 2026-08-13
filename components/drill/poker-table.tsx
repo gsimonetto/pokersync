@@ -163,9 +163,14 @@ const TABLE_CENTER = { x: 50, y: 44 }; // mesmo ponto onde o pote e' desenhado
 // Deslocamento em PIXELS fixos (nao mais %) — o card de nome/stack tem
 // largura fixa em px, entao um deslocamento percentual encolhe em telas
 // menores e a ficha acaba caindo em cima do nome. Pixel fixo garante a
-// mesma folga real em qualquer tamanho de tela. ~62px limpa a altura do
-// chip de posicao + chip de nome/stack empilhados.
+// mesma folga real em qualquer tamanho de tela.
 const COMMITTED_OFFSET_PX = 62;
+// Hero tem um bloco mais alto (cartas + chip nome/stack empilhados) —
+// o mesmo offset generico dos demais assentos nao limpa a altura das
+// cartas do hero e a ficha cai em cima delas. Hero fica sempre no
+// centro-baixo (dx=0), entao um offset vertical maior, so pra ele,
+// resolve sem afetar os outros assentos.
+const HERO_COMMITTED_OFFSET_PX = 118;
 
 function CommittedPill({ amount }: { amount: number }) {
   return (
@@ -202,6 +207,7 @@ function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number 
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
   const ux = dx / len;
   const uy = dy / len;
+  const offsetPx = seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX;
   return (
     <div
       style={{
@@ -209,9 +215,9 @@ function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number 
         left: `${seat.x}%`,
         top: `${seat.y}%`,
         // Base no proprio ponto do assento, depois empurra um valor fixo
-        // em px na direcao do centro — nunca sobrepoe o card de nome/
-        // stack, independente do tamanho da tela.
-        transform: `translate(-50%,-50%) translate(${ux * COMMITTED_OFFSET_PX}px, ${uy * COMMITTED_OFFSET_PX}px)`,
+        // em px na direcao do centro — nunca sobrepoe as cartas nem o
+        // card de nome/stack, independente do tamanho da tela.
+        transform: `translate(-50%,-50%) translate(${ux * offsetPx}px, ${uy * offsetPx}px)`,
         zIndex: 3,
         pointerEvents: "none",
       }}
