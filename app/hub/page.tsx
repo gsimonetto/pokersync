@@ -185,6 +185,26 @@ export default function HubPage() {
         .hub-mission-card:hover { transform: translateY(-3px) scale(1.01); box-shadow: 0 10px 24px -12px rgba(0,0,0,.6); }
         .hub-tab-btn { transition: all .2s ease; }
         .hub-tab-btn:hover:not(.is-active) { transform: translateY(-1px); }
+        @keyframes hubBadgeRotate {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes hubBadgeBreathe {
+          0%, 100% { box-shadow: 0 0 0 4px ${badgeColor}18, 0 0 14px -2px ${badgeColor}70; }
+          50%      { box-shadow: 0 0 0 6px ${badgeColor}26, 0 0 26px 2px ${badgeColor}aa; }
+        }
+        @keyframes hubBadgeNumberGlow {
+          0%, 100% { text-shadow: 0 0 6px ${badgeColor}55; }
+          50%      { text-shadow: 0 0 16px ${badgeColor}cc; }
+        }
+        @keyframes hubXpShimmer {
+          0%   { transform: translateX(-100%); }
+          100% { transform: translateX(300%); }
+        }
+        .hub-badge-ring { animation: hubBadgeRotate 6s linear infinite; }
+        .hub-badge-box { animation: hubBadgeBreathe 2.4s ease-in-out infinite; }
+        .hub-badge-number { animation: hubBadgeNumberGlow 2.4s ease-in-out infinite; }
+        .hub-xp-shimmer { animation: hubXpShimmer 2.2s ease-in-out infinite; }
         .hub-level-card { transition: box-shadow .3s ease, border-color .3s ease; }
         .hub-level-card:hover { border-color: rgba(224,178,76,0.4); box-shadow: 0 0 30px -10px rgba(224,178,76,0.25); }
         .hub-ministat { transition: transform .2s ease, background-color .2s ease; }
@@ -193,7 +213,7 @@ export default function HubPage() {
         .hub-trophy-btn:hover { transform: scale(1.08) rotate(-4deg); box-shadow: 0 0 16px -4px rgba(224,178,76,.5); }
         .hub-lb-row { animation: hubFadeInUp .25s ease-out both; transition: background-color .15s ease; }
         @media (prefers-reduced-motion: reduce) {
-          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn { animation: none !important; transition: none !important; }
+          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-box, .hub-badge-number, .hub-xp-shimmer { animation: none !important; transition: none !important; }
         }
       `}</style>
 
@@ -233,11 +253,20 @@ export default function HubPage() {
         />
 
         <div className="relative grid grid-cols-[auto_1fr_auto] items-center gap-5">
-          <div
-            className="grid h-20 w-20 place-items-center rounded-2xl bg-void text-3xl font-extrabold"
-            style={{ border: `2px solid ${badgeColor}`, color: badgeColor, boxShadow: `0 0 0 4px ${badgeColor}18` }}
-          >
-            {level}
+          <div className="relative h-20 w-20">
+            {/* Anel giratorio atras do badge — conic-gradient na cor da
+                faixa, sempre girando (pedido explicito: "mais animacoes
+                no nivel"). */}
+            <div
+              className="hub-badge-ring pointer-events-none absolute -inset-1.5 rounded-full opacity-70 blur-[2px]"
+              style={{ background: `conic-gradient(from 0deg, transparent, ${badgeColor}, transparent 55%)` }}
+            />
+            <div
+              className="hub-badge-box relative grid h-20 w-20 place-items-center rounded-2xl bg-void text-3xl font-extrabold"
+              style={{ border: `2px solid ${badgeColor}`, color: badgeColor }}
+            >
+              <span className="hub-badge-number">{level}</span>
+            </div>
           </div>
 
           <div className="min-w-0">
@@ -249,10 +278,17 @@ export default function HubPage() {
               {isMaxLevel && <span className="ml-1.5" style={{ color: badgeColor }}>· MÁXIMO</span>}
             </p>
             <div className="mt-3">
-              <div className="h-2 overflow-hidden rounded-full border border-hairline bg-white/5">
+              <div className="relative h-2 overflow-hidden rounded-full border border-hairline bg-white/5">
                 <div
                   className="h-full transition-all duration-500"
                   style={{ width: `${pct}%`, background: `linear-gradient(90deg, ${badgeColor}, #F5D48C)` }}
+                />
+                {/* Brilho passando pela barra (loop continuo) — so' visivel
+                    dentro da parte preenchida por causa do overflow-hidden
+                    do container pai. */}
+                <div
+                  className="hub-xp-shimmer pointer-events-none absolute inset-y-0 left-0 w-1/3"
+                  style={{ background: "linear-gradient(90deg, transparent, rgba(255,255,255,.55), transparent)" }}
                 />
               </div>
               <div className="mt-1.5 flex justify-between text-[11px] text-muted">
