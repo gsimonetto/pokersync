@@ -86,12 +86,6 @@ function ChipStackIcon({ size = 13 }: { size?: number }) {
   );
 }
 
-// Rotulo de valor: icone de ficha + numero em texto puro (mesma fonte
-// monoespacada usada no stack/pot), sem pill colorida ao redor — o
-// numero fica solto, igual HUD de replayer profissional em vez de "badge"
-// de app mobile. Usado so no pote/ficha voadora agora — a pilha parada
-// por assento virou um badge fixo ancorado no proprio avatar (ver Seat).
-
 // Pilha de fichas do POTE — 3 discos empilhados em verde (distinto do
 // dourado usado nos seats), pra leitura instantanea "essas fichas ja
 // estao consolidadas no meio da mesa". Substitui o antigo ponto verde
@@ -150,9 +144,7 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
 // Pilha de fichas PARADA em frente ao seat, representando quanto esse
 // jogador ja colocou na rua atual. Diferente de ChipAnimation (que voa e
 // some) — essa fica visivel ate a rua terminar (fixo durante toda a rua,
-// confirmado). Refinada (2026-08): saiu o pill dourado com bolinha dentro
-// (lido como "cartoon"); entra o icone de ficha real + numero solto, sem
-// container colorido.
+// confirmado).
 // Limite minimo pra exibir a pilha — pedido explicito: "pode tirar o
 // rake (0.1 de fichas no pre flop), desnecessario na nossa mesa". 0.1bb
 // e' tipicamente o ante de MTT, postado por todos os jogadores igual —
@@ -160,11 +152,16 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
 // raises reais (>= 0.5bb) continuam aparecendo normalmente.
 const MIN_COMMITTED_TO_SHOW = 0.5;
 
-// Pilha de fichas parada — "as apostas" — voltou pro fluxo normal do
-// layout do assento (nao mais ancorada no avatar). Pedido explicito:
-// "nao quero as apostas grudadas na posicao, mantenha do jeito que
-// estava antes". Componente pequeno reaproveitado tanto pro hero (ao
-// lado/acima das cartas) quanto pros demais assentos (abaixo do bloco).
+// 2026-08 v7 (pedido explicito): as fichas estavam "soltas" na mesa —
+// posicionadas no fluxo normal do card do assento, sem relacao com a
+// geometria da mesa. Assentos perto da borda empurravam a ficha praticamente
+// pra fora do feltro. Agora a ficha e' ancorada em coordenadas absolutas,
+// calculadas a partir do proprio x/y do assento na direcao do centro da
+// mesa — sempre dentro do oval, bem proxima da posicao (pouco deslocamento,
+// pedido explicito), nunca colada no avatar/chip do jogador.
+const TABLE_CENTER = { x: 50, y: 44 }; // mesmo ponto onde o pote e' desenhado
+const COMMITTED_APPROACH_FRACTION = 0.16; // "bem proxima da posicao"
+
 function CommittedPill({ amount }: { amount: number }) {
   return (
     <div
@@ -182,9 +179,6 @@ function CommittedPill({ amount }: { amount: number }) {
       }}
     >
       <ChipStackIcon size={13} />
-      {/* Valor aumentado (pedido explicito): estava pequeno demais pra
-          ler de relance durante o replay. "bb" agora sempre no final,
-          em tamanho proximo do numero (nao mais um detalhe minusculo). */}
       <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>
         {amount}
         <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>bb</span>
@@ -193,12 +187,36 @@ function CommittedPill({ amount }: { amount: number }) {
   );
 }
 
+// Ancora a CommittedPill num ponto absoluto da mesa, entre o assento e o
+// centro (fracao pequena = fica perto do assento). Renderizada como
+// irma do <Seat>, no mesmo sistema de coordenadas em % usado por
+// ChipAnimation — por isso nunca escapa do oval da mesa.
+function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number }) {
+  const dx = TABLE_CENTER.x - seat.x;
+  const dy = TABLE_CENTER.y - seat.y;
+  const left = seat.x + dx * COMMITTED_APPROACH_FRACTION;
+  const top = seat.y + dy * COMMITTED_APPROACH_FRACTION;
+  return (
+    <div
+      style={{
+        position: "absolute",
+        left: `${left}%`,
+        top: `${top}%`,
+        transform: "translate(-50%,-50%)",
+        zIndex: 3,
+        pointerEvents: "none",
+      }}
+    >
+      <CommittedPill amount={amount} />
+    </div>
+  );
+}
+
 function Seat({
-  seat, state, committed, isDealer,
+  seat, state, isDealer,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
-  committed?: number;
   // BTN — badge do dealer agora vive ANCORADO no proprio avatar (ver
   // abaixo), nao mais como elemento flutuante calculado por x/y.
   isDealer?: boolean;
@@ -213,17 +231,14 @@ function Seat({
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = SEAT_OPACITY[status];
 
-  // Hero agora usa o MESMO padrao vertical dos demais seats na parte de
-  // baixo da mesa (cardSide "below": cartas em cima, seatInfo embaixo) —
+  // Hero usa o MESMO padrao vertical dos demais seats na parte de baixo
+  // da mesa (cardSide "below": cartas em cima, seatInfo embaixo) —
   // pedido explicito: "cartas em cima e nome em baixo como as outras
-  // posicoes". Antes era row (cartas do lado, tamanho "hero" grande);
-  // ficou maior e mais dissonante do resto da mesa do que o necessario.
+  // posicoes".
   const layout: React.CSSProperties = hero
     ? { flexDirection: "column", alignItems: "center", gap: 6 }
     : (
         {
-          // Gap zerado pra "above" — pedido explicito: "cartas muito
-          // afastadas da posicao, dando a impressao de soltas".
           below: { flexDirection: "column", gap: 4 },
           above: { flexDirection: "column", gap: 0 },
           left: { flexDirection: "row-reverse", alignItems: "center", gap: 12 },
@@ -231,26 +246,22 @@ function Seat({
         } as const
       )[seat.cardSide];
 
-  // "VOCÊ" removido — hero sempre embaixo, orientacao natural da mesa
-  // ja identifica quem e o jogador. "NA AÇÃO" tambem removido (2026-08,
-  // pedido explicito): o anel dourado pulsante ao redor do avatar (ver
-  // seatInfo abaixo) ja e' sinal suficiente de quem esta agindo — texto
-  // adicional era redundante, replayers de referencia (Hand2Note,
-  // PokerTracker) usam so o realce visual do assento, sem rotulo.
   const badgeArea = !acting ? (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
       <ActionBadge action={action} />
     </div>
   ) : null;
 
-  // Redesenho estilo GG Poker (2026-08 v6, pedido explicito): saiu o
-  // avatar redondo com a posicao dentro. Agora sao 2 chips empilhados,
-  // os dois no MESMO formato pill (nunca redondos):
+  // Redesenho estilo GG Poker: 2 chips empilhados, ambos no MESMO
+  // formato pill:
   //  1) chip da posicao sozinha, em cima;
-  //  2) chip combinado nome + stack, embaixo — antes eram 2 elementos
-  //     separados (pill de nome + texto solto de stack).
-  // O badge do dealer ("D") continua ancorado, agora no canto do chip
-  // de posicao em vez do avatar circular que deixou de existir.
+  //  2) chip combinado nome + stack, embaixo — com uma linha fina
+  //     separando nome e stack (pedido explicito), pra deixar claro que
+  //     sao dois dados diferentes dentro do mesmo chip.
+  // Hero agora usa exatamente o mesmo chip 2 (nome + linha + stack) que
+  // os demais assentos, em vez do nameplate sobreposto nas cartas —
+  // pedido explicito: "hero com posicao em cima + nome e stack embaixo,
+  // igual as outras posicoes".
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
       <div style={{ position: "relative" }}>
@@ -302,11 +313,6 @@ function Seat({
         </div>
       </div>
 
-      {/* Chip unico com nome + stack, empilhados verticalmente (pedido
-          explicito): nome na linha de cima, stack OBRIGATORIAMENTE
-          embaixo — mesmo tratamento visual do hero (posicao separada
-          em cima, um unico chip abaixo). Antes nome e stack ficavam
-          lado a lado na mesma linha, separados por "·". */}
       {!empty && (
         <div
           style={{
@@ -327,15 +333,26 @@ function Seat({
             transition: "all 200ms ease",
           }}
         >
-          {/* Hero nao repete o nome aqui — ja aparece sobreposto nas
-              cartas (nameplate estilo GG, ver bloco do hero abaixo). */}
-          {seat.playerName && !hero && (
-            <span
-              style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}
-              title={seat.playerName}
-            >
-              {truncateName(seat.playerName)}
-            </span>
+          {seat.playerName && (
+            <>
+              <span
+                style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}
+                title={seat.playerName}
+              >
+                {truncateName(seat.playerName)}
+              </span>
+              {/* Risco fino separando nome e stack (pedido explicito) —
+                  deixa visualmente claro que sao 2 dados distintos dentro
+                  do mesmo chip. */}
+              <div
+                style={{
+                  width: "100%",
+                  height: 1,
+                  background: acting ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.14)",
+                  margin: "2px 0",
+                }}
+              />
+            </>
           )}
           <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack} bb</span>
         </div>
@@ -353,9 +370,6 @@ function Seat({
         top: `${seat.y}%`,
         transform: "translate(-50%,-50%)",
         opacity,
-        // Dessaturacao leve no fold — reforca "fora da mao" so com
-        // tratamento visual (opacidade + cinza), sem precisar de texto
-        // "FOLD". Acompanha o pedido de manter so o estado visual.
         filter: status === "folded" ? "grayscale(0.5)" : "none",
         transition: "opacity 220ms ease, filter 220ms ease",
         zIndex: acting ? 5 : 2,
@@ -365,31 +379,12 @@ function Seat({
       <div style={{ display: "flex", alignItems: "center", justifyContent: "center", ...layout }}>
         {hero ? (
           <>
-            {/* Ficha da aposta acima das cartas do hero (nao mais grudada
-                no avatar) — pedido explicito: "as apostas serem
-                visualizadas ao lado ou em cima das cartas". Quando ha
-                aposta, empurra as cartas um pouco pra baixo (marginTop)
-                pra abrir espaco — "a carta do hero pode baixar um pouco
-                mais". */}
-            {!!committed && committed >= MIN_COMMITTED_TO_SHOW && (
-              <div style={{ marginBottom: 2 }}>
-                <CommittedPill amount={committed} />
-              </div>
-            )}
             {cards && cards.length > 0 && (
-              // Cards do hero: tamanho "board" (mesmo das cartas comunitarias),
-              // sem rotacao. Antes usava size="hero" (bem maior) em layout
-              // row — pedido explicito: diminuir e trocar pro mesmo padrao
-              // vertical dos outros assentos (cartas em cima, seatInfo embaixo).
               <div
                 style={{
                   position: "relative",
                   display: "flex",
                   gap: 5,
-                  marginTop: committed && committed >= MIN_COMMITTED_TO_SHOW ? 4 : 0,
-                  // Espaco extra embaixo pra nameplate sobreposta nao
-                  // colidir com o seatInfo logo abaixo.
-                  marginBottom: seat.playerName ? 10 : 0,
                 }}
               >
                 {cards.map((c, i) => (
@@ -397,37 +392,6 @@ function Seat({
                     <Card card={c} size="board" />
                   </div>
                 ))}
-                {/* Nameplate sobreposta na base das cartas, estilo GG Poker
-                    (pedido explicito): "as cartas do hero podem vir tambem
-                    igual ao GG, com o nome um pouco sobreposto a parte de
-                    baixo da carta". */}
-                {seat.playerName && (
-                  <div
-                    style={{
-                      position: "absolute",
-                      left: "50%",
-                      bottom: 0,
-                      transform: "translate(-50%, 50%)",
-                      background: "rgba(0,0,0,.85)",
-                      border: "1px solid rgba(255,255,255,.18)",
-                      borderRadius: 999,
-                      padding: "2px 10px",
-                      fontFamily: F,
-                      fontSize: 10.5,
-                      fontWeight: 600,
-                      color: "#FFFFFF",
-                      whiteSpace: "nowrap",
-                      maxWidth: 110,
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      boxShadow: "0 3px 8px rgba(0,0,0,.6)",
-                      zIndex: 2,
-                    }}
-                    title={seat.playerName}
-                  >
-                    {truncateName(seat.playerName)}
-                  </div>
-                )}
               </div>
             )}
             {seatInfo}
@@ -442,15 +406,7 @@ function Seat({
                   </div>
                 ))}
               </div>
-            ) : null; // Verso da carta removido (pedido explicito) — sem
-            // cartas reveladas, o assento so mostra o chip de posicao/nome.
-            // Ordem trocada explicitamente por cardSide em vez de depender
-            // de flex-direction reverso (mais previsivel) — pedido
-            // explicito: "o vilao de cima esta com as cartas quase no
-            // meio da mesa". Pra assentos "above" (topo da mesa), as
-            // cartas ficam ANTES do seatInfo no fluxo, ou seja, mais
-            // proximas da borda superior (longe do centro); pra "below"/
-            // "left"/"right", mantem a ordem original (seatInfo primeiro).
+            ) : null;
             if (seat.cardSide === "above") {
               return (
                 <>
@@ -468,28 +424,11 @@ function Seat({
           })()
         )}
       </div>
-
-      {/* Ficha da aposta pros demais assentos — voltou pro fluxo normal,
-          abaixo do bloco inteiro do assento, do jeito que estava antes
-          da tentativa de ancorar no avatar. */}
-      {!hero && !!committed && committed >= MIN_COMMITTED_TO_SHOW && (
-        <div style={{ display: "flex", justifyContent: "center", marginTop: 4 }}>
-          <CommittedPill amount={committed} />
-        </div>
-      )}
     </div>
   );
 }
 
 // Pilha de fichas que anima do seat de quem agiu ate o pote central.
-// Renderizada uma unica vez por step (key = stepIndex do replay) — quando
-// o step muda, o componente remonta e a animacao dispara do zero. Nao
-// altera o estado da mesa; e' puramente visual, coordenada por CSS.
-// O destino (50,44) e' o mesmo ponto onde o pote e' desenhado (ver
-// PokerTable abaixo) — a animacao ja converge pro centro, nunca pra fora
-// da mesa; se algum seat aparentar "jogar fichas pra fora" o problema
-// esta nas coordenadas x/y desse seat especifico (seat-layout.ts), nao
-// aqui no vetor de destino.
 function ChipAnimation({
   fromSeat,
   amount,
@@ -499,11 +438,8 @@ function ChipAnimation({
   amount: number;
   animKey: string | number;
 }) {
-  // Distancia do seat ate o centro em unidades relativas (translate).
-  // fromSeat.x/y estao em %, mesa centrada em 50/44 (mesmo top-center
-  // usado pelo pote no PokerTable). O CSS custom prop passa o vetor.
-  const dx = 50 - fromSeat.x;
-  const dy = 44 - fromSeat.y;
+  const dx = TABLE_CENTER.x - fromSeat.x;
+  const dy = TABLE_CENTER.y - fromSeat.y;
   return (
     <div
       key={animKey}
@@ -514,8 +450,6 @@ function ChipAnimation({
         transform: "translate(-50%,-50%)",
         zIndex: 4,
         pointerEvents: "none",
-        // Anima translacao percentual do proprio elemento — usa CSS var
-        // pra endpoint ser configuravel por chip sem inline animation.
         ["--chip-dx" as string]: `${dx}%`,
         ["--chip-dy" as string]: `${dy}%`,
         animation: "chipTravel 600ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
@@ -531,12 +465,6 @@ function ChipAnimation({
   );
 }
 
-// Icone do dealer button (disco branco com "D") — agora renderizado
-// DENTRO do Seat, ancorado no avatar do assento BTN (ver isDealer no
-// Seat acima). Removida a versao antiga como elemento flutuante
-// calculado por x/y — colidia com as cartas do BTN quando puxado em
-// direcao ao centro (bug reportado com print).
-
 export function PokerTable({
   hand,
   seats,
@@ -546,16 +474,8 @@ export function PokerTable({
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
-  // Presente so no modo replay — clicavel na barra de historico pra
-  // pular pra rua correspondente. No Treino, undefined = labels nao clicaveis.
   onStreetClick?: (streetIndex: number) => void;
-  // Fichas animadas no replay: partem do seat que agiu ate o pote.
-  // A key deve mudar a cada step novo pra forcar remount + re-anim.
   chipAnimation?: { fromPosLabel: string; amount: number; key: string | number } | null;
-  // Quanto cada jogador (por posLabel) ja colocou na rua atual — pilha
-  // PARADA em frente ao seat, complementar ao chipAnimation (que e' so
-  // o voo momentaneo). Vem de ReplayState.streetCommitments; ausente no
-  // modo Treino (mao unica, sem conceito de rua acumulada).
   streetCommitments?: Record<string, number>;
 }) {
   const active = !!hand;
@@ -592,13 +512,6 @@ export function PokerTable({
             background: "rgba(255,255,255,0.03)",
           }}
         >
-          {/* Resumo de acao — rolavel horizontalmente, ocupa o espaco
-              disponivel. Antes essa barra so aparecia com historico
-              (hasHistory); agora aparece sempre que a mao esta ativa,
-              com placeholder quando ainda nao ha nenhuma acao (step 0).
-              Valores em BB (nao mais fichas cruas) — convertidos ja no
-              hand-replay-projector.ts, esse componente so exibe o label
-              pronto (ex: "call 6bb"). */}
           <div style={{ display: "flex", alignItems: "center", gap: 8, overflowX: "auto", flex: 1, minWidth: 0 }}>
             {hasHistory ? (
               history.map((h, i) => (
@@ -650,9 +563,6 @@ export function PokerTable({
             )}
           </div>
 
-          {/* SPR movido pro topo (pedido explicito) — antes ficava solto
-              embaixo do pote, no centro da mesa. Fixo a direita da barra,
-              nao rola com o resumo de acao. */}
           {hand.spr != null && (
             <div
               style={{
@@ -678,14 +588,6 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            // Inset vertical maior que o horizontal (9% vs 6%) — pedido:
-            // "esta cortando os nomes" em telas maiores (notebook 1080p).
-            // Os assentos de cima/baixo (posLabel proximo de y=0/100) tem
-            // o nome do jogador logo abaixo/acima do avatar; com inset
-            // simetrico a elipse chegava perto demais da borda do
-            // container (que tem overflow:hidden), cortando esse texto.
-            // Vertical maior da mais respiro sem encolher a largura da
-            // mesa.
             inset: "9% 6%",
             borderRadius: "50%",
             background: "radial-gradient(65% 75% at 50% 40%, #0F5A42 0%, #0A4231 30%, #062E22 60%, #031810 100%)",
@@ -736,11 +638,6 @@ export function PokerTable({
                     boxShadow: "0 8px 22px rgba(0,0,0,.7), 0 0 20px rgba(52,211,153,.20)",
                   }}
                 >
-                  {/* Pote agora mostra empilhamento de fichas de verdade
-                      (3 discos) em vez do ponto verde solto — pedido
-                      explicito de "empilhamento no centro". Cor separada
-                      do dourado usado nos seats, pra distinguir visualmente
-                      "ficha do jogador" (dourada) de "ficha no pote" (verde). */}
                   <PotChipStack />
                   <span style={{ color: TEXT.critical, fontWeight: 500, fontSize: 15, ...num }}>{hand.pot}</span>
                   <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>bb</span>
@@ -767,10 +664,17 @@ export function PokerTable({
             key={s.posLabel}
             seat={s}
             state={seatData(s.posLabel)}
-            committed={streetCommitments?.[s.posLabel]}
             isDealer={s.posLabel === "BTN"}
           />
         ))}
+
+        {/* Fichas de aposta ancoradas por assento — sempre dentro do
+            oval, na direcao do centro, bem proximas de cada posicao. */}
+        {seats.map((s) => {
+          const amt = streetCommitments?.[s.posLabel];
+          if (!amt || amt < MIN_COMMITTED_TO_SHOW) return null;
+          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} />;
+        })}
 
         {chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
           <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} />
