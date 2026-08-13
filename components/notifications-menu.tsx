@@ -2,8 +2,16 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle } from "lucide-react";
-import { fetchNotifications, markAsRead, markAllAsRead, deleteNotification, type Notification } from "@/lib/services/notification-service";
+import Link from "next/link";
+import { CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
+import {
+  fetchNotifications,
+  markAsRead,
+  markAllAsRead,
+  deleteNotification,
+  CATEGORIA_LABEL,
+  type Notification,
+} from "@/lib/services/notification-service";
 
 function timeAgo(iso: string) {
   const s = Math.floor((Date.now() - new Date(iso).getTime()) / 1000);
@@ -25,12 +33,14 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
   const [loading, setLoading] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
 
-  const unread = items.filter((n) => !n.read).length;
+  const unread = items.length;
 
   async function load() {
     setLoading(true);
     try {
-      setItems(await fetchNotifications());
+      // So nao lidas: ao marcar como lida, o item sai daqui e fica no
+      // historico completo em /notificacoes.
+      setItems(await fetchNotifications(20, { onlyUnread: true }));
     } catch (e) {
       console.error(e);
     } finally {
@@ -54,7 +64,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
 
   async function handleItemClick(n: Notification) {
     if (!n.read) {
-      setItems((prev) => prev.map((x) => (x.id === n.id ? { ...x, read: true } : x)));
+      setItems((prev) => prev.filter((x) => x.id !== n.id));
       try {
         await markAsRead(n.id);
       } catch {
@@ -68,7 +78,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
   }
 
   async function handleMarkAll() {
-    setItems((prev) => prev.map((x) => ({ ...x, read: true })));
+    setItems([]);
     try {
       await markAllAsRead();
     } catch {
@@ -104,7 +114,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
         {loading && items.length === 0 ? (
           <p className="p-5 text-center text-[13px] text-muted">Carregando…</p>
         ) : items.length === 0 ? (
-          <p className="p-6 text-center text-[13px] text-muted">Você está em dia. Sem notificações. 👌</p>
+          <p className="p-6 text-center text-[13px] text-muted">Você está em dia. Nada por ler. 👌</p>
         ) : (
           items.map((n) => {
             const meta = KIND_ICON[n.kind as keyof typeof KIND_ICON] || KIND_ICON.info;
@@ -113,7 +123,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
               <div
                 key={n.id}
                 onClick={() => handleItemClick(n)}
-                className={`flex cursor-pointer gap-2.5 border-b border-hairline px-4 py-3 transition-colors ${n.read ? "" : "bg-evolution/[0.06]"} ${n.action_url ? "hover:bg-review/[0.08]" : ""}`}
+                className={`flex cursor-pointer gap-2.5 border-b border-hairline px-4 py-3 transition-colors ${n.action_url ? "hover:bg-review/[0.08]" : "hover:bg-elevated"}`}
               >
                 <Icon size={16} color={meta.color} className="mt-0.5 shrink-0" />
                 <div className="min-w-0 flex-1">
@@ -122,6 +132,9 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
                     <span className="shrink-0 text-[11px] text-muted">{timeAgo(n.created_at)}</span>
                   </div>
                   {n.body && <p className="mt-0.5 text-xs leading-relaxed text-muted">{n.body}</p>}
+                  <span className="mt-1 inline-block rounded-full border border-hairline px-1.5 py-px text-[9px] font-bold uppercase tracking-wider text-muted">
+                    {CATEGORIA_LABEL[n.category] ?? "Sistema"}
+                  </span>
                 </div>
                 <button onClick={(e) => handleDelete(n.id, e)} title="Excluir" className="shrink-0 p-0.5 text-muted">
                   <Trash2 size={13} />
@@ -131,6 +144,15 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
           })
         )}
       </div>
+
+      <Link
+        href="/notificacoes"
+        onClick={onClose}
+        className="flex items-center justify-center gap-1 border-t border-hairline px-4 py-2.5 text-[12px] font-semibold text-muted transition-colors hover:bg-elevated hover:text-ink"
+      >
+        Ver todas
+        <ChevronRight size={13} />
+      </Link>
     </div>
   );
 }
