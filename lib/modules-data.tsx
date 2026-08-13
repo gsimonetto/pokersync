@@ -1,4 +1,4 @@
-import { Target, TrendingUp, BookOpen, LineChart, Layers } from "lucide-react";
+import { Target, TrendingUp, BookOpen, LineChart, Layers, Users } from "lucide-react";
 import type { ModuleDef } from "@/components/module-card";
 
 export const ACCENT = {
@@ -38,6 +38,16 @@ export const modules: ModuleDef[] = [
     accent: ACCENT.purple,
     available: true,
     href: "/revisor",
+  },
+  {
+    key: "time",
+    icon: Users,
+    title: "Meu Time",
+    subtitle: "Membros, papeis e convites",
+    accent: ACCENT.green,
+    tag: "NOVO",
+    available: true,
+    href: "/time",
   },
   {
     key: "performance",
