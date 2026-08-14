@@ -1,0 +1,355 @@
+"use client";
+
+import { useState } from "react";
+import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, TrendingUp, TrendingDown, Minus, Trophy, Send } from "lucide-react";
+import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
+import { Avatar } from "@/components/avatar";
+import {
+  assignTeamDrill,
+  diasSemAtividade,
+  type FinancialDay,
+  type PeriodComparison,
+  type TeamActivityDay,
+  type TeamDashboardRow,
+  type TeamLeak,
+} from "@/lib/services/team-service";
+
+// Visao geral do time. Hierarquia visual proposital:
+// 1. KPIs (leitura de 2s) -> 2. graficos lado a lado (dinheiro e estudo,
+// a relacao que o coach precisa enxergar) -> 3. leaks (acao).
+// Dinheiro vem primeiro da esquerda porque e' a metrica de resultado;
+// estudo a direita porque e' a metrica de causa.
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const BRL_CURTO = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
+const INATIVO_DIAS = 7;
+
+export function TabVisaoGeral({
+  jogadores,
+  atividade,
+  financeiro,
+  leaks,
+  comparacao,
+  pronto,
+  dias,
+  onAtribuido,
+}: {
+  jogadores: TeamDashboardRow[];
+  atividade: TeamActivityDay[];
+  financeiro: FinancialDay[];
+  leaks: TeamLeak[];
+  comparacao: PeriodComparison | null;
+  pronto: boolean;
+  dias: number;
+  onAtribuido: () => void;
+}) {
+  const treinos = jogadores.reduce((a, j) => a + j.treinos, 0);
+  const acertos = jogadores.reduce((a, j) => a + j.acertosGto, 0);
+  const revisadas = jogadores.reduce((a, j) => a + j.maosRevisadas, 0);
+  const jogos = jogadores.reduce((a, j) => a + j.jogosNoTime, 0);
+  const lucro = jogadores.reduce((a, j) => a + j.lucroNoTime, 0);
+  const inativos = jogadores.filter((j) => {
+    const d = diasSemAtividade(j.lastActivityAt);
+    return d === null || d >= INATIVO_DIAS;
+  }).length;
+  const acertoPct = treinos > 0 ? Math.round((acertos / treinos) * 100) : null;
+
+  const varTreinos = variacao(comparacao?.treinosAtual, comparacao?.treinosAnterior);
+  const varRevisadas = variacao(comparacao?.revisadasAtual, comparacao?.revisadasAnterior);
+  const acertoAnteriorPct =
+    comparacao && comparacao.treinosAnterior > 0
+      ? Math.round((comparacao.acertosAnterior / comparacao.treinosAnterior) * 100)
+      : null;
+  const varAcerto =
+    acertoPct !== null && acertoAnteriorPct !== null ? acertoPct - acertoAnteriorPct : null;
+
+  return (
+    <div className="space-y-5">
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 print:grid-cols-3">
+        <Kpi d={0} pronto={pronto} icon={Wallet} label="Resultado no time" value={BRL.format(lucro)}
+          hint="desde a entrada de cada um" tom={lucro > 0 ? "positivo" : lucro < 0 ? "negativo" : undefined} destaque />
+        <Kpi d={40} pronto={pronto} icon={Gamepad2} label="Jogos" value={String(jogos)} hint="desde a entrada" />
+        <Kpi d={80} pronto={pronto} icon={Target} label="Treinos no período" value={String(treinos)} tendencia={varTreinos} />
+        <Kpi d={120} pronto={pronto} icon={Flame} label="Acerto GTO" value={acertoPct === null ? "—" : `${acertoPct}%`}
+          hint={acertoPct === null ? "sem treinos" : undefined} tendencia={varAcerto} tendenciaSufixo="pp" />
+        <Kpi d={160} pronto={pronto} icon={BookOpen} label="Mãos revisadas" value={String(revisadas)} tendencia={varRevisadas} />
+        <Kpi d={200} pronto={pronto} icon={TriangleAlert} label="Precisam de atenção" value={String(inativos)}
+          hint={`${jogadores.length - inativos} ativos`} tom={inativos > 0 ? "negativo" : undefined} />
+      </section>
+
+      <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
+        <GraficoFinanceiro dados={financeiro} pronto={pronto} />
+        <GraficoEstudo dados={atividade} pronto={pronto} />
+      </section>
+
+      <Leaderboard jogadores={jogadores} pronto={pronto} />
+
+      <LeaksCard leaks={leaks} pronto={pronto} dias={dias} onAtribuido={onAtribuido} />
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Leaks do time com atribuicao em massa: quando um leak tem drill
+// compativel (mesma regra do Revisor individual — nem todo leak tem),
+// o coach manda o treino pra todos os jogadores afetados de uma vez,
+// em vez de repetir "Treinar esse leak" jogador por jogador.
+// ------------------------------------------------------------
+function LeaksCard({
+  leaks,
+  pronto,
+  dias,
+  onAtribuido,
+}: {
+  leaks: TeamLeak[];
+  pronto: boolean;
+  dias: number;
+  onAtribuido: () => void;
+}) {
+  const [atribuindo, setAtribuindo] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, string>>({});
+
+  async function atribuir(l: TeamLeak) {
+    if (!l.drillId) return;
+    const chave = `${l.reasonCode}:${l.street}`;
+    setAtribuindo(chave);
+    try {
+      const n = await assignTeamDrill(l.reasonCode, l.street, l.drillId, dias);
+      setFeedback((prev) => ({
+        ...prev,
+        [chave]: n > 0 ? `Enviado para ${n} jogador${n === 1 ? "" : "es"}` : "Já estavam com esse treino recente",
+      }));
+      onAtribuido();
+    } catch {
+      setFeedback((prev) => ({ ...prev, [chave]: "Não foi possível atribuir" }));
+    } finally {
+      setAtribuindo(null);
+    }
+  }
+
+  return (
+    <section
+      className={`rounded-xl border border-hairline bg-surface p-5 transition-all duration-500 print:break-inside-avoid ${
+        pronto ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[15px] font-semibold">Leaks mais frequentes</h2>
+        <span className="text-xs text-muted">avaliações de rua no Revisor</span>
+      </div>
+      {leaks.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">Ainda não há erros classificados neste período.</p>
+      ) : (
+        <ul className="mt-4 space-y-2">
+          {leaks.map((l, i) => {
+            const maior = leaks[0].total || 1;
+            const chave = `${l.reasonCode}:${l.street}`;
+            const msg = feedback[chave];
+            return (
+              <li key={chave} className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
+                <div className="flex items-center justify-between gap-3">
+                  <div className="min-w-0 flex-1">
+                    <span className="truncate text-[13px] font-medium">{l.label}</span>
+                    <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted">{l.street}</span>
+                  </div>
+                  <span className="shrink-0 text-xs text-muted tnum">
+                    {l.total}× · {l.jogadores} jogador(es)
+                  </span>
+                  {l.treinavel && (
+                    <button
+                      onClick={() => atribuir(l)}
+                      disabled={atribuindo === chave}
+                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-review/40 px-2.5 py-1.5 text-[11px] font-semibold text-review transition-colors hover:bg-review/10 disabled:opacity-50 print:hidden"
+                    >
+                      <Send size={12} />
+                      {atribuindo === chave ? "Enviando…" : "Atribuir aos afetados"}
+                    </button>
+                  )}
+                </div>
+                {l.drillTitle && !msg && (
+                  <p className="mt-1 text-[11px] text-muted">→ {l.drillTitle}</p>
+                )}
+                {msg && <p className="mt-1 text-[11px] text-training">{msg}</p>}
+                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-void">
+                  <div
+                    className="h-full rounded-full bg-review transition-all ease-out"
+                    style={{
+                      width: pronto ? `${Math.max(6, Math.round((l.total / maior) * 100))}%` : "0%",
+                      transitionDuration: "600ms",
+                      transitionDelay: `${150 + i * 40}ms`,
+                    }}
+                  />
+                </div>
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ------------------------------------------------------------
+// Leaderboard: reconhecimento entre jogadores, nao so vigilancia do
+// coach. Ranking por XP do periodo (o que reflete esforco recente,
+// nao nivel acumulado — um jogador novo pode liderar a semana).
+// Empate de XP desempata por ofensiva. Top 3 ganham medalha de cor.
+// ------------------------------------------------------------
+const MEDALHA = ["#F2C94C", "#C0C0C0", "#CD7F32"];
+
+function Leaderboard({ jogadores, pronto }: { jogadores: TeamDashboardRow[]; pronto: boolean }) {
+  const ranking = [...jogadores]
+    .filter((j) => j.xpPeriodo > 0)
+    .sort((a, b) => b.xpPeriodo - a.xpPeriodo || (b.streakDays ?? 0) - (a.streakDays ?? 0))
+    .slice(0, 8);
+
+  return (
+    <section
+      className={`rounded-xl border border-hairline bg-surface p-5 transition-all duration-500 delay-100 print:break-inside-avoid ${
+        pronto ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="flex items-center gap-1.5 text-[15px] font-semibold">
+          <Trophy size={15} className="text-evolution" />
+          Ranking do time
+        </h2>
+        <span className="text-xs text-muted">XP no período</span>
+      </div>
+
+      {ranking.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">Ninguém pontuou XP neste período ainda.</p>
+      ) : (
+        <ul className="mt-3 divide-y divide-hairline">
+          {ranking.map((j, i) => (
+            <li key={j.userId} className="flex items-center gap-3 py-2.5">
+              <span
+                className="w-5 shrink-0 text-center text-[13px] font-bold tnum"
+                style={{ color: MEDALHA[i] ?? "var(--color-muted, #8b8b8b)" }}
+              >
+                {i + 1}
+              </span>
+              <Avatar id={j.avatarId} url={j.avatarUrl} size={30} />
+              <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{j.nome}</span>
+              {j.streakDays ? (
+                <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-evolution">
+                  <Flame size={11} />
+                  {j.streakDays}
+                </span>
+              ) : null}
+              <span className="w-16 shrink-0 text-right text-[13px] font-semibold tnum text-evolution">
+                {j.xpPeriodo} XP
+              </span>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
+  );
+}
+
+// ------------------------------------------------------------
+// Grafico de estudo: treinos + revisoes por dia, mesma grade do
+// grafico financeiro ao lado.
+// ------------------------------------------------------------
+function GraficoEstudo({ dados, pronto }: { dados: TeamActivityDay[]; pronto: boolean }) {
+  const max = Math.max(1, ...dados.map((d) => d.treinos + d.revisoes));
+  const totalTreinos = dados.reduce((a, d) => a + d.treinos, 0);
+  const totalRev = dados.reduce((a, d) => a + d.revisoes, 0);
+
+  return (
+    <div
+      className={`rounded-xl border border-hairline bg-surface p-5 transition-all duration-500 delay-75 print:break-inside-avoid ${
+        pronto ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
+      }`}
+    >
+      <div className="flex items-baseline justify-between gap-3">
+        <h2 className="text-[15px] font-semibold">Estudo no período</h2>
+        <span className="text-sm font-semibold tnum text-muted">{totalTreinos + totalRev} atividades</span>
+      </div>
+
+      <div className="mt-4 flex items-end gap-[2px]" style={{ height: 132 }}>
+        {dados.map((d, i) => {
+          const total = d.treinos + d.revisoes;
+          return (
+            <div key={d.dia} className="flex h-full min-w-0 flex-1 flex-col justify-end"
+              title={`${new Date(d.dia).toLocaleDateString("pt-BR")}: ${d.treinos} treino(s), ${d.revisoes} revisão(ões)`}>
+              {total === 0 ? (
+                <div className="h-[2px] w-full rounded-sm bg-hairline" />
+              ) : (
+                <>
+                  <div className="w-full rounded-t-sm bg-review transition-all ease-out"
+                    style={{
+                      height: pronto ? `${(d.revisoes / max) * 100}%` : "0%",
+                      transitionDuration: "700ms",
+                      transitionDelay: `${Math.min(i * 10, 350)}ms`,
+                    }} />
+                  <div className="w-full rounded-b-sm bg-training transition-all ease-out"
+                    style={{
+                      height: pronto ? `${(d.treinos / max) * 100}%` : "0%",
+                      transitionDuration: "700ms",
+                      transitionDelay: `${Math.min(i * 10, 350)}ms`,
+                    }} />
+                </>
+              )}
+            </div>
+          );
+        })}
+      </div>
+
+      <div className="mt-2 flex gap-3 text-[11px] text-muted">
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-training" /> Treinos ({totalTreinos})</span>
+        <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-review" /> Revisões ({totalRev})</span>
+      </div>
+    </div>
+  );
+}
+
+function variacao(atual?: number, anterior?: number): number | null {
+  if (atual === undefined || anterior === undefined) return null;
+  if (anterior === 0) return atual > 0 ? 100 : null;
+  return Math.round(((atual - anterior) / anterior) * 100);
+}
+
+function Kpi({
+  icon: Icon, label, value, hint, tom, pronto, d = 0, destaque, tendencia, tendenciaSufixo = "%",
+}: {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  icon: any; label: string; value: string; hint?: string;
+  tom?: "positivo" | "negativo"; pronto: boolean; d?: number; destaque?: boolean;
+  tendencia?: number | null; tendenciaSufixo?: string;
+}) {
+  const cor = tom === "positivo" ? "text-positive" : tom === "negativo" ? "text-negative" : "text-ink";
+  const TendIcon = tendencia === null || tendencia === undefined || tendencia === 0
+    ? Minus
+    : tendencia > 0 ? TrendingUp : TrendingDown;
+  const tendCor = tendencia === null || tendencia === undefined || tendencia === 0
+    ? "text-muted"
+    : tendencia > 0 ? "text-positive" : "text-negative";
+  return (
+    <div
+      className={`rounded-xl border bg-surface p-4 transition-all ease-out print:break-inside-avoid ${
+        destaque ? "border-ink/20" : "border-hairline"
+      }`}
+      style={{
+        opacity: pronto ? 1 : 0,
+        transform: pronto ? "translateY(0)" : "translateY(6px)",
+        transitionDuration: "450ms",
+        transitionDelay: `${d}ms`,
+      }}
+    >
+      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+        <Icon size={13} className={tom === "negativo" ? "text-negative" : ""} />
+        {label}
+      </div>
+      <p className={`mt-1.5 text-2xl font-semibold tnum ${cor}`}>{value}</p>
+      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+      {tendencia !== undefined && (
+        <p className={`mt-1 flex items-center gap-1 text-[11px] font-medium tnum ${tendCor}`}>
+          <TendIcon size={11} />
+          {tendencia === null ? "sem comparação" : `${tendencia > 0 ? "+" : ""}${tendencia}${tendenciaSufixo} vs período anterior`}
+        </p>
+      )}
+    </div>
+  );
+}
