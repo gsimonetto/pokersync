@@ -38,7 +38,12 @@ export default async function ModulosPage() {
   const [{ data: sessionRows }, { data: planRow }, { data: teamRow }] = await Promise.all([
     supabase.from("bankroll_sessions").select("*"),
     supabase.from("user_plans").select("plan").maybeSingle(),
-    supabase.from("team_members").select("teams ( name, accent )").maybeSingle(),
+    // Filtro por user_id e' obrigatorio aqui: a RLS de team_members libera
+    // TODO membro do mesmo time (necessario pro painel do coach ver o
+    // time inteiro), entao sem esse filtro a query junta as N linhas do
+    // time e o .maybeSingle() abaixo falha com "multiple rows returned" —
+    // erro que ficava engolido silenciosamente, sem badge de time.
+    supabase.from("team_members").select("teams ( name, accent )").eq("user_id", user?.id ?? "").maybeSingle(),
   ]);
 
   // Ausencia de linha em user_plans == free (nao exige trigger de signup).
