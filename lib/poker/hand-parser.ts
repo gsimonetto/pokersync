@@ -102,6 +102,42 @@ export interface ParsedHand {
   villainPosition: string | null;
   heroInPosition: boolean | null;
   postflopTags: PostflopTags;
+  preflopTags: PreflopTags;
+}
+
+// ------------------------------------------------------------
+// Tags pre-flop do Spot Analyzer. Definicoes (mesmo padrao de
+// mercado usado por trackers):
+//   - RFI (raise first in) = 1o raise da mao, ninguem tinha entrado
+//     com call antes (so folds/blinds).
+//   - Steal attempt = RFI vindo de CO/BTN/SB (posicoes classicas de
+//     roubo de blind).
+//   - Steal success = steal attempt em que ninguem deu call/raise
+//     depois — ganhou os blinds sem disputa.
+//   - Fold/call/4-bet vs 3-bet = heroi deu o RFI, alguem 3-betou
+//     (2o raise), o que o heroi fez em seguida.
+//   - Defesa de blind = heroi em SB/BB, enfrentando exatamente 1
+//     raise (o open) quando chega a vez dele — calls ou raises conta
+//     como defendeu, fold conta como nao defendeu.
+//   - Re-steal = heroi da o 2o raise (3-bet) direto em cima de um
+//     steal attempt do oponente, sem ninguem dar call no meio.
+//   - Squeeze = heroi da um raise que NAO e' o 1o, com pelo menos um
+//     call de outro jogador entre o raise anterior e o do heroi.
+// ------------------------------------------------------------
+export interface PreflopTags {
+  heroOpenRaise: boolean;
+  stealAttempt: boolean;
+  stealSuccess: boolean;
+  heroFacedThreeBet: boolean;
+  heroFoldToThreeBet: boolean;
+  heroCallThreeBet: boolean;
+  heroMade4Bet: boolean;
+  heroFaced4Bet: boolean;
+  heroFoldTo4Bet: boolean;
+  blindDefenseOpportunity: boolean;
+  blindDefended: boolean;
+  reSteal: boolean;
+  squeeze: boolean;
 }
 
 // ------------------------------------------------------------
@@ -533,6 +569,124 @@ function computePostflopTags(streets: ParsedStreet[], heroName: string | null): 
   return { isPreflopAggressor, cbetFlop, cbetTurn, doubleBarrel, tripleBarrel, donkBetFlop, checkRaise, foldToCbetFlop };
 }
 
+const STEAL_POSITIONS = new Set(["CO", "BTN", "SB"]);
+
+function computePreflopTags(preflopActions: ParsedAction[], seats: ParsedSeat[], heroName: string | null): PreflopTags {
+  const empty: PreflopTags = {
+    heroOpenRaise: false,
+    stealAttempt: false,
+    stealSuccess: false,
+    heroFacedThreeBet: false,
+    heroFoldToThreeBet: false,
+    heroCallThreeBet: false,
+    heroMade4Bet: false,
+    heroFaced4Bet: false,
+    heroFoldTo4Bet: false,
+    blindDefenseOpportunity: false,
+    blindDefended: false,
+    reSteal: false,
+    squeeze: false,
+  };
+  if (!heroName) return empty;
+
+  const positionOf = (player: string): string | null => seats.find((s) => s.playerName === player)?.position ?? null;
+  const heroPosition = positionOf(heroName);
+
+  // Indices (na lista original de acoes do preflop) de cada raise, em
+  // ordem — usados pra olhar "o que teve entre um raise e outro".
+  const raiseIdx: number[] = [];
+  preflopActions.forEach((a, i) => {
+    if (a.action === "raises") raiseIdx.push(i);
+  });
+
+  const firstRaise = raiseIdx[0] !== undefined ? preflopActions[raiseIdx[0]] : null;
+  const secondRaise = raiseIdx[1] !== undefined ? preflopActions[raiseIdx[1]] : null;
+  const thirdRaise = raiseIdx[2] !== undefined ? preflopActions[raiseIdx[2]] : null;
+
+  const heroOpenRaise = firstRaise?.player === heroName;
+
+  // RFI limpo = ninguem deu call antes do 1o raise (so fold/post).
+  const noLimpsBeforeFirstRaise = raiseIdx[0] !== undefined
+    ? !preflopActions.slice(0, raiseIdx[0]).some((a) => a.action === "calls")
+    : false;
+
+  const stealAttempt = heroOpenRaise && !!heroPosition && STEAL_POSITIONS.has(heroPosition) && noLimpsBeforeFirstRaise;
+  const stealSuccess =
+    stealAttempt &&
+    !preflopActions.slice(raiseIdx[0] + 1).some((a) => a.action === "calls" || a.action === "raises");
+
+  const heroFacedThreeBet = heroOpenRaise && secondRaise !== null && secondRaise.player !== heroName;
+  let heroFoldToThreeBet = false;
+  let heroCallThreeBet = false;
+  if (heroFacedThreeBet) {
+    const heroResponse = preflopActions.slice(raiseIdx[1] + 1).find((a) => a.player === heroName);
+    heroFoldToThreeBet = heroResponse?.action === "folds";
+    heroCallThreeBet = heroResponse?.action === "calls";
+  }
+
+  const heroMade4Bet = thirdRaise !== null && thirdRaise.player === heroName;
+  const heroFaced4Bet = secondRaise?.player === heroName && thirdRaise !== null && thirdRaise.player !== heroName;
+  let heroFoldTo4Bet = false;
+  if (heroFaced4Bet) {
+    const heroResponse = preflopActions.slice(raiseIdx[2] + 1).find((a) => a.player === heroName);
+    heroFoldTo4Bet = heroResponse?.action === "folds";
+  }
+
+  // Defesa de blind: heroi em SB/BB, e no momento em que ele toma a
+  // PRIMEIRA DECISAO de verdade no preflop (post de blind nao conta,
+  // e' automatico, nao e' escolha), so existe 1 raise na mesa (o
+  // open) e nao foi ele quem deu.
+  const heroFirstActionIdx = preflopActions.findIndex((a) => a.player === heroName && a.action !== "posts");
+  const raisesBeforeHero = heroFirstActionIdx === -1 ? [] : raiseIdx.filter((i) => i < heroFirstActionIdx);
+  const blindDefenseOpportunity =
+    !!heroPosition &&
+    (heroPosition === "SB" || heroPosition === "BB") &&
+    raisesBeforeHero.length === 1 &&
+    preflopActions[raisesBeforeHero[0]].player !== heroName;
+  const blindDefended = blindDefenseOpportunity && preflopActions[heroFirstActionIdx]?.action !== "folds";
+
+  // Re-steal: heroi da o 2o raise direto em cima de um steal attempt
+  // do oponente (sem call no meio). Squeeze: heroi da um raise que
+  // nao e' o 1o, com pelo menos 1 call de outro jogador entre o raise
+  // anterior e o dele — mutuamente exclusivos por construcao.
+  let squeeze = false;
+  for (let k = 1; k < raiseIdx.length; k++) {
+    const raiseAction = preflopActions[raiseIdx[k]];
+    if (raiseAction.player !== heroName) continue;
+    const hasCallBetween = preflopActions.slice(raiseIdx[k - 1] + 1, raiseIdx[k]).some((a) => a.action === "calls");
+    if (hasCallBetween) {
+      squeeze = true;
+      break;
+    }
+  }
+
+  const openerPosition = firstRaise ? positionOf(firstRaise.player) : null;
+  const reSteal =
+    !squeeze &&
+    secondRaise !== null &&
+    secondRaise.player === heroName &&
+    firstRaise !== null &&
+    !!openerPosition &&
+    STEAL_POSITIONS.has(openerPosition) &&
+    noLimpsBeforeFirstRaise;
+
+  return {
+    heroOpenRaise,
+    stealAttempt,
+    stealSuccess,
+    heroFacedThreeBet,
+    heroFoldToThreeBet,
+    heroCallThreeBet,
+    heroMade4Bet,
+    heroFaced4Bet,
+    heroFoldTo4Bet,
+    blindDefenseOpportunity,
+    blindDefended,
+    reSteal,
+    squeeze,
+  };
+}
+
 // Seat/Lugar + em torneios PKO/Mystery Bounty PT-BR, sufixo ", Bounty de $ X"
 // junto do stack — capturado no grupo 4 (opcional) pra alimentar o bounty
 // automatico do heroi sem precisar digitar manual.
@@ -624,6 +778,7 @@ export function parseHand(rawText: string): ParsedHand {
   const preflopActionsForMatchup = streets.find((s) => s.name === "preflop")?.actions ?? [];
   const { villainPosition, heroInPosition } = computeHeroMatchup(seats, preflopActionsForMatchup, heroName);
   const postflopTags = computePostflopTags(streets, heroName);
+  const preflopTags = computePreflopTags(preflopActionsForMatchup, seats, heroName);
 
   return {
     site,
@@ -650,6 +805,7 @@ export function parseHand(rawText: string): ParsedHand {
     villainPosition,
     heroInPosition,
     postflopTags,
+    preflopTags,
   };
 }
 
