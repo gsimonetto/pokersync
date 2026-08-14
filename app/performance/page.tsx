@@ -18,7 +18,25 @@ import {
   TrendingDown,
   Sparkles,
 } from "lucide-react";
-import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
+import {
+  fetchPlayerPerformance,
+  fetchPositionStats,
+  fetchPlayerTimeline,
+  fetchMatchupStats,
+  fetchIpOopSplit,
+  fetchSkillBreakdown,
+  fetchPeriodComparison,
+  fetchPlayerInsights,
+  nivelDoScore,
+  computePositionHighlights,
+  type PlayerPerformance,
+  type PositionStat,
+  type TimelineEvent,
+  type MatchupStat,
+  type IpOopSplit,
+  type SkillArea,
+  type PeriodComparisonRow,
+} from "@/lib/services/performance-service";
 
 // ------------------------------------------------------------
 // Formatadores locais — a tela e' so leitura, nao reusa o form de banca.
@@ -45,16 +63,24 @@ function fmtNum(v: number | null | undefined, suffix = ""): string | null {
   return `${Number(v).toLocaleString("pt-BR")}${suffix}`;
 }
 
-type TabKey = "financeiro" | "jogo" | "estudo";
+type TabKey = "financeiro" | "jogo" | "estudo" | "evolucao";
 
 const TABS: { key: TabKey; label: string }[] = [
   { key: "financeiro", label: "Financeiro" },
   { key: "jogo", label: "Jogo" },
   { key: "estudo", label: "Estudo" },
+  { key: "evolucao", label: "Evolução" },
 ];
 
 export default function PerformancePage() {
   const [data, setData] = useState<PlayerPerformance | null>(null);
+  const [posStats, setPosStats] = useState<PositionStat[]>([]);
+  const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
+  const [matchupStats, setMatchupStats] = useState<MatchupStat[]>([]);
+  const [ipOop, setIpOop] = useState<IpOopSplit | null>(null);
+  const [skills, setSkills] = useState<SkillArea[]>([]);
+  const [periods, setPeriods] = useState<PeriodComparisonRow[]>([]);
+  const [insights, setInsights] = useState<string[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("financeiro");
@@ -63,8 +89,26 @@ export default function PerformancePage() {
     let alive = true;
     (async () => {
       try {
-        const d = await fetchPlayerPerformance();
-        if (alive) setData(d);
+        const [d, ps, tl, ms, io, sk, pc, ins] = await Promise.all([
+          fetchPlayerPerformance(),
+          fetchPositionStats(),
+          fetchPlayerTimeline(),
+          fetchMatchupStats(),
+          fetchIpOopSplit(),
+          fetchSkillBreakdown(),
+          fetchPeriodComparison(),
+          fetchPlayerInsights(),
+        ]);
+        if (alive) {
+          setData(d);
+          setPosStats(ps);
+          setTimeline(tl);
+          setMatchupStats(ms);
+          setIpOop(io);
+          setSkills(sk);
+          setPeriods(pc);
+          setInsights(ins);
+        }
       } catch (e) {
         if (alive) setErro(e instanceof Error ? e.message : "Falha ao carregar sua performance.");
       } finally {
@@ -118,6 +162,24 @@ export default function PerformancePage() {
           <h1 className="m-0 text-xl font-semibold tracking-tight">Player Evolution</h1>
           <p className="mt-0.5 text-sm text-muted">Banca, jogo e estudo em um só lugar</p>
         </div>
+        {data?.score_geral !== null && data?.score_geral !== undefined && (
+          <div className="ml-auto flex items-center gap-2">
+            <span className="hidden text-xs font-medium text-muted sm:inline">{nivelDoScore(Number(data.score_geral))}</span>
+            <div
+              className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 text-center"
+              style={{
+                borderColor:
+                  Number(data.score_geral) >= 70 ? "#2FB89A" : Number(data.score_geral) >= 45 ? "#E0B24C" : "#e0555a",
+              }}
+              title="Score Geral de Evolução"
+            >
+              <div>
+                <p className="text-base font-bold leading-none tabular-nums">{Math.round(Number(data.score_geral))}</p>
+                <p className="mt-0.5 text-[8px] uppercase tracking-wide text-muted">/100</p>
+              </div>
+            </div>
+          </div>
+        )}
       </header>
 
       {erro && (
@@ -240,8 +302,11 @@ export default function PerformancePage() {
 
           <div className="mt-4">
             {tab === "financeiro" && <AbaFinanceiro data={data} />}
-            {tab === "jogo" && <AbaJogo data={data} />}
+            {tab === "jogo" && <AbaJogo data={data} posStats={posStats} matchupStats={matchupStats} ipOop={ipOop} />}
             {tab === "estudo" && <AbaEstudo data={data} />}
+            {tab === "evolucao" && (
+              <AbaEvolucao data={data} timeline={timeline} skills={skills} periods={periods} insights={insights} />
+            )}
           </div>
 
           <p className="mt-6 text-center text-[11px] text-muted">
@@ -318,8 +383,19 @@ const REF = {
   threeBet: { min: 5, max: 10, escala: 20 },
 };
 
-function AbaJogo({ data }: { data: PlayerPerformance }) {
+function AbaJogo({
+  data,
+  posStats,
+  matchupStats,
+  ipOop,
+}: {
+  data: PlayerPerformance;
+  posStats: PositionStat[];
+  matchupStats: MatchupStat[];
+  ipOop: IpOopSplit | null;
+}) {
   const amostra = data.maos_com_dados_frequencia ?? 0;
+  const ipTotal = (ipOop?.ip_hands ?? 0) + (ipOop?.oop_hands ?? 0);
   return (
     <div className="space-y-4">
       <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />}>
@@ -333,6 +409,103 @@ function AbaJogo({ data }: { data: PlayerPerformance }) {
           <Frequencia label="PFR" valor={data.pfr_pct} referencia={REF.pfr} />
           <Frequencia label="3-Bet" valor={data.three_bet_pct} referencia={REF.threeBet} />
         </div>
+      </Painel>
+
+      <Painel titulo="Por posição" icone={<Target size={14} className="text-evolution" />}>
+        {posStats.length === 0 ? (
+          <p className="text-xs leading-relaxed text-muted">
+            Ainda sem mãos suficientes com posição identificada para separar por posição.
+          </p>
+        ) : (
+          <>
+            {computePositionHighlights(posStats).length > 0 && (
+              <ul className="mb-3 space-y-1">
+                {computePositionHighlights(posStats).map((h, i) => (
+                  <li key={i} className="flex gap-2 text-sm text-ink">
+                    <span className="text-evolution">•</span>
+                    {h}
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="overflow-hidden rounded-lg border border-hairline">
+              <table className="w-full text-xs">
+                <thead>
+                  <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
+                    <th className="px-3 py-2 text-left font-bold">Posição</th>
+                    <th className="px-3 py-2 text-right font-bold">Mãos</th>
+                    <th className="px-3 py-2 text-right font-bold">VPIP</th>
+                    <th className="px-3 py-2 text-right font-bold">PFR</th>
+                    <th className="px-3 py-2 text-right font-bold">3-Bet</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {posStats.map((p) => (
+                    <tr key={p.position} className="border-b border-hairline last:border-b-0">
+                      <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.vpip_pct) ?? "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.pfr_pct) ?? "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.three_bet_pct) ?? "—"}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          </>
+        )}
+      </Painel>
+
+      <Painel titulo="Dentro vs fora de posição" icone={<Target size={14} className="text-training" />}>
+        <p className="text-xs leading-relaxed text-muted">
+          Só conta mãos onde exatamente 2 jogadores chegaram ao flop (heads-up pot) — é o único caso em que IP/OOP tem
+          um valor único e correto. Mãos com 3+ jogadores no flop não entram aqui.
+        </p>
+        {ipTotal === 0 ? (
+          <p className="mt-2 text-xs text-muted/70">Sem mãos heads-up suficientes ainda.</p>
+        ) : (
+          <div className="mt-2 space-y-2">
+            <div className="flex h-3 w-full overflow-hidden rounded-full bg-void/40">
+              <div className="h-full bg-positive" style={{ width: `${((ipOop?.ip_hands ?? 0) / ipTotal) * 100}%` }} />
+              <div className="h-full bg-review" style={{ width: `${((ipOop?.oop_hands ?? 0) / ipTotal) * 100}%` }} />
+            </div>
+            <div className="flex justify-between text-xs">
+              <span className="text-positive">Em posição — {ipOop?.ip_hands ?? 0} mãos ({fmtPct(ipOop?.ip_pct) ?? "—"})</span>
+              <span className="text-review">Fora de posição — {ipOop?.oop_hands ?? 0} mãos</span>
+            </div>
+          </div>
+        )}
+      </Painel>
+
+      <Painel titulo="Matchups mais jogados" icone={<Target size={14} className="text-review" />}>
+        {matchupStats.length === 0 ? (
+          <p className="text-xs leading-relaxed text-muted">
+            Ainda sem matchups heads-up suficientes para listar.
+          </p>
+        ) : (
+          <div className="overflow-hidden rounded-lg border border-hairline">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
+                  <th className="px-3 py-2 text-left font-bold">Matchup</th>
+                  <th className="px-3 py-2 text-right font-bold">Mãos</th>
+                  <th className="px-3 py-2 text-right font-bold">VPIP</th>
+                  <th className="px-3 py-2 text-right font-bold">PFR</th>
+                </tr>
+              </thead>
+              <tbody>
+                {matchupStats.map((m) => (
+                  <tr key={m.matchup} className="border-b border-hairline last:border-b-0">
+                    <td className="px-3 py-2 font-semibold text-ink">{m.matchup}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted">{m.hands}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.vpip_pct) ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.pfr_pct) ?? "—"}</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
       </Painel>
 
       <Painel titulo="Precisão" icone={<Lock size={14} className="text-muted" />}>
@@ -408,6 +581,159 @@ function AbaEstudo({ data }: { data: PlayerPerformance }) {
           </div>
         )}
       </Painel>
+    </div>
+  );
+}
+
+// Rotulo + cor por componente do score — usado tanto na barra quanto na
+// legenda, pra nao duplicar a lista em dois lugares.
+const SCORE_COMPONENTS: { key: keyof PlayerPerformance; label: string }[] = [
+  { key: "score_tecnica", label: "Técnica" },
+  { key: "score_conhecimento", label: "Conhecimento" },
+  { key: "score_disciplina", label: "Disciplina" },
+  { key: "score_performance", label: "Performance" },
+  { key: "score_consistencia", label: "Consistência" },
+];
+
+function corDoScore(v: number) {
+  return v >= 70 ? "#2FB89A" : v >= 45 ? "#E0B24C" : "#e0555a";
+}
+
+function AbaEvolucao({
+  data,
+  timeline,
+  skills,
+  periods,
+  insights,
+}: {
+  data: PlayerPerformance;
+  timeline: TimelineEvent[];
+  skills: SkillArea[];
+  periods: PeriodComparisonRow[];
+  insights: string[];
+}) {
+  return (
+    <div className="space-y-4">
+      {insights.length > 0 && (
+        <Painel titulo="Insights" icone={<Sparkles size={14} className="text-evolution" />}>
+          <p className="text-xs leading-relaxed text-muted">
+            Gerado por regra simples comparando a primeira metade do seu histórico com a mais recente — sem IA.
+          </p>
+          <ul className="mt-2 space-y-2">
+            {insights.map((ins, i) => (
+              <li key={i} className="flex gap-2 text-sm text-ink">
+                <span className="text-evolution">•</span>
+                {ins}
+              </li>
+            ))}
+          </ul>
+        </Painel>
+      )}
+
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Painel titulo="Score Geral de Evolução" icone={<Sparkles size={14} className="text-evolution" />}>
+          <p className="text-xs leading-relaxed text-muted">
+            Combina 5 frentes numa nota só. Componente sem dado suficiente entra neutro (50) — não puxa a nota pra
+            baixo nem pra cima.
+          </p>
+          <div className="space-y-3 pt-1">
+            {SCORE_COMPONENTS.map((c) => {
+              const raw = data[c.key];
+              const v = raw === null || raw === undefined ? 50 : Number(raw);
+              return (
+                <div key={c.key}>
+                  <div className="flex items-baseline justify-between gap-3">
+                    <p className="text-[13px] text-muted">{c.label}</p>
+                    <span className="text-xs font-bold tabular-nums" style={{ color: corDoScore(v) }}>
+                      {Math.round(v)}
+                    </span>
+                  </div>
+                  <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-void/40">
+                    <div
+                      className="h-full rounded-full transition-[width] duration-500 ease-out"
+                      style={{ width: `${v}%`, backgroundColor: corDoScore(v) }}
+                    />
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+        </Painel>
+
+        <Painel titulo="Timeline" icone={<Award size={14} className="text-evolution" />}>
+          {timeline.length === 0 ? (
+            <p className="text-xs leading-relaxed text-muted">
+              Ainda sem marcos registrados. Eles aparecem conforme você joga sessões, revisa mãos e treina drills.
+            </p>
+          ) : (
+            <div className="space-y-3">
+              {timeline
+                .slice()
+                .sort((a, b) => (a.event_date < b.event_date ? -1 : 1))
+                .map((ev, i) => (
+                  <div key={`${ev.event_type}-${i}`} className="flex gap-3 border-b border-hairline pb-3 last:border-b-0 last:pb-0">
+                    <div className="mt-0.5 h-2 w-2 shrink-0 rounded-full bg-evolution" />
+                    <div>
+                      <p className="text-sm font-medium text-ink">{ev.title}</p>
+                      {ev.detail && <p className="text-[11px] text-muted">{ev.detail}</p>}
+                      <p className="mt-0.5 text-[11px] text-muted/70">
+                        {new Date(ev.event_date).toLocaleDateString("pt-BR")}
+                      </p>
+                    </div>
+                  </div>
+                ))}
+            </div>
+          )}
+        </Painel>
+
+        <Painel titulo="Evolução por habilidade" icone={<Target size={14} className="text-training" />}>
+          <p className="text-xs leading-relaxed text-muted">
+            Precisão da sua auto-avaliação no Revisor (acertei/errei), por área. ICM ficou de fora — ainda sem dado de
+            bolha/ICM (depende do agente desktop, que não existe ainda).
+          </p>
+          <div className="space-y-3 pt-1">
+            {skills.map((s) => (
+              <div key={s.area}>
+                <div className="flex items-baseline justify-between gap-3">
+                  <p className="text-[13px] text-muted">{s.area}</p>
+                  <span className="text-xs font-bold tabular-nums">
+                    {s.accuracy_pct !== null ? `${s.accuracy_pct}%` : "—"}{" "}
+                    <span className="font-normal text-muted/70">({s.sample_count})</span>
+                  </span>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-void/40">
+                  <div
+                    className="h-full rounded-full bg-training transition-[width] duration-500 ease-out"
+                    style={{ width: `${s.accuracy_pct ?? 0}%` }}
+                  />
+                </div>
+              </div>
+            ))}
+          </div>
+        </Painel>
+
+        <Painel titulo="Comparação entre períodos" icone={<LineChart size={14} className="text-evolution" />}>
+          <p className="text-xs leading-relaxed text-muted">
+            Primeira metade do seu histórico de sessões vs. a mais recente.
+          </p>
+          {periods.length === 0 ? (
+            <p className="mt-2 text-xs text-muted/70">Precisa de mais sessões registradas pra comparar períodos.</p>
+          ) : (
+            <div className="mt-2 space-y-2">
+              {periods.map((p) => (
+                <div key={p.metric} className="flex items-center justify-between border-b border-hairline pb-2 text-sm last:border-b-0">
+                  <span className="text-muted">{p.metric}</span>
+                  <span className="tabular-nums">
+                    {p.period_early !== null ? `${p.period_early}${p.unit}` : "—"}
+                    <span className="mx-1.5 text-muted/50">→</span>
+                    <strong className="text-ink">{p.period_recent !== null ? `${p.period_recent}${p.unit}` : "—"}</strong>
+                  </span>
+                </div>
+              ))}
+            </div>
+          )}
+        </Painel>
+      </div>
     </div>
   );
 }
