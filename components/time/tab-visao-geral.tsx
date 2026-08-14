@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, TrendingUp, TrendingDown, Minus, Trophy, Send } from "lucide-react";
+import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, TrendingUp, TrendingDown, Minus, Trophy, Send, Info } from "lucide-react";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { Avatar } from "@/components/avatar";
 import {
@@ -94,7 +94,18 @@ export function TabVisaoGeral({
 // compativel (mesma regra do Revisor individual — nem todo leak tem),
 // o coach manda o treino pra todos os jogadores afetados de uma vez,
 // em vez de repetir "Treinar esse leak" jogador por jogador.
+//
+// Redesenho: severidade em selo de cor (Alta/Média/Baixa, calculada
+// pela posição no ranking — mais claro que uma barra de progresso
+// sem escala) + botão com rótulo explícito do que ele faz.
 // ------------------------------------------------------------
+function severidade(indice: number, total: number): { label: string; cor: string; bg: string } {
+  const pct = total <= 1 ? 0 : indice / (total - 1);
+  if (pct <= 0.33) return { label: "Alta", cor: "#F26D6D", bg: "rgba(242,109,109,0.14)" };
+  if (pct <= 0.66) return { label: "Média", cor: "#F2B84C", bg: "rgba(242,184,76,0.14)" };
+  return { label: "Baixa", cor: "#8b8b8b", bg: "rgba(139,139,139,0.14)" };
+}
+
 function LeaksCard({
   leaks,
   pronto,
@@ -135,51 +146,54 @@ function LeaksCard({
     >
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="text-[15px] font-semibold">Leaks mais frequentes</h2>
-        <span className="text-xs text-muted">avaliações de rua no Revisor</span>
+        <span className="flex items-center gap-1 text-xs text-muted" title="Baseado nas autoavaliações de rua feitas no Revisor de Mãos">
+          <Info size={12} />
+          avaliações de rua no Revisor
+        </span>
       </div>
       {leaks.length === 0 ? (
         <p className="mt-3 text-sm text-muted">Ainda não há erros classificados neste período.</p>
       ) : (
         <ul className="mt-4 space-y-2">
           {leaks.map((l, i) => {
-            const maior = leaks[0].total || 1;
             const chave = `${l.reasonCode}:${l.street}`;
             const msg = feedback[chave];
+            const sev = severidade(i, leaks.length);
             return (
-              <li key={chave} className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-                <div className="flex items-center justify-between gap-3">
-                  <div className="min-w-0 flex-1">
+              <li key={chave} className="flex items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
+                <span
+                  className="shrink-0 rounded-md px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: sev.cor, backgroundColor: sev.bg }}
+                >
+                  {sev.label}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
                     <span className="truncate text-[13px] font-medium">{l.label}</span>
-                    <span className="ml-1.5 text-[10px] uppercase tracking-wider text-muted">{l.street}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted">{l.street}</span>
                   </div>
-                  <span className="shrink-0 text-xs text-muted tnum">
-                    {l.total}× · {l.jogadores} jogador(es)
-                  </span>
-                  {l.treinavel && (
-                    <button
-                      onClick={() => atribuir(l)}
-                      disabled={atribuindo === chave}
-                      className="flex shrink-0 items-center gap-1.5 rounded-lg border border-review/40 px-2.5 py-1.5 text-[11px] font-semibold text-review transition-colors hover:bg-review/10 disabled:opacity-50 print:hidden"
-                    >
-                      <Send size={12} />
-                      {atribuindo === chave ? "Enviando…" : "Atribuir aos afetados"}
-                    </button>
+                  {l.drillTitle && !msg && (
+                    <p className="mt-0.5 text-[11px] text-muted">→ {l.drillTitle}</p>
                   )}
+                  {msg && <p className="mt-0.5 text-[11px] text-training">{msg}</p>}
                 </div>
-                {l.drillTitle && !msg && (
-                  <p className="mt-1 text-[11px] text-muted">→ {l.drillTitle}</p>
+
+                <span className="shrink-0 text-xs text-muted tnum">
+                  {l.total}× · {l.jogadores} jogador(es)
+                </span>
+
+                {l.treinavel && (
+                  <button
+                    onClick={() => atribuir(l)}
+                    disabled={atribuindo === chave}
+                    title="Envia o drill correspondente a este leak para todos os jogadores afetados"
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-review/40 px-2.5 py-1.5 text-[11px] font-semibold text-review transition-colors hover:bg-review/10 disabled:opacity-50 print:hidden"
+                  >
+                    <Send size={12} />
+                    {atribuindo === chave ? "Enviando…" : "Enviar treino ao time"}
+                  </button>
                 )}
-                {msg && <p className="mt-1 text-[11px] text-training">{msg}</p>}
-                <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-void">
-                  <div
-                    className="h-full rounded-full bg-review transition-all ease-out"
-                    style={{
-                      width: pronto ? `${Math.max(6, Math.round((l.total / maior) * 100))}%` : "0%",
-                      transitionDuration: "600ms",
-                      transitionDelay: `${150 + i * 40}ms`,
-                    }}
-                  />
-                </div>
               </li>
             );
           })}
