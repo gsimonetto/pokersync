@@ -1,16 +1,12 @@
 import { WelcomeHero } from "@/components/welcome-hero";
 import { StatCards } from "@/components/stat-cards";
-import { ProgressSection } from "@/components/progress-section";
-import { BrandValues } from "@/components/brand-values";
 import { modules } from "@/lib/modules-data";
 import { ModuleCard } from "@/components/module-card";
 import { aggregate } from "@/lib/bankroll/calc";
 import { fmtMoney, fmtSignedMoney, fmtPct } from "@/lib/bankroll/format";
 import type { Session } from "@/lib/bankroll/types";
 import { createClient } from "@/lib/supabase/server";
-
 const TOURNEY_FORMATS = new Set(["MTT", "SNG", "Spin"]);
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToSession(r: any): Session {
   return {
@@ -26,7 +22,6 @@ function rowToSession(r: any): Session {
     notes: r.notes || "",
   };
 }
-
 export default async function ModulosPage() {
   const supabase = await createClient();
   const {
@@ -34,7 +29,6 @@ export default async function ModulosPage() {
   } = await supabase.auth.getUser();
   const meta = (user?.user_metadata ?? {}) as { nome?: string; apelido?: string };
   const displayName = meta.apelido || meta.nome || "Jogador";
-
   const [{ data: sessionRows }, { data: planRow }, { data: teamRow }] = await Promise.all([
     supabase.from("bankroll_sessions").select("*"),
     supabase.from("user_plans").select("plan").maybeSingle(),
@@ -45,17 +39,14 @@ export default async function ModulosPage() {
     // erro que ficava engolido silenciosamente, sem badge de time.
     supabase.from("team_members").select("teams ( name, accent )").eq("user_id", user?.id ?? "").maybeSingle(),
   ]);
-
   // Ausencia de linha em user_plans == free (nao exige trigger de signup).
   const plan = (planRow?.plan as "free" | "pro" | "master") ?? "free";
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const teamData = teamRow?.teams as any;
   const team = teamData ? { name: teamData.name as string, accent: teamData.accent as string } : null;
-
   const sessions = (sessionRows ?? []).map(rowToSession);
   const agg = aggregate(sessions);
   const tourneyCount = sessions.filter((s) => TOURNEY_FORMATS.has(s.format)).length;
-
   return (
     <div className="min-h-screen bg-void">
       <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
@@ -83,8 +74,6 @@ export default async function ModulosPage() {
               ))}
             </div>
           </section>
-          <ProgressSection />
-          <BrandValues />
         </div>
       </main>
     </div>
