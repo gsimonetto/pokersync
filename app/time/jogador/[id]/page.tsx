@@ -11,23 +11,37 @@ import {
   MessageSquare,
   Eye,
   ChevronRight,
+  Wallet,
+  Gamepad2,
+  Printer,
+  TrendingUp,
+  TrendingDown,
+  Minus,
 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
+import { MetasCard } from "@/components/time/metas-card";
+import { createClient } from "@/lib/supabase/client";
 import {
   ALERTA_LABEL,
   diasSemAtividade,
   fetchPlayerActivity,
   fetchPlayerAlerts,
   fetchPlayerDetail,
+  fetchPlayerFinancialSeries,
   fetchPlayerLeaks,
   fetchPlayerSharedHands,
+  fetchMyMembership,
   traduzErroTime,
+  type FinancialDay,
   type PlayerActivityDay,
   type TeamAlert,
   type PlayerDetail,
   type PlayerSharedHand,
-  type TeamLeak,
+  type PlayerLeak,
 } from "@/lib/services/team-service";
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 // Ficha individual do jogador. Quem pode abrir: admin do time, o coach
 // responsavel, ou o proprio jogador — a checagem esta nas RPCs, esta
@@ -47,26 +61,35 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const [erro, setErro] = useState<string | null>(null);
   const [p, setP] = useState<PlayerDetail | null>(null);
   const [atividade, setAtividade] = useState<PlayerActivityDay[]>([]);
-  const [leaks, setLeaks] = useState<TeamLeak[]>([]);
+  const [leaks, setLeaks] = useState<PlayerLeak[]>([]);
   const [maos, setMaos] = useState<PlayerSharedHand[]>([]);
   const [alertas, setAlertas] = useState<TeamAlert[]>([]);
+  const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
+  const [meuId, setMeuId] = useState<string | null>(null);
+  const [meuPapel, setMeuPapel] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al] = await Promise.all([
+      const [d, a, l, m, al, fin, mem, auth] = await Promise.all([
         fetchPlayerDetail(id, dias),
         fetchPlayerActivity(id, dias),
         fetchPlayerLeaks(id, dias),
         fetchPlayerSharedHands(id),
         fetchPlayerAlerts(id).catch(() => []),
+        fetchPlayerFinancialSeries(id, dias).catch(() => []),
+        fetchMyMembership().catch(() => null),
+        createClient().auth.getUser(),
       ]);
       setP(d);
       setAtividade(a);
       setLeaks(l);
       setMaos(m);
       setAlertas(al);
+      setFinanceiro(fin);
+      setMeuPapel(mem?.role ?? null);
+      setMeuId(auth.data.user?.id ?? null);
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -87,10 +110,11 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const maxDia = Math.max(1, ...atividade.map((d) => d.treinos + d.revisoes));
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <header className="mb-6 flex flex-wrap items-center gap-3">
+    <>
+    <main className="mx-auto max-w-6xl px-6 py-10 text-ink print:max-w-full print:p-0">
+      <header className="mb-6 flex flex-wrap items-center gap-3 print:mb-4">
         <Link
-          href="/time/painel"
+          href="/time/painel?tab=jogadores"
           className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
           aria-label="Voltar"
         >
@@ -131,6 +155,14 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
             </button>
           ))}
         </div>
+
+        <button
+          onClick={() => window.print()}
+          className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 print:hidden"
+        >
+          <Printer size={15} />
+          PDF
+        </button>
       </header>
 
       {erro && (
@@ -143,13 +175,35 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
         <p className="text-sm text-muted">Jogador não encontrado.</p>
       ) : (
         <div className="space-y-6">
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-            <Kpi icon={Target} label="Treinos" value={String(p.treinos)} hint={`${p.xpPeriodo} XP no período`} />
+          <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
+            <Kpi
+              icon={Wallet}
+              label="Resultado no time"
+              value={p.jogosNoTime > 0 ? BRL.format(p.lucroNoTime) : "—"}
+              hint="desde que entrou"
+              tom={p.lucroNoTime > 0 ? "positivo" : p.lucroNoTime < 0 ? "negativo" : undefined}
+              destaque
+            />
+            <Kpi icon={Gamepad2} label="Jogos" value={String(p.jogosNoTime)} hint="desde que entrou" />
+            <Kpi
+              icon={Target}
+              label="Treinos"
+              value={String(p.treinos)}
+              hint={`${p.xpPeriodo} XP no período`}
+              tendencia={variacao(p.treinos, p.treinosPeriodoAnterior)}
+            />
             <Kpi
               icon={Flame}
               label="Acerto GTO"
               value={acertoPct === null ? "—" : `${acertoPct}%`}
               hint={p.errosGraves > 0 ? `${p.errosGraves} erro(s) grave(s)` : undefined}
+              tendencia={variacao(
+                p.treinos > 0 ? Math.round((100 * (p.acertosGto ?? 0)) / p.treinos) : null,
+                p.treinosPeriodoAnterior > 0
+                  ? Math.round((100 * (p.acertosGtoPeriodoAnterior ?? 0)) / p.treinosPeriodoAnterior)
+                  : null
+              )}
+              tendenciaSufixo="pp"
             />
             <Kpi
               icon={BookOpen}
@@ -165,9 +219,11 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
             />
           </section>
 
-          <section className="rounded-xl border border-hairline bg-surface p-6">
-            <h2 className="text-base font-semibold">Frequência de estudo</h2>
-            <p className="mt-1 text-sm text-muted">Treinos e revisões concluídas por dia.</p>
+          <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
+            <GraficoFinanceiro dados={financeiro} pronto={!loading} titulo="Resultado no período" />
+            <div className="rounded-xl border border-hairline bg-surface p-6">
+              <h2 className="text-base font-semibold">Frequência de estudo</h2>
+              <p className="mt-1 text-sm text-muted">Treinos e revisões concluídas por dia.</p>
 
             <div className="mt-4 flex h-28 items-end gap-[3px]">
               {atividade.map((d) => {
@@ -200,7 +256,13 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
                 <span className="h-2 w-2 rounded-sm bg-review" /> Revisões
               </span>
             </div>
+            </div>
           </section>
+
+          <MetasCard
+            playerId={id}
+            podeGerenciar={meuPapel === "admin" || (meuPapel === "coach" && p.coachId === meuId)}
+          />
 
           <section className="rounded-xl border border-hairline bg-surface p-6">
             <h2 className="text-base font-semibold">Mãos enviadas para você</h2>
@@ -299,7 +361,25 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
         </div>
       )}
     </main>
+
+    <style jsx global>{`
+      @media print {
+        body { background: #fff !important; color: #111 !important; }
+        .text-ink, .text-ink\\/90, .font-medium, .font-semibold { color: #111 !important; }
+        .text-muted { color: #555 !important; }
+        .bg-surface, .bg-elevated { background: #fff !important; border-color: #ddd !important; }
+        .border-hairline { border-color: #ddd !important; }
+        @page { margin: 14mm; }
+      }
+    `}</style>
+    </>
   );
+}
+
+function variacao(atual?: number | null, anterior?: number | null): number | null {
+  if (atual === undefined || atual === null || anterior === undefined || anterior === null) return null;
+  if (anterior === 0) return atual > 0 ? 100 : null;
+  return Math.round(((atual - anterior) / anterior) * 100);
 }
 
 function Kpi({
@@ -307,21 +387,44 @@ function Kpi({
   label,
   value,
   hint,
+  tom,
+  destaque,
+  tendencia,
+  tendenciaSufixo = "%",
 }: {
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   icon: any;
   label: string;
   value: string;
   hint?: string;
+  tom?: "positivo" | "negativo";
+  destaque?: boolean;
+  tendencia?: number | null;
+  tendenciaSufixo?: string;
 }) {
+  const cor = tom === "positivo" ? "text-positive" : tom === "negativo" ? "text-negative" : "text-ink";
+  const TendIcon =
+    tendencia === null || tendencia === undefined || tendencia === 0 ? Minus : tendencia > 0 ? TrendingUp : TrendingDown;
+  const tendCor =
+    tendencia === null || tendencia === undefined || tendencia === 0
+      ? "text-muted"
+      : tendencia > 0
+      ? "text-positive"
+      : "text-negative";
   return (
-    <div className="rounded-xl border border-hairline bg-surface p-4">
+    <div className={`rounded-xl border bg-surface p-4 ${destaque ? "border-ink/20" : "border-hairline"}`}>
       <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
         <Icon size={13} />
         {label}
       </div>
-      <p className="mt-1.5 text-2xl font-semibold tnum">{value}</p>
+      <p className={`mt-1.5 text-2xl font-semibold tnum ${cor}`}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
+      {tendencia !== undefined && (
+        <p className={`mt-1 flex items-center gap-1 text-[11px] font-medium tnum ${tendCor}`}>
+          <TendIcon size={11} />
+          {tendencia === null ? "sem comparação" : `${tendencia > 0 ? "+" : ""}${tendencia}${tendenciaSufixo} vs período anterior`}
+        </p>
+      )}
     </div>
   );
 }
