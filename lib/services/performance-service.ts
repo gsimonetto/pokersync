@@ -121,6 +121,41 @@ export function nivelDoScore(score: number | null): string {
   return "Profissional";
 }
 
+export interface PreflopSituation {
+  label: string;
+  pct: number | null;
+  sample: number;
+}
+
+// Situacoes pre-flop (steal, 3-bet, 4-bet, defesa de blind) — le
+// direto de player_preflop_stats, sem recalculo. Re-steal e squeeze
+// aparecem como contagem, nao %: nao guardamos "quantas vezes um
+// oponente tentou roubar contra o heroi" como denominador, entao
+// calcular uma taxa aqui seria inventar um numero sem base real.
+export async function fetchPreflopSituations(): Promise<PreflopSituation[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("player_preflop_stats")
+    .select("*")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return [];
+
+  const pct = (num: number, den: number) => (den > 0 ? Math.round((num / den) * 1000) / 10 : null);
+
+  return [
+    { label: "Steal attempt (CO/BTN/SB)", pct: pct(data.steal_attempts, data.steal_opportunities), sample: data.steal_opportunities },
+    { label: "Steal bem-sucedido", pct: pct(data.steal_success_count, data.steal_attempts), sample: data.steal_attempts },
+    { label: "Fold para 3-Bet", pct: pct(data.fold_to_3bet_count, data.faced_3bet_count), sample: data.faced_3bet_count },
+    { label: "Call vs 3-Bet", pct: pct(data.call_3bet_count, data.faced_3bet_count), sample: data.faced_3bet_count },
+    { label: "4-Bet vs 3-Bet", pct: pct(data.made_4bet_count, data.faced_3bet_count), sample: data.faced_3bet_count },
+    { label: "Fold para 4-Bet", pct: pct(data.fold_to_4bet_count, data.faced_4bet_count), sample: data.faced_4bet_count },
+    { label: "Defesa de Blinds", pct: pct(data.blind_defended_count, data.blind_defense_opportunities), sample: data.blind_defense_opportunities },
+    { label: "Re-steal (contagem)", pct: null, sample: data.re_steal_count },
+    { label: "Squeeze (contagem)", pct: null, sample: data.squeeze_count },
+  ];
+}
+
 export interface PositionStat {
   position: string;
   hands: number;
