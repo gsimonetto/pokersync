@@ -16,6 +16,7 @@ import {
   Hash,
   TrendingUp,
   TrendingDown,
+  Sparkles,
 } from "lucide-react";
 import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
 
@@ -153,19 +154,32 @@ export default function PerformancePage() {
               visual desproporcional de propósito — o resto da tela é
               contexto, isto aqui é o placar.
              ---------------------------------------------------------- */}
-          <section className="rounded-xl border border-hairline bg-surface p-6">
-            <div className="grid grid-cols-1 gap-6 sm:grid-cols-3">
+          <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
+            {/* Halo de acento atras do KPI principal — da profundidade e
+                ancora o olho no canto superior esquerdo, onde a leitura
+                comeca. Cor segue o sinal do ROI. */}
+            <div
+              aria-hidden="true"
+              className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full opacity-[0.13] blur-3xl"
+              style={{
+                background:
+                  data.roi_pct === null ? "#5AA6E0" : Number(data.roi_pct) >= 0 ? "#2FB89A" : "#e0555a",
+              }}
+            />
+
+            <div className="relative grid grid-cols-1 divide-y divide-hairline sm:grid-cols-3 sm:divide-x sm:divide-y-0">
               <HeroMetric
                 label="ROI acumulado"
                 value={fmtPct(data.roi_pct, 2)}
                 tone={data.roi_pct === null ? "neutro" : Number(data.roi_pct) >= 0 ? "bom" : "ruim"}
                 hint={data.total_investido !== null ? `sobre ${fmtMoney(data.total_investido)} investidos` : undefined}
+                destaque
               />
               <HeroMetric
                 label="Resultado"
                 value={fmtSignedMoney(data.lucro_acumulado)}
                 tone={data.lucro_acumulado === null ? "neutro" : Number(data.lucro_acumulado) >= 0 ? "bom" : "ruim"}
-                hint={data.dolar_hora !== null ? `${fmtMoney(data.dolar_hora)}/hora` : "sem horas registradas"}
+                hint={data.dolar_hora !== null ? `${fmtMoney(data.dolar_hora)} por hora` : "sem horas registradas"}
               />
               <HeroMetric
                 label="Volume"
@@ -173,20 +187,39 @@ export default function PerformancePage() {
                 tone="neutro"
                 hint={
                   data.frequencia_semanal_sessoes !== null
-                    ? `${data.frequencia_semanal_sessoes} sessões/semana`
+                    ? `${data.frequencia_semanal_sessoes} sessões por semana`
                     : "sessões registradas"
                 }
               />
             </div>
 
+            {/* Veredito como faixa propria, nao como paragrafo solto: barra
+                de acento a esquerda + fundo levemente tingido dao a ele o
+                peso de "conclusao", nao de legenda. */}
             {veredito && (
-              <p
-                className={`mt-5 border-t border-hairline pt-4 text-[13px] leading-relaxed ${
-                  veredito.tom === "bom" ? "text-positive" : veredito.tom === "ruim" ? "text-negative" : "text-muted"
+              <div
+                className={`relative flex items-start gap-3 border-t border-hairline px-6 py-4 ${
+                  veredito.tom === "bom"
+                    ? "bg-positive/[0.06]"
+                    : veredito.tom === "ruim"
+                      ? "bg-negative/[0.06]"
+                      : "bg-elevated/40"
                 }`}
               >
-                {veredito.texto}
-              </p>
+                <span
+                  aria-hidden="true"
+                  className={`absolute inset-y-0 left-0 w-[3px] ${
+                    veredito.tom === "bom" ? "bg-positive" : veredito.tom === "ruim" ? "bg-negative" : "bg-muted/40"
+                  }`}
+                />
+                <Sparkles
+                  size={14}
+                  className={`mt-0.5 shrink-0 ${
+                    veredito.tom === "bom" ? "text-positive" : veredito.tom === "ruim" ? "text-negative" : "text-muted"
+                  }`}
+                />
+                <p className="text-[13px] leading-relaxed text-ink/80">{veredito.texto}</p>
+              </div>
             )}
           </section>
 
@@ -292,12 +325,14 @@ function AbaJogo({ data }: { data: PlayerPerformance }) {
       <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />}>
         <p className="text-xs leading-relaxed text-muted">
           Calculado sobre <strong className="text-ink/85">{amostra}</strong> {amostra === 1 ? "mão" : "mãos"} com hand
-          history estruturada. A faixa clara na barra é apenas uma referência comum de MTT — não é um veredito sobre o
+          history estruturada. A faixa marcada na régua é apenas uma referência comum de MTT — não é um veredito sobre o
           seu jogo.
         </p>
-        <Frequencia label="VPIP" valor={data.vpip_pct} referencia={REF.vpip} />
-        <Frequencia label="PFR" valor={data.pfr_pct} referencia={REF.pfr} />
-        <Frequencia label="3-Bet" valor={data.three_bet_pct} referencia={REF.threeBet} />
+        <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-3">
+          <Frequencia label="VPIP" valor={data.vpip_pct} referencia={REF.vpip} />
+          <Frequencia label="PFR" valor={data.pfr_pct} referencia={REF.pfr} />
+          <Frequencia label="3-Bet" valor={data.three_bet_pct} referencia={REF.threeBet} />
+        </div>
       </Painel>
 
       <Painel titulo="Precisão" icone={<Lock size={14} className="text-muted" />}>
@@ -385,20 +420,26 @@ function HeroMetric({
   value,
   hint,
   tone,
+  destaque = false,
 }: {
   label: string;
   value: string | null;
   hint?: string;
   tone: "bom" | "ruim" | "neutro";
+  destaque?: boolean;
 }) {
   const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
   return (
-    <div>
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{label}</p>
-      <p className={`mt-1.5 text-4xl font-bold leading-none tabular-nums ${value ? cor : "text-muted/40"}`}>
+    <div className="px-6 py-6">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
+      <p
+        className={`mt-2 font-bold leading-none tracking-tight tabular-nums ${
+          destaque ? "text-[2.75rem]" : "text-[2.25rem]"
+        } ${value ? cor : "text-muted/30"}`}
+      >
         {value ?? "—"}
       </p>
-      {hint && <p className="mt-2 text-xs text-muted">{hint}</p>}
+      {hint && <p className="mt-2.5 text-[11.5px] text-muted">{hint}</p>}
     </div>
   );
 }
@@ -489,6 +530,12 @@ function MiniCard({
 // Barra de frequência com faixa de referência ao fundo. O ponto não é
 // dizer "certo/errado" — é dar escala: 31% de VPIP sozinho não significa
 // nada pra quem não tem parâmetro na cabeça.
+// Régua em vez de barra preenchida. A barra cheia competia visualmente
+// com a faixa de referência (o pedaço cinza sobrando depois do
+// preenchimento parecia defeito) e sugeria "quanto mais cheio, melhor" —
+// leitura errada para VPIP/PFR, onde o que importa é ONDE você está, não
+// o tamanho. O marcador resolve isso: a faixa é o contexto, o traço é
+// você.
 function Frequencia({
   label,
   valor,
@@ -499,33 +546,44 @@ function Frequencia({
   referencia: { min: number; max: number; escala: number };
 }) {
   const v = valor === null || valor === undefined ? null : Number(valor);
-  const pos = v === null ? 0 : Math.min((v / referencia.escala) * 100, 100);
+  const pos = v === null ? 0 : Math.min(Math.max((v / referencia.escala) * 100, 0), 100);
   const refLeft = (referencia.min / referencia.escala) * 100;
   const refWidth = ((referencia.max - referencia.min) / referencia.escala) * 100;
 
+  const situacao =
+    v === null ? null : v < referencia.min ? "abaixo" : v > referencia.max ? "acima" : "dentro";
+
   return (
-    <div>
-      <div className="flex items-baseline justify-between gap-3">
-        <p className="text-[13px] text-muted">{label}</p>
-        <span className={`text-sm font-semibold tabular-nums ${v === null ? "text-muted/40" : "text-ink"}`}>
-          {v === null ? "—" : `${v.toFixed(1)}%`}
-        </span>
-      </div>
-      <div className="relative mt-1.5 h-2 w-full overflow-hidden rounded-full bg-void/40">
+    <div className="rounded-lg border border-hairline bg-elevated p-3.5">
+      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">{label}</p>
+      <p className={`mt-1 text-2xl font-bold leading-none tabular-nums ${v === null ? "text-muted/30" : "text-ink"}`}>
+        {v === null ? "—" : `${v.toFixed(1)}%`}
+      </p>
+
+      <div className="relative mt-4 h-1 w-full rounded-full bg-void/60">
+        {/* faixa de referência */}
         <div
           aria-hidden="true"
-          className="absolute inset-y-0 bg-ink/10"
+          className="absolute inset-y-0 rounded-full bg-ink/15"
           style={{ left: `${refLeft}%`, width: `${refWidth}%` }}
         />
+        {/* marcador do jogador */}
         {v !== null && (
-          <div
-            className="absolute inset-y-0 left-0 rounded-full bg-training/70 transition-[width] duration-500 ease-out"
-            style={{ width: `${pos}%` }}
+          <span
+            className="absolute top-1/2 h-3.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-training shadow-[0_0_8px_rgba(90,166,224,.6)] transition-[left] duration-500 ease-out"
+            style={{ left: `${pos}%` }}
           />
         )}
       </div>
-      <p className="mt-1 text-[11px] text-muted/70">
-        referência comum: {referencia.min}–{referencia.max}%
+
+      <p className="mt-2.5 text-[11px] text-muted/70">
+        {situacao === "dentro" ? (
+          <span className="text-muted">dentro da referência ({referencia.min}–{referencia.max}%)</span>
+        ) : (
+          <>
+            {situacao === null ? "referência" : situacao} de {referencia.min}–{referencia.max}%
+          </>
+        )}
       </p>
     </div>
   );
