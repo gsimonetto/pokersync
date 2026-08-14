@@ -79,9 +79,6 @@ export default function BankrollPage() {
 
   const [coachExpanded, setCoachExpanded] = useState(false);
 
-  // Registro rapido (2026-08): "Registrar sessao" e "Deposito/saque" viram
-  // modais acionados por atalho logo abaixo do header — o jogador nao
-  // precisa mais rolar a tela ate o fim pra bater o registro pos-sessao.
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [goalsModalOpen, setGoalsModalOpen] = useState(false);
@@ -90,13 +87,11 @@ export default function BankrollPage() {
   const [calcFormat, setCalcFormat] = useState<BrmFormat>("Cash");
   const [calcBuyIn, setCalcBuyIn] = useState("");
 
-  // Anotacoes no grafico ("subi pra NL100 aqui")
   const [annotations, setAnnotations] = useState<Annotation[]>([]);
   const [annoModalOpen, setAnnoModalOpen] = useState(false);
   const [annoDate, setAnnoDate] = useState(todayISO());
   const [annoNote, setAnnoNote] = useState("");
 
-  // Comparar periodos (mes atual vs anterior)
   const [compareOpen, setCompareOpen] = useState(false);
 
   useEffect(() => {
@@ -166,18 +161,8 @@ export default function BankrollPage() {
   const recentTx = [...transactions].reverse().slice(0, 6);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
 
-  // Coach nao e' mural fixo (pedido explicito): o tip em destaque (o que
-  // aparece sempre visivel, sem precisar expandir) roda com um TTL —
-  // fica ativo ate 1 dia se for algo accionavel (bad/warn), bem menos
-  // tempo se for so um "good/info" (que muda com mais frequencia natural
-  // de qualquer forma). Se o tip deixar de ser relevante (sumiu do
-  // calculo por causa de dado novo), roda pro proximo IMEDIATAMENTE, nao
-  // espera o TTL. Ver useFeaturedCoachTip no fim do arquivo.
   const featuredTip = useFeaturedCoachTip(tips);
 
-  // Alerta de BRM via notificacao (Hub de Evolucao ja tem sino/lista) —
-  // dispara so quando o status muda pra algo accionavel (moveup/
-  // movedown), com dedupe no service (nao duplica notificacao repetida).
   useEffect(() => {
     if (loading || !currentBrm) return;
     if (currentBrm.status === "moveup") {
@@ -378,8 +363,6 @@ export default function BankrollPage() {
         <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
 
-      {/* Atalho de registro rapido do lado direito; toggle Banca/Patrimonio
-          do lado esquerdo — mesma linha, nao empilhados. */}
       <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
         <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
           <button
@@ -401,11 +384,6 @@ export default function BankrollPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
-          {/* Registro/deposito em destaque — maior, com label, cor solida.
-              Metas/BRM/Leaks viram icones menores ao lado, mesma funcao
-              (abrem modal), mas com peso visual secundario. Hovers mais
-              expressivos (pedido explicito): escala + leve rotacao do
-              icone + glow na cor de acento, nao so troca de cor. */}
           <button
             onClick={() => setSessionModalOpen(true)}
             aria-label="Registrar sessao"
@@ -452,23 +430,25 @@ export default function BankrollPage() {
         </div>
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-        <StatCard
-          label={view === "jogo" ? "Banca atual" : "Patrimonio total"}
+      <div className="mt-4">
+        <HeroStat
+          label={view === "jogo" ? "Banca atual" : "Patrimônio total"}
           value={fmtMoney(currentBankroll)}
-          tone={currentBankroll < 0 ? "negative" : undefined}
-          accent={currentBankroll < 0 ? "#e0555a" : "#22c55e"}
-        />
-        <StatCard
-          label="Resultado"
-          value={fmtSignedMoney(agg.profit)}
-          tone={agg.profit >= 0 ? "positive" : "negative"}
-          accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
+          negative={currentBankroll < 0}
           delta={
             comparison.previous.n > 0
               ? { text: `${fmtSignedMoney(profitDelta)} vs mês passado`, positive: profitDelta >= 0 }
               : undefined
           }
+        />
+      </div>
+
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        <StatCard
+          label="Resultado"
+          value={fmtSignedMoney(agg.profit)}
+          tone={agg.profit >= 0 ? "positive" : "negative"}
+          accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
         />
         <StatCard
           label="ROI"
@@ -481,11 +461,6 @@ export default function BankrollPage() {
           }
         />
         <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
-      </div>
-
-      {/* Volume, ritmo e risco atual — segunda linha de cards (pedido
-          explicito: mais informacoes rapidas junto das que ja existiam). */}
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
         <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
         <StatCard label="Buy-in médio" value={fmtMoney(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
         <StatCard
@@ -581,12 +556,6 @@ export default function BankrollPage() {
           )}
         </section>
 
-        {/* Coluna lateral (2026-08 v8, pedido explicito): os icones de
-            atalho agora SO abrem modal de criacao/edicao — o que ja foi
-            criado (metas ativas, leitura de BRM) precisa aparecer fixo
-            na tela, nao escondido atras de clique. Fica ao lado do
-            grafico, empilhado. Coach encolheu mais (max-h-[150px], texto
-            menor) pra abrir espaco pros outros dois widgets. */}
         <div className="flex flex-col gap-3">
           <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
             <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">AI Coach</h2>
@@ -618,8 +587,6 @@ export default function BankrollPage() {
             )}
           </section>
 
-          {/* Widget de Metas — so leitura + progresso + excluir. Criar
-              nova meta e' so pelo icone Target (abre modal de criacao). */}
           <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
             <div className="flex items-center gap-1.5">
               <Target size={12} className="text-review" />
@@ -669,8 +636,6 @@ export default function BankrollPage() {
             )}
           </section>
 
-          {/* Widget de BRM — so a leitura automatica. Editar thresholds
-              e calculadora ficam no icone Gauge (modal de criacao). */}
           <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
             <div className="flex items-center gap-1.5">
               <Gauge size={12} className="text-training" />
@@ -701,9 +666,6 @@ export default function BankrollPage() {
         </div>
       </div>
 
-      {/* Metas — modal agora e' SO criacao (pedido explicito). O que ja
-          foi criado (progresso, excluir) mora no widget fixo ao lado do
-          grafico, nao aqui. */}
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
           <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm">
@@ -729,14 +691,7 @@ export default function BankrollPage() {
         </div>
       </Modal>
 
-      {/* BRM — modal agora e' so calculadora + edicao de thresholds
-          (pedido explicito: icones so pra criar/configurar). A leitura
-          automatica (o "resultado ja criado") mora no widget fixo ao
-          lado do grafico, nao aqui. */}
       <Modal open={brmModalOpen} onClose={() => setBrmModalOpen(false)} title="BRM — moveup / movedown">
-        {/* Calculadora: o jogador digita um buy-in hipotetico (nao precisa
-            ser o que ele jogou de fato) e ve na hora quantos buy-ins a
-            banca atual cobre e se isso fica dentro/fora do threshold. */}
         <div className="rounded-lg border border-hairline bg-elevated p-3">
           <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Calculadora</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
@@ -788,9 +743,6 @@ export default function BankrollPage() {
           ))}
         </div>
 
-        {/* Risco de ruina (Monte Carlo simplificado, bootstrap sobre os
-            resultados historicos reais) — so aparece com amostra minima
-            (15 sessoes), senao o numero nao significa nada. */}
         {ruin && (
           <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
             <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-muted">
@@ -807,8 +759,6 @@ export default function BankrollPage() {
         )}
       </Modal>
 
-      {/* Anotacoes no grafico ("subi pra NL100 aqui") — criar + listar
-          (com excluir). Os marcadores ja aparecem direto no grafico. */}
       <Modal open={annoModalOpen} onClose={() => setAnnoModalOpen(false)} title="Anotações no gráfico">
         <div className="grid grid-cols-[auto_1fr] gap-2">
           <input
@@ -1063,12 +1013,6 @@ export default function BankrollPage() {
         )}
       </section>
 
-      {/* Painel de leaks financeiro/comportamental — reusa groupStats
-          (ja calculado, nunca tinha sido visualizado) agrupando por
-          formato, dia da semana ou horario. Ordenado do pior pro melhor
-          (groupStats ja devolve nessa ordem). Leak TECNICO (spot a spot)
-          continua no Revisor de Maos — isso aqui e' leak financeiro.
-          Agora em modal (icone Flame no atalho). */}
       <Modal open={leaksModalOpen} onClose={() => setLeaksModalOpen(false)} title="Painel de leaks">
         <div className="flex justify-end">
           <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
@@ -1148,6 +1092,35 @@ export default function BankrollPage() {
   );
 }
 
+function HeroStat({
+  label,
+  value,
+  negative,
+  delta,
+}: {
+  label: string;
+  value: string;
+  negative?: boolean;
+  delta?: { text: string; positive: boolean };
+}) {
+  const accent = negative ? "#e0555a" : "#22c55e";
+  return (
+    <div
+      style={{ "--acc": accent } as React.CSSProperties}
+      className="acc-card relative overflow-hidden rounded-xl border border-ink/15 bg-surface p-6"
+    >
+      <div aria-hidden="true" className="acc-glow pointer-events-none absolute -right-10 -top-10 size-40 rounded-full blur-3xl" />
+      <p className="relative text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{label}</p>
+      <p className={`relative mt-2 text-4xl font-bold tabular-nums ${negative ? "text-negative" : "text-ink"}`}>{value}</p>
+      {delta && (
+        <p className={`relative mt-2 text-[12px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
+          {delta.positive ? "▲" : "▼"} {delta.text}
+        </p>
+      )}
+    </div>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -1161,8 +1134,6 @@ function StatCard({
   tone?: "positive" | "negative" | "training" | "evolution";
   icon?: React.ReactNode;
   accent: string;
-  // Variacao vs periodo anterior (pedido explicito) — linha pequena
-  // abaixo do valor, so quando faz sentido comparar (Resultado/ROI).
   delta?: { text: string; positive: boolean };
 }) {
   const color =
@@ -1195,8 +1166,6 @@ function StatCard({
   );
 }
 
-// Linha editavel de threshold por formato — salva no blur (sem botao de
-// "salvar" por linha, pra manter a secao compacta como pedido).
 function BrmThresholdRow({
   threshold,
   onSave,
@@ -1248,13 +1217,6 @@ function toneClasses(level: CoachTip["level"]) {
   return "border-hairline bg-elevated";
 }
 
-// Coach nao e' mural fixo (pedido explicito) — o tip em destaque roda
-// com um TTL guardado no localStorage do navegador:
-//  - bad/warn (accionavel, "desca de stake", "vazamento em X"): ate 24h.
-//  - good/info (menos urgente): bem menos tempo, precisa girar mais.
-// Se o tip guardado sumiu da lista atual (dado novo mudou o calculo —
-// ex: nao esta mais em downswing), roda pro proximo IMEDIATAMENTE, nao
-// espera o TTL vencer. Roda em ordem ciclica pela lista de tips atual.
 const COACH_TTL_MS: Record<CoachTip["level"], number> = {
   bad: 24 * 60 * 60 * 1000,
   warn: 24 * 60 * 60 * 1000,
@@ -1302,10 +1264,6 @@ function useFeaturedCoachTip(tips: CoachTip[]): CoachTip | null {
   return tips.find((t) => t.id === featuredId) ?? tips[0] ?? null;
 }
 
-// Modal/drawer no topo (2026-08): usado pro registro rapido de sessao e
-// transacao. Fecha com Esc, clique no backdrop ou no X — nunca trava o
-// jogador sem saida. Entra deslizando do topo pra reforcar "isso e um
-// atalho rapido", nao uma pagina nova.
 function Modal({
   open,
   onClose,
@@ -1355,12 +1313,6 @@ function Modal({
   );
 }
 
-// Grafico com eixos (2026-08 v7): antes era so uma linha solta (sparkline).
-// Pedido explicito de ter eixo X (dias) e eixo Y (valor) visiveis, como no
-// Sharkscope — grid horizontal com valores em R$ a esquerda, datas
-// abaixo do eixo X. Mantém o efeito LED (glow + ponto pulsante) so na
-// linha, os eixos ficam discretos (cor hairline/muted) pra nao competir
-// visualmente com o dado principal.
 const Y_TICKS = 4;
 
 function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; annotations?: Annotation[] }) {
@@ -1380,7 +1332,6 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
   const min = Math.min(...points),
     max = Math.max(...points);
   const spread = max - min || 1;
-  // Respiro de 8% acima/abaixo pra linha e pontos nao colarem no grid.
   const yMin = min - spread * 0.08;
   const yMax = max + spread * 0.08;
   const yRange = yMax - yMin || 1;
@@ -1399,21 +1350,13 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
   const gradId = "bankrollLedFill";
   const glowId = "bankrollLedGlow";
 
-  // Eixo Y: Y_TICKS+1 linhas igualmente espacadas entre yMin e yMax.
   const yTicks = Array.from({ length: Y_TICKS + 1 }, (_, i) => yMin + (yRange * i) / Y_TICKS);
 
-  // Eixo X: no maximo 6 labels de data, igualmente espacados pelos pontos
-  // reais da serie (evita rotular todo ponto e poluir em series longas).
   const xTickCount = Math.min(6, series.length);
   const xTickIdx = Array.from({ length: xTickCount }, (_, i) =>
     xTickCount === 1 ? 0 : Math.round((i / (xTickCount - 1)) * (series.length - 1))
   );
 
-  // Anotacoes ("subi pra NL100 aqui"): so plota as que caem numa data com
-  // ponto na serie visivel (o grafico so tem eixo X nos dias com sessao,
-  // nao e' uma escala continua de calendario). Cada anotacao vira uma
-  // linha vertical pontilhada + circulo pequeno, com o texto no title
-  // (tooltip nativo) pra nao precisar de um componente de tooltip custom.
   const plottedAnnotations = annotations
     .map((a) => {
       const idx = series.findIndex((p) => p.date === a.date);
@@ -1437,7 +1380,6 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
         </filter>
       </defs>
 
-      {/* Grid + labels do eixo Y (valor) */}
       {yTicks.map((v, i) => {
         const y = yAt(v);
         return (
@@ -1450,7 +1392,6 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
         );
       })}
 
-      {/* Labels do eixo X (dias) */}
       {xTickIdx.map((idx) => (
         <text
           key={idx}
@@ -1464,8 +1405,6 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
         </text>
       ))}
 
-      {/* Marcadores de anotacao — atras da linha principal (zIndex visual
-          via ordem no SVG), pra nao competir com o dado. */}
       {plottedAnnotations.map((a) => (
         <g key={a.id}>
           <line
