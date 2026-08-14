@@ -6,7 +6,7 @@ export function Logo({ className }: { className?: string }) {
       src="/pokersync-logo.svg"
       alt="PokerSync"
       width={160}
-      height={49}
+      height={107}
       priority
       className={className ?? "h-8 w-auto sm:h-9"}
     />
