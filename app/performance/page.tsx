@@ -29,6 +29,7 @@ import {
   fetchPlayerInsights,
   nivelDoScore,
   computePositionHighlights,
+  fetchPreflopSituations,
   type PlayerPerformance,
   type PositionStat,
   type TimelineEvent,
@@ -36,6 +37,7 @@ import {
   type IpOopSplit,
   type SkillArea,
   type PeriodComparisonRow,
+  type PreflopSituation,
 } from "@/lib/services/performance-service";
 
 // ------------------------------------------------------------
@@ -81,6 +83,7 @@ export default function PerformancePage() {
   const [skills, setSkills] = useState<SkillArea[]>([]);
   const [periods, setPeriods] = useState<PeriodComparisonRow[]>([]);
   const [insights, setInsights] = useState<string[]>([]);
+  const [preflopSit, setPreflopSit] = useState<PreflopSituation[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("financeiro");
@@ -89,7 +92,7 @@ export default function PerformancePage() {
     let alive = true;
     (async () => {
       try {
-        const [d, ps, tl, ms, io, sk, pc, ins] = await Promise.all([
+        const [d, ps, tl, ms, io, sk, pc, ins, pfs] = await Promise.all([
           fetchPlayerPerformance(),
           fetchPositionStats(),
           fetchPlayerTimeline(),
@@ -98,6 +101,7 @@ export default function PerformancePage() {
           fetchSkillBreakdown(),
           fetchPeriodComparison(),
           fetchPlayerInsights(),
+          fetchPreflopSituations(),
         ]);
         if (alive) {
           setData(d);
@@ -108,6 +112,7 @@ export default function PerformancePage() {
           setSkills(sk);
           setPeriods(pc);
           setInsights(ins);
+          setPreflopSit(pfs);
         }
       } catch (e) {
         if (alive) setErro(e instanceof Error ? e.message : "Falha ao carregar sua performance.");
@@ -302,7 +307,9 @@ export default function PerformancePage() {
 
           <div className="mt-4">
             {tab === "financeiro" && <AbaFinanceiro data={data} />}
-            {tab === "jogo" && <AbaJogo data={data} posStats={posStats} matchupStats={matchupStats} ipOop={ipOop} />}
+            {tab === "jogo" && (
+              <AbaJogo data={data} posStats={posStats} matchupStats={matchupStats} ipOop={ipOop} preflopSit={preflopSit} />
+            )}
             {tab === "estudo" && <AbaEstudo data={data} />}
             {tab === "evolucao" && (
               <AbaEvolucao data={data} timeline={timeline} skills={skills} periods={periods} insights={insights} />
@@ -388,16 +395,39 @@ function AbaJogo({
   posStats,
   matchupStats,
   ipOop,
+  preflopSit,
 }: {
   data: PlayerPerformance;
   posStats: PositionStat[];
   matchupStats: MatchupStat[];
   ipOop: IpOopSplit | null;
+  preflopSit: PreflopSituation[];
 }) {
   const amostra = data.maos_com_dados_frequencia ?? 0;
   const ipTotal = (ipOop?.ip_hands ?? 0) + (ipOop?.oop_hands ?? 0);
   return (
     <div className="space-y-4">
+      <Painel titulo="Situações pré-flop" icone={<Target size={14} className="text-training" />}>
+        <p className="text-xs leading-relaxed text-muted">
+          Steal, 3-bet/4-bet e defesa de blinds — direto da hand history, sem depender de solver. Re-steal e squeeze
+          aparecem só como contagem: ainda não guardamos quantas vezes um oponente tentou roubar contra você, então uma
+          % aqui seria inventada.
+        </p>
+        <div className="mt-2 divide-y divide-hairline">
+          {preflopSit.map((s) => (
+            <div key={s.label} className="flex items-center justify-between py-2 text-sm">
+              <span className="text-muted">{s.label}</span>
+              <span className="tabular-nums">
+                {s.pct !== null ? <strong className="text-ink">{s.pct}%</strong> : <strong className="text-ink">{s.sample}</strong>}
+                <span className="ml-1.5 text-[11px] text-muted/70">
+                  {s.pct !== null ? `(${s.sample})` : "mãos"}
+                </span>
+              </span>
+            </div>
+          ))}
+        </div>
+      </Painel>
+
       <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />}>
         <p className="text-xs leading-relaxed text-muted">
           Calculado sobre <strong className="text-ink/85">{amostra}</strong> {amostra === 1 ? "mão" : "mãos"} com hand
