@@ -49,6 +49,11 @@ export interface ParsedSeat {
   // o bounty de cada jogador junto do stack ("... em fichas, Bounty de $ 50").
   // Usado pra ler o bounty do heroi automaticamente em vez de pedir manual.
   bountyValue?: number;
+  // Posicao de TODOS os assentos (nao so do heroi), calculada por
+  // assignSeatPositions a partir do buttonSeat + quantidade de jogadores
+  // ativos na mao. Null quando o motor nao suporta aquele numero de
+  // assentos (fora de 2-9) ou o buttonSeat nao foi identificado.
+  position: string | null;
 }
 
 export interface ParsedShowdown {
@@ -90,6 +95,42 @@ export interface ParsedHand {
   // wonTournament, nao essa frase). Usado pra badge de 2o/3o lugar e "FT"
   // na lista de torneios.
   heroFinishPlace: number | null;
+  // Matchup de posicao — SO preenchido quando exatamente 2 jogadores
+  // chegam vivos ao flop (heroi + 1 villain). Com 3+ jogadores no flop
+  // nao existe um "IP/OOP" unico valido, entao fica null de proposito
+  // em vez de arriscar um numero errado.
+  villainPosition: string | null;
+  heroInPosition: boolean | null;
+  postflopTags: PostflopTags;
+}
+
+// ------------------------------------------------------------
+// Tags pos-flop do Spot Analyzer. Definicoes (padrao de mercado, mesmo
+// usado por trackers como PokerTracker/Hold'em Manager):
+//   - PFA (preflop aggressor) = quem deu o ultimo raise no preflop.
+//     Mao sem raise nenhum (limped pot) nao tem PFA.
+//   - cbet = PFA aposta primeiro na rua seguinte (accao 'bets' so
+//     acontece quando ninguem apostou antes na mesma rua — nao precisa
+//     ser literalmente a 1a acao da rua, checks antes nao desqualificam).
+//   - donk bet = NAO-PFA aposta primeiro numa rua onde existe PFA.
+//   - check-raise = heroi checa e depois, na MESMA rua, da um raise.
+//   - fold pra cbet = heroi nao e' PFA, o PFA da cbet no flop, heroi
+//     desiste no flop depois disso.
+// "Float" e "probe bet" ficaram de fora — as definicoes de mercado pra
+// esses dois exigem inferir INTENCAO (blefar pra depois roubar, ou
+// testar fraqueza), nao so a sequencia de acoes, e qualquer proxy que
+// a gente escolhesse ia arriscar rotular errado. Preferimos nao ter a
+// tag a ter uma tag que mente.
+// ------------------------------------------------------------
+export interface PostflopTags {
+  isPreflopAggressor: boolean;
+  cbetFlop: boolean;
+  cbetTurn: boolean;
+  doubleBarrel: boolean;
+  tripleBarrel: boolean;
+  donkBetFlop: boolean;
+  checkRaise: boolean;
+  foldToCbetFlop: boolean;
 }
 
 export class HandParseError extends Error {
@@ -345,6 +386,153 @@ function extractHeroPosition(text: string, heroName: string | null): string | nu
   return null;
 }
 
+// ------------------------------------------------------------
+// Motor de posicoes por assento — cobre TODOS os jogadores da mao,
+// nao so heroi/BTN/SB/BB (que e' tudo que extractHeroPosition acima
+// consegue via regex direto no texto).
+//
+// Convencao adotada (ordem SB->BTN = ordem de acao pos-flop; o indice
+// nesse array TAMBEM serve pra decidir IP/OOP: indice maior = mais em
+// posicao, ate o BTN que e' sempre o ultimo a agir pos-flop):
+//   2: BB, BTN            6: SB, BB, UTG, MP, CO, BTN
+//   3: SB, BB, BTN        7: SB, BB, UTG, MP, HJ, CO, BTN
+//   4: SB, BB, CO, BTN    8: SB, BB, UTG, UTG+1, MP, HJ, CO, BTN
+//   5: SB, BB, UTG, CO,   9: SB, BB, UTG, UTG+1, MP, MP+1, HJ, CO, BTN
+//      BTN
+// 4 e 5-handed nao tem uma convencao 100% universal no mercado — essa
+// e' a mais comum entre trackers (PT4/HM3) e foi a escolha adotada aqui.
+// ------------------------------------------------------------
+const POSITIONS_BY_TABLE_SIZE: Record<number, string[]> = {
+  2: ["BB", "BTN"],
+  3: ["SB", "BB", "BTN"],
+  4: ["SB", "BB", "CO", "BTN"],
+  5: ["SB", "BB", "UTG", "CO", "BTN"],
+  6: ["SB", "BB", "UTG", "MP", "CO", "BTN"],
+  7: ["SB", "BB", "UTG", "MP", "HJ", "CO", "BTN"],
+  8: ["SB", "BB", "UTG", "UTG+1", "MP", "HJ", "CO", "BTN"],
+  9: ["SB", "BB", "UTG", "UTG+1", "MP", "MP+1", "HJ", "CO", "BTN"],
+};
+
+// Roda a lista de assentos pra comecar logo apos o botao e terminar NO
+// botao — essa e' a ordem de acao pos-flop (SB age primeiro, BTN por
+// ultimo). Retorna null se o buttonSeat nao bate com nenhum assento
+// listado (hand history incompleta/nao suportada).
+function rotateStartingAfterButton(seats: ParsedSeat[], buttonSeat: number): ParsedSeat[] | null {
+  const sorted = [...seats].sort((a, b) => a.seatNumber - b.seatNumber);
+  const btnIdx = sorted.findIndex((s) => s.seatNumber === buttonSeat);
+  if (btnIdx === -1) return null;
+  return [...sorted.slice(btnIdx + 1), ...sorted.slice(0, btnIdx + 1)];
+}
+
+// Preenche seat.position em TODOS os assentos, direto no array recebido.
+// Mao com numero de jogadores fora de 2-9 (praticamente nunca acontece
+// em hold'em) fica com position=null em todos os assentos — nao
+// inventa rotulo fora do que o motor suporta.
+function assignSeatPositions(seats: ParsedSeat[], buttonSeat: number | null): void {
+  if (buttonSeat === null) return;
+  const n = seats.length;
+  const order = POSITIONS_BY_TABLE_SIZE[n];
+  if (!order) return;
+  const rotated = rotateStartingAfterButton(seats, buttonSeat);
+  if (!rotated) return;
+  rotated.forEach((seat, i) => {
+    seat.position = order[i] ?? null;
+  });
+}
+
+// Matchup heads-up: so tem sentido quando exatamente 2 jogadores chegam
+// vivos ao flop (heroi + 1 villain). Le os folds da rua preflop pra
+// descobrir quem sobrou.
+function computeHeroMatchup(
+  seats: ParsedSeat[],
+  preflopActions: ParsedAction[],
+  heroName: string | null
+): { villainPosition: string | null; heroInPosition: boolean | null } {
+  if (!heroName) return { villainPosition: null, heroInPosition: null };
+
+  const folded = new Set(preflopActions.filter((a) => a.action === "folds").map((a) => a.player));
+  const active = seats.filter((s) => !folded.has(s.playerName));
+
+  if (active.length !== 2) return { villainPosition: null, heroInPosition: null };
+
+  const heroSeat = active.find((s) => s.playerName === heroName);
+  const villainSeat = active.find((s) => s.playerName !== heroName);
+  if (!heroSeat || !villainSeat || heroSeat.position === null || villainSeat.position === null) {
+    return { villainPosition: null, heroInPosition: null };
+  }
+
+  const n = seats.length;
+  const order = POSITIONS_BY_TABLE_SIZE[n];
+  if (!order) return { villainPosition: null, heroInPosition: null };
+
+  const heroIdx = order.indexOf(heroSeat.position);
+  const villainIdx = order.indexOf(villainSeat.position);
+  if (heroIdx === -1 || villainIdx === -1) return { villainPosition: null, heroInPosition: null };
+
+  return { villainPosition: villainSeat.position, heroInPosition: heroIdx > villainIdx };
+}
+
+function streetActions(streets: ParsedStreet[], name: ParsedStreet["name"]): ParsedAction[] {
+  return streets.find((s) => s.name === name)?.actions ?? [];
+}
+
+function heroOpenedBetting(actions: ParsedAction[], heroName: string): boolean {
+  return actions.some((a) => a.player === heroName && (a.action === "bets" || a.action === "allin"));
+}
+
+function computePostflopTags(streets: ParsedStreet[], heroName: string | null): PostflopTags {
+  const empty: PostflopTags = {
+    isPreflopAggressor: false,
+    cbetFlop: false,
+    cbetTurn: false,
+    doubleBarrel: false,
+    tripleBarrel: false,
+    donkBetFlop: false,
+    checkRaise: false,
+    foldToCbetFlop: false,
+  };
+  if (!heroName) return empty;
+
+  const preflop = streetActions(streets, "preflop");
+  const flop = streetActions(streets, "flop");
+  const turn = streetActions(streets, "turn");
+  const river = streetActions(streets, "river");
+
+  const preflopRaises = preflop.filter((a) => a.action === "raises");
+  const lastPreflopRaiser = preflopRaises.length ? preflopRaises[preflopRaises.length - 1].player : null;
+  const isPreflopAggressor = lastPreflopRaiser === heroName;
+
+  const cbetFlop = isPreflopAggressor && heroOpenedBetting(flop, heroName);
+  const cbetTurn = isPreflopAggressor && heroOpenedBetting(turn, heroName);
+  const doubleBarrel = cbetFlop && cbetTurn;
+  const tripleBarrel = doubleBarrel && heroOpenedBetting(river, heroName);
+
+  // Donk bet so existe se HOUVE um raise no preflop (ou seja, existe um
+  // PFA de verdade) e o heroi, nao sendo o PFA, e' quem abre a aposta
+  // no flop.
+  const donkBetFlop = lastPreflopRaiser !== null && !isPreflopAggressor && heroOpenedBetting(flop, heroName);
+
+  // Check-raise: olhando so as acoes do proprio heroi, em ordem, em
+  // qualquer rua pos-flop — primeira acao da rua e' 'checks' e uma
+  // acao posterior na MESMA rua e' 'raises'.
+  const checkRaise = [flop, turn, river].some((streetActs) => {
+    const heroActs = streetActs.filter((a) => a.player === heroName);
+    const firstCheckIdx = heroActs.findIndex((a) => a.action === "checks");
+    if (firstCheckIdx === -1) return false;
+    return heroActs.slice(firstCheckIdx + 1).some((a) => a.action === "raises");
+  });
+
+  // Fold pra cbet: heroi nao e' o PFA, o PFA abriu aposta no flop, e o
+  // heroi desistiu no flop depois disso.
+  const foldToCbetFlop =
+    lastPreflopRaiser !== null &&
+    !isPreflopAggressor &&
+    heroOpenedBetting(flop, lastPreflopRaiser) &&
+    flop.some((a) => a.player === heroName && a.action === "folds");
+
+  return { isPreflopAggressor, cbetFlop, cbetTurn, doubleBarrel, tripleBarrel, donkBetFlop, checkRaise, foldToCbetFlop };
+}
+
 // Seat/Lugar + em torneios PKO/Mystery Bounty PT-BR, sufixo ", Bounty de $ X"
 // junto do stack — capturado no grupo 4 (opcional) pra alimentar o bounty
 // automatico do heroi sem precisar digitar manual.
@@ -369,6 +557,7 @@ function extractSeats(
       isButton: buttonSeat === seatNumber,
       isHero: heroName ? m[2] === heroName : false,
       bountyValue: m[4] ? Number(m[4].replace(",", "")) : undefined,
+      position: null,
     });
   }
 
@@ -420,6 +609,22 @@ export function parseHand(rawText: string): ParsedHand {
   const riverSt = extractStreetActions(rawText, "river", riverMarker, showdownMarker);
   if (riverSt) streets.push({ ...riverSt, board: [...flop, ...turn, ...river] });
 
+  // Motor de posicoes: preenche seat.position pra TODOS os assentos (nao
+  // so o heroi). Roda depois de extractSeats mas antes do heroPosition
+  // final, porque a posicao do heroi agora vem daqui, nao so do regex
+  // antigo (que so pegava BTN/SB/BB explicitos no texto).
+  assignSeatPositions(seats, buttonSeat);
+
+  const heroSeatComputed = seats.find((s) => s.isHero);
+  const heroPositionFromEngine = heroSeatComputed?.position ?? null;
+  // Fallback pro regex antigo so quando o motor nao resolveu (ex: numero
+  // de assentos fora de 2-9, ou buttonSeat nao identificado no texto).
+  const heroPosition = heroPositionFromEngine ?? extractHeroPosition(rawText, heroName);
+
+  const preflopActionsForMatchup = streets.find((s) => s.name === "preflop")?.actions ?? [];
+  const { villainPosition, heroInPosition } = computeHeroMatchup(seats, preflopActionsForMatchup, heroName);
+  const postflopTags = computePostflopTags(streets, heroName);
+
   return {
     site,
     handId: extractHandId(rawText),
@@ -428,7 +633,7 @@ export function parseHand(rawText: string): ParsedHand {
     stakes: extractStakes(rawText),
     heroName,
     heroCards: extractHeroCards(rawText, heroName),
-    heroPosition: extractHeroPosition(rawText, heroName),
+    heroPosition,
     board,
     pot: extractPot(rawText),
     winner: extractWinner(rawText),
@@ -442,6 +647,9 @@ export function parseHand(rawText: string): ParsedHand {
     smallBlind,
     bigBlind,
     showdown: extractShowdown(rawText),
+    villainPosition,
+    heroInPosition,
+    postflopTags,
   };
 }
 
