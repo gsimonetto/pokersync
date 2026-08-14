@@ -145,32 +145,14 @@ function PainelConteudo() {
   return (
     <>
       <main className="mx-auto max-w-6xl px-6 py-10 text-ink print:max-w-full print:p-0">
-        <header className="mb-5 flex flex-wrap items-center gap-3 print:mb-4">
+        <div className="mb-5 flex items-center justify-between print:hidden">
           <Link href="/modulos"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+            className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
             aria-label="Voltar">
             <ArrowLeft size={18} />
           </Link>
 
-          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-hairline"
-            style={{ backgroundColor: `${info?.accent ?? "#5AA6E0"}18` }}>
-            {info?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={info.logoUrl} alt={info.name} className="h-full w-full object-cover" />
-            ) : (
-              <Users size={18} style={{ color: info?.accent ?? "#5AA6E0" }} />
-            )}
-          </div>
-
-          <div className="min-w-0 flex-1">
-            <h1 className="m-0 truncate text-xl font-semibold tracking-tight">{info?.name ?? "Painel do time"}</h1>
-            <p className="mt-0.5 text-sm text-muted">
-              {time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
-              <span className="hidden print:inline"> · gerado em {new Date().toLocaleDateString("pt-BR")}</span>
-            </p>
-          </div>
-
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1 print:hidden">
+          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
             {PERIODOS.map((p) => (
               <button key={p.days} onClick={() => setDias(p.days)}
                 className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
@@ -180,15 +162,33 @@ function PainelConteudo() {
               </button>
             ))}
           </div>
+        </div>
+
+        <header className="mb-8 flex flex-col items-center gap-2 text-center print:mb-4">
+          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-hairline shadow-sm"
+            style={{ backgroundColor: `${info?.accent ?? "#5AA6E0"}18` }}>
+            {info?.logoUrl ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={info.logoUrl} alt={info.name} className="h-full w-full object-cover" />
+            ) : (
+              <Users size={18} style={{ color: info?.accent ?? "#5AA6E0" }} />
+            )}
+          </div>
+
+          <h1 className="m-0 text-xl font-bold tracking-tight">{info?.name ?? "Painel do time"}</h1>
+          <p className="text-sm text-muted">
+            {time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
+            <span className="hidden print:inline"> · gerado em {new Date().toLocaleDateString("pt-BR")}</span>
+          </p>
 
           <button onClick={() => window.print()}
-            className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 print:hidden">
+            className="mt-2 flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 print:hidden">
             <Printer size={15} />
             PDF
           </button>
         </header>
 
-        <nav className="mb-5 flex gap-1 overflow-x-auto border-b border-hairline print:hidden">
+        <nav className="mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline print:hidden">
           {ABAS.map((a) => {
             const Icon = a.icon;
             const pend = a.key === "convites" ? pendentes.length : 0;
