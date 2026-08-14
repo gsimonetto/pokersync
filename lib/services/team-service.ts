@@ -3,14 +3,6 @@ import { createClient } from "@/lib/supabase/client";
 // ============================================================
 // Modo Team — base (time, papeis, convites por token)
 // ============================================================
-// Regras que vivem no banco (nao replicar aqui como validacao final,
-// so como UX antecipada):
-//   - criar time exige user_plans.plan em ('team','master');
-//   - 1 jogador = 1 time (PK de team_members em user_id);
-//   - convite e' um token opaco gerado no servidor, com validade e
-//     limite de usos — serve pra WhatsApp/comunidade, nao so e-mail;
-//   - papel do time (admin/coach/player) nao se mistura com o acesso
-//     total de plataforma (esse continua sendo por e-mail).
 
 export type TeamRole = "admin" | "coach" | "player";
 
@@ -64,8 +56,6 @@ export interface FinancialDay {
   sessoes: number;
 }
 
-// Adesao do proprio usuario — inclui o estado 'pendente', que
-// my_team_id() esconde de proposito.
 export interface MyMembership {
   teamId: string;
   teamName: string;
@@ -112,8 +102,6 @@ export interface InviteInfo {
   reason: string | null;
 }
 
-// Erros das funcoes do banco chegam como codigo seco (ex.:
-// "PLANO_TEAM_NECESSARIO"). Traduz pra mensagem de tela.
 const ERROS: Record<string, string> = {
   NAO_AUTENTICADO: "Sessão expirada. Entre novamente.",
   PLANO_TEAM_NECESSARIO: "Criar um time exige o plano Team.",
@@ -127,6 +115,8 @@ const ERROS: Record<string, string> = {
   CONVITE_CANCELADO: "Este convite foi cancelado.",
   CONVITE_EXPIRADO: "Este convite expirou.",
   CONVITE_ESGOTADO: "Este convite já atingiu o limite de usos.",
+  MENSAGEM_VAZIA: "Escreva uma mensagem.",
+  NAO_E_DO_MESMO_TIME: "Esse jogador não está mais no seu time.",
 };
 
 export function traduzErroTime(err: unknown): string {
@@ -184,8 +174,6 @@ export async function fetchMyTeam(): Promise<MyTeam | null> {
   if (eMembers) throw eMembers;
   if (!teamRow) return null;
 
-  // Sem FK entre team_members e profiles — busca separada e junta no
-  // client (mesmo padrao ja usado em hand-review-service).
   const ids = (memberRows ?? []).map((m) => m.user_id);
   const { data: profileRows } = await supabase
     .from("profiles")
@@ -298,8 +286,6 @@ export async function revokeInvite(inviteId: string) {
   if (error) throw error;
 }
 
-// Trocar de papel ajusta is_coach junto: coach sempre atua como coach,
-// jogador nunca atua. Admin mantem a escolha (padrao: nao recebe mao).
 export async function updateMemberRole(userId: string, role: TeamRole) {
   const supabase = createClient();
   const patch: Record<string, unknown> = { role };
@@ -309,8 +295,6 @@ export async function updateMemberRole(userId: string, role: TeamRole) {
   if (error) throw error;
 }
 
-// Admin que acumula a funcao de coach: passa a receber maos dos
-// jogadores. Revisar mao nao e' funcao do admin por padrao.
 export async function updateMemberIsCoach(userId: string, isCoach: boolean) {
   const supabase = createClient();
   const { error } = await supabase.from("team_members").update({ is_coach: isCoach }).eq("user_id", userId);
@@ -357,10 +341,6 @@ export async function acceptInvite(token: string): Promise<string> {
 // ============================================================
 // Painel do time
 // ============================================================
-// Os agregados vem de RPCs security definer (team_dashboard /
-// team_leaks) — a RLS individual so libera o proprio dono, entao a
-// autorizacao acontece la dentro, por papel de time:
-//   admin -> time inteiro | coach -> so os jogadores atribuidos a ele.
 
 export interface TeamDashboardRow {
   userId: string;
@@ -376,8 +356,6 @@ export interface TeamDashboardRow {
   maosRevisadas: number;
   maosCompartilhadas: number;
   xpPeriodo: number;
-  // Acumulado desde que o jogador ACEITOU O CONVITE do time — nao
-  // respeita o filtro de periodo do painel, e' contagem de vida no time.
   jogosNoTime: number;
   lucroNoTime: number;
   avatarId: number;
@@ -436,8 +414,6 @@ export async function fetchTeamDashboard(days = 30): Promise<TeamDashboardRow[]>
   }));
 }
 
-// Evolucao diaria do time inteiro (escopo do coach ou do admin) —
-// alimenta o grafico do painel geral.
 export async function fetchTeamActivity(days = 30): Promise<TeamActivityDay[]> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("team_activity", { p_days: days });
@@ -468,9 +444,6 @@ export async function fetchTeamLeaks(days = 30, limit = 8): Promise<TeamLeak[]> 
   }));
 }
 
-// Atribui o drill de um leak a todos os jogadores afetados no escopo de
-// quem chama. Retorna quantos jogadores realmente receberam (alguns
-// podem ja estar no cooldown de 3 dias e ficam de fora silenciosamente).
 export async function assignTeamDrill(
   reasonCode: string,
   street: string,
@@ -488,8 +461,6 @@ export async function assignTeamDrill(
   return (data as number) ?? 0;
 }
 
-// Atribui (ou remove) o coach responsavel por um jogador. O banco valida
-// que o coach e' do mesmo time e atua como coach.
 export async function assignCoach(playerUserId: string, coachUserId: string | null) {
   const supabase = createClient();
   const { error } = await supabase
@@ -499,8 +470,6 @@ export async function assignCoach(playerUserId: string, coachUserId: string | nu
   if (error) throw error;
 }
 
-// Sem atividade ha X dias: usado pra destacar quem precisa de
-// acompanhamento no painel.
 export function diasSemAtividade(lastActivityAt: string | null): number | null {
   if (!lastActivityAt) return null;
   const ms = Date.now() - new Date(lastActivityAt).getTime();
@@ -510,8 +479,6 @@ export function diasSemAtividade(lastActivityAt: string | null): number | null {
 // ============================================================
 // Jogador individual (visao do coach)
 // ============================================================
-// Tudo passa por RPCs security definer que validam quem pode olhar:
-// admin do time, coach responsavel pelo jogador, ou o proprio jogador.
 
 export interface PeriodComparison {
   treinosAtual: number; treinosAnterior: number;
@@ -686,9 +653,6 @@ export async function fetchPlayerSharedHands(playerId: string, limit = 20): Prom
 // ============================================================
 // Alertas automaticos
 // ============================================================
-// Gerados pela varredura diaria no banco (run_team_alerts, via cron).
-// Aqui so leitura: a RLS libera o proprio jogador, o coach responsavel
-// e o admin do time.
 
 export type TeamAlertKind =
   | "inatividade"
@@ -790,8 +754,6 @@ export async function updateTeamInfo(patch: {
   if (error) throw error;
 }
 
-// Logo vai pro bucket publico team-logos, sempre em <team_id>/ — a
-// policy de storage exige essa pasta e papel de admin/coach.
 export async function uploadTeamLogo(teamId: string, file: File): Promise<string> {
   const supabase = createClient();
   const ext = (file.name.split(".").pop() || "png").toLowerCase();
@@ -826,7 +788,6 @@ export async function deleteLabel(labelId: string) {
   if (error) throw error;
 }
 
-// Uma etiqueta por jogador — passar null remove.
 export async function setMemberLabel(userId: string, labelId: string | null) {
   const supabase = createClient();
   const { error } = await supabase.from("team_members").update({ label_id: labelId }).eq("user_id", userId);
@@ -885,8 +846,6 @@ export async function fetchFinancialSeries(days = 30): Promise<FinancialDay[]> {
 // ============================================================
 // Metas por jogador (definidas pelo coach/admin)
 // ============================================================
-// Janela rolante (7 ou 30 dias a partir de agora), nao calendario fixo
-// — meta "revisar 5 mãos por semana" e' um padrao continuo.
 
 export type GoalMetric = "treinos" | "maos_revisadas" | "maos_compartilhadas";
 export type GoalPeriod = "semana" | "mes";
@@ -949,5 +908,67 @@ export async function createPlayerGoal(
 export async function deactivatePlayerGoal(goalId: string) {
   const supabase = createClient();
   const { error } = await supabase.rpc("deactivate_player_goal", { p_goal: goalId });
+  if (error) throw error;
+}
+
+// ============================================================
+// Chat 1:1 (coach/admin <-> jogador), dentro do mesmo time
+// ============================================================
+// RLS libera so remetente e destinatario. Insert sempre via RPC
+// send_team_message (valida "mesmo time" + dispara notificacao de
+// sino). Leitura e marcar-como-lida podem ir direto na tabela.
+
+export interface TeamMessage {
+  id: string;
+  teamId: string;
+  senderId: string;
+  recipientId: string;
+  body: string;
+  createdAt: string;
+  readAt: string | null;
+}
+
+export async function fetchTeamThread(otherUserId: string, limit = 100): Promise<TeamMessage[]> {
+  const supabase = createClient();
+  const meId = await getUserId();
+  const { data, error } = await supabase
+    .from("team_messages")
+    .select("id, team_id, sender_id, recipient_id, body, created_at, read_at")
+    .or(
+      `and(sender_id.eq.${meId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${meId})`
+    )
+    .order("created_at", { ascending: true })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    teamId: r.team_id,
+    senderId: r.sender_id,
+    recipientId: r.recipient_id,
+    body: r.body,
+    createdAt: r.created_at,
+    readAt: r.read_at,
+  }));
+}
+
+export async function sendTeamMessage(recipientId: string, body: string): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("send_team_message", {
+    p_recipient: recipientId,
+    p_body: body,
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+export async function markThreadRead(otherUserId: string) {
+  const supabase = createClient();
+  const meId = await getUserId();
+  const { error } = await supabase
+    .from("team_messages")
+    .update({ read_at: new Date().toISOString() })
+    .eq("sender_id", otherUserId)
+    .eq("recipient_id", meId)
+    .is("read_at", null);
   if (error) throw error;
 }
