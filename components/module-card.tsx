@@ -3,37 +3,14 @@ import Link from "next/link";
 import { Lock, ArrowRight } from "lucide-react";
 import { ModuleCardShell } from "./module-card-shell";
 
-export type ModuleStatus = "ATIVO" | "NOVO" | "EM BREVE";
-
 export interface ModuleDef {
   key: string;
   icon: LucideIcon;
   title: string;
   subtitle: string;
   accent: string;
-  tag?: ModuleStatus;
   available: boolean;
   href?: string;
-}
-
-function StatusBadge({ tag, available }: { tag?: ModuleStatus; available: boolean }) {
-  const label = tag ?? (available ? "ATIVO" : "EM BREVE");
-  const isActive = label === "ATIVO";
-  const isNew = label === "NOVO";
-  return (
-    <span
-      className={
-        "rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider " +
-        (isActive
-          ? "bg-ink text-void"
-          : isNew
-          ? "border border-evolution text-evolution"
-          : "border border-hairline text-muted")
-      }
-    >
-      {label}
-    </span>
-  );
 }
 
 // Server Component: resolve o icone aqui (JSX ja renderizado), so o
@@ -43,7 +20,6 @@ export function ModuleCard({
   title,
   subtitle,
   accent,
-  tag,
   available,
   href,
 }: Omit<ModuleDef, "key">) {
@@ -59,11 +35,7 @@ export function ModuleCard({
         <div className="acc-border flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-elevated">
           <Icon size={20} className="acc-fg" />
         </div>
-        {available ? (
-          <StatusBadge tag={tag} available={available} />
-        ) : (
-          <Lock size={14} className="text-muted" />
-        )}
+        {!available && <Lock size={14} className="text-muted" />}
       </div>
       <div className="relative mt-4">
         <h3 className="acc-fg text-sm font-semibold text-ink">{title}</h3>
