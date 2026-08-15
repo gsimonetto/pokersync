@@ -265,15 +265,17 @@ export function RangeEditor({ id }: { id: string }) {
       {/* Grade + analise lado a lado — a analise so preenche quando tem
           board digitado/rodado, mas fica sempre visivel na lateral pra
           nao precisar rolar a pagina pra baixo pra ver ela. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
-        <RangeGrid
-          value={hands}
-          onChange={setHands}
-          labelsWithOverrides={labelsWithOverrides}
-          onOpenComboEditor={setEditingComboLabel}
-        />
+      <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
+        <div className="lg:shrink-0">
+          <RangeGrid
+            value={hands}
+            onChange={setHands}
+            labelsWithOverrides={labelsWithOverrides}
+            onOpenComboEditor={setEditingComboLabel}
+          />
+        </div>
 
-        <div className="space-y-3 lg:sticky lg:top-4 lg:self-start">
+        <div className="w-full space-y-2 lg:sticky lg:top-4 lg:max-w-[300px]">
           <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
           <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
         </div>

@@ -11,8 +11,8 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 // proprio construtor (RangeListModal), sem sair da tela.
 export default function RangesPage() {
   return (
-    <main className="mx-auto max-w-[1280px] px-4 py-4 text-ink">
-      <header className="mb-3 flex items-center gap-3">
+    <main className="mx-auto max-w-[1280px] px-3 py-3 text-ink">
+      <header className="mb-2 flex items-center gap-3">
         <Link
           href="/modulos"
           className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"

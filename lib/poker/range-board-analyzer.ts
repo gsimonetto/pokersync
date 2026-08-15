@@ -345,6 +345,23 @@ export interface MultiBoardAnalysis {
   byCategory: Record<Category, number>;
 }
 
+// Escolhe automaticamente quantos boards rodar, sem pedir isso ao
+// usuario: ranges largos (muitos combos ativos) usam menos boards por
+// board ser mais caro de avaliar; ranges estreitos usam mais boards
+// porque cada um e' barato. O alvo e' manter o trabalho total (combos
+// ativos x boards) num teto que nunca trava o navegador, mesmo no pior
+// caso (range 100% aberto) — testado manualmente antes de fixar os
+// numeros abaixo.
+const ADAPTIVE_TARGET_EVALUATIONS = 100_000;
+const ADAPTIVE_MIN_BOARDS = 60;
+const ADAPTIVE_MAX_BOARDS = 800;
+
+export function chooseAdaptiveSampleSize(hands: RangeHands, comboOverrides: RangeHands = {}): number {
+  const activeCombos = analyzeRangeVsBoard(hands, [], comboOverrides).totalCombos;
+  const raw = Math.round(ADAPTIVE_TARGET_EVALUATIONS / Math.max(activeCombos, 1));
+  return Math.max(ADAPTIVE_MIN_BOARDS, Math.min(ADAPTIVE_MAX_BOARDS, raw));
+}
+
 export function analyzeRangeAcrossRandomBoards(
   hands: RangeHands,
   sampleSize: number,

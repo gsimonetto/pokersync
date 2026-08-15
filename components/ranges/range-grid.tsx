@@ -160,93 +160,98 @@ export function RangeGrid({
 
   return (
     <div className="w-full select-none">
-      {!readOnly && (
-        <div className="mb-4 flex flex-wrap items-center gap-4">
-          <div className="flex items-center gap-2">
-            {ACTIONS.map((a) => (
-              <button
-                key={a}
-                type="button"
-                onClick={() => setTool(a)}
-                className={`flex items-center gap-1.5 rounded-lg border px-3 py-1 text-sm transition-colors ${
-                  tool === a ? "border-ink bg-elevated" : "border-hairline bg-surface text-muted"
-                }`}
-              >
-                <span
-                  className="h-2.5 w-2.5 rounded-full"
-                  style={{ backgroundColor: ACTION_META[a].color }}
-                />
-                {ACTION_META[a].label}
-              </button>
-            ))}
-          </div>
-          <div className="flex items-center gap-2">
-            <span className="text-sm text-muted">Peso:</span>
-            {WEIGHT_PRESETS.map((w) => (
-              <button
-                key={w}
-                type="button"
-                onClick={() => setWeight(w)}
-                className={`rounded-lg border px-3 py-1 text-sm transition-colors ${
-                  weight === w ? "border-ink bg-ink text-void" : "border-hairline bg-surface text-ink hover:bg-elevated"
-                }`}
-              >
-                {w}%
-              </button>
-            ))}
-          </div>
-        </div>
-      )}
-
-      <div
-        className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-[2px] rounded-xl border border-hairline bg-surface p-2"
-        onPointerUp={stopPaint}
-        onPointerLeave={stopPaint}
-      >
-        {RANKS.map((_, rowIdx) =>
-          RANKS.map((__, colIdx) => {
-            const label = getHandLabel(rowIdx, colIdx);
-            const d = getDecision(value, label);
-            const hasOverride = labelsWithOverrides?.has(label) ?? false;
-            const title = `${label} — Fold ${d.fold}% / Call ${d.call}% / Raise ${d.raise}%${hasOverride ? " (tem combo customizado)" : ""}`;
-            return (
-              <div
-                key={label}
-                onPointerDown={() => startPaint(label)}
-                onPointerEnter={() => continuePaint(label)}
-                title={title}
-                className={`relative flex aspect-square items-center justify-center rounded-sm text-[10px] font-medium text-ink ${
-                  readOnly ? "cursor-default" : "cursor-pointer"
-                }`}
-                style={{ background: cellBackground(d) }}
-              >
-                {label}
-                {hasOverride && (
-                  <span className="absolute right-0.5 top-0.5 h-1.5 w-1.5 rounded-full bg-evolution" />
-                )}
-                {onOpenComboEditor && !readOnly && (
+      <div className="mx-auto max-w-[480px]">
+        {!readOnly && (
+          <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-elevated p-1">
+              {ACTIONS.map((a) => {
+                const active = tool === a;
+                return (
                   <button
+                    key={a}
                     type="button"
-                    onPointerDown={(e) => e.stopPropagation()}
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      onOpenComboEditor(label);
-                    }}
-                    className="absolute bottom-0 left-0 h-2.5 w-2.5 rounded-tr bg-black/0 text-[6px] leading-none text-transparent hover:bg-black/50 hover:text-ink"
-                    title="Editar combos individuais desta mão"
+                    onClick={() => setTool(a)}
+                    className={`flex items-center gap-1.5 rounded-full px-3 py-1.5 text-xs font-medium transition-all ${
+                      active ? "shadow-sm" : "text-muted hover:text-ink"
+                    }`}
+                    style={active ? { backgroundColor: `${ACTION_META[a].color}26`, color: ACTION_META[a].color } : undefined}
                   >
-                    ⋯
+                    <span
+                      className="h-2 w-2 rounded-full transition-transform"
+                      style={{ backgroundColor: ACTION_META[a].color, transform: active ? "scale(1.15)" : "scale(1)" }}
+                    />
+                    {ACTION_META[a].label}
                   </button>
-                )}
-              </div>
-            );
-          })
+                );
+              })}
+            </div>
+            <div className="flex items-center gap-1 rounded-full border border-hairline bg-elevated p-1">
+              {WEIGHT_PRESETS.map((w) => (
+                <button
+                  key={w}
+                  type="button"
+                  onClick={() => setWeight(w)}
+                  className={`rounded-full px-2.5 py-1.5 text-xs font-medium transition-colors ${
+                    weight === w ? "bg-ink text-void" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {w}%
+                </button>
+              ))}
+            </div>
+          </div>
         )}
-      </div>
 
-      <p className="mt-3 text-sm text-muted">
-        {summary.activeHands} mãos com ação · {summary.raise} combos raise · {summary.call} combos call
-      </p>
+        <div
+          className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-[2px] rounded-xl border border-hairline bg-surface p-1.5"
+          onPointerUp={stopPaint}
+          onPointerLeave={stopPaint}
+        >
+          {RANKS.map((_, rowIdx) =>
+            RANKS.map((__, colIdx) => {
+              const label = getHandLabel(rowIdx, colIdx);
+              const d = getDecision(value, label);
+              const hasOverride = labelsWithOverrides?.has(label) ?? false;
+              const title = `${label} — Fold ${d.fold}% / Call ${d.call}% / Raise ${d.raise}%${hasOverride ? " (tem combo customizado)" : ""}`;
+              return (
+                <div
+                  key={label}
+                  onPointerDown={() => startPaint(label)}
+                  onPointerEnter={() => continuePaint(label)}
+                  title={title}
+                  className={`relative flex aspect-square items-center justify-center rounded-[3px] text-[9px] font-medium text-ink transition-transform hover:z-10 hover:scale-[1.12] hover:shadow-md ${
+                    readOnly ? "cursor-default" : "cursor-pointer"
+                  }`}
+                  style={{ background: cellBackground(d) }}
+                >
+                  {label}
+                  {hasOverride && (
+                    <span className="absolute right-0.5 top-0.5 h-1 w-1 rounded-full bg-evolution" />
+                  )}
+                  {onOpenComboEditor && !readOnly && (
+                    <button
+                      type="button"
+                      onPointerDown={(e) => e.stopPropagation()}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        onOpenComboEditor(label);
+                      }}
+                      className="absolute bottom-0 left-0 h-2 w-2 rounded-tr bg-black/0 text-[5px] leading-none text-transparent hover:bg-black/50 hover:text-ink"
+                      title="Editar combos individuais desta mão"
+                    >
+                      ⋯
+                    </button>
+                  )}
+                </div>
+              );
+            })
+          )}
+        </div>
+
+        <p className="mt-2 text-center text-[11px] text-muted">
+          {summary.activeHands} mãos · {summary.raise} raise · {summary.call} call
+        </p>
+      </div>
     </div>
   );
 }

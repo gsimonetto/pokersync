@@ -9,8 +9,8 @@ export default function RangeEditPage({ params }: { params: Promise<{ id: string
   const { id } = use(params);
 
   return (
-    <main className="mx-auto max-w-[1280px] px-4 py-4 text-ink">
-      <header className="mb-3 flex items-center gap-3">
+    <main className="mx-auto max-w-[1280px] px-3 py-3 text-ink">
+      <header className="mb-2 flex items-center gap-3">
         <Link
           href="/ranges"
           className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"

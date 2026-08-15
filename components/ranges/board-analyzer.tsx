@@ -44,52 +44,49 @@ export function BoardAnalyzer({
   }, [hands, comboOverrides, parsed]);
 
   return (
-    <div className="mt-6 rounded-xl border border-hairline bg-surface">
+    <div className="rounded-xl border border-hairline bg-surface">
       <button
         onClick={() => setOpen((v) => !v)}
-        className="flex w-full items-center justify-between px-4 py-3 text-left"
+        className="flex w-full items-center justify-between px-3 py-2.5 text-left"
       >
-        <span className="text-sm font-medium">Analisar contra um board</span>
-        {open ? <ChevronUp size={16} className="text-muted" /> : <ChevronDown size={16} className="text-muted" />}
+        <span className="text-xs font-medium">Analisar contra um board</span>
+        {open ? <ChevronUp size={14} className="text-muted" /> : <ChevronDown size={14} className="text-muted" />}
       </button>
 
       {open && (
-        <div className="border-t border-hairline p-4">
-          <label className="mb-1 block text-xs text-muted">
-            Board (3 a 5 cartas — ex: Kc8h2d ou Kc 8h 2d)
-          </label>
+        <div className="border-t border-hairline p-3">
           <input
             value={boardInput}
             onChange={(e) => setBoardInput(e.target.value)}
-            placeholder="Kc8h2d"
-            className="w-full max-w-xs rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
+            placeholder="Board: Kc8h2d"
+            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-sm outline-none"
           />
 
-          {parsed.error && <p className="mt-2 text-sm text-negative">{parsed.error}</p>}
+          {parsed.error && <p className="mt-2 text-xs text-negative">{parsed.error}</p>}
 
           {analysis && (
-            <div className="mt-4">
-              <p className="mb-3 text-sm text-muted">
-                {analysis.totalCombos} combos restantes no range contra esse board
-                {analysis.totalCombos === 0 && " — nenhuma mão com call/raise sobrevive a esse board."}
+            <div className="mt-3">
+              <p className="mb-2 text-[11px] text-muted">
+                {analysis.totalCombos} combos restantes
+                {analysis.totalCombos === 0 && " — nenhuma mão sobrevive a esse board."}
               </p>
 
               {analysis.totalCombos > 0 && (
-                <div className="space-y-1.5">
+                <div className="space-y-1">
                   {CATEGORY_ORDER.filter((cat) => analysis.byCategory[cat] > 0).map((cat) => {
                     const count = analysis.byCategory[cat];
                     const pct = Math.round((count / analysis.totalCombos) * 100);
                     return (
-                      <div key={cat} className="flex items-center gap-3">
-                        <span className="w-44 shrink-0 text-xs text-muted">{CATEGORY_LABEL[cat]}</span>
-                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-elevated">
+                      <div key={cat} className="flex items-center gap-2">
+                        <span className="w-28 shrink-0 truncate text-[11px] text-muted">{CATEGORY_LABEL[cat]}</span>
+                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
                           <div
                             className="h-full rounded-full"
                             style={{ width: `${pct}%`, backgroundColor: categoryColor(cat) }}
                           />
                         </div>
-                        <span className="w-16 shrink-0 text-right text-xs tabular-nums text-muted">
-                          {count} ({pct}%)
+                        <span className="w-12 shrink-0 text-right text-[11px] tabular-nums text-muted">
+                          {pct}%
                         </span>
                       </div>
                     );
