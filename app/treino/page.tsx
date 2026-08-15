@@ -7,6 +7,7 @@ import { ArrowLeft, Loader2, AlertTriangle, SkipForward } from "lucide-react";
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { ActionBar, type DrillAction } from "@/components/drill/action-bar";
 import { GtoFeedback } from "@/components/drill/gto-feedback";
+import { RangeDrill } from "@/components/drill/range-drill";
 import {
   fetchDrillBatch,
   fetchDrillBatchBySuggestion,
@@ -431,10 +432,65 @@ function TreinoPageInner() {
   );
 }
 
+type Tab = "gto" | "ranges";
+
+// Duas praticas de treino distintas de proposito (Decisao 009: o
+// construtor de ranges e' 100% offline, o Modo Treino continua sendo
+// o unico lugar de "exercicio" do produto — por isso o drill de ranges
+// entra aqui como aba, e nao como tela propria em /ranges). O TreinoPageInner
+// (drill GTO com solver) fica intocado — a aba Ranges e' um componente
+// isolado do lado, sem compartilhar estado nenhum.
+//
+// Aceita ?tab=ranges&rangeId=<uuid> na querystring — e' o link que a
+// Aderencia a Range (Revisor de Maos) usa pra mandar o jogador direto
+// pro drill do range que teve divergencia, ja selecionado (Decisao 002:
+// integracao entre modulos).
+function TreinoTabs() {
+  const searchParams = useSearchParams();
+  const initialTab = searchParams.get("tab") === "ranges" ? "ranges" : "gto";
+  const initialRangeId = searchParams.get("rangeId");
+  const [tab, setTab] = useState<Tab>(initialTab);
+
+  return (
+    <div style={{ minHeight: "100vh", background: "#050505" }}>
+      <div style={{ maxWidth: 1280, margin: "0 auto", padding: "16px 16px 0" }}>
+        <div style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 10, background: "#111111", border: "1px solid rgba(255,255,255,0.08)" }}>
+          {(["gto", "ranges"] as Tab[]).map((t) => (
+            <button
+              key={t}
+              onClick={() => setTab(t)}
+              style={{
+                padding: "6px 14px",
+                borderRadius: 7,
+                fontSize: 12,
+                fontWeight: 500,
+                border: "none",
+                cursor: "pointer",
+                background: tab === t ? "#FFFFFF" : "transparent",
+                color: tab === t ? "#111111" : "rgba(255,255,255,0.55)",
+              }}
+            >
+              {t === "gto" ? "GTO" : "Ranges"}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      {tab === "gto" ? (
+        <TreinoPageInner />
+      ) : (
+        <div className="mx-auto max-w-6xl px-6 py-6 text-ink">
+          <RangeDrill initialRangeId={initialRangeId} />
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function TreinoPage() {
   return (
     <Suspense fallback={null}>
-      <TreinoPageInner />
+      <TreinoTabs />
     </Suspense>
   );
 }

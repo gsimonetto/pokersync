@@ -8,8 +8,9 @@ import { RevisorFila } from "@/components/revisor/revisor-fila";
 import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
 import { RevisorSessao } from "@/components/revisor/revisor-sessao";
+import { AderenciaRange } from "@/components/revisor/aderencia-range";
 
-type Screen = "fila" | "nova" | "sessao" | "detalhe";
+type Screen = "fila" | "nova" | "sessao" | "detalhe" | "aderencia";
 
 // Navegacao interna do Revisor de Maos (2026-08 v2): agora inclui a tela
 // "sessao" (master-detail de torneio/cash). Fluxo esperado:
@@ -72,7 +73,7 @@ function RevisorPageInner() {
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
       <header className="mb-4 flex items-center gap-3">
-        {screen === "fila" ? (
+        {screen === "fila" || screen === "aderencia" ? (
           <Link
             href="/modulos"
             className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"
@@ -91,9 +92,27 @@ function RevisorPageInner() {
         )}
         <BookOpen size={20} className="text-review" />
         <h1 className="m-0 text-xl font-semibold">Revisão de Mãos</h1>
+
+        {(screen === "fila" || screen === "aderencia") && (
+          <div className="ml-auto flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+            <button
+              onClick={goFila}
+              className={`rounded-md px-3 py-1 text-xs font-medium ${screen === "fila" ? "bg-ink text-void" : "text-muted"}`}
+            >
+              Fila
+            </button>
+            <button
+              onClick={() => setScreen("aderencia")}
+              className={`rounded-md px-3 py-1 text-xs font-medium ${screen === "aderencia" ? "bg-ink text-void" : "text-muted"}`}
+            >
+              Aderência a Range
+            </button>
+          </div>
+        )}
       </header>
 
       {screen === "fila" && <RevisorFila onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />}
+      {screen === "aderencia" && <AderenciaRange />}
       {screen === "nova" && (
         <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
       )}
