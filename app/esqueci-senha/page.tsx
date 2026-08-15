@@ -73,7 +73,7 @@ export default function EsqueciSenhaPage() {
           </Link>
 
           <div className="mb-6 flex justify-center">
-            <Logo className="h-16 w-auto sm:h-20" />
+            <Logo className="h-9 w-auto sm:h-11" />
           </div>
 
           <div className="mb-5 text-center">
