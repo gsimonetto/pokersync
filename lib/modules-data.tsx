@@ -62,6 +62,7 @@ export const modules: ModuleDef[] = [
     title: "Construtor de Ranges",
     subtitle: "Mapeamento estrategico",
     accent: ACCENT.pink,
-    available: false,
+    available: true,
+    href: "/ranges",
   },
 ];

@@ -47,7 +47,7 @@ function parseActionString(raw: string): ParsedAction {
   return { type, sizing };
 }
 
-function classifyFrequency(freq: number): Verdict {
+export function classifyFrequency(freq: number): Verdict {
   if (freq >= FREQ_OTIMA) return "OTIMA";
   if (freq >= FREQ_ACEITAVEL) return "ACEITAVEL";
   if (freq >= FREQ_ERRO_LEVE) return "ERRO_LEVE";
