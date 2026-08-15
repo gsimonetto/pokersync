@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Users, Lock, Plus, Clock, Flame, Target, BookOpen } from "lucide-react";
+import { ArrowLeft, Users, Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
 import { ACCENT } from "@/lib/modules-data";
+import { fetchDrillFacets } from "@/lib/services/drill-service";
 import {
   createTeam,
   fetchMyMembership,
@@ -15,6 +16,18 @@ import {
   type MyMembership,
   type MyTeam,
 } from "@/lib/services/team-service";
+import {
+  fetchTeamEvents,
+  updateMyParticipantStatus,
+  traduzErroCalendario,
+  type TeamEvent,
+} from "@/lib/services/team-calendar-service";
+import {
+  fetchPlayerCards,
+  fetchWorstThreeBetPosition,
+  STAT_METRIC_LABEL,
+  type PlayerCard,
+} from "@/lib/services/team-funnel-service";
 
 // Porta de entrada do modulo. Nao e' uma tela de conteudo: decide para
 // onde o usuario vai e sai da frente.
@@ -157,7 +170,163 @@ function VisaoJogador({ data }: { data: MyTeam }) {
             Volume de jogos e resultado, contados a partir da sua entrada no time.</li>
         </ul>
       </section>
+
+      <MetaDoFunil />
+      <EventosDoJogador />
     </div>
+  );
+}
+
+// So mostra treino direto quando a meta tem correspondencia honesta no
+// banco de drills hoje: 3-bet -> action "3-Bet" (spots pos-flop de pote
+// de 3-bet). VPIP e PFR sao estatisticas de pre-flop e o banco de
+// drills so tem Flop/Turn/River — link inventado seria pior que nenhum.
+function MetaDoFunil() {
+  const [card, setCard] = useState<PlayerCard | null>(null);
+  const [piorPosicao, setPiorPosicao] = useState<string | null>(null);
+  const [temDrillsTresBet, setTemDrillsTresBet] = useState(false);
+
+  useEffect(() => {
+    fetchPlayerCards()
+      .then((cards) => setCard(cards[0] ?? null))
+      .catch(() => setCard(null));
+    fetchWorstThreeBetPosition()
+      .then(setPiorPosicao)
+      .catch(() => setPiorPosicao(null));
+    fetchDrillFacets()
+      .then((facets) => setTemDrillsTresBet(facets.some((f) => f.action === "3-Bet" && f.n > 0)))
+      .catch(() => setTemDrillsTresBet(false));
+  }, []);
+
+  if (!card || !card.statMetric) return null;
+
+  // "vs Open" nao tem correspondencia clara com PFR/VPIP (sao stats de
+  // pre-flop puro, banco de drills so tem pos-flop). "3-Bet" so entra
+  // se realmente existir spot solvado — hoje a base e' 100% SRP.
+  const temTreino = card.statMetric === "three_bet" && temDrillsTresBet;
+  // So passa "pos" quando a posicao vier de dado real do jogador (Revisor)
+  // e for uma das posicoes que os spots realmente cobrem.
+  const posValida = piorPosicao && ["UTG", "CO", "BTN", "SB"].includes(piorPosicao) ? piorPosicao : null;
+  const linkTreino = posValida ? `/treino?action=3-Bet&pos=${posValida}` : "/treino?action=3-Bet";
+
+  return (
+    <section className="rounded-xl border border-hairline bg-surface p-6">
+      <h2 className="flex items-center gap-2 text-base font-semibold">
+        <Target size={16} />
+        Meta do seu coach
+      </h2>
+      <p className="mt-1 text-sm text-muted">
+        {STAT_METRIC_LABEL[card.statMetric]} atual: <strong className="text-ink/85">{card.statValue ?? "—"}%</strong>
+        {card.statTarget != null && <> · meta: {card.statTarget}%</>}
+      </p>
+
+      {temTreino ? (
+        <Link href={linkTreino}
+          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02]">
+          <Dumbbell size={16} />
+          {posValida ? `Treinar 3-bet (${posValida})` : "Treinar 3-bet"}
+        </Link>
+      ) : (
+        <p className="mt-2 text-xs text-muted">Ainda não há drills específicos pra esse número na base atual — foco em revisar suas mãos por enquanto.</p>
+      )}
+    </section>
+  );
+}
+
+const TIPO_LABEL: Record<string, string> = { aula: "Aula", reuniao: "Reunião", outro: "Outro" };
+
+// Eventos onde o jogador foi convidado. RLS ja devolve so a linha de
+// participante do proprio usuario (nao ve status de outros jogadores) —
+// por isso "meuStatus" e' sempre o primeiro item de participants.
+function EventosDoJogador() {
+  const [eventos, setEventos] = useState<TeamEvent[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [erro, setErro] = useState<string | null>(null);
+  const [processando, setProcessando] = useState<string | null>(null);
+  const [destaqueId, setDestaqueId] = useState<string | null>(null);
+
+  const carregar = useCallback(async () => {
+    try {
+      const ev = await fetchTeamEvents();
+      setEventos(ev.filter((e) => e.participants.length > 0));
+    } catch (e) {
+      setErro(traduzErroCalendario(e));
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    carregar();
+    const params = new URLSearchParams(window.location.search);
+    setDestaqueId(params.get("eventId"));
+  }, [carregar]);
+
+  async function responder(eventId: string, status: "confirmado" | "recusado") {
+    setProcessando(eventId);
+    try {
+      await updateMyParticipantStatus(eventId, status);
+      await carregar();
+    } catch (e) {
+      setErro(traduzErroCalendario(e));
+    } finally {
+      setProcessando(null);
+    }
+  }
+
+  if (loading || eventos.length === 0) return null;
+
+  return (
+    <section className="rounded-xl border border-hairline bg-surface p-6">
+      <h2 className="flex items-center gap-2 text-base font-semibold">
+        <CalendarDays size={17} />
+        Próximos eventos
+      </h2>
+      {erro && <p className="mt-2 text-xs text-negative">{erro}</p>}
+
+      <ul className="mt-3 divide-y divide-hairline">
+        {eventos.map((ev) => {
+          const meuStatus = ev.participants[0]?.status ?? "pendente";
+          const destacado = ev.id === destaqueId;
+          return (
+            <li key={ev.id} className={`py-3.5 ${destacado ? "rounded-lg bg-ink/5 px-2" : ""}`}>
+              <p className="text-sm font-medium">{TIPO_LABEL[ev.eventType] ?? ev.eventType} · {ev.title}</p>
+              <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                <Clock size={12} />
+                {new Date(ev.startsAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                {ev.locationUrl && (
+                  <>
+                    <span className="text-hairline">·</span>
+                    <a href={ev.locationUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-ink/80 hover:underline">
+                      <Video size={12} /> link
+                    </a>
+                  </>
+                )}
+              </p>
+
+              {meuStatus === "pendente" ? (
+                <div className="mt-2 flex gap-2">
+                  <button onClick={() => responder(ev.id, "confirmado")} disabled={processando === ev.id}
+                    className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[12px] font-semibold text-void transition-transform hover:scale-[1.03] disabled:opacity-50">
+                    <Check size={13} /> Confirmar presença
+                  </button>
+                  <button onClick={() => responder(ev.id, "recusado")} disabled={processando === ev.id}
+                    className="flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-1.5 text-[12px] text-muted transition-colors hover:border-negative/50 hover:text-negative disabled:opacity-50">
+                    <X size={13} /> Não vou
+                  </button>
+                </div>
+              ) : (
+                <span className={`mt-2 inline-block rounded-full border px-2 py-0.5 text-[11px] ${
+                  meuStatus === "confirmado" ? "border-positive/40 text-positive" : "border-negative/40 text-negative"
+                }`}>
+                  {meuStatus === "confirmado" ? "Presença confirmada" : "Você recusou"}
+                </span>
+              )}
+            </li>
+          );
+        })}
+      </ul>
+    </section>
   );
 }
 
