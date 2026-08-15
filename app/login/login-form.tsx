@@ -150,7 +150,7 @@ export default function LoginForm() {
           )}
 
           <div className="mb-6 flex justify-center">
-            <Logo className="h-20 w-auto sm:h-24" />
+            <Logo className="h-11 w-auto sm:h-12" />
           </div>
 
           <div className="flex flex-col gap-3.5">
