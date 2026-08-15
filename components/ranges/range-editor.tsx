@@ -2,10 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitCompare, Save, Trash2, Download, Check, Users, X, History, FolderOpen, ChevronDown, ChevronUp } from "lucide-react";
+import { GitCompare, Save, Trash2, Download, Check, Users, X, History, FolderOpen, ChevronDown, ChevronUp, Percent } from "lucide-react";
 import { RangeGrid, getDecision, type RangeHands } from "@/components/ranges/range-grid";
 import { BoardAnalyzer } from "@/components/ranges/board-analyzer";
-import { HeroVillainEquity } from "@/components/ranges/hero-villain-equity";
 import { RangeVersionHistory } from "@/components/ranges/range-version-history";
 import { ComboEditorModal } from "@/components/ranges/combo-editor-modal";
 import { RangeListModal } from "@/components/ranges/range-list-modal";
@@ -268,7 +267,13 @@ export function RangeEditor({ id }: { id: string }) {
 
         <div className="w-full flex-1 space-y-2 lg:sticky lg:top-4 lg:max-w-[460px]">
           <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
-          <HeroVillainEquity heroHands={hands} heroComboOverrides={comboOverrides} />
+          <a
+            href={rangeId ? `/ranges/equidade?rangeId=${rangeId}` : "/ranges/equidade"}
+            className="flex items-center justify-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-2.5 text-xs text-muted hover:text-ink"
+          >
+            <Percent size={14} />
+            {rangeId ? "Calcular equidade desse range" : "Calcular equidade (salve o range primeiro)"}
+          </a>
         </div>
       </div>
 

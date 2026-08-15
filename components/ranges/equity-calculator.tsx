@@ -7,24 +7,39 @@ import { parseBoardInput } from "@/lib/poker/range-board-analyzer";
 import { runEquityMonteCarlo, type EquityResult, type EquitySource } from "@/lib/poker/equity-engine";
 import { Card } from "@/components/drill/card";
 import { CardPickerModal } from "@/components/ranges/card-picker-modal";
+import { RangeGrid, type RangeHands } from "@/components/ranges/range-grid";
+
+type ParticipantMode = "range" | "hand" | "build";
 
 interface ParticipantForm {
   id: string;
   label: string;
-  mode: "hand" | "range";
+  mode: ParticipantMode;
   handInput: string;
   rangeId: string;
+  builtHands: RangeHands;
 }
 
-function newParticipant(n: number): ParticipantForm {
-  return { id: Math.random().toString(36).slice(2, 8), label: `Jogador ${n}`, mode: "range", handInput: "", rangeId: "" };
+function newParticipant(n: number, overrides: Partial<ParticipantForm> = {}): ParticipantForm {
+  return {
+    id: Math.random().toString(36).slice(2, 8),
+    label: `Jogador ${n}`,
+    mode: "range",
+    handInput: "",
+    rangeId: "",
+    builtHands: {},
+    ...overrides,
+  };
 }
 
 const TRIAL_OPTIONS = [1000, 3000, 5000, 10000];
 
-export function EquityCalculator() {
+export function EquityCalculator({ initialRangeId }: { initialRangeId?: string | null }) {
   const [ranges, setRanges] = useState<RangeListItem[]>([]);
-  const [participants, setParticipants] = useState<ParticipantForm[]>([newParticipant(1), newParticipant(2)]);
+  const [participants, setParticipants] = useState<ParticipantForm[]>([
+    newParticipant(1, initialRangeId ? { rangeId: initialRangeId } : {}),
+    newParticipant(2),
+  ]);
   const [boardInput, setBoardInput] = useState("");
   const [showBoardPicker, setShowBoardPicker] = useState(false);
   const [handPickerFor, setHandPickerFor] = useState<string | null>(null);
@@ -39,7 +54,7 @@ export function EquityCalculator() {
         const trainable = rows.filter((r) => r.hand_count > 0);
         setRanges(trainable);
         setParticipants((prev) =>
-          prev.map((p) => (trainable.length > 0 && !p.rangeId ? { ...p, rangeId: trainable[0].id } : p))
+          prev.map((p) => (p.mode === "range" && trainable.length > 0 && !p.rangeId ? { ...p, rangeId: trainable[0].id } : p))
         );
       })
       .catch(() => setError("Erro ao carregar seus ranges."));
@@ -55,6 +70,21 @@ export function EquityCalculator() {
   }
   function updateParticipant(id: string, patch: Partial<ParticipantForm>) {
     setParticipants((prev) => prev.map((p) => (p.id === id ? { ...p, ...patch } : p)));
+  }
+
+  // Cartas ja em uso em algum outro lugar do setup (board + maos fixas
+  // de outros participantes) — usado pra desabilitar essas cartas nos
+  // seletores, pra nunca dar pra escolher a mesma carta duas vezes.
+  function usedCards(excludeParticipantId?: string): string[] {
+    const cards: string[] = [];
+    if (boardInput.length > 0) cards.push(...(boardInput.match(/.{1,2}/g) ?? []));
+    for (const p of participants) {
+      if (p.id === excludeParticipantId) continue;
+      if (p.mode === "hand" && p.handInput.length === 4) {
+        cards.push(p.handInput.slice(0, 2), p.handInput.slice(2, 4));
+      }
+    }
+    return cards;
   }
 
   async function handleRun() {
@@ -78,10 +108,9 @@ export function EquityCalculator() {
             setRunning(false);
             return;
           }
-          resolved.push({
-            label: p.label,
-            source: { kind: "hand", cards: [clean.slice(0, 2), clean.slice(2, 4)] },
-          });
+          resolved.push({ label: p.label, source: { kind: "hand", cards: [clean.slice(0, 2), clean.slice(2, 4)] } });
+        } else if (p.mode === "build") {
+          resolved.push({ label: p.label, source: { kind: "range", hands: p.builtHands } });
         } else {
           if (!p.rangeId) {
             setError(`Selecione um range pra "${p.label}".`);
@@ -111,8 +140,8 @@ export function EquityCalculator() {
   return (
     <div>
       <p className="mb-4 text-sm text-muted">
-        Calcula a equidade entre 2 ou mais mãos/ranges por amostragem (Monte Carlo) — funciona preflop, no flop ou
-        no turn. Cada participante pode ser uma mão específica ou um range salvo.
+        Calcula a equidade entre 2 a 6 mãos/ranges por amostragem (Monte Carlo) — funciona preflop, no flop ou no
+        turn. Cada participante pode ser um range salvo, uma mão específica, ou montado na hora.
       </p>
 
       <div className="mb-4 space-y-3">
@@ -125,13 +154,13 @@ export function EquityCalculator() {
                 className="w-40 rounded-lg border border-hairline bg-elevated px-2 py-1 text-sm outline-none"
               />
               <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-                {(["range", "hand"] as const).map((m) => (
+                {(["range", "build", "hand"] as const).map((m) => (
                   <button
                     key={m}
                     onClick={() => updateParticipant(p.id, { mode: m })}
                     className={`rounded-md px-2 py-1 text-xs ${p.mode === m ? "bg-ink text-void" : "text-muted"}`}
                   >
-                    {m === "range" ? "Range" : "Mão fixa"}
+                    {m === "range" ? "Range salvo" : m === "build" ? "Montar agora" : "Mão fixa"}
                   </button>
                 ))}
               </div>
@@ -142,7 +171,7 @@ export function EquityCalculator() {
               )}
             </div>
 
-            {p.mode === "range" ? (
+            {p.mode === "range" && (
               <select
                 value={p.rangeId}
                 onChange={(e) => updateParticipant(p.id, { rangeId: e.target.value })}
@@ -155,7 +184,9 @@ export function EquityCalculator() {
                   </option>
                 ))}
               </select>
-            ) : (
+            )}
+
+            {p.mode === "hand" && (
               <button
                 onClick={() => setHandPickerFor(p.id)}
                 className="flex min-h-[40px] w-full max-w-[160px] items-center gap-1 rounded-lg border border-hairline bg-elevated px-2 py-1"
@@ -172,6 +203,14 @@ export function EquityCalculator() {
                   </span>
                 )}
               </button>
+            )}
+
+            {p.mode === "build" && (
+              <RangeGrid
+                value={p.builtHands}
+                onChange={(hands) => updateParticipant(p.id, { builtHands: hands })}
+                maxWidthPx={340}
+              />
             )}
 
             {results && (
@@ -200,7 +239,7 @@ export function EquityCalculator() {
         <label className="mb-1 block text-xs text-muted">Board (opcional — 0, 3, 4 ou 5 cartas)</label>
         <button
           onClick={() => setShowBoardPicker(true)}
-          className="flex min-h-[44px] w-full max-w-xs items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1.5"
+          className="mx-auto flex min-h-[44px] w-fit items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5"
         >
           {boardInput.length === 0 ? (
             <span className="flex items-center gap-1.5 text-xs text-muted">
@@ -208,7 +247,7 @@ export function EquityCalculator() {
               Selecionar board (ou deixe vazio pra preflop)
             </span>
           ) : (
-            (boardInput.match(/.{1,2}/g) ?? []).map((c) => <Card key={c} card={c} size="mini" />)
+            (boardInput.match(/.{1,2}/g) ?? []).map((c) => <Card key={c} card={c} size="mini" hideCornerSuitGlyph />)
           )}
         </button>
       </div>
@@ -252,6 +291,7 @@ export function EquityCalculator() {
           maxCards={5}
           minCards={0}
           initialCards={boardInput.match(/.{1,2}/g) ?? []}
+          excludeCards={usedCards()}
           onConfirm={(cards) => {
             setBoardInput(cards.join(""));
             setShowBoardPicker(false);
@@ -265,9 +305,8 @@ export function EquityCalculator() {
           title={`Mão de ${participants.find((p) => p.id === handPickerFor)?.label ?? ""}`}
           maxCards={2}
           minCards={2}
-          initialCards={
-            participants.find((p) => p.id === handPickerFor)?.handInput.match(/.{1,2}/g) ?? []
-          }
+          initialCards={participants.find((p) => p.id === handPickerFor)?.handInput.match(/.{1,2}/g) ?? []}
+          excludeCards={usedCards(handPickerFor)}
           onConfirm={(cards) => {
             updateParticipant(handPickerFor, { handInput: cards.join("") });
             setHandPickerFor(null);

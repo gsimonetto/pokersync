@@ -1,11 +1,16 @@
 "use client";
 
+import { Suspense } from "react";
 import Link from "next/link";
+import { useSearchParams } from "next/navigation";
 import { ArrowLeft, Percent } from "lucide-react";
 import { EquityCalculator } from "@/components/ranges/equity-calculator";
 import { RangesTabs } from "@/components/ranges/ranges-tabs";
 
-export default function EquidadePage() {
+function EquidadePageInner() {
+  const searchParams = useSearchParams();
+  const rangeId = searchParams.get("rangeId");
+
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
       <header className="mb-4 flex items-center gap-3">
@@ -21,7 +26,15 @@ export default function EquidadePage() {
         <RangesTabs active="equidade" />
       </header>
 
-      <EquityCalculator />
+      <EquityCalculator initialRangeId={rangeId} />
     </main>
+  );
+}
+
+export default function EquidadePage() {
+  return (
+    <Suspense fallback={null}>
+      <EquidadePageInner />
+    </Suspense>
   );
 }
