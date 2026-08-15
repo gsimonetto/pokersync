@@ -659,7 +659,9 @@ export type TeamAlertKind =
   | "queda_frequencia"
   | "sem_revisao"
   | "mao_sem_resposta"
-  | "lembrete_estudo";
+  | "lembrete_estudo"
+  | "faltas_consecutivas"
+  | "rsvp_sem_resposta";
 
 export interface TeamAlert {
   id: string;
@@ -675,6 +677,8 @@ export const ALERTA_LABEL: Record<TeamAlertKind, string> = {
   sem_revisao: "Treina sem revisar",
   mao_sem_resposta: "Mão sem resposta",
   lembrete_estudo: "Lembrete enviado",
+  faltas_consecutivas: "Faltas consecutivas",
+  rsvp_sem_resposta: "Convite sem resposta",
 };
 
 export async function fetchPlayerAlerts(playerId: string, limit = 10): Promise<TeamAlert[]> {
@@ -683,6 +687,26 @@ export async function fetchPlayerAlerts(playerId: string, limit = 10): Promise<T
     .from("team_alerts")
     .select("id, player_id, kind, detail, created_at")
     .eq("player_id", playerId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    playerId: r.player_id,
+    kind: r.kind as TeamAlertKind,
+    detail: r.detail,
+    createdAt: r.created_at,
+  }));
+}
+
+// Visao do time todo (RLS ja filtra: admin ve tudo, coach so os proprios
+// jogadores) — usado no resumo do assistente do coach.
+export async function fetchTeamAlerts(days = 14, limit = 30): Promise<TeamAlert[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("team_alerts")
+    .select("id, player_id, kind, detail, created_at")
+    .gte("created_at", new Date(Date.now() - days * 24 * 60 * 60 * 1000).toISOString())
     .order("created_at", { ascending: false })
     .limit(limit);
   if (error) throw error;
