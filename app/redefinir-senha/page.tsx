@@ -72,7 +72,7 @@ export default function RedefinirSenhaPage() {
       <main className="w-full max-w-sm">
         <section className="relative rounded-xl border border-hairline bg-surface/70 p-6 shadow-2xl shadow-black/50 backdrop-blur-xl">
           <div className="mb-6 flex justify-center">
-            <Logo className="h-16 w-auto sm:h-20" />
+            <Logo className="h-9 w-auto sm:h-11" />
           </div>
 
           <div className="mb-5 text-center">
