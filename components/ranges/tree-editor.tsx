@@ -13,7 +13,10 @@ import {
   Download,
   Check,
   GitBranch,
+  Upload,
 } from "lucide-react";
+import { ImportHandModal } from "@/components/ranges/import-hand-modal";
+import { TagPicker } from "@/components/shared/tag-picker";
 import {
   addChildNode,
   createTree,
@@ -167,10 +170,11 @@ export function TreeEditor({ id }: { id: string }) {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
-  const [tagsInput, setTagsInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [nodes, setNodes] = useState<TreeNode[]>([]);
   const [treeId, setTreeId] = useState<string | null>(isNew ? null : id);
   const [exported, setExported] = useState(false);
+  const [showImportHand, setShowImportHand] = useState(false);
 
   const [ranges, setRanges] = useState<RangeListItem[]>([]);
 
@@ -185,7 +189,7 @@ export function TreeEditor({ id }: { id: string }) {
         const t = await getTree(id);
         setName(t.name);
         setDescription(t.description ?? "");
-        setTagsInput(t.tags.join(", "));
+        setTags(t.tags);
         setNodes(t.nodes);
       } catch {
         setError("Árvore não encontrada.");
@@ -198,6 +202,10 @@ export function TreeEditor({ id }: { id: string }) {
   function addRoot() {
     setNodes((prev) => [...prev, emptyNode()]);
   }
+  function handleImportHand(node: TreeNode) {
+    setNodes((prev) => [...prev, node]);
+    setShowImportHand(false);
+  }
   function handleAddChild(parentId: string) {
     setNodes((prev) => addChildNode(prev, parentId, emptyNode()));
   }
@@ -209,10 +217,6 @@ export function TreeEditor({ id }: { id: string }) {
   }
   function handleMove(nodeId: string, dir: -1 | 1) {
     setNodes((prev) => moveNodeById(prev, nodeId, dir));
-  }
-
-  function parseTags(): string[] {
-    return tagsInput.split(",").map((t) => t.trim()).filter(Boolean);
   }
 
   function hasEmptyLabel(list: TreeNode[]): boolean {
@@ -231,7 +235,7 @@ export function TreeEditor({ id }: { id: string }) {
     setSaving(true);
     setError("");
     try {
-      const input = { name: name.trim(), description: description.trim() || null, nodes, tags: parseTags() };
+      const input = { name: name.trim(), description: description.trim() || null, nodes, tags };
       if (treeId) {
         await updateTree(treeId, input);
       } else {
@@ -247,7 +251,7 @@ export function TreeEditor({ id }: { id: string }) {
   }
 
   async function handleExport() {
-    const json = exportTreeToJSON({ name: name.trim() || "Árvore sem nome", description: description.trim() || null, tags: parseTags(), nodes });
+    const json = exportTreeToJSON({ name: name.trim() || "Árvore sem nome", description: description.trim() || null, tags, nodes });
     try {
       await navigator.clipboard.writeText(json);
       setExported(true);
@@ -285,13 +289,8 @@ export function TreeEditor({ id }: { id: string }) {
           />
         </div>
         <div>
-          <label className="mb-1 block text-xs text-muted">Tags (separadas por vírgula)</label>
-          <input
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            placeholder="Ex: 3bet pots, c-bet, ICM"
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
-          />
+          <label className="mb-1 block text-xs text-muted">Tags</label>
+          <TagPicker value={tags} onChange={setTags} />
         </div>
         <div className="sm:col-span-2">
           <label className="mb-1 block text-xs text-muted">Descrição (opcional)</label>
@@ -328,13 +327,26 @@ export function TreeEditor({ id }: { id: string }) {
         ))}
       </div>
 
-      <button
-        onClick={addRoot}
-        className="mb-6 flex items-center gap-2 rounded-lg border border-hairline px-3 py-2 text-sm text-muted hover:text-ink"
-      >
-        <Plus size={16} />
-        {nodes.length === 0 ? "Adicionar primeiro passo" : "Adicionar novo início de linha"}
-      </button>
+      <div className="mb-6 flex flex-wrap gap-2">
+        <button
+          onClick={addRoot}
+          className="flex items-center gap-2 rounded-lg border border-hairline px-3 py-2 text-sm text-muted hover:text-ink"
+        >
+          <Plus size={16} />
+          {nodes.length === 0 ? "Adicionar primeiro passo" : "Adicionar novo início de linha"}
+        </button>
+        <button
+          onClick={() => setShowImportHand(true)}
+          className="flex items-center gap-2 rounded-lg border border-hairline px-3 py-2 text-sm text-muted hover:text-ink"
+        >
+          <Upload size={16} />
+          Importar de uma mão
+        </button>
+      </div>
+
+      {showImportHand && (
+        <ImportHandModal onImport={handleImportHand} onClose={() => setShowImportHand(false)} />
+      )}
 
       <div className="flex flex-wrap items-center gap-2">
         <button

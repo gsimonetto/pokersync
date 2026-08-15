@@ -1,11 +1,14 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { ChevronDown, ChevronUp } from "lucide-react";
+import { ChevronDown, ChevronUp, LayoutGrid } from "lucide-react";
 import type { RangeHands } from "@/components/ranges/range-grid";
+import { Card } from "@/components/drill/card";
+import { CardPickerModal } from "@/components/ranges/card-picker-modal";
 import {
   analyzeRangeVsBoard,
   parseBoardInput,
+  cardToString,
   CATEGORY_ORDER,
   CATEGORY_LABEL,
   type Category,
@@ -35,6 +38,7 @@ export function BoardAnalyzer({
 }) {
   const [open, setOpen] = useState(startOpen);
   const [boardInput, setBoardInput] = useState("");
+  const [showPicker, setShowPicker] = useState(false);
 
   const parsed = useMemo(() => parseBoardInput(boardInput), [boardInput]);
 
@@ -55,12 +59,33 @@ export function BoardAnalyzer({
 
       {open && (
         <div className="border-t border-hairline p-3">
-          <input
-            value={boardInput}
-            onChange={(e) => setBoardInput(e.target.value)}
-            placeholder="Board: Kc8h2d"
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-sm outline-none"
-          />
+          <button
+            onClick={() => setShowPicker(true)}
+            className="flex min-h-[44px] w-full items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-left"
+          >
+            {parsed.cards.length === 0 ? (
+              <span className="flex items-center gap-1.5 text-xs text-muted">
+                <LayoutGrid size={13} />
+                Selecionar board
+              </span>
+            ) : (
+              parsed.cards.map((c) => <Card key={cardToString(c)} card={cardToString(c)} size="mini" />)
+            )}
+          </button>
+
+          {showPicker && (
+            <CardPickerModal
+              title="Escolher board"
+              maxCards={5}
+              minCards={0}
+              initialCards={boardInput.match(/.{1,2}/g) ?? []}
+              onConfirm={(cards) => {
+                setBoardInput(cards.join(""));
+                setShowPicker(false);
+              }}
+              onClose={() => setShowPicker(false)}
+            />
+          )}
 
           {parsed.error && <p className="mt-2 text-xs text-negative">{parsed.error}</p>}
 
@@ -78,7 +103,7 @@ export function BoardAnalyzer({
                     const pct = Math.round((count / analysis.totalCombos) * 100);
                     return (
                       <div key={cat} className="flex items-center gap-2">
-                        <span className="w-28 shrink-0 truncate text-[11px] text-muted">{CATEGORY_LABEL[cat]}</span>
+                        <span className="w-36 shrink-0 truncate text-xs text-muted">{CATEGORY_LABEL[cat]}</span>
                         <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
                           <div
                             className="h-full rounded-full"

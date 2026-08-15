@@ -113,12 +113,18 @@ export function RangeGrid({
   const [tool, setTool] = useState<PaintAction>("raise");
   const [weight, setWeight] = useState(100);
   const isDragging = useRef(false);
+  // Decidido uma vez no inicio de cada arrastada (nao a cada celula) —
+  // se a primeira celula clicada ja tinha exatamente essa ferramenta+
+  // peso, a arrastada inteira vira "apagar" (volta pro fold 100%
+  // padrao); senao, a arrastada inteira pinta. Mesmo padrao de toggle
+  // que existia antes do modelo de 3 acoes, so' generalizado.
+  const dragMode = useRef<"paint" | "erase">("paint");
 
-  const paint = useCallback(
+  const applyToCell = useCallback(
     (label: string) => {
       if (readOnly) return;
       const current = getDecision(value, label);
-      const next = applyAction(current, tool, weight);
+      const next = dragMode.current === "erase" ? EMPTY_DECISION : applyAction(current, tool, weight);
       onChange({ ...value, [label]: next });
     },
     [value, onChange, readOnly, tool, weight]
@@ -127,11 +133,13 @@ export function RangeGrid({
   const startPaint = (label: string) => {
     if (readOnly) return;
     isDragging.current = true;
-    paint(label);
+    const current = getDecision(value, label);
+    dragMode.current = current[tool] === weight ? "erase" : "paint";
+    applyToCell(label);
   };
   const continuePaint = (label: string) => {
     if (!isDragging.current || readOnly) return;
-    paint(label);
+    applyToCell(label);
   };
   const stopPaint = () => {
     isDragging.current = false;
@@ -160,7 +168,7 @@ export function RangeGrid({
 
   return (
     <div className="w-full select-none">
-      <div className="mx-auto max-w-[480px]">
+      <div className="mx-auto max-w-[580px]">
         {!readOnly && (
           <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
             <div className="flex items-center gap-1.5 rounded-full border border-hairline bg-elevated p-1">

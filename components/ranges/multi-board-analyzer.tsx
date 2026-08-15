@@ -80,7 +80,7 @@ export function MultiBoardAnalyzer({
                   const pct = Math.round((count / result.totalCombos) * 100);
                   return (
                     <div key={cat} className="flex items-center gap-2">
-                      <span className="w-28 shrink-0 truncate text-[11px] text-muted">{CATEGORY_LABEL[cat]}</span>
+                      <span className="w-36 shrink-0 truncate text-xs text-muted">{CATEGORY_LABEL[cat]}</span>
                       <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
                         <div
                           className="h-full rounded-full"

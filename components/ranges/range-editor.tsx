@@ -9,6 +9,7 @@ import { MultiBoardAnalyzer } from "@/components/ranges/multi-board-analyzer";
 import { RangeVersionHistory } from "@/components/ranges/range-version-history";
 import { ComboEditorModal } from "@/components/ranges/combo-editor-modal";
 import { RangeListModal } from "@/components/ranges/range-list-modal";
+import { TagPicker } from "@/components/shared/tag-picker";
 import { labelForComboKey } from "@/lib/poker/range-board-analyzer";
 import {
   createRange,
@@ -35,7 +36,7 @@ export function RangeEditor({ id }: { id: string }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [showDescription, setShowDescription] = useState(false);
-  const [tagsInput, setTagsInput] = useState("");
+  const [tags, setTags] = useState<string[]>([]);
   const [hands, setHands] = useState<RangeHands>({});
   const [comboOverrides, setComboOverrides] = useState<RangeHands>({});
   const [editingComboLabel, setEditingComboLabel] = useState<string | null>(null);
@@ -78,7 +79,7 @@ export function RangeEditor({ id }: { id: string }) {
   }
 
   async function handleExport() {
-    const json = exportRangeToJSON({ name: name.trim() || "Range sem nome", description: description.trim() || null, tags: parseTags(), hands, comboOverrides });
+    const json = exportRangeToJSON({ name: name.trim() || "Range sem nome", description: description.trim() || null, tags, hands, comboOverrides });
     try {
       await navigator.clipboard.writeText(json);
       setExported(true);
@@ -100,7 +101,7 @@ export function RangeEditor({ id }: { id: string }) {
       setName(r.name);
       setDescription(r.description ?? "");
       setShowDescription(Boolean(r.description));
-      setTagsInput(r.tags.join(", "));
+      setTags(r.tags);
       setHands(r.hands);
       setComboOverrides(r.comboOverrides);
       setTeamId(r.team_id);
@@ -109,13 +110,6 @@ export function RangeEditor({ id }: { id: string }) {
     } finally {
       setLoading(false);
     }
-  }
-
-  function parseTags(): string[] {
-    return tagsInput
-      .split(",")
-      .map((t) => t.trim())
-      .filter(Boolean);
   }
 
   const labelsWithOverrides = useMemo(() => {
@@ -136,9 +130,9 @@ export function RangeEditor({ id }: { id: string }) {
     setError("");
     try {
       if (rangeId) {
-        await updateRange(rangeId, { name: name.trim(), description: description.trim() || null, hands, tags: parseTags(), comboOverrides });
+        await updateRange(rangeId, { name: name.trim(), description: description.trim() || null, hands, tags, comboOverrides });
       } else {
-        const created = await createRange({ name: name.trim(), description: description.trim() || null, hands, tags: parseTags(), comboOverrides });
+        const created = await createRange({ name: name.trim(), description: description.trim() || null, hands, tags, comboOverrides });
         setRangeId(created.id);
         // Troca a URL "novo" pela URL real, sem perder o estado em tela.
         router.replace(`/ranges/${created.id}`);
@@ -176,12 +170,9 @@ export function RangeEditor({ id }: { id: string }) {
           placeholder="Nome do range — ex: BTN Open 40bb"
           className="min-w-[200px] flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm font-medium outline-none"
         />
-        <input
-          value={tagsInput}
-          onChange={(e) => setTagsInput(e.target.value)}
-          placeholder="Tags: 3bet, ICM…"
-          className="w-40 shrink-0 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
-        />
+        <div className="w-56 shrink-0">
+          <TagPicker value={tags} onChange={setTags} />
+        </div>
 
         <button
           onClick={handleSave}
@@ -275,7 +266,7 @@ export function RangeEditor({ id }: { id: string }) {
           />
         </div>
 
-        <div className="w-full space-y-2 lg:sticky lg:top-4 lg:max-w-[300px]">
+        <div className="w-full flex-1 space-y-2 lg:sticky lg:top-4 lg:max-w-[460px]">
           <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
           <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
         </div>

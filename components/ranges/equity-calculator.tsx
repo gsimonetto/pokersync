@@ -1,10 +1,12 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Plus, Trash2, Dices } from "lucide-react";
+import { Plus, Trash2, Dices, LayoutGrid } from "lucide-react";
 import { listRanges, getRange, type RangeListItem } from "@/lib/services/range-service";
 import { parseBoardInput } from "@/lib/poker/range-board-analyzer";
 import { runEquityMonteCarlo, type EquityResult, type EquitySource } from "@/lib/poker/equity-engine";
+import { Card } from "@/components/drill/card";
+import { CardPickerModal } from "@/components/ranges/card-picker-modal";
 
 interface ParticipantForm {
   id: string;
@@ -24,6 +26,8 @@ export function EquityCalculator() {
   const [ranges, setRanges] = useState<RangeListItem[]>([]);
   const [participants, setParticipants] = useState<ParticipantForm[]>([newParticipant(1), newParticipant(2)]);
   const [boardInput, setBoardInput] = useState("");
+  const [showBoardPicker, setShowBoardPicker] = useState(false);
+  const [handPickerFor, setHandPickerFor] = useState<string | null>(null);
   const [trials, setTrials] = useState(3000);
   const [running, setRunning] = useState(false);
   const [error, setError] = useState("");
@@ -152,12 +156,22 @@ export function EquityCalculator() {
                 ))}
               </select>
             ) : (
-              <input
-                value={p.handInput}
-                onChange={(e) => updateParticipant(p.id, { handInput: e.target.value })}
-                placeholder="Ex: AsKd"
-                className="w-full max-w-[140px] rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
-              />
+              <button
+                onClick={() => setHandPickerFor(p.id)}
+                className="flex min-h-[40px] w-full max-w-[160px] items-center gap-1 rounded-lg border border-hairline bg-elevated px-2 py-1"
+              >
+                {p.handInput.length === 4 ? (
+                  <>
+                    <Card card={p.handInput.slice(0, 2)} size="mini" />
+                    <Card card={p.handInput.slice(2, 4)} size="mini" />
+                  </>
+                ) : (
+                  <span className="flex items-center gap-1.5 text-xs text-muted">
+                    <LayoutGrid size={13} />
+                    Escolher mão
+                  </span>
+                )}
+              </button>
             )}
 
             {results && (
@@ -184,12 +198,19 @@ export function EquityCalculator() {
 
       <div className="mb-4">
         <label className="mb-1 block text-xs text-muted">Board (opcional — 0, 3, 4 ou 5 cartas)</label>
-        <input
-          value={boardInput}
-          onChange={(e) => setBoardInput(e.target.value)}
-          placeholder="Ex: Kc8h2d (deixe vazio pra preflop)"
-          className="w-full max-w-xs rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
-        />
+        <button
+          onClick={() => setShowBoardPicker(true)}
+          className="flex min-h-[44px] w-full max-w-xs items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1.5"
+        >
+          {boardInput.length === 0 ? (
+            <span className="flex items-center gap-1.5 text-xs text-muted">
+              <LayoutGrid size={13} />
+              Selecionar board (ou deixe vazio pra preflop)
+            </span>
+          ) : (
+            (boardInput.match(/.{1,2}/g) ?? []).map((c) => <Card key={c} card={c} size="mini" />)
+          )}
+        </button>
       </div>
 
       <div className="mb-4 flex flex-wrap items-center gap-2">
@@ -223,6 +244,36 @@ export function EquityCalculator() {
           {results.trialsCompleted.toLocaleString("pt-BR")} simulações completadas — estimativa por amostragem, não
           um cálculo exaustivo.
         </p>
+      )}
+
+      {showBoardPicker && (
+        <CardPickerModal
+          title="Escolher board"
+          maxCards={5}
+          minCards={0}
+          initialCards={boardInput.match(/.{1,2}/g) ?? []}
+          onConfirm={(cards) => {
+            setBoardInput(cards.join(""));
+            setShowBoardPicker(false);
+          }}
+          onClose={() => setShowBoardPicker(false)}
+        />
+      )}
+
+      {handPickerFor && (
+        <CardPickerModal
+          title={`Mão de ${participants.find((p) => p.id === handPickerFor)?.label ?? ""}`}
+          maxCards={2}
+          minCards={2}
+          initialCards={
+            participants.find((p) => p.id === handPickerFor)?.handInput.match(/.{1,2}/g) ?? []
+          }
+          onConfirm={(cards) => {
+            updateParticipant(handPickerFor, { handInput: cards.join("") });
+            setHandPickerFor(null);
+          }}
+          onClose={() => setHandPickerFor(null)}
+        />
       )}
     </div>
   );
