@@ -1,7 +1,7 @@
 "use client";
 
-import { useState } from "react";
-import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, TrendingUp, TrendingDown, Minus, Trophy, Send, Info } from "lucide-react";
+import { useEffect, useState } from "react";
+import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, TrendingUp, TrendingDown, Minus, Trophy, Send, Info, Kanban, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { Avatar } from "@/components/avatar";
 import {
@@ -13,6 +13,7 @@ import {
   type TeamDashboardRow,
   type TeamLeak,
 } from "@/lib/services/team-service";
+import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-service";
 
 // Visao geral do time. Hierarquia visual proposital:
 // 1. KPIs (leitura de 2s) -> 2. graficos lado a lado (dinheiro e estudo,
@@ -33,6 +34,7 @@ export function TabVisaoGeral({
   pronto,
   dias,
   onAtribuido,
+  onAbrirFunil,
 }: {
   jogadores: TeamDashboardRow[];
   atividade: TeamActivityDay[];
@@ -42,6 +44,7 @@ export function TabVisaoGeral({
   pronto: boolean;
   dias: number;
   onAtribuido: () => void;
+  onAbrirFunil: () => void;
 }) {
   const treinos = jogadores.reduce((a, j) => a + j.treinos, 0);
   const acertos = jogadores.reduce((a, j) => a + j.acertosGto, 0);
@@ -77,6 +80,8 @@ export function TabVisaoGeral({
           hint={`${jogadores.length - inativos} ativos`} tom={inativos > 0 ? "negativo" : undefined} />
       </section>
 
+      <ResumoFunilMini onAbrirFunil={onAbrirFunil} />
+
       <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
         <GraficoFinanceiro dados={financeiro} pronto={pronto} />
         <GraficoEstudo dados={atividade} pronto={pronto} />
@@ -86,6 +91,49 @@ export function TabVisaoGeral({
 
       <LeaksCard leaks={leaks} pronto={pronto} dias={dias} onAtribuido={onAtribuido} />
     </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Espelho compacto do assistente do Kanban — so pra quem abre o painel
+// e fica na Visao Geral sem clicar em Funil. Busca leve (so cards),
+// some sozinho se nao ha nada a mostrar.
+function ResumoFunilMini({ onAbrirFunil }: { onAbrirFunil: () => void }) {
+  const [prontos, setProntos] = useState(0);
+  const [comFaltas, setComFaltas] = useState(0);
+  const [carregado, setCarregado] = useState(false);
+
+  useEffect(() => {
+    fetchPlayerCards()
+      .then((cards) => {
+        setProntos(cards.filter(progressoPronto).length);
+        setComFaltas(cards.filter((c) => c.eventosAusente >= 2).length);
+      })
+      .catch(() => {})
+      .finally(() => setCarregado(true));
+  }, []);
+
+  if (!carregado || (prontos === 0 && comFaltas === 0)) return null;
+
+  return (
+    <button
+      onClick={onAbrirFunil}
+      className="flex w-full flex-wrap items-center gap-3 rounded-xl border border-hairline bg-surface px-4 py-3 text-left transition-colors hover:border-ink/30"
+    >
+      <Kanban size={16} className="shrink-0 text-muted" />
+      <span className="text-[13px] text-muted">No funil:</span>
+      {prontos > 0 && (
+        <span className="flex items-center gap-1 text-[13px] font-medium text-positive">
+          <CheckCircle2 size={13} /> {prontos} pronto{prontos > 1 ? "s" : ""} pra subir de fase
+        </span>
+      )}
+      {comFaltas > 0 && (
+        <span className="flex items-center gap-1 text-[13px] font-medium text-negative">
+          <AlertTriangle size={13} /> {comFaltas} com faltas
+        </span>
+      )}
+      <ArrowRight size={14} className="ml-auto shrink-0 text-muted" />
+    </button>
   );
 }
 
