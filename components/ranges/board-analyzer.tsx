@@ -24,8 +24,16 @@ function categoryColor(cat: Category): string {
   return "#c4c7c8";
 }
 
-export function BoardAnalyzer({ hands, comboOverrides = {} }: { hands: RangeHands; comboOverrides?: RangeHands }) {
-  const [open, setOpen] = useState(false);
+export function BoardAnalyzer({
+  hands,
+  comboOverrides = {},
+  startOpen = false,
+}: {
+  hands: RangeHands;
+  comboOverrides?: RangeHands;
+  startOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(startOpen);
   const [boardInput, setBoardInput] = useState("");
 
   const parsed = useMemo(() => parseBoardInput(boardInput), [boardInput]);

@@ -4,8 +4,16 @@ import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, History, RotateCcw } from "lucide-react";
 import { listRangeVersions, restoreRangeVersion, type RangeVersion } from "@/lib/services/range-service";
 
-export function RangeVersionHistory({ rangeId, onRestored }: { rangeId: string; onRestored: () => void }) {
-  const [open, setOpen] = useState(false);
+export function RangeVersionHistory({
+  rangeId,
+  onRestored,
+  startOpen = false,
+}: {
+  rangeId: string;
+  onRestored: () => void;
+  startOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(startOpen);
   const [versions, setVersions] = useState<RangeVersion[] | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [error, setError] = useState("");

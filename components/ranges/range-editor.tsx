@@ -2,12 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { GitCompare, Save, Trash2, Download, Check, Users, X } from "lucide-react";
+import { GitCompare, Save, Trash2, Download, Check, Users, X, History, FolderOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { RangeGrid, getDecision, type RangeHands } from "@/components/ranges/range-grid";
 import { BoardAnalyzer } from "@/components/ranges/board-analyzer";
 import { MultiBoardAnalyzer } from "@/components/ranges/multi-board-analyzer";
 import { RangeVersionHistory } from "@/components/ranges/range-version-history";
 import { ComboEditorModal } from "@/components/ranges/combo-editor-modal";
+import { RangeListModal } from "@/components/ranges/range-list-modal";
 import { labelForComboKey } from "@/lib/poker/range-board-analyzer";
 import {
   createRange,
@@ -33,6 +34,7 @@ export function RangeEditor({ id }: { id: string }) {
 
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
+  const [showDescription, setShowDescription] = useState(false);
   const [tagsInput, setTagsInput] = useState("");
   const [hands, setHands] = useState<RangeHands>({});
   const [comboOverrides, setComboOverrides] = useState<RangeHands>({});
@@ -42,6 +44,8 @@ export function RangeEditor({ id }: { id: string }) {
   const [teamId, setTeamId] = useState<string | null>(null);
   const [myTeam, setMyTeam] = useState<MyTeam | null>(null);
   const [publishing, setPublishing] = useState(false);
+  const [showMyRanges, setShowMyRanges] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   useEffect(() => {
     fetchMyTeam().then(setMyTeam).catch(() => {});
@@ -95,6 +99,7 @@ export function RangeEditor({ id }: { id: string }) {
       const r = await getRange(id);
       setName(r.name);
       setDescription(r.description ?? "");
+      setShowDescription(Boolean(r.description));
       setTagsInput(r.tags.join(", "));
       setHands(r.hands);
       setComboOverrides(r.comboOverrides);
@@ -160,50 +165,119 @@ export function RangeEditor({ id }: { id: string }) {
 
   return (
     <div>
-      {error && <p className="mb-4 text-sm text-negative">{error}</p>}
+      {error && <p className="mb-3 text-sm text-negative">{error}</p>}
 
-      <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
-        <div>
-          <label className="mb-1 block text-xs text-muted">Nome</label>
-          <input
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            placeholder="Ex: BTN Open 40bb"
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
-          />
-        </div>
-        <div>
-          <label className="mb-1 block text-xs text-muted">Tags (separadas por vírgula)</label>
-          <input
-            value={tagsInput}
-            onChange={(e) => setTagsInput(e.target.value)}
-            placeholder="Ex: 3bet, ICM, push/fold"
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
-          />
-        </div>
-        <div className="sm:col-span-2">
-          <label className="mb-1 block text-xs text-muted">Descrição (opcional)</label>
-          <textarea
-            value={description}
-            onChange={(e) => setDescription(e.target.value)}
-            rows={2}
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
-          />
-        </div>
+      {/* Barra compacta: nome + tags + acoes, tudo numa linha so — o
+          Salvar fica sempre visivel sem precisar rolar a pagina. */}
+      <div className="mb-3 flex flex-wrap items-center gap-2">
+        <input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Nome do range — ex: BTN Open 40bb"
+          className="min-w-[200px] flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm font-medium outline-none"
+        />
+        <input
+          value={tagsInput}
+          onChange={(e) => setTagsInput(e.target.value)}
+          placeholder="Tags: 3bet, ICM…"
+          className="w-40 shrink-0 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
+        />
+
+        <button
+          onClick={handleSave}
+          disabled={saving}
+          className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-void disabled:opacity-50"
+        >
+          <Save size={16} />
+          {saving ? "Salvando…" : "Salvar"}
+        </button>
+
+        <button
+          onClick={() => setShowMyRanges(true)}
+          title="Meus ranges"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
+        >
+          <FolderOpen size={16} />
+        </button>
+        <button
+          onClick={handleExport}
+          title="Exportar (copiar JSON)"
+          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
+        >
+          {exported ? <Check size={16} className="text-positive" /> : <Download size={16} />}
+        </button>
+        {rangeId && myTeam && (
+          <button
+            onClick={teamId ? handleUnpublish : handlePublish}
+            disabled={publishing}
+            title={teamId ? `Publicado no time ${myTeam.team.name} — clique pra remover` : `Publicar no time ${myTeam.team.name}`}
+            className={`grid h-9 w-9 place-items-center rounded-lg border disabled:opacity-50 ${
+              teamId ? "border-positive text-positive" : "border-hairline bg-elevated text-muted hover:text-ink"
+            }`}
+          >
+            {teamId ? <X size={16} /> : <Users size={16} />}
+          </button>
+        )}
+        {rangeId && (
+          <>
+            <button
+              onClick={() => setShowHistory(true)}
+              title="Histórico de versões"
+              className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
+            >
+              <History size={16} />
+            </button>
+            <button
+              onClick={() => router.push(`/ranges/compare?a=${rangeId}`)}
+              title="Comparar"
+              className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
+            >
+              <GitCompare size={16} />
+            </button>
+            <button
+              onClick={handleDelete}
+              title="Excluir"
+              className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-negative"
+            >
+              <Trash2 size={16} />
+            </button>
+          </>
+        )}
       </div>
 
-      <RangeGrid
-        value={hands}
-        onChange={setHands}
-        labelsWithOverrides={labelsWithOverrides}
-        onOpenComboEditor={setEditingComboLabel}
-      />
+      <button
+        onClick={() => setShowDescription((v) => !v)}
+        className="mb-3 flex items-center gap-1 text-xs text-muted hover:text-ink"
+      >
+        {showDescription ? <ChevronUp size={12} /> : <ChevronDown size={12} />}
+        {description ? "Descrição" : "+ Adicionar descrição"}
+      </button>
+      {showDescription && (
+        <textarea
+          value={description}
+          onChange={(e) => setDescription(e.target.value)}
+          rows={2}
+          placeholder="Anotações, conceito, observação do treinador…"
+          className="mb-3 w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm outline-none"
+        />
+      )}
 
-      <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
+      {/* Grade + analise lado a lado — a analise so preenche quando tem
+          board digitado/rodado, mas fica sempre visivel na lateral pra
+          nao precisar rolar a pagina pra baixo pra ver ela. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[minmax(0,1fr)_320px]">
+        <RangeGrid
+          value={hands}
+          onChange={setHands}
+          labelsWithOverrides={labelsWithOverrides}
+          onOpenComboEditor={setEditingComboLabel}
+        />
 
-      <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
-
-      {rangeId && <RangeVersionHistory rangeId={rangeId} onRestored={loadRange} />}
+        <div className="space-y-3 lg:sticky lg:top-4 lg:self-start">
+          <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
+          <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
+        </div>
+      </div>
 
       {editingComboLabel && (
         <ComboEditorModal
@@ -215,60 +289,21 @@ export function RangeEditor({ id }: { id: string }) {
         />
       )}
 
-      <div className="mt-6 flex flex-wrap items-center gap-2">
-        <button
-          onClick={handleSave}
-          disabled={saving}
-          className="flex items-center gap-2 rounded-lg bg-ink px-4 py-2 text-sm font-medium text-void disabled:opacity-50"
-        >
-          <Save size={16} />
-          {saving ? "Salvando…" : "Salvar"}
-        </button>
+      {showMyRanges && <RangeListModal onClose={() => setShowMyRanges(false)} />}
 
-        <button
-          onClick={handleExport}
-          className="flex items-center gap-2 rounded-lg border border-hairline px-4 py-2 text-sm text-muted hover:text-ink"
+      {showHistory && rangeId && (
+        <div
+          className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-10"
+          onClick={() => setShowHistory(false)}
         >
-          {exported ? <Check size={16} className="text-positive" /> : <Download size={16} />}
-          {exported ? "Copiado!" : "Exportar (copiar)"}
-        </button>
-
-        {rangeId && myTeam && (
-          <button
-            onClick={teamId ? handleUnpublish : handlePublish}
-            disabled={publishing}
-            className={`flex items-center gap-2 rounded-lg border px-4 py-2 text-sm disabled:opacity-50 ${
-              teamId ? "border-positive text-positive" : "border-hairline text-muted hover:text-ink"
-            }`}
+          <div
+            className="w-full max-w-lg rounded-xl border border-hairline bg-surface p-1"
+            onClick={(e) => e.stopPropagation()}
           >
-            {teamId ? <X size={16} /> : <Users size={16} />}
-            {publishing
-              ? "Salvando…"
-              : teamId
-                ? `Publicado no time ${myTeam.team.name} — remover`
-                : `Publicar no time ${myTeam.team.name}`}
-          </button>
-        )}
-
-        {rangeId && (
-          <>
-            <button
-              onClick={() => router.push(`/ranges/compare?a=${rangeId}`)}
-              className="flex items-center gap-2 rounded-lg border border-hairline px-4 py-2 text-sm text-muted hover:text-ink"
-            >
-              <GitCompare size={16} />
-              Comparar
-            </button>
-            <button
-              onClick={handleDelete}
-              className="flex items-center gap-2 rounded-lg border border-hairline px-4 py-2 text-sm text-negative"
-            >
-              <Trash2 size={16} />
-              Excluir
-            </button>
-          </>
-        )}
-      </div>
+            <RangeVersionHistory rangeId={rangeId} onRestored={loadRange} startOpen />
+          </div>
+        </div>
+      )}
     </div>
   );
 }

@@ -22,8 +22,16 @@ function categoryColor(cat: Category): string {
 
 const SAMPLE_SIZES = [100, 300, 500, 1000];
 
-export function MultiBoardAnalyzer({ hands, comboOverrides = {} }: { hands: RangeHands; comboOverrides?: RangeHands }) {
-  const [open, setOpen] = useState(false);
+export function MultiBoardAnalyzer({
+  hands,
+  comboOverrides = {},
+  startOpen = false,
+}: {
+  hands: RangeHands;
+  comboOverrides?: RangeHands;
+  startOpen?: boolean;
+}) {
+  const [open, setOpen] = useState(startOpen);
   const [sampleSize, setSampleSize] = useState(300);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<MultiBoardAnalysis | null>(null);
