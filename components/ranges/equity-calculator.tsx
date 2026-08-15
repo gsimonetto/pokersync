@@ -162,8 +162,8 @@ export function EquityCalculator() {
               >
                 {p.handInput.length === 4 ? (
                   <>
-                    <Card card={p.handInput.slice(0, 2)} size="mini" />
-                    <Card card={p.handInput.slice(2, 4)} size="mini" />
+                    <Card card={p.handInput.slice(0, 2)} size="mini" hideCornerSuitGlyph />
+                    <Card card={p.handInput.slice(2, 4)} size="mini" hideCornerSuitGlyph />
                   </>
                 ) : (
                   <span className="flex items-center gap-1.5 text-xs text-muted">

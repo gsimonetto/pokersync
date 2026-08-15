@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { GitCompare, Save, Trash2, Download, Check, Users, X, History, FolderOpen, ChevronDown, ChevronUp } from "lucide-react";
 import { RangeGrid, getDecision, type RangeHands } from "@/components/ranges/range-grid";
 import { BoardAnalyzer } from "@/components/ranges/board-analyzer";
-import { MultiBoardAnalyzer } from "@/components/ranges/multi-board-analyzer";
+import { HeroVillainEquity } from "@/components/ranges/hero-villain-equity";
 import { RangeVersionHistory } from "@/components/ranges/range-version-history";
 import { ComboEditorModal } from "@/components/ranges/combo-editor-modal";
 import { RangeListModal } from "@/components/ranges/range-list-modal";
@@ -268,7 +268,7 @@ export function RangeEditor({ id }: { id: string }) {
 
         <div className="w-full flex-1 space-y-2 lg:sticky lg:top-4 lg:max-w-[460px]">
           <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
-          <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
+          <HeroVillainEquity heroHands={hands} heroComboOverrides={comboOverrides} />
         </div>
       </div>
 

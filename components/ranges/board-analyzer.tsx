@@ -61,7 +61,7 @@ export function BoardAnalyzer({
         <div className="border-t border-hairline p-3">
           <button
             onClick={() => setShowPicker(true)}
-            className="flex min-h-[44px] w-full items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-left"
+            className="mx-auto flex min-h-[40px] w-fit items-center justify-center gap-1 rounded-lg border border-hairline bg-elevated px-3 py-1"
           >
             {parsed.cards.length === 0 ? (
               <span className="flex items-center gap-1.5 text-xs text-muted">
@@ -69,7 +69,7 @@ export function BoardAnalyzer({
                 Selecionar board
               </span>
             ) : (
-              parsed.cards.map((c) => <Card key={cardToString(c)} card={cardToString(c)} size="mini" />)
+              parsed.cards.map((c) => <Card key={cardToString(c)} card={cardToString(c)} size="mini" hideCornerSuitGlyph />)
             )}
           </button>
 
@@ -87,7 +87,7 @@ export function BoardAnalyzer({
             />
           )}
 
-          {parsed.error && <p className="mt-2 text-xs text-negative">{parsed.error}</p>}
+          {parsed.error && <p className="mt-2 text-center text-xs text-negative">{parsed.error}</p>}
 
           {analysis && (
             <div className="mt-3">
@@ -98,24 +98,25 @@ export function BoardAnalyzer({
 
               {analysis.totalCombos > 0 && (
                 <div className="space-y-1">
-                  {CATEGORY_ORDER.filter((cat) => analysis.byCategory[cat] > 0).map((cat) => {
-                    const count = analysis.byCategory[cat];
-                    const pct = Math.round((count / analysis.totalCombos) * 100);
-                    return (
-                      <div key={cat} className="flex items-center gap-2">
-                        <span className="w-36 shrink-0 truncate text-xs text-muted">{CATEGORY_LABEL[cat]}</span>
-                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
-                          <div
-                            className="h-full rounded-full"
-                            style={{ width: `${pct}%`, backgroundColor: categoryColor(cat) }}
-                          />
+                  {CATEGORY_ORDER.map((cat) => ({ cat, count: analysis.byCategory[cat] }))
+                    .sort((a, b) => b.count - a.count)
+                    .map(({ cat, count }) => {
+                      const pct = Math.round((count / analysis.totalCombos) * 100);
+                      return (
+                        <div key={cat} className="flex items-center gap-2">
+                          <span className="w-36 shrink-0 truncate text-xs text-muted">{CATEGORY_LABEL[cat]}</span>
+                          <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-elevated">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, backgroundColor: categoryColor(cat) }}
+                            />
+                          </div>
+                          <span className="w-12 shrink-0 text-right text-[11px] tabular-nums text-muted">
+                            {pct}%
+                          </span>
                         </div>
-                        <span className="w-12 shrink-0 text-right text-[11px] tabular-nums text-muted">
-                          {pct}%
-                        </span>
-                      </div>
-                    );
-                  })}
+                      );
+                    })}
                 </div>
               )}
             </div>
