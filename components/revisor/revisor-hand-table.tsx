@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, DollarSign, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
@@ -42,13 +42,37 @@ const SUPPORTED_DRILL_POSITIONS = new Set(["BB", "BTN", "SB"]);
 // fixo em codigo).
 const AUTOPLAY_MS = 900;
 
-function StatRow({ label, value }: { label: string; value: string }) {
+// Chip estático (não clicável) — mesmo visual do ChipButton, usado pra
+// exibir info (torneio/buyin/blinds) em vez de disparar ação.
+function InfoChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
-    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline" }}>
-      <span style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{label}</span>
-      <span style={{ fontSize: 14, fontWeight: 500, color: "#FFFFFF", ...num }}>{value}</span>
+    <div
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        fontFamily: F,
+        fontSize: 12,
+        fontWeight: 500,
+        padding: "7px 12px",
+        borderRadius: 999,
+        border: "1px solid rgba(255,255,255,0.10)",
+        background: "rgba(255,255,255,0.03)",
+        color: "rgba(255,255,255,0.75)",
+        whiteSpace: "nowrap",
+        minWidth: 0,
+      }}
+    >
+      {icon}
+      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
     </div>
   );
+}
+
+// "$50" em vez de "$50.00" — só mostra decimais quando existem de fato.
+function formatBuyin(value: number): string {
+  const rounded = Math.round(value * 100) / 100;
+  return `$${Number.isInteger(rounded) ? rounded : rounded.toFixed(2)}`;
 }
 
 // Botao "modelo chips" — pill discreta com friso fino, neutra por
@@ -119,6 +143,7 @@ function ChipButton({
 export function RevisorHandTable({
   parsedHand,
   tournamentName,
+  buyin,
   hasTeam = false,
   onShareWithCoach,
   onOpenHand,
@@ -130,6 +155,9 @@ export function RevisorHandTable({
   // (ex: usos fora do contexto de sessao); se ausente, o header so nao
   // mostra o nome (nunca quebra o layout).
   tournamentName?: string | null;
+  // Buyin do torneio (numero cru, ex: 59) — exibido como chip formatado
+  // ($59). Opcional pelo mesmo motivo do tournamentName.
+  buyin?: number | null;
   // Se o jogador esta vinculado a um time — controla se "Compartilhar
   // com o coach" fica ativo ou em estado "em breve".
   hasTeam?: boolean;
@@ -327,33 +355,80 @@ export function RevisorHandTable({
           overflow: "hidden",
         }}
       >
-        {/* Header da mesa (novo, pedido explicito): nome do torneio a
-            esquerda, "Analisar mão" e "Compartilhar" como botoes chip no
-            canto superior direito. Substitui o antigo botao "Analisar
-            essa mão em detalhe" que ficava embaixo da mesa inteira — e'
-            o mesmo destino (onOpenHand/trainDetail), so reposicionado
-            pra sempre visivel sem rolar. Numero de jogadores na mesa foi
-            removido daqui (ja aparece nos StatRows abaixo, sem duplicar). */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
-            <Trophy size={13} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
-            <span
-              style={{
-                fontFamily: F,
-                fontSize: 12.5,
-                fontWeight: 600,
-                color: "rgba(255,255,255,0.85)",
-                overflow: "hidden",
-                textOverflow: "ellipsis",
-                whiteSpace: "nowrap",
-              }}
-              title={tournamentName ?? undefined}
-            >
-              {tournamentName ?? "Torneio sem nome"}
-            </span>
+        {/* Header unico (pedido explicito: "refine os botoes do
+            replayer e suba ele, ficando na mesma linha que as demais
+            informacoes") — torneio, buyin e blinds como chips de
+            informacao a esquerda; controles de navegacao/autoplay
+            refinados (menores, mesmo padrao visual dos chips) + acoes
+            (Compartilhar/Analisar) a direita. Tudo numa unica linha
+            flex com wrap — em telas largas fica tudo lado a lado; em
+            telas estreitas quebra em 2 linhas sem misturar grupos. */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+            <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} />
+            {buyin != null && <InfoChip icon={<DollarSign size={12} color="rgba(255,255,255,0.45)" />} label={formatBuyin(buyin)} />}
+            <InfoChip
+              icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
+              label={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`}
+            />
           </div>
 
-          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+            {/* Controles de navegacao/autoplay — refinados (28px, era
+                34px) e movidos pra dentro da mesma linha do header,
+                junto do resto das informacoes (pedido explicito).
+                Seletor de velocidade continua removido — autoplay roda
+                em ritmo fixo. */}
+            <div style={{ display: "flex", alignItems: "center", gap: 3, padding: 3, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
+              <button
+                onClick={prevStep}
+                disabled={replayState.stepIndex === 0}
+                aria-label="Passo anterior"
+                title="Anterior"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
+                  color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
+                  borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
+                }}
+              >
+                <ChevronLeft size={13} />
+              </button>
+
+              <button
+                onClick={() => setAutoplay((v) => !v)}
+                disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                aria-label={autoplay ? "Pausar" : "Reproduzir"}
+                title={autoplay ? "Pausar" : "Reproduzir"}
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", border: 0,
+                  background: autoplay ? "rgba(52,211,153,0.18)" : "transparent",
+                  color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.75)",
+                  borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                {autoplay ? <Pause size={11} /> : <Play size={11} />}
+              </button>
+
+              <button
+                onClick={nextStep}
+                disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                aria-label="Próximo passo"
+                title="Próximo"
+                style={{
+                  display: "flex", alignItems: "center", justifyContent: "center", border: 0,
+                  background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "rgba(255,255,255,0.85)",
+                  color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : "#111111",
+                  borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+                }}
+              >
+                <ChevronRight size={13} />
+              </button>
+
+              <span style={{ marginLeft: 3, marginRight: 5, fontSize: 10.5, color: "rgba(255,255,255,0.4)", ...num }}>
+                {replayState.stepIndex + 1}/{replayState.stepCount}
+              </span>
+            </div>
+
             <ChipButton
               icon={<Share2 size={13} />}
               label="Compartilhar"
@@ -367,61 +442,6 @@ export function RevisorHandTable({
           </div>
         </div>
 
-        {/* Controles de navegacao/autoplay — seletor de velocidade
-            removido (pedido explicito), autoplay roda em ritmo fixo. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10 }}>
-          <button
-            onClick={prevStep}
-            disabled={replayState.stepIndex === 0}
-            aria-label="Passo anterior"
-            title="Anterior"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center", background: "transparent",
-              border: "1px solid rgba(255,255,255,0.14)",
-              color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.25)" : "rgba(255,255,255,0.75)",
-              borderRadius: 10, width: 34, height: 34, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
-            }}
-          >
-            <ChevronLeft size={15} />
-          </button>
-
-          <button
-            onClick={() => setAutoplay((v) => !v)}
-            disabled={replayState.stepIndex >= replayState.stepCount - 1}
-            aria-label={autoplay ? "Pausar" : "Reproduzir"}
-            title={autoplay ? "Pausar" : "Reproduzir"}
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: autoplay ? "rgba(52,211,153,0.15)" : "transparent",
-              border: `1px solid ${autoplay ? "rgba(52,211,153,0.5)" : "rgba(255,255,255,0.14)"}`,
-              color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.25)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.75)",
-              borderRadius: 10, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-            }}
-          >
-            {autoplay ? <Pause size={13} /> : <Play size={13} />}
-          </button>
-
-          <button
-            onClick={nextStep}
-            disabled={replayState.stepIndex >= replayState.stepCount - 1}
-            aria-label="Próximo passo"
-            title="Próximo"
-            style={{
-              display: "flex", alignItems: "center", justifyContent: "center",
-              background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "#FFFFFF",
-              border: replayState.stepIndex >= replayState.stepCount - 1 ? "1px solid rgba(255,255,255,0.14)" : "0",
-              color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.25)" : "#111111",
-              borderRadius: 10, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-            }}
-          >
-            <ChevronRight size={15} />
-          </button>
-
-          <span style={{ marginLeft: 2, fontSize: 11, color: "rgba(255,255,255,0.4)", ...num }}>
-            {replayState.stepIndex + 1}/{replayState.stepCount}
-          </span>
-        </div>
-
         {/* Altura responsiva por breakpoint (className, nao inline) — fixa
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. */}
@@ -430,12 +450,7 @@ export function RevisorHandTable({
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", gap: 10, flexWrap: "wrap" }}>
-        <div style={{ display: "flex", gap: 16, flex: 1, minWidth: 0 }}>
-          <StatRow label="Blinds" value={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`} />
-          <StatRow label="Mesa" value={`${parsedHand.seats.length}-max`} />
-        </div>
-
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
         {trainHref ? (
           <Link
             href={trainHref}
