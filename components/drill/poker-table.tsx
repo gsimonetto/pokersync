@@ -152,25 +152,37 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
 // raises reais (>= 0.5bb) continuam aparecendo normalmente.
 const MIN_COMMITTED_TO_SHOW = 0.5;
 
-// 2026-08 v7 (pedido explicito): as fichas estavam "soltas" na mesa —
-// posicionadas no fluxo normal do card do assento, sem relacao com a
-// geometria da mesa. Assentos perto da borda empurravam a ficha praticamente
-// pra fora do feltro. Agora a ficha e' ancorada em coordenadas absolutas,
-// calculadas a partir do proprio x/y do assento na direcao do centro da
-// mesa — sempre dentro do oval, bem proxima da posicao (pouco deslocamento,
-// pedido explicito), nunca colada no avatar/chip do jogador.
+// 2026-08 v7: as fichas estavam "soltas" na mesa — posicionadas no fluxo
+// normal do card do assento, sem relacao com a geometria da mesa.
+// Assentos perto da borda empurravam a ficha praticamente pra fora do
+// feltro. A ficha e' ancorada em coordenadas absolutas, calculadas a
+// partir do proprio x/y do assento na direcao do centro da mesa.
 const TABLE_CENTER = { x: 50, y: 44 }; // mesmo ponto onde o pote e' desenhado
 // Deslocamento em PIXELS fixos (nao mais %) — o card de nome/stack tem
 // largura fixa em px, entao um deslocamento percentual encolhe em telas
 // menores e a ficha acaba caindo em cima do nome. Pixel fixo garante a
 // mesma folga real em qualquer tamanho de tela.
-const COMMITTED_OFFSET_PX = 62;
+//
+// 2026-08 v8 (correcao pedida): o offset generico (62px) ainda deixava a
+// CommittedPill invadir o chip da POSICAO (posLabel) em assentos "above"
+// (cardSide: as cartas ficam acima do chip, e o chip de posicao fica no
+// topo do bloco) — a pill de fichas nascia a meia distancia entre o seat
+// e o centro, o que em mesas menores (6-max) cai quase em cima do
+// proprio rotulo. Fix: aumenta o offset base e soma uma folga extra
+// vertical especifica pros assentos "above", empurrando a pill pra mais
+// perto do centro da mesa (longe do proprio bloco do jogador) em vez de
+// so "um pouco na direcao do centro".
+const COMMITTED_OFFSET_PX = 78;
 // Hero tem um bloco mais alto (cartas + chip nome/stack empilhados) —
 // o mesmo offset generico dos demais assentos nao limpa a altura das
 // cartas do hero e a ficha cai em cima delas. Hero fica sempre no
 // centro-baixo (dx=0), entao um offset vertical maior, so pra ele,
 // resolve sem afetar os outros assentos.
-const HERO_COMMITTED_OFFSET_PX = 118;
+const HERO_COMMITTED_OFFSET_PX = 130;
+// Assentos com cardSide "above" (cartas empilhadas acima do chip de
+// posicao) precisam de folga extra — sem isso a pill nasce em cima do
+// proprio posLabel nesses slots.
+const ABOVE_SEAT_EXTRA_OFFSET_PX = 20;
 
 function CommittedPill({ amount }: { amount: number }) {
   return (
@@ -207,7 +219,10 @@ function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number 
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
   const ux = dx / len;
   const uy = dy / len;
-  const offsetPx = seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX;
+  let offsetPx = seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX;
+  if (!seat.isHero && seat.cardSide === "above") {
+    offsetPx += ABOVE_SEAT_EXTRA_OFFSET_PX;
+  }
   return (
     <div
       style={{
@@ -599,7 +614,84 @@ export function PokerTable({
         </div>
       )}
 
-      <div style={{ position: "relative", flex: 1, minHeight: 0, width: "100%", overflow: "hidden" }}>
+      {/* Container do feltro — recebeu a borda "carbono/grafite moderno"
+          pedida: friso metalico fino (linear-gradient cinza sutil) por
+          fora do preto solido que ja existia, textura de fibra de
+          carbono discreta (repeating-linear-gradient em baixa opacidade)
+          e a logo do projeto no fundo, bem apagada, atras do feltro.
+          Camadas separadas (wrapper > textura > feltro) pra nao alterar
+          nada da geometria interna da mesa (seats, board, pote) — so
+          adiciona moldura por fora. */}
+      <div
+        style={{
+          position: "relative",
+          flex: 1,
+          minHeight: 0,
+          width: "100%",
+          overflow: "hidden",
+          borderRadius: "50%",
+        }}
+      >
+        {/* Friso metalico fino — anel entre a moldura de carbono e o
+            preto que ja envolvia o feltro. */}
+        <div
+          style={{
+            position: "absolute",
+            inset: "8% 5%",
+            borderRadius: "50%",
+            pointerEvents: "none",
+            background: "conic-gradient(from 200deg, #4A4E55, #8A8F98, #3A3D42, #6E727A, #4A4E55)",
+            opacity: 0.9,
+          }}
+        />
+        {/* Moldura carbono/grafite — textura de fibra sutil (linhas
+            diagonais repetidas em baixa opacidade sobre grafite escuro)
+            + logo do projeto no fundo, bem leve, atras de tudo. */}
+        <div
+          style={{
+            position: "absolute",
+            inset: "9.6% 6.6%",
+            borderRadius: "50%",
+            pointerEvents: "none",
+            background: [
+              "repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 4px)",
+              "repeating-linear-gradient(-45deg, rgba(0,0,0,0.4) 0px, rgba(0,0,0,0.4) 1px, transparent 1px, transparent 4px)",
+              "radial-gradient(circle at 50% 50%, #2A2C30 0%, #1C1D20 55%, #0E0F10 100%)",
+            ].join(", "),
+            boxShadow: "inset 0 0 24px rgba(0,0,0,.7)",
+          }}
+        />
+        {/* Logo do projeto — marca d'agua bem leve no fundo da moldura,
+            atras do feltro (feltro fica opaco por cima, entao a logo so
+            aparece na faixa da borda, nunca competindo com o jogo). */}
+        <div
+          style={{
+            position: "absolute",
+            inset: "9.6% 6.6%",
+            borderRadius: "50%",
+            pointerEvents: "none",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            opacity: 0.05,
+            overflow: "hidden",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: F,
+              fontWeight: 800,
+              fontSize: 46,
+              letterSpacing: 4,
+              color: "#FFFFFF",
+              transform: "rotate(-8deg)",
+              whiteSpace: "nowrap",
+            }}
+          >
+            POKERSYNC
+          </span>
+        </div>
+
         <div
           style={{
             position: "absolute",
@@ -684,7 +776,8 @@ export function PokerTable({
         ))}
 
         {/* Fichas de aposta ancoradas por assento — sempre dentro do
-            oval, na direcao do centro, bem proximas de cada posicao. */}
+            oval, na direcao do centro, bem proximas de cada posicao,
+            sem invadir o chip do posLabel (offset corrigido acima). */}
         {seats.map((s) => {
           const amt = streetCommitments?.[s.posLabel];
           if (!amt || amt < MIN_COMMITTED_TO_SHOW) return null;
