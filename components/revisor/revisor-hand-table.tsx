@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2 } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
@@ -21,14 +21,26 @@ import { F, T, num } from "@/lib/poker/drill-theme";
 // E o classifier consegue resolver a situacao preflop (vs Open/3-Bet) via
 // situation_dictionary. Qualquer uma dessas faltando, o botao fica oculto
 // — nunca leva pro Treino sem filtro certo.
+//
+// 2026-08 v9 (pedido explicito): correcoes de UX na tela de revisao —
+// 1) removido o seletor de velocidade do autoplay (fixo em "Normal").
+// 2) header proprio no topo da mesa com o nome do torneio, sem contagem
+//    de jogadores, com "Analisar mão" reposicionado pro canto superior
+//    direito como botao estilo chip (neutro, so destaca no hover).
+// 3) botao "Compartilhar com o coach" ao lado, sempre visivel — envia o
+//    hand history dessa mao pro coach abrir no replayer dele (Modo
+//    Time). Sem time vinculado, fica em estado "em breve" (desabilitado
+//    com tooltip apontando pra Comunidade, ainda nao implementada) em
+//    vez de sumir — pedido explicito: "pode colocar la pra quem nao tem
+//    time, mas sendo possivel compartilhar na comunidade quando estiver
+//    pronto".
 
 const SUPPORTED_DRILL_POSITIONS = new Set(["BB", "BTN", "SB"]);
 
-const AUTOPLAY_SPEEDS = [
-  { label: "Devagar", ms: 1600 },
-  { label: "Normal", ms: 900 },
-  { label: "Rápido", ms: 500 },
-];
+// Velocidade do autoplay fixa (pedido explicito: "tirar a velocidade do
+// play automatico" — sem seletor visivel na tela, so um valor razoavel
+// fixo em codigo).
+const AUTOPLAY_MS = 900;
 
 function StatRow({ label, value }: { label: string; value: string }) {
   return (
@@ -39,11 +51,97 @@ function StatRow({ label, value }: { label: string; value: string }) {
   );
 }
 
+// Botao "modelo chips" — pill discreta com friso fino, neutra por
+// padrao e so ganhando destaque real no hover (pedido explicito). Usado
+// tanto pro "Analisar mão" quanto pro "Compartilhar", pra manter os dois
+// no mesmo padrao visual no canto superior direito.
+function ChipButton({
+  icon,
+  label,
+  onClick,
+  href,
+  disabled,
+  title,
+}: {
+  icon: React.ReactNode;
+  label: string;
+  onClick?: () => void;
+  href?: string;
+  disabled?: boolean;
+  title?: string;
+}) {
+  const [hover, setHover] = useState(false);
+  const style: React.CSSProperties = {
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    fontFamily: F,
+    fontSize: 12,
+    fontWeight: 500,
+    padding: "7px 13px",
+    borderRadius: 999,
+    border: `1px solid ${disabled ? "rgba(255,255,255,0.08)" : hover ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"}`,
+    background: disabled ? "rgba(255,255,255,0.02)" : hover ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
+    color: disabled ? "rgba(255,255,255,0.25)" : hover ? "#FFFFFF" : "rgba(255,255,255,0.75)",
+    whiteSpace: "nowrap",
+    cursor: disabled ? "not-allowed" : "pointer",
+    textDecoration: "none",
+    transition: "all 150ms ease",
+  };
+  const content = (
+    <>
+      {icon}
+      {label}
+    </>
+  );
+  if (href && !disabled) {
+    return (
+      <Link href={href} title={title} style={style} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+        {content}
+      </Link>
+    );
+  }
+  return (
+    <button
+      type="button"
+      onClick={disabled ? undefined : onClick}
+      disabled={disabled}
+      title={title}
+      style={style}
+      onMouseEnter={() => setHover(true)}
+      onMouseLeave={() => setHover(false)}
+    >
+      {content}
+    </button>
+  );
+}
+
 export function RevisorHandTable({
   parsedHand,
+  tournamentName,
+  hasTeam = false,
+  onShareWithCoach,
+  onOpenHand,
   onFatalError,
 }: {
   parsedHand: ParsedHand;
+  // Nome do torneio sendo revisado — exibido no header da mesa. Opcional
+  // porque nem todo consumidor de RevisorHandTable tem esse dado a mao
+  // (ex: usos fora do contexto de sessao); se ausente, o header so nao
+  // mostra o nome (nunca quebra o layout).
+  tournamentName?: string | null;
+  // Se o jogador esta vinculado a um time — controla se "Compartilhar
+  // com o coach" fica ativo ou em estado "em breve".
+  hasTeam?: boolean;
+  // Chamado quando o jogador clica em compartilhar E ha time vinculado.
+  // Quem implementa o envio (hand history -> coach) e' o consumidor;
+  // esse componente so dispara a intencao.
+  onShareWithCoach?: () => void;
+  // Chamado quando o jogador clica em "Analisar mão" no header — leva
+  // pra RevisorDetalhe (perguntas guiadas, self-eval, drill suggestion).
+  // Se omitido, o botao "Analisar mão" nao aparece (em vez de renderizar
+  // um botao morto sem acao nenhuma).
+  onOpenHand?: () => void;
   // Chamado quando o replay dessa mao especifica nao pode ser montado
   // (ex: pote calculado nao bate com o total da mao — sanity check do
   // projector). Pedido explicito (2026-08): em vez de travar numa tela
@@ -58,7 +156,6 @@ export function RevisorHandTable({
   const [stepIndex, setStepIndex] = useState(0);
   const previousStepRef = useRef(0);
   const [autoplay, setAutoplay] = useState(false);
-  const [autoplaySpeed, setAutoplaySpeed] = useState(1);
 
   // Resolvido uma vez por mao (a situacao preflop nao muda step a step,
   // so a rua muda). Consulta situation_dictionary no Supabase — por isso
@@ -140,10 +237,9 @@ export function RevisorHandTable({
 
   useEffect(() => {
     if (!autoplay) return;
-    const ms = AUTOPLAY_SPEEDS[autoplaySpeed].ms;
-    const timer = setTimeout(() => nextStep(), ms);
+    const timer = setTimeout(() => nextStep(), AUTOPLAY_MS);
     return () => clearTimeout(timer);
-  }, [autoplay, autoplaySpeed, stepIndex, nextStep]);
+  }, [autoplay, stepIndex, nextStep]);
 
   // Link "Treinar esse spot" — so existe quando rua e' postflop, posicao
   // suportada pelos drills, e a situacao preflop foi resolvida com sucesso.
@@ -210,6 +306,11 @@ export function RevisorHandTable({
     );
   }
 
+  const canAnalyze = !!replayState && !!onOpenHand;
+  const shareTitle = hasTeam
+    ? "Enviar essa mão pro seu coach"
+    : "Disponível quando você entrar num time — em breve também pela Comunidade";
+
   return (
     <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10 }}>
       <div
@@ -226,12 +327,48 @@ export function RevisorHandTable({
           overflow: "hidden",
         }}
       >
-        {/* Controles movidos pro TOPO da mesa (pedido explicito): antes
-            ficavam embaixo da mesa inteira, obrigando rolar a barra pra
-            baixo pra alcancar. Agora ficam logo no topo, sempre visiveis
-            junto com o resto da tela. So icone (sem "Anterior"/"Proximo"
-            escrito) — pedido explicito de local mais estrategico e
-            compacto. aria-label mantido pra acessibilidade. */}
+        {/* Header da mesa (novo, pedido explicito): nome do torneio a
+            esquerda, "Analisar mão" e "Compartilhar" como botoes chip no
+            canto superior direito. Substitui o antigo botao "Analisar
+            essa mão em detalhe" que ficava embaixo da mesa inteira — e'
+            o mesmo destino (onOpenHand/trainDetail), so reposicionado
+            pra sempre visivel sem rolar. Numero de jogadores na mesa foi
+            removido daqui (ja aparece nos StatRows abaixo, sem duplicar). */}
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0 }}>
+            <Trophy size={13} color="rgba(255,255,255,0.4)" style={{ flexShrink: 0 }} />
+            <span
+              style={{
+                fontFamily: F,
+                fontSize: 12.5,
+                fontWeight: 600,
+                color: "rgba(255,255,255,0.85)",
+                overflow: "hidden",
+                textOverflow: "ellipsis",
+                whiteSpace: "nowrap",
+              }}
+              title={tournamentName ?? undefined}
+            >
+              {tournamentName ?? "Torneio sem nome"}
+            </span>
+          </div>
+
+          <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+            <ChipButton
+              icon={<Share2 size={13} />}
+              label="Compartilhar"
+              title={shareTitle}
+              disabled={!hasTeam}
+              onClick={onShareWithCoach}
+            />
+            {canAnalyze && (
+              <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" />
+            )}
+          </div>
+        </div>
+
+        {/* Controles de navegacao/autoplay — seletor de velocidade
+            removido (pedido explicito), autoplay roda em ritmo fixo. */}
         <div style={{ display: "flex", alignItems: "center", justifyContent: "center", gap: 6, marginBottom: 10 }}>
           <button
             onClick={prevStep}
@@ -280,18 +417,6 @@ export function RevisorHandTable({
             <ChevronRight size={15} />
           </button>
 
-          <select
-            value={autoplaySpeed}
-            onChange={(e) => setAutoplaySpeed(Number(e.target.value))}
-            aria-label="Velocidade da reprodução automática"
-            title="Velocidade"
-            style={{ background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)", color: "rgba(255,255,255,0.75)", borderRadius: 10, padding: "7px 8px", fontSize: 11, fontFamily: F, cursor: "pointer", outline: "none", height: 34 }}
-          >
-            {AUTOPLAY_SPEEDS.map((s, i) => (
-              <option key={i} value={i}>{s.label}</option>
-            ))}
-          </select>
-
           <span style={{ marginLeft: 2, fontSize: 11, color: "rgba(255,255,255,0.4)", ...num }}>
             {replayState.stepIndex + 1}/{replayState.stepCount}
           </span>
@@ -299,13 +424,7 @@ export function RevisorHandTable({
 
         {/* Altura responsiva por breakpoint (className, nao inline) — fixa
             e diferente por formato: menor no celular, media no tablet,
-            maior no desktop. Pedido explicito: "precisa ser fixa pro
-            desktop e se ajustar em outro formato (cel, tablet)". */}
-        {/* Altura ganhou um breakpoint a mais (xl) — pedido: "notebook,
-            deveria ser responsivo". 500px em telas grandes (1280px+)
-            deixava pouca folga vertical pros nomes de cima/baixo; 560px
-            a partir de xl (1280px+) da mais espaco sem forcar rolagem
-            em telas medias. */}
+            maior no desktop. */}
         <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px] xl:h-[520px]">
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
         </div>
