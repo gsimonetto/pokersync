@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Users, Printer, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, Inbox } from "lucide-react";
+import { ArrowLeft, Users, Printer, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban } from "lucide-react";
 import {
   fetchFinancialSeries,
   fetchMyTeam,
@@ -30,25 +30,16 @@ import {
   type TeamStaff,
 } from "@/lib/services/team-service";
 import { fetchTeamEvents, type TeamEvent } from "@/lib/services/team-calendar-service";
-import { fetchSharedHands } from "@/lib/services/shared-hands-service";
 import { TabVisaoGeral } from "@/components/time/tab-visao-geral";
 import { TabJogadores } from "@/components/time/tab-jogadores";
 import { TabConvites } from "@/components/time/tab-convites";
 import { TabTime } from "@/components/time/tab-time";
 import { TabCalendario } from "@/components/time/tab-calendario";
 import { TabKanban } from "@/components/time/tab-kanban";
-import { TabMaosRecebidas } from "@/components/time/tab-maos-recebidas";
 
-// Painel do time: um so lugar, cinco abas + Time (6 no total). A aba fica
-// na URL (?tab=) para que notificacao e link externo abram direto no
-// ponto certo. Espacamento de borda seguindo Banca/Revisor: max-w-6xl
-// px-6 py-10.
-//
-// 2026-08 (pedido explicito): nova aba "Mãos Recebidas" — jogadores
-// compartilham mãos específicas do Revisor de Mãos com o coach
-// (shared_hands), e o coach abre exatamente a mesma mesa/replayer aqui.
-// Contador de pendentes na aba segue o mesmo padrão visual já usado em
-// "Convites" (badge redondo com número).
+// Painel do time: um so lugar, quatro abas. A aba fica na URL (?tab=)
+// para que notificacao e link externo abram direto no ponto certo.
+// Espacamento de borda seguindo Banca/Revisor: max-w-6xl px-6 py-10.
 
 const PERIODOS = [
   { label: "7d", days: 7 },
@@ -56,7 +47,7 @@ const PERIODOS = [
   { label: "90d", days: 90 },
 ];
 
-type Aba = "visao" | "jogadores" | "convites" | "calendario" | "kanban" | "maos" | "time";
+type Aba = "visao" | "jogadores" | "convites" | "calendario" | "kanban" | "time";
 
 const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "visao", label: "Visão geral", icon: LayoutDashboard },
@@ -64,7 +55,6 @@ const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "convites", label: "Convites", icon: Mail },
   { key: "calendario", label: "Calendário", icon: CalendarDays },
   { key: "kanban", label: "Funil", icon: Kanban },
-  { key: "maos", label: "Mãos Recebidas", icon: Inbox },
   { key: "time", label: "Time", icon: Settings2 },
 ];
 
@@ -100,11 +90,6 @@ function PainelConteudo() {
   const [comparacao, setComparacao] = useState<PeriodComparison | null>(null);
   const [eventos, setEventos] = useState<TeamEvent[]>([]);
   const [prefillEventoPlayerId, setPrefillEventoPlayerId] = useState<string | null>(null);
-  // Contador de mãos pendentes (status "pendente") — só pro badge da
-  // aba, igual ao padrão de "Convites". Buscado à parte de fetchSharedHands
-  // completo (que a própria TabMaosRecebidas chama quando a aba abre),
-  // pra não duplicar a query pesada aqui — só a contagem.
-  const [maosPendentes, setMaosPendentes] = useState(0);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -119,7 +104,7 @@ function PainelConteudo() {
       setTime(t);
       setInfo(i);
 
-      const [rows, lk, at, fin, st, lb, pend, inv, comp, ev, shared] = await Promise.all([
+      const [rows, lk, at, fin, st, lb, pend, inv, comp, ev] = await Promise.all([
         fetchTeamDashboard(dias),
         fetchTeamLeaks(dias),
         fetchTeamActivity(dias),
@@ -130,7 +115,6 @@ function PainelConteudo() {
         fetchInvites(t.team.id).catch(() => []),
         fetchPeriodComparison(dias).catch(() => null),
         fetchTeamEvents().catch(() => []),
-        fetchSharedHands(t.team.id).catch(() => []),
       ]);
       setLinhas(rows);
       setLeaks(lk);
@@ -142,7 +126,6 @@ function PainelConteudo() {
       setInvites(inv);
       setComparacao(comp);
       setEventos(ev);
-      setMaosPendentes(shared.filter((s) => s.status === "pendente").length);
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -217,7 +200,7 @@ function PainelConteudo() {
         <nav className="mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline print:hidden">
           {ABAS.map((a) => {
             const Icon = a.icon;
-            const pend = a.key === "convites" ? pendentes.length : a.key === "maos" ? maosPendentes : 0;
+            const pend = a.key === "convites" ? pendentes.length : 0;
             return (
               <button key={a.key} onClick={() => trocarAba(a.key)}
                 className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
@@ -269,9 +252,6 @@ function PainelConteudo() {
                   setPrefillEventoPlayerId(playerId);
                   trocarAba("calendario");
                 }} />
-            )}
-            {aba === "maos" && time && (
-              <TabMaosRecebidas teamId={time.team.id} />
             )}
             {aba === "time" && info && (
               <TabTime info={info} staff={staff} labels={labels} podeEditar={time?.role !== "player"}
