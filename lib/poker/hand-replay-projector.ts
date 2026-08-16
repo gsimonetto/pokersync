@@ -491,10 +491,16 @@ function buildHistoryUpToStep(events: StepEvent[], throughStep: number, currentS
     }
   }
 
+  // CORRECAO (pedido explicito, 2026-08): antes so entravam no resultado
+  // as ruas JA ALCANCADAS (`if (!byStreet.has(s)) continue`) — cada nova
+  // rua fazia a barra crescer, empurrando a mesa pra baixo ("nao precisa
+  // se mover"). Agora sempre retorna as 4 linhas fixas (PREFLOP/FLOP/
+  // TURN/RIVER); ruas ainda nao alcancadas ficam com actions:[] (a UI em
+  // poker-table.tsx ja mostra "—" nesse caso). Altura da barra fica
+  // constante do primeiro ao ultimo step da mao.
   const order: StreetName[] = ["preflop", "flop", "turn", "river"];
   const result: HistoryStep[] = [];
   for (const s of order) {
-    if (!byStreet.has(s)) continue;
     result.push({
       street: STREET_LABELS[s],
       current: s === currentStreet,
