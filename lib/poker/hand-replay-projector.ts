@@ -172,18 +172,52 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
 
     for (const a of street.actions) {
       if (a.action === "posts") {
-        // Post de blind/ante nao vira step navegavel, mas ainda conta
-        // na contabilidade pra que o proximo "raises X to Y" calcule
-        // o delta certo. Ex: BB posta 1, depois BB "raises to 3" =
-        // delta de 2, nao 3.
-        committed.set(a.player, (committed.get(a.player) ?? 0) + (a.amount ?? 0));
+        // CORRECAO (2026-08, bug real): so BLIND (SB/BB) entra nessa
+        // contabilidade de "quanto o jogador ja apostou nessa rua",
+        // usada no calculo do delta de "raises X para Y". Ante NAO
+        // conta — "raises para Y" e' relativo as apostas da rodada
+        // (blinds + raises), nunca ao ante, que e' forcado e separado
+        // antes de qualquer decisao. Bug encontrado numa mao real: MTT
+        // com ante, jogador que so tinha pago ante dava o primeiro
+        // raise da mao — o codigo subtraia o ante do valor do raise
+        // (raiseTo - ante), subestimando o pote reconstruido em relacao
+        // ao total do resumo da mao (sanity check acusava divergencia).
+        // Nao ha campo explicito de "tipo de post" disponivel aqui pra
+        // diferenciar de outro jeito — identifica blind comparando o
+        // valor do post com hand.smallBlind/hand.bigBlind.
+        const isBlindPost = a.amount === hand.smallBlind || a.amount === hand.bigBlind;
+        if (isBlindPost) {
+          committed.set(a.player, (committed.get(a.player) ?? 0) + (a.amount ?? 0));
+        }
         continue;
       }
 
       if (a.action === "uncalled_return") {
-        // Uncalled bet retorna dinheiro ao jogador — aplicado
-        // automaticamente no fim da rua (invisivel pro replayer),
-        // nao vira step navegavel.
+        // CORRECAO (2026-08, bug real): aposta nao-igualada volta pro
+        // jogador ("Aposta nao-igualada (X) voltou pra Y" no resumo),
+        // mas o pote reconstruido nunca descontava esse valor de volta
+        // — contava a aposta inteira como se tivesse ficado no pote.
+        // Continua NAO virando um step navegavel (mantido como pedido
+        // originalmente: "aplicado automaticamente, invisivel pro
+        // replayer") — em vez disso, desconta o valor devolvido do
+        // ULTIMO evento de acao desse mesmo jogador NESSA MESMA rua (o
+        // bet/raise que gerou a sobra), corrigindo o total sem alterar
+        // a navegacao existente. Se a aposta foi TOTALMENTE nao-
+        // igualada (ninguem pagou nada dela), o evento correspondente
+        // fica com chipsAdded=0 — a ficha nao anima nem aparece parada
+        // em frente ao assento nesse step (o pote nunca recebeu esse
+        // dinheiro de verdade), mas o texto na history bar continua
+        // mostrando o valor apostado originalmente (actionLabel usa o
+        // valor bruto do parser, nao afetado por essa correcao).
+        const returned = a.amount ?? 0;
+        for (let i = events.length - 1; i >= 0; i--) {
+          const ev = events[i];
+          if (ev.kind === "deal") break; // nao cruza pra uma rua anterior
+          if (ev.kind === "action" && ev.player === a.player && ev.chipsAdded > 0) {
+            ev.chipsAdded = Math.max(0, ev.chipsAdded - returned);
+            break;
+          }
+        }
         continue;
       }
 
