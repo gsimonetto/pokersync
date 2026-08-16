@@ -532,13 +532,13 @@ export function PokerTable({
         }
       `}</style>
 
-      {/* Barra de ruas — refeita (pedido explicito): "encaixar tudo numa
-          linha, ou separar as ruas uma embaixo da outra, mas nao pode
-          ficar muito grande". Uma linha por rua (preflop/flop/turn/river),
-          cada linha compacta (~20px), rotulo fixo a esquerda + acoes em
-          scroll horizontal proprio — nunca estoura a altura total mesmo
-          com muitas acoes numa rua so. So mostra ruas ja iniciadas
-          (history ja vem filtrado assim por buildHistoryUpToStep). */}
+      {/* Barra de ruas — refeita (pedido explicito): "as ruas pode vir
+          fixa as linhas... desta forma a mesa em baixo fica fixa, nao
+          precisa se mover". SEMPRE 4 linhas (preflop/flop/turn/river),
+          mesmo as ainda nao alcancadas (mostram "—") — altura constante
+          do primeiro ao ultimo step da mao, a mesa embaixo nunca pula.
+          Cada linha compacta (~20px), rotulo fixo a esquerda + acoes em
+          scroll horizontal proprio. */}
       {active && (
         <div
           style={{
@@ -551,8 +551,10 @@ export function PokerTable({
             border: "1px solid rgba(255,255,255,0.08)",
             flexShrink: 0,
             background: "rgba(255,255,255,0.03)",
-            maxHeight: 92,
-            overflowY: hasHistory && history.length > 4 ? "auto" : "visible",
+            // Sempre 4 linhas fixas agora (Preflop/Flop/Turn/River,
+            // mesmo as ainda nao alcancadas) — altura constante, nunca
+            // precisa de scroll interno.
+            minHeight: 108,
           }}
         >
           {hasHistory ? (
@@ -643,11 +645,16 @@ export function PokerTable({
         }}
       >
         {/* Friso metalico fino — anel entre a moldura de carbono e o
-            preto que ja envolvia o feltro. */}
+            preto que ja envolvia o feltro. Margem horizontal reduzida
+            (pedido explicito: "diminua os espacos em preto no lado
+            esquerdo e direito") — inset vertical intacto (governa a
+            folga acima/abaixo, que estava ok), so o horizontal (6%→1.5%
+            aqui, e nos aneis seguintes) encolheu pra mesa ocupar mais
+            largura do card. */}
         <div
           style={{
             position: "absolute",
-            inset: "8% 5%",
+            inset: "8% 1.5%",
             borderRadius: "50%",
             pointerEvents: "none",
             background: "conic-gradient(from 200deg, #4A4E55, #8A8F98, #3A3D42, #6E727A, #4A4E55)",
@@ -660,7 +667,7 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "9.6% 6.6%",
+            inset: "9.6% 2.6%",
             borderRadius: "50%",
             pointerEvents: "none",
             background: [
@@ -677,7 +684,7 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "9.6% 6.6%",
+            inset: "9.6% 2.6%",
             borderRadius: "50%",
             pointerEvents: "none",
             display: "flex",
@@ -705,7 +712,7 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "9% 6%",
+            inset: "9% 2%",
             borderRadius: "50%",
             // Feltro BORDÔ (pedido explicito) — mesmas 4 paradas de
             // profundidade que o verde original tinha, so trocando a
