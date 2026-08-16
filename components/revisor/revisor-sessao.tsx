@@ -513,7 +513,7 @@ export function RevisorSessao({
           {selectedId && parsedForSelected ? (
             <RevisorHandTable
               parsedHand={parsedForSelected}
-              tournamentName={session.title ?? null}
+              tournamentName={session.label ?? null}
               hasTeam={!!teamMembership}
               onShareWithCoach={handleShareWithCoach}
               onOpenHand={() => selectedId && onOpenHand(selectedId)}
