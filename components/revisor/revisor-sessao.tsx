@@ -514,6 +514,7 @@ export function RevisorSessao({
             <RevisorHandTable
               parsedHand={parsedForSelected}
               tournamentName={session.label ?? null}
+              buyin={session.buyin ?? null}
               hasTeam={!!teamMembership}
               onShareWithCoach={handleShareWithCoach}
               onOpenHand={() => selectedId && onOpenHand(selectedId)}
