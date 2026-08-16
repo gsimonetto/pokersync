@@ -1,6 +1,5 @@
 "use client";
 
-import { Fragment } from "react";
 import { Card } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
@@ -163,26 +162,23 @@ const TABLE_CENTER = { x: 50, y: 44 }; // mesmo ponto onde o pote e' desenhado
 // menores e a ficha acaba caindo em cima do nome. Pixel fixo garante a
 // mesma folga real em qualquer tamanho de tela.
 //
-// 2026-08 v8 (correcao pedida): o offset generico (62px) ainda deixava a
-// CommittedPill invadir o chip da POSICAO (posLabel) em assentos "above"
-// (cardSide: as cartas ficam acima do chip, e o chip de posicao fica no
-// topo do bloco) — a pill de fichas nascia a meia distancia entre o seat
-// e o centro, o que em mesas menores (6-max) cai quase em cima do
-// proprio rotulo. Fix: aumenta o offset base e soma uma folga extra
-// vertical especifica pros assentos "above", empurrando a pill pra mais
-// perto do centro da mesa (longe do proprio bloco do jogador) em vez de
-// so "um pouco na direcao do centro".
-const COMMITTED_OFFSET_PX = 78;
+// 2026-08 v9 (ajuste fino, pedido explicito: "tente manter a aposta nao
+// tao longe do apostador, mas que nao sobreponha"): offset v8 (78px +
+// 20px extra em "above") deixou a ficha longe demais do jogador. Reduz
+// pra ficar mais proxima, mantendo so a folga extra minima nos seats
+// "above" (onde o chip de posicao fica mais perto do centro, unico caso
+// real de colisao observado).
+const COMMITTED_OFFSET_PX = 56;
 // Hero tem um bloco mais alto (cartas + chip nome/stack empilhados) —
 // o mesmo offset generico dos demais assentos nao limpa a altura das
 // cartas do hero e a ficha cai em cima delas. Hero fica sempre no
 // centro-baixo (dx=0), entao um offset vertical maior, so pra ele,
 // resolve sem afetar os outros assentos.
-const HERO_COMMITTED_OFFSET_PX = 130;
+const HERO_COMMITTED_OFFSET_PX = 104;
 // Assentos com cardSide "above" (cartas empilhadas acima do chip de
 // posicao) precisam de folga extra — sem isso a pill nasce em cima do
 // proprio posLabel nesses slots.
-const ABOVE_SEAT_EXTRA_OFFSET_PX = 20;
+const ABOVE_SEAT_EXTRA_OFFSET_PX = 14;
 
 function CommittedPill({ amount }: { amount: number }) {
   return (
@@ -276,11 +272,20 @@ function Seat({
         } as const
       )[seat.cardSide];
 
-  const badgeArea = !acting ? (
+  // FIX (2026-08, bug real): antes badgeArea virava `null` quando o
+  // seat estava "acting" — isso REMOVIA os ~17px reservados pro badge
+  // de acao, encolhendo a altura total do bloco do seat. Como o seat
+  // inteiro e' posicionado com translate(-50%,-50%), uma mudanca de
+  // altura desloca o ponto visual (o "centro" recalcula), causando a
+  // "baixada" reportada — e no hero (perto da borda inferior da mesa,
+  // y=92%), esse deslocamento cortava as cartas/chip. Agora o container
+  // sempre existe com a mesma altura minima; so o CONTEUDO (ActionBadge)
+  // e' condicional. Layout nunca muda de tamanho ao entrar/sair de "acting".
+  const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
-      <ActionBadge action={action} />
+      {!acting && <ActionBadge action={action} />}
     </div>
-  ) : null;
+  );
 
   // Redesenho estilo GG Poker: 2 chips empilhados, ambos no MESMO
   // formato pill:
@@ -527,54 +532,63 @@ export function PokerTable({
         }
       `}</style>
 
+      {/* Barra de ruas — refeita (pedido explicito): "encaixar tudo numa
+          linha, ou separar as ruas uma embaixo da outra, mas nao pode
+          ficar muito grande". Uma linha por rua (preflop/flop/turn/river),
+          cada linha compacta (~20px), rotulo fixo a esquerda + acoes em
+          scroll horizontal proprio — nunca estoura a altura total mesmo
+          com muitas acoes numa rua so. So mostra ruas ja iniciadas
+          (history ja vem filtrado assim por buildHistoryUpToStep). */}
       {active && (
         <div
           style={{
             display: "flex",
-            alignItems: "center",
-            gap: 10,
+            flexDirection: "column",
+            gap: 3,
             marginBottom: 8,
-            padding: "6px 12px",
-            minHeight: 32,
+            padding: "6px 10px",
             borderRadius: 12,
             border: "1px solid rgba(255,255,255,0.08)",
             flexShrink: 0,
             background: "rgba(255,255,255,0.03)",
+            maxHeight: 92,
+            overflowY: hasHistory && history.length > 4 ? "auto" : "visible",
           }}
         >
-          <div style={{ display: "flex", alignItems: "center", gap: 8, overflowX: "auto", flex: 1, minWidth: 0 }}>
-            {hasHistory ? (
-              history.map((h, i) => (
-                <Fragment key={i}>
-                  <button
-                    type="button"
-                    onClick={onStreetClick ? () => onStreetClick(i) : undefined}
-                    disabled={!onStreetClick}
-                    style={{
-                      all: "unset",
-                      cursor: onStreetClick ? "pointer" : "default",
-                      fontFamily: F,
-                      fontSize: 9.5,
-                      fontWeight: 500,
-                      letterSpacing: 1.2,
-                      color: h.current ? TEXT.critical : TEXT.decorative,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {h.street}
-                  </button>
-                  <div style={{ display: "flex", gap: 5 }}>
-                    {h.actions.map((a, j) => (
+          {hasHistory ? (
+            history.map((h, i) => (
+              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 20 }}>
+                <span
+                  onClick={onStreetClick ? () => onStreetClick(i) : undefined}
+                  style={{
+                    fontFamily: F,
+                    fontSize: 9,
+                    fontWeight: 700,
+                    letterSpacing: 1,
+                    color: h.current ? TEXT.critical : TEXT.decorative,
+                    whiteSpace: "nowrap",
+                    width: 34,
+                    flexShrink: 0,
+                    cursor: onStreetClick ? "pointer" : "default",
+                  }}
+                >
+                  {h.street}
+                </span>
+                <div style={{ display: "flex", gap: 5, overflowX: "auto", flex: 1, minWidth: 0 }}>
+                  {h.actions.length === 0 ? (
+                    <span style={{ fontFamily: F, fontSize: 10, color: TEXT.disabled }}>—</span>
+                  ) : (
+                    h.actions.map((a, j) => (
                       <span
                         key={j}
                         style={{
                           fontFamily: F,
-                          fontSize: 10.5,
+                          fontSize: 10,
                           fontWeight: 500,
                           whiteSpace: "nowrap",
                           color: POS[a.pos]?.glow,
-                          opacity: h.current ? 1 : 0.7,
-                          padding: "2px 7px",
+                          opacity: h.current ? 1 : 0.65,
+                          padding: "1px 6px",
                           borderRadius: 999,
                           background: `${POS[a.pos]?.base}1F`,
                           border: `1px solid ${POS[a.pos]?.base}55`,
@@ -583,28 +597,24 @@ export function PokerTable({
                       >
                         {a.pos} {a.label}
                       </span>
-                    ))}
-                  </div>
-                  {i < history.length - 1 && <span style={{ color: "rgba(255,255,255,.1)" }}>|</span>}
-                </Fragment>
-              ))
-            ) : (
-              <span style={{ fontFamily: F, fontSize: 11, color: TEXT.decorative }}>Nenhuma ação ainda</span>
-            )}
-          </div>
+                    ))
+                  )}
+                </div>
+              </div>
+            ))
+          ) : (
+            <span style={{ fontFamily: F, fontSize: 11, color: TEXT.decorative }}>Nenhuma ação ainda</span>
+          )}
 
           {hand.spr != null && (
             <div
               style={{
                 fontFamily: F,
-                fontSize: 10.5,
+                fontSize: 10,
                 fontWeight: 500,
                 letterSpacing: 0.6,
                 color: TEXT.secondary,
-                whiteSpace: "nowrap",
-                flexShrink: 0,
-                paddingLeft: 10,
-                borderLeft: "1px solid rgba(255,255,255,0.08)",
+                marginTop: 2,
                 ...num,
               }}
             >
@@ -697,12 +707,15 @@ export function PokerTable({
             position: "absolute",
             inset: "9% 6%",
             borderRadius: "50%",
-            background: "radial-gradient(65% 75% at 50% 40%, #0F5A42 0%, #0A4231 30%, #062E22 60%, #031810 100%)",
+            // Feltro BORDÔ (pedido explicito) — mesmas 4 paradas de
+            // profundidade que o verde original tinha, so trocando a
+            // paleta pra tons de vinho/bordô.
+            background: "radial-gradient(65% 75% at 50% 40%, #7A1830 0%, #5C1224 30%, #3D0C18 60%, #1F0509 100%)",
             border: "2px solid #000000",
             boxShadow: [
               "0 0 0 6px #000000",
               "0 0 0 7px rgba(255,255,255,.08)",
-              "0 0 40px rgba(15,90,66,.35)",
+              "0 0 40px rgba(122,24,48,.35)",
               "0 24px 60px rgba(0,0,0,.75)",
               "inset 0 2px 30px rgba(255,255,255,.06)",
               "inset 0 -30px 80px rgba(0,0,0,.65)",
