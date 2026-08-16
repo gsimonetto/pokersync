@@ -2,8 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, DollarSign, Layers } from "lucide-react";
+import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
+import { ShareHandModal } from "./share-hand-modal";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
@@ -43,7 +44,7 @@ const SUPPORTED_DRILL_POSITIONS = new Set(["BB", "BTN", "SB"]);
 const AUTOPLAY_MS = 900;
 
 // Chip estático (não clicável) — mesmo visual do ChipButton, usado pra
-// exibir info (torneio/buyin/blinds) em vez de disparar ação.
+// exibir info (torneio/blinds) em vez de disparar ação.
 function InfoChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div
@@ -67,12 +68,6 @@ function InfoChip({ icon, label }: { icon: React.ReactNode; label: string }) {
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
     </div>
   );
-}
-
-// "$50" em vez de "$50.00" — só mostra decimais quando existem de fato.
-function formatBuyin(value: number): string {
-  const rounded = Math.round(value * 100) / 100;
-  return `$${Number.isInteger(rounded) ? rounded : rounded.toFixed(2)}`;
 }
 
 // Botao "modelo chips" — pill discreta com friso fino, neutra por
@@ -143,9 +138,7 @@ function ChipButton({
 export function RevisorHandTable({
   parsedHand,
   tournamentName,
-  buyin,
-  hasTeam = false,
-  onShareWithCoach,
+  reviewId,
   onOpenHand,
   onFatalError,
 }: {
@@ -155,16 +148,12 @@ export function RevisorHandTable({
   // (ex: usos fora do contexto de sessao); se ausente, o header so nao
   // mostra o nome (nunca quebra o layout).
   tournamentName?: string | null;
-  // Buyin do torneio (numero cru, ex: 59) — exibido como chip formatado
-  // ($59). Opcional pelo mesmo motivo do tournamentName.
-  buyin?: number | null;
-  // Se o jogador esta vinculado a um time — controla se "Compartilhar
-  // com o coach" fica ativo ou em estado "em breve".
-  hasTeam?: boolean;
-  // Chamado quando o jogador clica em compartilhar E ha time vinculado.
-  // Quem implementa o envio (hand history -> coach) e' o consumidor;
-  // esse componente so dispara a intencao.
-  onShareWithCoach?: () => void;
+  // Id da hand_review correspondente — necessario pro botao "Compartilhar"
+  // abrir a modal de perguntas guiadas (ShareHandModal) e pra salvar as
+  // respostas/compartilhar via hand_review_shares (mesma infra que
+  // "Analisar mão" ja usa). Se ausente, o botao "Compartilhar" fica
+  // oculto (igual ao padrao ja usado em onOpenHand/canAnalyze).
+  reviewId?: string;
   // Chamado quando o jogador clica em "Analisar mão" no header — leva
   // pra RevisorDetalhe (perguntas guiadas, self-eval, drill suggestion).
   // Se omitido, o botao "Analisar mão" nao aparece (em vez de renderizar
@@ -184,6 +173,9 @@ export function RevisorHandTable({
   const [stepIndex, setStepIndex] = useState(0);
   const previousStepRef = useRef(0);
   const [autoplay, setAutoplay] = useState(false);
+  // Modal de compartilhamento (pedido explicito) — abre com as mesmas
+  // perguntas guiadas do "Analisar mão"; ver share-hand-modal.tsx.
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // Resolvido uma vez por mao (a situacao preflop nao muda step a step,
   // so a rua muda). Consulta situation_dictionary no Supabase — por isso
@@ -335,12 +327,10 @@ export function RevisorHandTable({
   }
 
   const canAnalyze = !!replayState && !!onOpenHand;
-  const shareTitle = hasTeam
-    ? "Enviar essa mão pro seu coach"
-    : "Disponível quando você entrar num time — em breve também pela Comunidade";
+  const canShare = !!reviewId;
 
   return (
-    <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10 }}>
+    <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
       <div
         style={{
           background: "#050505",
@@ -349,10 +339,20 @@ export function RevisorHandTable({
           padding: 10,
           // overflow:hidden — bug corrigido: sem isso, conteudo de seat
           // (chip de nome, fichas paradas) que se acumula conforme a acao
-          // avanca podia vazar visualmente pra fora da caixa de 500px,
-          // dando a impressao de "a mesa vai crescendo". Agora fica
+          // avanca podia vazar visualmente pra fora da caixa. Agora fica
           // sempre travada no tamanho definido, clipando qualquer excesso.
           overflow: "hidden",
+          // flex:1 + minHeight:0 (pedido explicito: "aumentar a mesa no
+          // mesmo tamanho da lista de maos... nao devera conter espaco
+          // em branco em baixo") — antes a mesa tinha altura FIXA por
+          // breakpoint (360/420/500/520px) que nao acompanhava a altura
+          // real da coluna (a lista de maos ao lado usa flex:1 e enche
+          // o espaco todo). Agora o card da mesa cresce junto com a
+          // coluna, ate a altura real disponivel na tela.
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          minHeight: 0,
         }}
       >
         {/* Header unico (pedido explicito: "refine os botoes do
@@ -363,10 +363,9 @@ export function RevisorHandTable({
             (Compartilhar/Analisar) a direita. Tudo numa unica linha
             flex com wrap — em telas largas fica tudo lado a lado; em
             telas estreitas quebra em 2 linhas sem misturar grupos. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap" }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
           <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
             <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} />
-            {buyin != null && <InfoChip icon={<DollarSign size={12} color="rgba(255,255,255,0.45)" />} label={formatBuyin(buyin)} />}
             <InfoChip
               icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
               label={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`}
@@ -429,13 +428,14 @@ export function RevisorHandTable({
               </span>
             </div>
 
-            <ChipButton
-              icon={<Share2 size={13} />}
-              label="Compartilhar"
-              title={shareTitle}
-              disabled={!hasTeam}
-              onClick={onShareWithCoach}
-            />
+            {canShare && (
+              <ChipButton
+                icon={<Share2 size={13} />}
+                label="Compartilhar"
+                title="Compartilhar essa mão com o coach"
+                onClick={() => setShareModalOpen(true)}
+              />
+            )}
             {canAnalyze && (
               <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" />
             )}
@@ -445,12 +445,12 @@ export function RevisorHandTable({
         {/* Altura responsiva por breakpoint (className, nao inline) — fixa
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. */}
-        <div className="h-[360px] overflow-hidden sm:h-[420px] lg:h-[500px] xl:h-[520px]">
+        <div style={{ flex: 1, minHeight: 0 }}>
           <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
         </div>
       </div>
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
         {trainHref ? (
           <Link
             href={trainHref}
@@ -474,6 +474,10 @@ export function RevisorHandTable({
           )
         )}
       </div>
+
+      {reviewId && (
+        <ShareHandModal open={shareModalOpen} reviewId={reviewId} onClose={() => setShareModalOpen(false)} />
+      )}
     </div>
   );
 }
