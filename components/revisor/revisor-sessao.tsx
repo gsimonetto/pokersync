@@ -7,6 +7,7 @@ import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard } from "@/components/drill/card";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
+import { getActiveTeamMembership, shareHandWithCoach, type ActiveTeamMembership } from "@/lib/services/hand-share-service";
 import { F, T } from "@/lib/poker/drill-theme";
 
 // Tela nova (2026-08): abre uma sessao/torneio e mostra o master-detail —
@@ -33,6 +34,15 @@ import { F, T } from "@/lib/poker/drill-theme";
 // (updateSessionBounty) removida junto — se precisar editar bounty de
 // novo, precisa de um lugar novo pra isso (ex: dentro da lista ou um
 // menu de opcoes da sessao).
+//
+// 2026-08 v4 (pedido explicito): filtro "Só com ação" deixou de ficar
+// escondido atras do icone de lupa — agora e' um toggle sempre visivel
+// no topo da lista, junto do contador de maos. A lupa continua so pra
+// busca por texto (posicao/stack/numero) e pros marcadores da sessao,
+// que sao mais situacionais. Nome do torneio/numero de jogadores e o
+// botao "Analisar mao" saem daqui — agora vivem no header da propria
+// mesa (RevisorHandTable), reposicionados pro canto superior direito
+// como pedido.
 const GRID_HEIGHT = "calc(100vh - 240px)"; // aproximado — depende do header
 // fixo da pagina (fora deste componente). Se ainda sobrar scroll da
 // pagina inteira ao abrir a tela, o ajuste fino de altura do
@@ -107,6 +117,37 @@ export function RevisorSessao({
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyWithAction, setOnlyWithAction] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  // Vinculo do jogador com o time — resolve uma vez por sessao de tela
+  // (nao muda enquanto o jogador esta navegando entre maos). null =
+  // sem time (botao "Compartilhar" fica desabilitado no header da mesa).
+  const [teamMembership, setTeamMembership] = useState<ActiveTeamMembership | null>(null);
+  // Feedback textual e transitorio apos compartilhar — some sozinho.
+  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
+  const [sharing, setSharing] = useState(false);
+
+  useEffect(() => {
+    let cancelled = false;
+    getActiveTeamMembership().then((m) => {
+      if (!cancelled) setTeamMembership(m);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  const handleShareWithCoach = useCallback(async () => {
+    if (!selectedId || !teamMembership || sharing) return;
+    setSharing(true);
+    try {
+      await shareHandWithCoach(selectedId, teamMembership);
+      setShareFeedback("Mão enviada pro coach.");
+    } catch {
+      setShareFeedback("Não foi possível compartilhar — tenta de novo.");
+    } finally {
+      setSharing(false);
+      setTimeout(() => setShareFeedback(null), 3000);
+    }
+  }, [selectedId, teamMembership, sharing]);
 
   useEffect(() => {
     let cancelled = false;
@@ -170,8 +211,8 @@ export function RevisorSessao({
   // Busca (lupa): filtra por posicao do hero, stack inicial do hero, ou
   // numero da mao ("Mão 5" casa com "5"). Um unico campo de texto livre
   // pra cobrir os 3 casos pedidos ("stack ou posições") — mais simples
-  // pro jogador que 3 campos separados. "So com acao" e' um toggle a
-  // parte, e' booleano, nao cabe bem como texto livre.
+  // pro jogador que 3 campos separados. "So com acao" saiu daqui — agora
+  // e' um toggle sempre visivel fora da busca (ver JSX abaixo).
   // Tags distintas presentes nas maos DESSA sessao — so mostra no filtro
   // o que existe de fato aqui, nao a lista inteira de marcadores do
   // sistema (a maioria nao se aplica a um torneio especifico).
@@ -209,21 +250,37 @@ export function RevisorSessao({
       });
   }, [hands, searchQuery, onlyWithAction, tagFilter]);
 
+  // Se o filtro "so com acao" tirar a mao selecionada da lista visivel,
+  // pula pra primeira mao que sobrou — pedido explicito: "quando
+  // selecionar, pode pular a sequencia de maos e so usar com as ações".
+  // Sem isso a mesa continuaria mostrando uma mao que sumiu da lista
+  // (selecao "orfa"), confuso pro jogador acompanhar qual mao esta
+  // olhando.
+  useEffect(() => {
+    if (filteredHands.length === 0) return;
+    const stillVisible = filteredHands.some((f) => f.hand.id === selectedId);
+    if (!stillVisible) {
+      setSelectedId(filteredHands[0].hand.id);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [filteredHands]);
+
   // Avança pra próxima mão da fila quando o replay da mão atual falha
   // (ex: checagem de pote do projector) — pedido explicito (2026-08):
   // "ao finalizar de ver a ação daquela mão... preciso que vá para a
   // próxima mão ao invés de sair ou aparecer essa info", confirmado pra
-  // valer "independente do que causou o erro". Se já é a última mão da
-  // lista, não tem pra onde avançar — mantém a seleção (RevisorHandTable
-  // mostra o indicador de transição, mas sem próxima mão real ele fica
-  // parado; aceitável, é o fim da fila).
+  // valer "independente do que causou o erro". Avança dentro da lista
+  // FILTRADA (não da lista bruta) — se "só com ação" está ativo, pular
+  // pra próxima mão de verdade significa a próxima que também tem ação,
+  // não qualquer mão da sessão. Se já é a última mão visível, mantém a
+  // seleção.
   const goToNextHand = useCallback(() => {
     setSelectedId((current) => {
-      const idx = hands.findIndex((h) => h.id === current);
-      if (idx === -1 || idx >= hands.length - 1) return current;
-      return hands[idx + 1].id;
+      const idx = filteredHands.findIndex((f) => f.hand.id === current);
+      if (idx === -1 || idx >= filteredHands.length - 1) return current;
+      return filteredHands[idx + 1].hand.id;
     });
-  }, [hands]);
+  }, [filteredHands]);
 
   if (loading) {
     return (
@@ -284,6 +341,32 @@ export function RevisorSessao({
               </button>
             </div>
 
+            {/* "Só com ação" agora é um toggle sempre visível (pedido
+                explicito) — não depende mais de abrir a busca pra
+                aparecer. Selecionar pula a mão atual, se ela ficar de
+                fora do filtro, pra próxima mão visível (ver useEffect
+                acima). */}
+            <button
+              onClick={() => setOnlyWithAction((v) => !v)}
+              style={{
+                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+                fontFamily: F, fontSize: 11.5, fontWeight: 600,
+                padding: "7px 10px", borderRadius: 9,
+                border: `1px solid ${onlyWithAction ? "#34D399" : "rgba(255,255,255,0.14)"}`,
+                background: onlyWithAction ? "rgba(52,211,153,0.16)" : "rgba(255,255,255,0.03)",
+                color: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.65)",
+              }}
+            >
+              <span
+                style={{
+                  width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+                  background: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.25)",
+                  boxShadow: onlyWithAction ? "0 0 6px #34D399" : "none",
+                }}
+              />
+              Só com ação
+            </button>
+
             {searchOpen && (
               <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
                 <div
@@ -313,24 +396,12 @@ export function RevisorSessao({
               </div>
             )}
 
-            {searchOpen && (
+            {/* Filtro por marcador (pedido explicito) — so lista tags
+                que realmente aparecem em alguma mao dessa sessao.
+                Continua dentro da busca (searchOpen), e' mais
+                situacional que "so com acao". */}
+            {searchOpen && availableTags.length > 0 && (
               <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                <button
-                  onClick={() => setOnlyWithAction((v) => !v)}
-                  style={{
-                    all: "unset", cursor: "pointer",
-                    fontFamily: F, fontSize: 10.5, fontWeight: 500,
-                    padding: "4px 9px", borderRadius: 999,
-                    border: `1px solid ${onlyWithAction ? "#34D399" : "rgba(255,255,255,0.14)"}`,
-                    background: onlyWithAction ? "rgba(52,211,153,0.14)" : "transparent",
-                    color: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.5)",
-                  }}
-                >
-                  Só com ação
-                </button>
-
-                {/* Filtro por marcador (pedido explicito) — so lista tags
-                    que realmente aparecem em alguma mao dessa sessao. */}
                 {availableTags.map((t) => {
                   const active = tagFilter === t.id;
                   return (
@@ -427,8 +498,27 @@ export function RevisorSessao({
             excesso. "auto" so cria uma rolagem interna nesse caso raro,
             nunca esconde os controles. */}
         <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
+          {shareFeedback && (
+            <div
+              style={{
+                fontFamily: F, fontSize: 12, fontWeight: 500, textAlign: "center",
+                padding: "6px 12px", borderRadius: 10,
+                background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.35)",
+                color: "#6EE7B7", flexShrink: 0,
+              }}
+            >
+              {shareFeedback}
+            </div>
+          )}
           {selectedId && parsedForSelected ? (
-            <RevisorHandTable parsedHand={parsedForSelected} onFatalError={goToNextHand} />
+            <RevisorHandTable
+              parsedHand={parsedForSelected}
+              tournamentName={session.title ?? null}
+              hasTeam={!!teamMembership}
+              onShareWithCoach={handleShareWithCoach}
+              onOpenHand={() => selectedId && onOpenHand(selectedId)}
+              onFatalError={goToNextHand}
+            />
           ) : selectedId && parsedForSelected === null ? (
             <div
               style={{
@@ -460,20 +550,6 @@ export function RevisorSessao({
             >
               Selecione uma mão na lista.
             </div>
-          )}
-
-          {selectedId && parsedForSelected && (
-            <button
-              onClick={() => onOpenHand(selectedId)}
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.4)",
-                color: "#C4B5FD", borderRadius: 10, padding: "10px 16px",
-                fontFamily: F, fontSize: 13, fontWeight: 500, cursor: "pointer",
-              }}
-            >
-              Analisar essa mão em detalhe
-            </button>
           )}
         </section>
       </div>
