@@ -7,7 +7,6 @@ import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard } from "@/components/drill/card";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
-import { getActiveTeamMembership, shareHandWithCoach, type ActiveTeamMembership } from "@/lib/services/hand-share-service";
 import { F, T } from "@/lib/poker/drill-theme";
 
 // Tela nova (2026-08): abre uma sessao/torneio e mostra o master-detail —
@@ -117,37 +116,6 @@ export function RevisorSessao({
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyWithAction, setOnlyWithAction] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
-  // Vinculo do jogador com o time — resolve uma vez por sessao de tela
-  // (nao muda enquanto o jogador esta navegando entre maos). null =
-  // sem time (botao "Compartilhar" fica desabilitado no header da mesa).
-  const [teamMembership, setTeamMembership] = useState<ActiveTeamMembership | null>(null);
-  // Feedback textual e transitorio apos compartilhar — some sozinho.
-  const [shareFeedback, setShareFeedback] = useState<string | null>(null);
-  const [sharing, setSharing] = useState(false);
-
-  useEffect(() => {
-    let cancelled = false;
-    getActiveTeamMembership().then((m) => {
-      if (!cancelled) setTeamMembership(m);
-    });
-    return () => {
-      cancelled = true;
-    };
-  }, []);
-
-  const handleShareWithCoach = useCallback(async () => {
-    if (!selectedId || !teamMembership || sharing) return;
-    setSharing(true);
-    try {
-      await shareHandWithCoach(selectedId, teamMembership);
-      setShareFeedback("Mão enviada pro coach.");
-    } catch {
-      setShareFeedback("Não foi possível compartilhar — tenta de novo.");
-    } finally {
-      setSharing(false);
-      setTimeout(() => setShareFeedback(null), 3000);
-    }
-  }, [selectedId, teamMembership, sharing]);
 
   useEffect(() => {
     let cancelled = false;
@@ -498,25 +466,11 @@ export function RevisorSessao({
             excesso. "auto" so cria uma rolagem interna nesse caso raro,
             nunca esconde os controles. */}
         <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
-          {shareFeedback && (
-            <div
-              style={{
-                fontFamily: F, fontSize: 12, fontWeight: 500, textAlign: "center",
-                padding: "6px 12px", borderRadius: 10,
-                background: "rgba(52,211,153,0.12)", border: "1px solid rgba(52,211,153,0.35)",
-                color: "#6EE7B7", flexShrink: 0,
-              }}
-            >
-              {shareFeedback}
-            </div>
-          )}
           {selectedId && parsedForSelected ? (
             <RevisorHandTable
               parsedHand={parsedForSelected}
               tournamentName={session.label ?? null}
-              buyin={session.buyin ?? null}
-              hasTeam={!!teamMembership}
-              onShareWithCoach={handleShareWithCoach}
+              reviewId={selectedId}
               onOpenHand={() => selectedId && onOpenHand(selectedId)}
               onFatalError={goToNextHand}
             />
