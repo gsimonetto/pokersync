@@ -51,7 +51,11 @@ export function ActionBar({
 }) {
   if (!actions.length) return null;
   return (
-    <div style={{ display: "flex", gap: 8, marginTop: 14 }}>
+    // marginTop removido: a barra agora vive dentro do wrapper da mesa,
+    // com altura reservada pelo container pai. A margem interna somava
+    // altura por fora do que o pai reservava e empurrava os botões pra
+    // fora da área visível.
+    <div style={{ display: "flex", gap: 8, width: "100%" }}>
       {actions.map((a) => (
         <button
           key={a.id}
