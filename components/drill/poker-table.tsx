@@ -273,7 +273,7 @@ function Seat({
             borderRadius: 6,
             fontFamily: F,
             fontWeight: 700,
-            fontSize: 11.5,
+            fontSize: 12.5,
             letterSpacing: 0.3,
             textAlign: "center",
             color: empty ? TEXT.disabled : "#FFFFFF",
@@ -329,7 +329,7 @@ function Seat({
               />
             </>
           )}
-          <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} bb</span>
+          <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} bb</span>
         </div>
       )}
 
@@ -462,8 +462,8 @@ function SprBadge({ spr }: { spr: number }) {
         whiteSpace: "nowrap",
       }}
     >
-      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.6, color: TEXT.decorative }}>SPR</span>
-      <span style={{ fontSize: 12.5, fontWeight: 700, color: TEXT.critical, ...num }}>{spr}</span>
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: TEXT.decorative }}>SPR</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>{spr}</span>
     </div>
   );
 }
