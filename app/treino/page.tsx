@@ -2,7 +2,8 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, AlertTriangle, SkipForward, SlidersHorizontal, X, Layers, Target } from "lucide-react";
+import { Loader2, AlertTriangle, SkipForward, SlidersHorizontal, X, Layers, Target, CheckCircle2, XCircle, Zap } from "lucide-react";
+import { createClient } from "@/lib/supabase/client";
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { ActionBar, type DrillAction } from "@/components/drill/action-bar";
 import { GtoFeedback } from "@/components/drill/gto-feedback";
@@ -15,7 +16,7 @@ import {
   type DrillFacet,
 } from "@/lib/services/drill-service";
 import { useDrillFilters, type DrillFilterKey } from "@/lib/poker/use-drill-filters";
-import { matchUserActionToGtoNode, describeAction } from "@/lib/poker/gto-verdict";
+import { matchUserActionToGtoNode, describeAction, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { parseBoard, parseHeroCombo } from "@/lib/poker/parse-board";
 import { computeStylizedSeatLayout, type SeatLayoutSlot } from "@/lib/poker/seat-layout";
 import { T, F, num } from "@/lib/poker/drill-theme";
@@ -232,6 +233,102 @@ function SessionInline({ handIdx, handsTotal, hits, total, sessionPct }: { handI
   );
 }
 
+// Traduz o veredito local (OTIMA/ACEITAVEL/ERRO_LEVE/ERRO_GRAVE/UNKNOWN,
+// de gto-verdict.ts) pro vocabulário que register_training() espera
+// ('PERFECT'/'OK'/'BLUNDER' — literais que o RPC checa por igualdade
+// exata pra decidir XP base e reset de combo). Só remapeia os 2 tiers
+// que têm efeito especial no RPC:
+//   OTIMA      -> PERFECT  (25 XP base, incrementa combo)
+//   ERRO_GRAVE -> BLUNDER  (10 XP base, ZERA o combo)
+// ACEITAVEL vira 'OK' (15 XP, combo neutro) — é o único outro literal
+// que o RPC reconhece. ERRO_LEVE passa como está: cai no "else" do RPC
+// (10 XP, sem mexer no combo) — não é um blunder de verdade, não deveria
+// quebrar o streak, mas também não merece o XP de uma jogada aceitável.
+// UNKNOWN retorna null — sem combo válido no solver pra essa mão, não
+// registra nada (evita sujar training_sessions/xp_events com dado
+// inventado).
+function toRegisterTrainingVerdict(v: Verdict): string | null {
+  if (v === "UNKNOWN") return null;
+  if (v === "OTIMA") return "PERFECT";
+  if (v === "ACEITAVEL") return "OK";
+  if (v === "ERRO_GRAVE") return "BLUNDER";
+  return v; // ERRO_LEVE
+}
+
+const VERDICT_LABEL: Record<Verdict, string> = {
+  OTIMA: "Jogada Ótima",
+  ACEITAVEL: "Aceitável",
+  ERRO_LEVE: "Erro Leve",
+  ERRO_GRAVE: "Erro Grave",
+  UNKNOWN: "Sem dados do solver",
+};
+
+// Veredito na PRÓPRIA mesa — antes o único feedback imediato vivia no
+// painel lateral/bottom sheet, fora do centro de atenção do jogador
+// (que está olhando pra mesa, não pro painel). Isso não substitui o
+// GtoFeedback (que continua com o detalhe técnico: frequência, EV,
+// range) — é só o "acertei/errei" instantâneo, no lugar onde o olho já
+// está.
+function VerdictFlash({ verdict, chosenFreq }: { verdict: Verdict; chosenFreq: number }) {
+  const color = verdictColor(verdict);
+  const isGood = verdict === "OTIMA" || verdict === "ACEITAVEL";
+  const Icon = isGood ? CheckCircle2 : XCircle;
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "10%", pointerEvents: "none", zIndex: 50 }}>
+      <div
+        style={{
+          fontFamily: F,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "9px 18px",
+          borderRadius: 999,
+          background: "rgba(5,5,5,0.9)",
+          border: `1.5px solid ${color}`,
+          boxShadow: `0 0 28px ${color}55, 0 6px 16px rgba(0,0,0,.6)`,
+          animation: "fadeInUp 220ms ease-out both",
+        }}
+      >
+        <Icon size={17} color={color} strokeWidth={2.2} />
+        <span style={{ color, fontWeight: 700, fontSize: 14 }}>{VERDICT_LABEL[verdict]}</span>
+        {verdict !== "UNKNOWN" && (
+          <span style={{ color: "rgba(255,255,255,.5)", fontSize: 11.5, fontWeight: 600, ...num }}>{Math.round(chosenFreq * 100)}%</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Chip de XP ganho — conecta a sessão de treino ao resto do produto
+// (Hub de Evolução). Antes o drill era uma ilha: respondia, via
+// certo/errado local, e nada disso batia no banco. Some sozinho quando
+// a próxima mão carrega (nextHand limpa o estado).
+function XpFlash({ xp, levelUp, newLevel }: { xp: number; levelUp: boolean; newLevel: number | null }) {
+  return (
+    <div
+      style={{
+        fontFamily: F,
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "6px 13px",
+        borderRadius: 999,
+        background: "rgba(234,179,8,0.12)",
+        border: "1px solid rgba(234,179,8,0.4)",
+        color: "#EAB308",
+        fontSize: 13,
+        fontWeight: 700,
+        whiteSpace: "nowrap",
+        animation: "fadeInUp 220ms ease-out both",
+      }}
+    >
+      <Zap size={12} strokeWidth={2.4} />
+      <span style={{ ...num }}>+{xp} XP</span>
+      {levelUp && <span style={{ color: "rgba(255,255,255,.7)", fontWeight: 600 }}>· Nível {newLevel}!</span>}
+    </div>
+  );
+}
+
 function NextButton({ onClick }: { onClick: () => void }) {
   return (
     <button
@@ -255,28 +352,53 @@ function TreinoResponsiveStyles() {
       .ps-tr-filters-toggle { display: none; }
 
       @media (max-width: 768px) {
-        .ps-treino-page { padding: 0 !important; }
+        /* Tela travada em 100dvh com overflow hidden: o jogador não
+           deve precisar rolar pra achar os botões de aposta (bug
+           reportado). dvh em vez de vh porque a barra de endereço do
+           navegador mobile encolhe a viewport e o vh não reage. */
+        html, body { overflow: hidden; }
+        .ps-treino-page {
+          padding: 0 !important;
+          height: 100dvh !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
+        }
         .ps-treino-card {
           padding: 0 !important;
           border-radius: 0 !important;
           border: none !important;
           box-shadow: none !important;
-          height: 100vh !important;
+          height: 100dvh !important;
+          gap: 0 !important;
+          overflow: hidden !important;
         }
+        /* Tabs GTO/Ranges ancoradas à ESQUERDA (pedido explícito), sem
+           colidir com os chips de sessão que ficam centralizados. */
         .ps-treino-tabs {
           position: absolute;
           top: 8px;
-          right: 8px;
+          left: 8px;
           z-index: 25;
           background: rgba(10,10,10,.85);
           backdrop-filter: blur(6px);
+          transform: scale(.88);
+          transform-origin: top left;
         }
-        .ps-tr-header { padding: 8px 10px 0 !important; }
+        .ps-tr-header {
+          padding: 8px 10px 0 !important;
+          justify-content: flex-end !important;
+          gap: 8px !important;
+          flex-shrink: 0;
+        }
+        /* Botão de filtros à direita — as tabs já ocupam a esquerda. */
+        .ps-tr-filters-toggle { display: flex !important; order: 2; }
+        .ps-tr-session { flex: 0 1 auto !important; order: 1; }
         .ps-tr-body {
           grid-template-columns: 1fr !important;
-          padding: 0 10px 10px !important;
+          padding: 0 8px 8px !important;
+          min-height: 0 !important;
+          overflow: hidden !important;
         }
-        .ps-tr-filters-toggle { display: flex !important; }
         .ps-tr-filters {
           position: fixed;
           inset: 0;
@@ -297,14 +419,25 @@ function TreinoResponsiveStyles() {
           right: 0;
           bottom: 0;
           z-index: 30;
-          max-height: 62vh;
+          max-height: 62dvh;
           overflow-y: auto;
           border-radius: 18px 18px 0 0 !important;
           box-shadow: 0 -20px 50px rgba(0,0,0,.6);
           padding-bottom: calc(14px + env(safe-area-inset-bottom)) !important;
         }
-        .ps-tr-table-col { gap: 6px !important; }
+        .ps-tr-table-col { gap: 6px !important; min-height: 0 !important; }
         .ps-tr-table-wrap { max-width: none !important; max-height: none !important; }
+        /* Barra de apostas compacta: botões menores e sempre visíveis
+           dentro da tela, sem scroll (bug reportado). */
+        .ps-tr-actions {
+          min-height: 0 !important;
+          padding-bottom: env(safe-area-inset-bottom);
+        }
+        .ps-tr-actions button {
+          padding: 8px 10px !important;
+          border-radius: 10px !important;
+        }
+        .ps-tr-actions button span { font-size: 12px !important; }
       }
     `}</style>
   );
@@ -329,6 +462,13 @@ function TreinoPageInner() {
   // botão que abre fica escondido via CSS no desktop), mas o estado
   // fica aqui pra fechar automaticamente assim que uma mão carrega.
   const [filtersOpen, setFiltersOpen] = useState(false);
+  // XP ganho na última mão respondida — conecta a sessão ao Hub de
+  // Evolução (award_xp/register_training). null enquanto não há
+  // resposta, ou se a mão não tinha combo válido pra registrar.
+  const [xpFlash, setXpFlash] = useState<{ xp: number; levelUp: boolean; newLevel: number | null } | null>(null);
+  // Metadados do leak que originou esse treino (só existe no caminho
+  // "Treinar esse leak" do Revisor de Mãos, via suggestionId).
+  const [suggestionMeta, setSuggestionMeta] = useState<{ title: string; tagLabel: string | null } | null>(null);
 
   const canLoad = isComplete || !!suggestionId;
 
@@ -352,6 +492,30 @@ function TreinoPageInner() {
     fetchDrillFacets().then(setFacets).catch(() => setFacets([]));
   }, []);
 
+  // Conecta o header ao leak real que originou o treino (drill_title /
+  // tag_label de hand_review_drill_suggestions), em vez do texto
+  // genérico fixo "Sugestão do Revisor de Mãos" que não dizia qual leak
+  // era. Só roda no caminho "Treinar esse leak" (suggestionId presente).
+  useEffect(() => {
+    if (!suggestionId) {
+      setSuggestionMeta(null);
+      return;
+    }
+    let cancelled = false;
+    const supabase = createClient();
+    supabase
+      .from("hand_review_drill_suggestions")
+      .select("drill_title, tag_label")
+      .eq("id", suggestionId)
+      .single()
+      .then(({ data }) => {
+        if (!cancelled && data) setSuggestionMeta({ title: data.drill_title, tagLabel: data.tag_label });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [suggestionId]);
+
   useEffect(() => {
     if (suggestionId) return;
     if (presetPos) setFilter("position", presetPos);
@@ -364,7 +528,10 @@ function TreinoPageInner() {
     reload();
     setIdx(0);
     setChosen(null);
-    setFiltersOpen(false);
+    // NÃO fecha o drawer aqui: fechar a cada filtro escolhido obrigava
+    // o jogador a reabrir pra selecionar os outros dois eixos (bug
+    // reportado). O drawer só fecha por ação explícita (X ou toque no
+    // fundo escuro).
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [filters.position, filters.action, filters.street, suggestionId]);
 
@@ -412,13 +579,35 @@ function TreinoPageInner() {
 
   const nextHand = useCallback(() => {
     setChosen(null);
+    setXpFlash(null);
     if (idx + 1 < hands.length) setIdx((i) => i + 1);
     else { reload(); setIdx(0); }
   }, [idx, hands.length, reload]);
 
   useEffect(() => {
-    if (!chosen || !result) return;
+    if (!chosen || !result || !hand) return;
     setStats((prev) => ({ hits: prev.hits + (result.verdict === "OTIMA" ? 1 : 0), total: prev.total + 1 }));
+
+    // Registra o drill no banco (award_xp + missões + combo) — antes a
+    // sessão só vivia em estado local (`stats`), nada ia pro Hub de
+    // Evolução. UNKNOWN não registra (sem combo válido no solver pra
+    // essa mão, não dá pra afirmar acerto/erro).
+    const rpcVerdict = toRegisterTrainingVerdict(result.verdict);
+    if (!rpcVerdict) return;
+    const supabase = createClient();
+    supabase
+      .rpc("register_training", {
+        p_spot_id: hand.drillId,
+        p_verdict: rpcVerdict,
+        p_ev_loss: null,
+        p_user_action: chosen.type,
+        p_user_sizing: chosen.sizing ?? null,
+      })
+      .then(({ data, error }) => {
+        if (error || !data || !data[0]) return;
+        const row = data[0];
+        setXpFlash({ xp: row.xp_final, levelUp: row.level_up, newLevel: row.new_level ?? null });
+      });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chosen]);
 
@@ -458,14 +647,17 @@ function TreinoPageInner() {
         </button>
 
         {suggestionId && (
-          <span style={{ fontSize: 10.5, fontWeight: 500, color: "rgba(168,85,247,0.9)" }}>Sugestão do Revisor de Mãos</span>
+          <span style={{ fontSize: 10.5, fontWeight: 500, color: "rgba(168,85,247,0.9)" }}>
+            {suggestionMeta ? suggestionMeta.title : "Sugestão do Revisor de Mãos"}
+          </span>
         )}
         {!suggestionId && (presetPos || presetAction || presetStreet) && (
           <span style={{ fontSize: 10.5, fontWeight: 500, color: "rgba(196,181,253,0.9)" }}>Spot do Revisor de Mãos</span>
         )}
 
-        <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 18, alignItems: "center" }}>
+        <div className="ps-tr-session" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
           {hand && <SessionInline handIdx={idx + 1} handsTotal={hands.length} hits={stats.hits} total={stats.total} sessionPct={sessionPct} />}
+          {xpFlash && <XpFlash xp={xpFlash.xp} levelUp={xpFlash.levelUp} newLevel={xpFlash.newLevel} />}
         </div>
       </div>
 
@@ -508,8 +700,13 @@ function TreinoPageInner() {
                 ficando desproporcional em telas largas. Ainda bem maior
                 que o limite antigo (820x460), só que contido. */}
             {hand && tableHand && seatLayout ? (
-              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1100, maxHeight: 640, margin: "auto" }}>
+              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1100, maxHeight: 640, margin: "auto", position: "relative" }}>
                 <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
+                {/* Veredito imediato NA mesa — antes o "acertei/errei" só
+                    aparecia no painel lateral, longe de onde o olho do
+                    jogador está fixo (a mesa). O detalhe técnico
+                    continua no GtoFeedback ao lado/embaixo. */}
+                {chosen && result && <VerdictFlash verdict={result.verdict} chosenFreq={result.chosenFreq} />}
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
@@ -544,7 +741,7 @@ function TreinoPageInner() {
               toda (mais larga que a mesa) e o ActionBar, sem flex:1
               próprio, encolhia pro tamanho do conteúdo e ficava
               "flutuando" fora de contexto no canto. */}
-          <div style={{ minHeight: 64, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, width: "100%", maxWidth: 1100, margin: "0 auto" }}>
+          <div className="ps-tr-actions" style={{ minHeight: 64, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, width: "100%", maxWidth: 1100, margin: "0 auto" }}>
             {hand && !chosen && seatLayout && (
               <div style={{ flex: 1 }}>
                 <ActionBar actions={actions} onAct={onAct} />
@@ -553,7 +750,7 @@ function TreinoPageInner() {
             {hand && chosen && (
               <>
                 <div style={{ fontFamily: F, flex: 1, padding: "12px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-                  Ação registrada — leia o feedback abaixo e siga pra próxima mão.
+                  Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen.label}</span> — detalhe completo no painel.
                 </div>
                 {/* "Próxima" saiu do header (longe da mesa) e ficou aqui,
                     colada na própria linha de ação, embaixo da mesa —
