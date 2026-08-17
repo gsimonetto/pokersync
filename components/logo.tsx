@@ -1,3 +1,4 @@
+// components/logo.tsx
 import Image from "next/image";
 
 export function Logo({ className }: { className?: string }) {
@@ -5,10 +6,10 @@ export function Logo({ className }: { className?: string }) {
     <Image
       src="/pokersync-logo.svg"
       alt="PokerSync"
-      width={1340}
-      height={330}
+      width={160}
+      height={107}
       priority
-      className={className ?? "h-11 w-auto sm:h-14"}
+      className={className ?? "h-8 w-auto sm:h-10"}
     />
   );
 }
