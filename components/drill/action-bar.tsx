@@ -1,7 +1,5 @@
 "use client";
-
 import { T, F, num } from "@/lib/poker/drill-theme";
-
 /* Contrato adaptado: o original (aspiracional, nunca conectado no Vite)
    mostrava EV por acao ANTES do jogador escolher — mas o banco nao tem
    EV (TexasSolver nao exporta), entao mostrar um numero ali seria
@@ -10,7 +8,6 @@ import { T, F, num } from "@/lib/poker/drill-theme";
    sempre pede a decisao do jogador primeiro e so revela o gabarito
    depois. ActionBar ficou mais simples: so os botoes, sizing e atalho
    de teclado — nada de numero antes da jogada. */
-
 export interface DrillAction {
   id: string;
   type: "CHECK" | "BET" | "CALL" | "RAISE" | "FOLD";
@@ -19,7 +16,6 @@ export interface DrillAction {
   sizing?: number;
   primary?: boolean;
 }
-
 export function Key({ children }: { children: React.ReactNode }) {
   return (
     <span
@@ -44,7 +40,6 @@ export function Key({ children }: { children: React.ReactNode }) {
     </span>
   );
 }
-
 export function ActionBar({
   actions = [],
   onAct = () => {},
@@ -71,14 +66,21 @@ export function ActionBar({
             cursor: disabled ? "default" : "pointer",
             fontFamily: F,
             opacity: disabled ? 0.4 : 1,
-            transition: "opacity .2s, transform .1s",
-            background: a.primary ? `linear-gradient(180deg,${T.accent},#7E22CE)` : `linear-gradient(180deg,${T.panelAlt},${T.panel})`,
-            border: `1px solid ${a.primary ? "rgba(255,255,255,.25)" : T.line}`,
-            boxShadow: a.primary ? `0 6px 18px ${T.accent}40` : "0 2px 8px rgba(0,0,0,.4)",
+            transition: "opacity .2s, transform .1s, border-color .2s",
+            // Neutro pra todos os botões (pedido explícito: "botões de
+            // apostas não podem ter cores") — o botão "primary" (ação
+            // mais forte do node GTO) se distingue só por borda mais
+            // clara e peso de fonte, nunca por cor/gradiente. Uma mesa
+            // colorida (feltro azul) já compete visualmente; roxo/verde
+            // nos botões só adicionava ruído sem significado (a cor não
+            // indicava nada sobre a força da ação pro jogador).
+            background: `linear-gradient(180deg,${T.panelAlt},${T.panel})`,
+            border: `1px solid ${a.primary ? "rgba(255,255,255,.28)" : T.line}`,
+            boxShadow: "0 2px 8px rgba(0,0,0,.4)",
           }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
-            <span style={{ color: T.text, fontWeight: 800, fontSize: 13.5 }}>{a.label}</span>
+            <span style={{ color: T.text, fontWeight: a.primary ? 800 : 700, fontSize: 13.5 }}>{a.label}</span>
             {a.key && <Key>{a.key}</Key>}
           </div>
         </button>
