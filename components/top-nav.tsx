@@ -1,3 +1,4 @@
+// components/top-nav.tsx
 "use client";
 
 import { useEffect, useState } from "react";
@@ -69,8 +70,8 @@ export function TopNav() {
 
   return (
     <header className="relative sm:sticky sm:top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
-      <div className="mx-auto flex h-24 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo className="h-16 w-auto sm:h-20" />
+      <div className="mx-auto flex h-16 sm:h-18 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6">
+        <Logo className="h-8 w-auto sm:h-10" />
 
         <div className="flex items-center gap-1.5">
           {TABS.map((tab) => {
@@ -121,7 +122,6 @@ export function TopNav() {
             {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
           </div>
 
-          {/* Avatar maior + nivel ao lado — antes so tinha iniciais pequenas. */}
           <div className="relative">
             <button
               type="button"
