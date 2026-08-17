@@ -503,11 +503,11 @@ function TreinoPageInner() {
             filtros e resultado saem do grid e viram overlays. */}
         <div className="ps-tr-table-col" style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", flex: 1, minHeight: 0 }}>
+            {/* Limite de tamanho no wrapper abaixo — sem isso a mesa
+                esticava muito além das cartas/chips (que têm px fixo),
+                ficando desproporcional em telas largas. Ainda bem maior
+                que o limite antigo (820x460), só que contido. */}
             {hand && tableHand && seatLayout ? (
-              {/* Limite de tamanho — sem isso a mesa esticava muito além
-                  das cartas/chips (que têm px fixo), ficando
-                  desproporcional em telas largas. Ainda bem maior que o
-                  limite antigo (820x460), só que contido. */}
               <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1100, maxHeight: 640, margin: "auto" }}>
                 <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
               </div>
