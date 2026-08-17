@@ -10,7 +10,9 @@
 
 import type { ParsedSeat } from "./hand-parser";
 
-export type CardSide = "left" | "right" | "above" | "below";export type SeatLayoutSlot = {
+export type CardSide = "left" | "right" | "above" | "below";
+
+export type SeatLayoutSlot = {
   posLabel: string;
   x: number;
   y: number;
@@ -21,23 +23,33 @@ export type CardSide = "left" | "right" | "above" | "below";export type SeatLayo
   playerName?: string;
 };
 
-// As mesmas 8 coordenadas visuais que ja existiam no PokerTable — o
-// desenho da mesa nao muda, so deixa de ter rotulo de posicao embutido.
+// FIX (2026-08): os assentos da metade de baixo estavam colados demais na
+// borda inferior do oval (hero em y=92). Como o bloco do assento e'
+// posicionado com translate(-50%,-50%) e o do hero e' o mais alto da mesa
+// (cartas + chip de posicao + chip nome/stack + area de badge), metade
+// dele caia fora do container, que tem overflow:hidden — era o "hero
+// cortado" reportado, tanto no Treino quanto no Replayer. Os tres slots
+// de baixo subiram (92→82 no hero, 84→76 nos vizinhos) e os de cima
+// desceram um pouco (12→16), redistribuindo a folga sem achatar o anel.
 const RING_COORDS: { x: number; y: number; cardSide: CardSide }[] = [
-  { x: 13, y: 30, cardSide: "right" },
-  { x: 34, y: 12, cardSide: "below" },
-  { x: 66, y: 12, cardSide: "below" },
-  { x: 87, y: 30, cardSide: "left" },
-  { x: 92, y: 62, cardSide: "left" },
-  { x: 74, y: 84, cardSide: "above" },
-  { x: 50, y: 92, cardSide: "above" }, // slot do hero — sempre embaixo, centralizado
-  { x: 26, y: 84, cardSide: "above" },
+  { x: 13, y: 32, cardSide: "right" },
+  { x: 34, y: 16, cardSide: "below" },
+  { x: 66, y: 16, cardSide: "below" },
+  { x: 87, y: 32, cardSide: "left" },
+  { x: 92, y: 60, cardSide: "left" },
+  { x: 74, y: 76, cardSide: "above" },
+  { x: 50, y: 82, cardSide: "above" }, // slot do hero — sempre embaixo, centralizado
+  { x: 26, y: 76, cardSide: "above" },
 ];
 
-// Ordem posicional padrao de poker, sentido horario, alinhada indice a
-// indice com RING_COORDS acima (index 6 = slot de baixo = BTN nessa
-// ordem "neutra", antes de qualquer rotacao pelo hero real).
-const RING_ORDER_8MAX = ["UTG", "UTG+1", "MP", "HJ", "CO", "BB", "BTN", "SB"];
+// FIX (2026-08): a ordem anterior era ["UTG","UTG+1","MP","HJ","CO","BB",
+// "BTN","SB"], que colocava BB antes do BTN e o SB depois — invertendo os
+// blinds na mesa (bug reportado: "a posicao do BB esta errada, precisa ser
+// depois do SB"). A ordem correta, em sentido horario a partir do botao,
+// e' a mesma ja usada por POSITION_LABELS_BY_COUNT[8] no modo replay:
+// BTN → SB → BB → UTG → UTG+1 → MP → HJ → CO. Alinhada indice a indice com
+// RING_COORDS acima (que tambem percorre o anel em sentido horario).
+const RING_ORDER_8MAX = ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "HJ", "CO"];
 
 const HERO_SLOT_INDEX = 6;
 
@@ -119,12 +131,17 @@ function clockwiseOccupiedSeats(seats: ParsedSeat[], buttonSeatNumber: number, m
 // fino depois de testado no navegador com mesas de tamanhos diferentes.
 function ellipseSeatCoords(n: number): { x: number; y: number; cardSide: CardSide }[] {
   const centerX = 50;
-  const centerY = 50;
+  // FIX (2026-08): centro subiu de 50 para 46 e radiusY caiu de 36 para
+  // 32 — com os valores antigos o slot do hero caia em y=86 e o bloco
+  // dele (o mais alto da mesa) era cortado pela borda inferior do
+  // container, mesmo bug do anel estilizado acima. Agora o hero cai em
+  // y=78, com folga suficiente para cartas + chips.
+  const centerY = 46;
   const radiusX = 42;
   // radiusY menor que radiusX: com 42 nos dois eixos, a cadeira oposta
   // ao hero (topo da mesa, em mesas com n par) quase saia do feltro —
   // confirmado visualmente num render de teste antes de mudar isso.
-  const radiusY = 36;
+  const radiusY = 32;
   const coords: { x: number; y: number; cardSide: CardSide }[] = [];
 
   for (let i = 0; i < n; i++) {
