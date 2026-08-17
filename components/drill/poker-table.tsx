@@ -439,33 +439,31 @@ function ChipAnimation({
   );
 }
 
-// Badge de SPR — antes vivia como linha de texto dentro da caixa de
-// ruas (acima da mesa). Pedido explicito: mover pra DENTRO do layout
-// da mesa, no espaço preto da moldura (canto superior esquerdo, fora
-// do oval do feltro — mesma área onde ficaria um HUD de replayer
-// tradicional). Ancorado no wrapper externo do PokerTable (fora do
-// container com overflow:hidden do feltro), pra nunca ser clipado.
+// Badge de SPR — fica ACIMA das cartas do board, dentro do bloco
+// central da mesa (pedido explícito: "informação do SPR em cima das
+// cartas pra ficar visível"). Posicionado no fluxo do stack central em
+// vez de absoluto no canto: no canto ele era cortado pelo oval do
+// feltro em telas menores, e ficava longe da leitura natural do
+// jogador, que olha pro board.
 function SprBadge({ spr }: { spr: number }) {
   return (
     <div
       style={{
-        position: "absolute",
-        top: 10,
-        left: 10,
-        zIndex: 6,
-        display: "flex",
+        display: "inline-flex",
         alignItems: "baseline",
         gap: 5,
-        padding: "4px 10px",
-        borderRadius: 8,
+        padding: "3px 11px",
+        borderRadius: 999,
         fontFamily: F,
-        background: "rgba(255,255,255,0.04)",
-        border: "1px solid rgba(255,255,255,0.10)",
+        background: "rgba(0,0,0,0.62)",
+        border: "1px solid rgba(255,255,255,0.14)",
+        boxShadow: "0 3px 10px rgba(0,0,0,.5)",
         pointerEvents: "none",
+        whiteSpace: "nowrap",
       }}
     >
       <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.6, color: TEXT.decorative }}>SPR</span>
-      <span style={{ fontSize: 12.5, fontWeight: 600, color: TEXT.secondary, ...num }}>{spr}</span>
+      <span style={{ fontSize: 12.5, fontWeight: 700, color: TEXT.critical, ...num }}>{spr}</span>
     </div>
   );
 }
@@ -506,7 +504,7 @@ export function PokerTable({
         }
       `}</style>
 
-      {active && hand.spr != null && <SprBadge spr={hand.spr} />}
+      {/* SPR agora é renderizado no bloco central, acima do board. */}
 
       {/* Caixa de ruas ("Nenhuma ação ainda" + histórico por rua) só faz
           sentido no Replayer, que tem ação real pra mostrar. No Modo
@@ -675,6 +673,7 @@ export function PokerTable({
         <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%,-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, zIndex: 3 }}>
           {active && hand ? (
             <>
+              {hand.spr != null && <SprBadge spr={hand.spr} />}
               <div style={{ display: "flex", gap: 7 }}>
                 {hand.board.map((c, i) => (
                   <div key={i} style={{ animation: "cardDeal 300ms ease-out both", animationDelay: `${i * 70}ms` }}>
