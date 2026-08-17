@@ -508,7 +508,12 @@ export function PokerTable({
 
       {active && hand.spr != null && <SprBadge spr={hand.spr} />}
 
-      {active && (
+      {/* Caixa de ruas ("Nenhuma ação ainda" + histórico por rua) só faz
+          sentido no Replayer, que tem ação real pra mostrar. No Modo
+          Treino ela sempre ficava vazia (pedido explícito: "retire
+          aquele quadrado... no modo treino") — a mesa ganha o espaço
+          vertical que essa caixa ocupava. */}
+      {active && variant === "replay" && (
         <div
           style={{
             display: "flex",
