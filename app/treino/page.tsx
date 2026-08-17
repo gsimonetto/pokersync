@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Loader2, AlertTriangle, SkipForward, SlidersHorizontal, X, Layers, Target, CheckCircle2, XCircle, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -201,10 +201,10 @@ function SessionInline({ handIdx, handsTotal, hits, total, sessionPct }: { handI
     display: "flex",
     alignItems: "center",
     gap: 6,
-    padding: "6px 13px",
+    padding: "7px 14px",
     borderRadius: 999,
-    fontSize: 13,
-    fontWeight: 600,
+    fontSize: 14.5,
+    fontWeight: 700,
     whiteSpace: "nowrap",
   };
   const hasHits = hits > 0;
@@ -311,12 +311,12 @@ function XpFlash({ xp, levelUp, newLevel }: { xp: number; levelUp: boolean; newL
         display: "flex",
         alignItems: "center",
         gap: 6,
-        padding: "6px 13px",
+        padding: "7px 14px",
         borderRadius: 999,
         background: "rgba(234,179,8,0.12)",
         border: "1px solid rgba(234,179,8,0.4)",
         color: "#EAB308",
-        fontSize: 13,
+        fontSize: 14.5,
         fontWeight: 700,
         whiteSpace: "nowrap",
         animation: "fadeInUp 220ms ease-out both",
@@ -372,27 +372,18 @@ function TreinoResponsiveStyles() {
           gap: 0 !important;
           overflow: hidden !important;
         }
-        /* Tabs GTO/Ranges ancoradas à ESQUERDA (pedido explícito), sem
-           colidir com os chips de sessão que ficam centralizados. */
-        .ps-treino-tabs {
-          position: absolute;
-          top: 8px;
-          left: 8px;
-          z-index: 25;
-          background: rgba(10,10,10,.85);
-          backdrop-filter: blur(6px);
-          transform: scale(.88);
-          transform-origin: top left;
-        }
+        /* Tabs agora vivem dentro da própria linha do header (não são
+           mais absolutas): basta não deixá-las esticar. */
+        .ps-treino-tabs { transform: scale(.88); transform-origin: center right; }
         .ps-tr-header {
-          padding: 8px 10px 0 !important;
-          justify-content: flex-end !important;
+          padding: 6px 8px 0 !important;
+          justify-content: flex-start !important;
           gap: 8px !important;
           flex-shrink: 0;
         }
-        /* Botão de filtros à direita — as tabs já ocupam a esquerda. */
-        .ps-tr-filters-toggle { display: flex !important; order: 2; }
-        .ps-tr-session { flex: 0 1 auto !important; order: 1; }
+        /* Botão de filtros à esquerda — as tabs ocupam a direita. */
+        .ps-tr-filters-toggle { display: flex !important; order: 0; }
+        .ps-tr-session { flex: 1 1 auto !important; order: 1; }
         .ps-tr-body {
           grid-template-columns: 1fr !important;
           padding: 0 8px 8px !important;
@@ -426,7 +417,9 @@ function TreinoResponsiveStyles() {
           padding-bottom: calc(14px + env(safe-area-inset-bottom)) !important;
         }
         .ps-tr-table-col { gap: 6px !important; min-height: 0 !important; }
+        .ps-tr-table-inner { padding-top: 0 !important; }
         .ps-tr-table-wrap { max-width: none !important; max-height: none !important; }
+        .ps-tr-sheet-close { display: flex !important; }
         /* Barra de apostas compacta: botões menores e sempre visíveis
            dentro da tela, sem scroll (bug reportado). */
         .ps-tr-actions {
@@ -443,7 +436,7 @@ function TreinoResponsiveStyles() {
   );
 }
 
-function TreinoPageInner() {
+function TreinoPageInner({ tabs }: { tabs?: React.ReactNode }) {
   const searchParams = useSearchParams();
   const suggestionId = searchParams.get("suggestionId");
   const presetPos = searchParams.get("pos");
@@ -469,6 +462,11 @@ function TreinoPageInner() {
   // Metadados do leak que originou esse treino (só existe no caminho
   // "Treinar esse leak" do Revisor de Mãos, via suggestionId).
   const [suggestionMeta, setSuggestionMeta] = useState<{ title: string; tagLabel: string | null } | null>(null);
+  // Bottom sheet do resultado, no mobile — antes só sumia trocando de
+  // mão (bug reportado: "após fazer um drill a tela não fecha da
+  // resposta"). Agora tem um X próprio pra recolher sem precisar
+  // avançar pra próxima mão; reabre sozinho a cada nova resposta.
+  const [sheetCollapsed, setSheetCollapsed] = useState(false);
 
   const canLoad = isComplete || !!suggestionId;
 
@@ -580,6 +578,7 @@ function TreinoPageInner() {
   const nextHand = useCallback(() => {
     setChosen(null);
     setXpFlash(null);
+    setSheetCollapsed(false);
     if (idx + 1 < hands.length) setIdx((i) => i + 1);
     else { reload(); setIdx(0); }
   }, [idx, hands.length, reload]);
@@ -587,6 +586,7 @@ function TreinoPageInner() {
   useEffect(() => {
     if (!chosen || !result || !hand) return;
     setStats((prev) => ({ hits: prev.hits + (result.verdict === "OTIMA" ? 1 : 0), total: prev.total + 1 }));
+    setSheetCollapsed(false);
 
     // Registra o drill no banco (award_xp + missões + combo) — antes a
     // sessão só vivia em estado local (`stats`), nada ia pro Hub de
@@ -635,7 +635,7 @@ function TreinoPageInner() {
     <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 12, height: "100%", minHeight: 0, position: "relative" }}>
       <TreinoResponsiveStyles />
 
-      <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12 }}>
+      <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minHeight: 40 }}>
         {/* Botão só existe (e só aparece) no breakpoint mobile — abre o
             drawer de filtros por cima da mesa. */}
         <button
@@ -659,6 +659,13 @@ function TreinoPageInner() {
           {hand && <SessionInline handIdx={idx + 1} handsTotal={hands.length} hits={stats.hits} total={stats.total} sessionPct={sessionPct} />}
           {xpFlash && <XpFlash xp={xpFlash.xp} levelUp={xpFlash.levelUp} newLevel={xpFlash.newLevel} />}
         </div>
+
+        {/* Tabs GTO/Ranges renderizadas AQUI, na mesma linha do header —
+            antes viviam numa linha própria acima, o que criava duas
+            faixas quase vazias empilhadas (tabs sozinhas numa, chips
+            sozinhos na outra). Uma linha só resolve o desperdício
+            vertical e mantém as tabs à direita. */}
+        {tabs}
       </div>
 
       <div className="ps-tr-body" style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr) 280px", gap: 12, minHeight: 0 }}>
@@ -693,20 +700,54 @@ function TreinoPageInner() {
             (pedido explícito: "a mesa deverá ocupar a tela toda... como
             o PokerStars faz") essa coluna vira a tela inteira, já que
             filtros e resultado saem do grid e viram overlays. */}
-        <div className="ps-tr-table-col" style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
-          <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", flex: 1, minHeight: 0 }}>
-            {/* Limite de tamanho no wrapper abaixo — sem isso a mesa
-                esticava muito além das cartas/chips (que têm px fixo),
-                ficando desproporcional em telas largas. Ainda bem maior
-                que o limite antigo (820x460), só que contido. */}
+        <div className="ps-tr-table-col" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+          {/* Alinhamento no topo (não mais "center") — centralizar
+              verticalmente dentro de uma coluna com altura sobrando
+              empurrava mesa + botões pra baixo, cortando os botões da
+              tela (bug reportado: "muita tela preta em cima, tudo
+              voando" / "botões fora da tela"). */}
+          <div className="ps-tr-table-inner" style={{ display: "flex", flexDirection: "column", justifyContent: "flex-start", alignItems: "center", flex: 1, minHeight: 0, paddingTop: 6 }}>
             {hand && tableHand && seatLayout ? (
-              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1100, maxHeight: 640, margin: "auto", position: "relative" }}>
-                <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
-                {/* Veredito imediato NA mesa — antes o "acertei/errei" só
-                    aparecia no painel lateral, longe de onde o olho do
-                    jogador está fixo (a mesa). O detalhe técnico
-                    continua no GtoFeedback ao lado/embaixo. */}
-                {chosen && result && <VerdictFlash verdict={result.verdict} chosenFreq={result.chosenFreq} />}
+              // Mesa reduzida (1100x640 → 900x560) e a barra de apostas
+              // agora mora DENTRO deste mesmo wrapper, como filho direto
+              // logo abaixo da mesa — antes era um elemento irmão fora
+              // desse container, o que a fazia parecer "flutuando" sem
+              // relação com a mesa (pedido explícito: "trazer os botões
+              // pra dentro do layout da mesa").
+              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 900, maxHeight: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+                  <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
+                  {/* Veredito imediato NA mesa — antes o "acertei/errei" só
+                      aparecia no painel lateral, longe de onde o olho do
+                      jogador está fixo (a mesa). O detalhe técnico
+                      continua no GtoFeedback ao lado/embaixo. */}
+                  {chosen && result && <VerdictFlash verdict={result.verdict} chosenFreq={result.chosenFreq} />}
+                </div>
+
+                {/* Altura reservada e fixa (não `minHeight`): a barra de
+                    apostas nunca cede espaço pra mesa. Antes ela era o
+                    último elemento do fluxo e, quando a mesa crescia,
+                    era ela que saía da tela. Agora a mesa é quem encolhe
+                    (flex:1 + minHeight:0 acima). */}
+                <div className="ps-tr-actions" style={{ height: 62, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                  {hand && !chosen && seatLayout && (
+                    <div style={{ flex: 1 }}>
+                      <ActionBar actions={actions} onAct={onAct} />
+                    </div>
+                  )}
+                  {hand && chosen && (
+                    <>
+                      <div style={{ fontFamily: F, flex: 1, padding: "12px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
+                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen.label}</span> — detalhe completo no painel.
+                      </div>
+                      {/* "Próxima" saiu do header (longe da mesa) e ficou
+                          aqui, colada na própria linha de ação, embaixo
+                          da mesa — pedido explícito: "próximo à mesa e
+                          não fora". */}
+                      <NextButton onClick={nextHand} />
+                    </>
+                  )}
+                </div>
               </div>
             ) : (
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center", gap: 16 }}>
@@ -735,39 +776,25 @@ function TreinoPageInner() {
               </div>
             )}
           </div>
-
-          {/* Largura/centro alinhados com o wrapper da mesa (mesmo
-              maxWidth:1100) — sem isso a linha de ação ocupava a coluna
-              toda (mais larga que a mesa) e o ActionBar, sem flex:1
-              próprio, encolhia pro tamanho do conteúdo e ficava
-              "flutuando" fora de contexto no canto. */}
-          <div className="ps-tr-actions" style={{ minHeight: 64, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, width: "100%", maxWidth: 1100, margin: "0 auto" }}>
-            {hand && !chosen && seatLayout && (
-              <div style={{ flex: 1 }}>
-                <ActionBar actions={actions} onAct={onAct} />
-              </div>
-            )}
-            {hand && chosen && (
-              <>
-                <div style={{ fontFamily: F, flex: 1, padding: "12px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-                  Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen.label}</span> — detalhe completo no painel.
-                </div>
-                {/* "Próxima" saiu do header (longe da mesa) e ficou aqui,
-                    colada na própria linha de ação, embaixo da mesa —
-                    pedido explícito: "próximo à mesa e não fora". */}
-                <NextButton onClick={nextHand} />
-              </>
-            )}
-          </div>
         </div>
 
         {/* Resultado do drill — no desktop segue como coluna à direita.
             No mobile (sem espaço pra 3ª coluna com a mesa em tela cheia)
             vira um bottom sheet: some por completo enquanto não há
             escolha (a mesa + barra de apostas já comunicam isso sozinhas)
-            e sobe de baixo, com scroll próprio, assim que o jogador age. */}
-        {chosen && hand && result ? (
-          <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ overflowY: "auto", background: "#0A0A0A" }}>
+            e sobe de baixo, com scroll próprio, assim que o jogador age.
+            Tem um X pra recolher sem precisar avançar de mão (bug
+            reportado: sheet não fechava depois da resposta). */}
+        {chosen && hand && result && !sheetCollapsed ? (
+          <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ overflowY: "auto", background: "#0A0A0A", position: "relative" }}>
+            <button
+              onClick={() => setSheetCollapsed(true)}
+              className="ps-tr-sheet-close"
+              style={{ position: "absolute", top: 10, right: 10, zIndex: 2, display: "none", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)" }}
+              aria-label="Fechar resultado"
+            >
+              <X size={15} />
+            </button>
             <GtoFeedback pot={hand.pot} stack={hand.effectiveStack} spr={tableHand?.spr ?? null} heroLabel={heroCardsParsed.filter(Boolean).join(" ")} gtoNodes={hand.gtoNodes} heroCards={hand.heroCards} chosenRawAction={result.chosenAction} result={result} chosenLabel={chosen.label} />
           </div>
         ) : (
@@ -790,8 +817,63 @@ function TreinoTabs() {
   const initialRangeId = searchParams.get("rangeId");
   const [tab, setTab] = useState<Tab>(initialTab);
 
+  // Altura disponível medida, não chutada. Antes o card usava
+  // `calc(100vh - 32px)`, ignorando o header global do app que fica
+  // acima desta página — o card ficava mais alto que o espaço real e o
+  // rodapé (barra de apostas) caía fora da tela (bug reportado: "cadê o
+  // botão de aposta? sumiu"). Medindo o offset real do topo do
+  // container, isso funciona com qualquer header, sem hardcode.
+  const pageRef = useRef<HTMLDivElement | null>(null);
+  const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    function measure() {
+      const el = pageRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setAvailableHeight(Math.max(320, window.innerHeight - top));
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
+
+  const tabsNode = (
+    <div className="ps-treino-tabs" style={{ display: "inline-flex", gap: 4, padding: 3, borderRadius: 10, background: "#111111", border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+      {(["gto", "ranges"] as Tab[]).map((t) => (
+        <button
+          key={t}
+          onClick={() => setTab(t)}
+          style={{
+            padding: "6px 14px",
+            borderRadius: 7,
+            fontSize: 12.5,
+            fontWeight: 600,
+            border: "none",
+            cursor: "pointer",
+            background: tab === t ? "#FFFFFF" : "transparent",
+            color: tab === t ? "#111111" : "rgba(255,255,255,0.55)",
+          }}
+        >
+          {t === "gto" ? "GTO" : "Ranges"}
+        </button>
+      ))}
+    </div>
+  );
+
   return (
-    <div className="ps-treino-page" style={{ fontFamily: F, minHeight: "100vh", background: "#050505", padding: 16, boxSizing: "border-box" }}>
+    <div
+      ref={pageRef}
+      className="ps-treino-page"
+      style={{
+        fontFamily: F,
+        height: availableHeight ? `${availableHeight}px` : "100vh",
+        background: "#050505",
+        padding: 16,
+        boxSizing: "border-box",
+        overflow: "hidden",
+      }}
+    >
       {/* Container principal — antes limitado a maxWidth 1280 e com o
           título "Modo Treino" fixo no header. Agora ocupa a tela quase
           inteira (pedido explicito) e as abas GTO/Ranges entram no
@@ -804,7 +886,7 @@ function TreinoTabs() {
         style={{
           width: "100%",
           maxWidth: "100%",
-          height: "calc(100vh - 32px)",
+          height: "100%",
           margin: "0 auto",
           background: "#050505",
           borderRadius: 18,
@@ -812,41 +894,31 @@ function TreinoTabs() {
           boxShadow: "0 30px 80px rgba(0,0,0,0.7)",
           display: "flex",
           flexDirection: "column",
-          gap: 12,
-          padding: 14,
+          gap: 8,
+          padding: 12,
           boxSizing: "border-box",
+          overflow: "hidden",
         }}
       >
-        <div className="ps-treino-tabs" style={{ display: "inline-flex", gap: 4, padding: 4, borderRadius: 10, background: "#111111", border: "1px solid rgba(255,255,255,0.08)", alignSelf: "flex-start" }}>
-          {(["gto", "ranges"] as Tab[]).map((t) => (
-            <button
-              key={t}
-              onClick={() => setTab(t)}
-              style={{
-                padding: "6px 14px",
-                borderRadius: 7,
-                fontSize: 12,
-                fontWeight: 500,
-                border: "none",
-                cursor: "pointer",
-                background: tab === t ? "#FFFFFF" : "transparent",
-                color: tab === t ? "#111111" : "rgba(255,255,255,0.55)",
-              }}
-            >
-              {t === "gto" ? "GTO" : "Ranges"}
-            </button>
-          ))}
-        </div>
-
-        <div style={{ flex: 1, minHeight: 0 }}>
-          {tab === "gto" ? (
-            <TreinoPageInner />
-          ) : (
-            <div className="h-full overflow-y-auto text-ink">
-              <RangeDrill initialRangeId={initialRangeId} />
+        {/* Bloco de tabs — não é mais renderizado como linha própria do
+            card. Vai como prop pro header do drill, entrando na mesma
+            linha dos chips de sessão (fim do desperdício de duas faixas
+            empilhadas). Na aba Ranges, que não tem header próprio, ele
+            volta a ser renderizado direto. */}
+        {tab === "gto" ? (
+          <div style={{ flex: 1, minHeight: 0 }}>
+            <TreinoPageInner tabs={tabsNode} />
+          </div>
+        ) : (
+          <>
+            <div style={{ display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>{tabsNode}</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <div className="h-full overflow-y-auto text-ink">
+                <RangeDrill initialRangeId={initialRangeId} />
+              </div>
             </div>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
