@@ -2,7 +2,7 @@
 
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Loader2, AlertTriangle, SkipForward, SlidersHorizontal, X } from "lucide-react";
+import { Loader2, AlertTriangle, SkipForward, SlidersHorizontal, X, Layers, Target } from "lucide-react";
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { ActionBar, type DrillAction } from "@/components/drill/action-bar";
 import { GtoFeedback } from "@/components/drill/gto-feedback";
@@ -18,16 +18,40 @@ import { useDrillFilters, type DrillFilterKey } from "@/lib/poker/use-drill-filt
 import { matchUserActionToGtoNode, describeAction } from "@/lib/poker/gto-verdict";
 import { parseBoard, parseHeroCombo } from "@/lib/poker/parse-board";
 import { computeStylizedSeatLayout, type SeatLayoutSlot } from "@/lib/poker/seat-layout";
-import { T, F } from "@/lib/poker/drill-theme";
+import { T, F, num } from "@/lib/poker/drill-theme";
 
 const ALL_POSITIONS = ["UTG", "UTG+1", "MP", "HJ", "CO", "BB", "BTN", "SB"];
-const DECORATIVE_VILLAIN_POSITIONS = ["SB", "CO", "BB", "MP"];
 
-function buildSeatInvolvement(heroPosition: string) {
+// Vilão real do spot, extraído do próprio drillId — confirmado no banco
+// (9 prefixos válidos, todos no padrão mtt_{stack}bb_{heroPos}_vs_
+// {villainPos}[_srp]). Antes usávamos 4 posições decorativas fixas
+// (SB/CO/BB/MP) sem relação com a mão; agora só acende a cor de quem
+// realmente abriu/agiu contra o herói naquele spot. Se o formato não
+// bater (drillId fora do padrão), não inventa vilão — mesa mostra só o
+// herói, igual à regra do resto do produto (nunca exibir dado que não
+// existe).
+const VILLAIN_TOKEN_TO_POS: Record<string, string> = {
+  utg: "UTG",
+  "utg1": "UTG+1",
+  mp: "MP",
+  hj: "HJ",
+  co: "CO",
+  btn: "BTN",
+  sb: "SB",
+  bb: "BB",
+};
+
+function parseVillainPosition(drillId: string): string | null {
+  const match = /^mtt_\d+bb_[a-z0-9]+_vs_([a-z0-9]+)/i.exec(drillId);
+  if (!match) return null;
+  return VILLAIN_TOKEN_TO_POS[match[1].toLowerCase()] ?? null;
+}
+
+function buildSeatInvolvement(heroPosition: string, villainPosition: string | null) {
   return ALL_POSITIONS.map((pos) => ({
     pos,
     hero: pos === heroPosition,
-    inHand: pos !== heroPosition && DECORATIVE_VILLAIN_POSITIONS.includes(pos),
+    inHand: pos !== heroPosition && pos === villainPosition,
   }));
 }
 
@@ -164,17 +188,45 @@ function StatRow({ label, value, accent }: { label: string; value: string; accen
   );
 }
 
+// Antes era só texto corrido ("Mão 1/20 · 3/5 acertos (60%)"), quase
+// ilegível perto da mesa. Pedido explícito: "ter mais visibilidade, com
+// chips ou algo mais bonito" — viraram 2 pills reais, com ícone, no
+// mesmo padrão visual das badges do resto da tela (fundo translúcido +
+// borda). O chip de acertos ganha um tom verde quando há acerto — sinal
+// rápido, sem precisar ler o número.
 function SessionInline({ handIdx, handsTotal, hits, total, sessionPct }: { handIdx: number; handsTotal: number; hits: number; total: number; sessionPct: number }) {
-  const dim = "rgba(255,255,255,0.4)";
-  const soft = "rgba(255,255,255,0.65)";
+  const chipBase: React.CSSProperties = {
+    fontFamily: F,
+    display: "flex",
+    alignItems: "center",
+    gap: 6,
+    padding: "6px 13px",
+    borderRadius: 999,
+    fontSize: 13,
+    fontWeight: 600,
+    whiteSpace: "nowrap",
+  };
+  const hasHits = hits > 0;
   return (
-    <div style={{ fontFamily: F, fontSize: 12, color: dim, display: "flex", gap: 10, alignItems: "baseline" }}>
-      <span>Mão <span style={{ color: soft, fontWeight: 500 }}>{handIdx}/{handsTotal}</span></span>
+    <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
+      <div style={{ ...chipBase, background: "rgba(255,255,255,0.05)", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.75)" }}>
+        <Layers size={12} strokeWidth={2} color="rgba(255,255,255,0.4)" />
+        <span style={{ ...num }}>{handIdx}<span style={{ opacity: 0.45, fontWeight: 500 }}>/{handsTotal}</span></span>
+      </div>
       {total > 0 && (
-        <>
-          <span style={{ opacity: 0.4 }}>·</span>
-          <span><span style={{ color: hits > 0 ? T.ok : soft, fontWeight: 500 }}>{hits}/{total}</span> acertos ({sessionPct}%)</span>
-        </>
+        <div
+          style={{
+            ...chipBase,
+            background: hasHits ? `${T.ok}1F` : "rgba(255,255,255,0.05)",
+            border: `1px solid ${hasHits ? `${T.ok}55` : "rgba(255,255,255,0.10)"}`,
+            color: hasHits ? T.ok : "rgba(255,255,255,0.75)",
+          }}
+        >
+          <Target size={12} strokeWidth={2} color={hasHits ? T.ok : "rgba(255,255,255,0.4)"} />
+          <span style={{ ...num }}>
+            {hits}/{total} <span style={{ opacity: 0.7, fontWeight: 500 }}>({sessionPct}%)</span>
+          </span>
+        </div>
       )}
     </div>
   );
@@ -184,7 +236,7 @@ function NextButton({ onClick }: { onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      style={{ display: "flex", alignItems: "center", gap: 6, background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 13, flexShrink: 0, boxShadow: "0 2px 6px rgba(0,0,0,0.3)" }}
+      style={{ display: "flex", alignItems: "center", gap: 6, background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "9px 18px", cursor: "pointer", fontWeight: 600, fontSize: 13, flexShrink: 0, boxShadow: "0 4px 14px rgba(0,0,0,0.4)" }}
     >
       Próxima <SkipForward size={14} />
     </button>
@@ -252,6 +304,7 @@ function TreinoResponsiveStyles() {
           padding-bottom: calc(14px + env(safe-area-inset-bottom)) !important;
         }
         .ps-tr-table-col { gap: 6px !important; }
+        .ps-tr-table-wrap { max-width: none !important; max-height: none !important; }
       }
     `}</style>
   );
@@ -330,9 +383,10 @@ function TreinoPageInner() {
   const tableHand: TableHand | null = useMemo(() => {
     if (!hand) return null;
     const spr = hand.pot > 0 && hand.effectiveStack != null ? Math.round((hand.effectiveStack / hand.pot) * 10) / 10 : null;
+    const villainPosition = parseVillainPosition(hand.drillId);
 
     const seats: TableHand["seats"] = {};
-    buildSeatInvolvement(hand.position).forEach(({ pos, hero: isHero, inHand }) => {
+    buildSeatInvolvement(hand.position, villainPosition).forEach(({ pos, hero: isHero, inHand }) => {
       if (isHero) {
         seats[pos] = { status: chosen ? "live" : "acting", stack: hand.effectiveStack, cards: heroCardsParsed, ...(chosen ? { action: { type: chosen.type, size: chosen.sizing } } : {}) };
       } else if (inHand) {
@@ -410,11 +464,9 @@ function TreinoPageInner() {
           <span style={{ fontSize: 10.5, fontWeight: 500, color: "rgba(196,181,253,0.9)" }}>Spot do Revisor de Mãos</span>
         )}
 
-        <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 18, alignItems: "baseline" }}>
+        <div style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 18, alignItems: "center" }}>
           {hand && <SessionInline handIdx={idx + 1} handsTotal={hands.length} hits={stats.hits} total={stats.total} sessionPct={sessionPct} />}
         </div>
-
-        {chosen && hand && <NextButton onClick={nextHand} />}
       </div>
 
       <div className="ps-tr-body" style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr) 280px", gap: 12, minHeight: 0 }}>
@@ -452,7 +504,11 @@ function TreinoPageInner() {
         <div className="ps-tr-table-col" style={{ display: "flex", flexDirection: "column", gap: 10, minHeight: 0 }}>
           <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", flex: 1, minHeight: 0 }}>
             {hand && tableHand && seatLayout ? (
-              <div style={{ width: "100%", height: "100%", margin: "auto" }}>
+              {/* Limite de tamanho — sem isso a mesa esticava muito além
+                  das cartas/chips (que têm px fixo), ficando
+                  desproporcional em telas largas. Ainda bem maior que o
+                  limite antigo (820x460), só que contido. */}
+              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1100, maxHeight: 640, margin: "auto" }}>
                 <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
               </div>
             ) : (
@@ -483,12 +539,27 @@ function TreinoPageInner() {
             )}
           </div>
 
-          <div style={{ minHeight: 64, display: "flex", alignItems: "center", flexShrink: 0 }}>
-            {hand && !chosen && seatLayout && <ActionBar actions={actions} onAct={onAct} />}
-            {hand && chosen && (
-              <div style={{ fontFamily: F, width: "100%", padding: "12px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-                Ação registrada — leia o feedback abaixo e siga pra próxima mão.
+          {/* Largura/centro alinhados com o wrapper da mesa (mesmo
+              maxWidth:1100) — sem isso a linha de ação ocupava a coluna
+              toda (mais larga que a mesa) e o ActionBar, sem flex:1
+              próprio, encolhia pro tamanho do conteúdo e ficava
+              "flutuando" fora de contexto no canto. */}
+          <div style={{ minHeight: 64, display: "flex", alignItems: "center", gap: 10, flexShrink: 0, width: "100%", maxWidth: 1100, margin: "0 auto" }}>
+            {hand && !chosen && seatLayout && (
+              <div style={{ flex: 1 }}>
+                <ActionBar actions={actions} onAct={onAct} />
               </div>
+            )}
+            {hand && chosen && (
+              <>
+                <div style={{ fontFamily: F, flex: 1, padding: "12px 16px", borderRadius: 12, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
+                  Ação registrada — leia o feedback abaixo e siga pra próxima mão.
+                </div>
+                {/* "Próxima" saiu do header (longe da mesa) e ficou aqui,
+                    colada na própria linha de ação, embaixo da mesa —
+                    pedido explícito: "próximo à mesa e não fora". */}
+                <NextButton onClick={nextHand} />
+              </>
             )}
           </div>
         </div>
