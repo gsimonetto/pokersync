@@ -210,7 +210,7 @@ export default function LoginForm() {
             </div>
 
             {!isSignup && (
-              
+              <a
                 href="/esqueci-senha"
                 className="self-end text-xs text-muted transition hover:text-ink"
               >
