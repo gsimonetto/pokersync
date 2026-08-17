@@ -11,14 +11,17 @@ export interface SeatState {
   cards?: (string | null)[];
 }
 
-// Trunca por CONTAGEM de caracteres (nao so por CSS text-overflow em px) —
-// pedido explicito: nomes longos estouram o chip antes do ellipsis de CSS
-// conseguir cortar de forma previsivel em telas menores. Corta em 12
-// chars fixos + "..." (o title="" no elemento mantem o nome completo
-// disponivel via tooltip/hover pra quem precisar conferir).
 const NAME_MAX_CHARS = 12;
 function truncateName(name: string): string {
   return name.length > NAME_MAX_CHARS ? `${name.slice(0, NAME_MAX_CHARS)}...` : name;
+}
+
+// Stack sempre com no máximo 1 casa decimal (pedido explícito: "21.5 no
+// máximo, não mais que isso"). 21.515 -> "21.5"; 21 -> "21" (sem ".0"
+// solto quando o valor já é redondo).
+function formatStack(value: number): string {
+  const rounded = Math.round(value * 10) / 10;
+  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
 }
 
 export interface HistoryStep {
@@ -38,9 +41,6 @@ export interface TableHand {
 const NEUTRAL = "#3A4048";
 const NEUTRAL_GLOW = "#5A6270";
 
-// Ver commit de UI (2026-08): valores unicos, calibrados pro modo replay
-// onde NINGUEM esta "acting" — a escala antiga (0.15/0.1/0.08) fazia a
-// mesa inteira sumir. Aqui todo seat vivo continua legivel.
 const SEAT_OPACITY = {
   acting: 1,
   live: 0.85,
@@ -48,7 +48,6 @@ const SEAT_OPACITY = {
   empty: 0.25,
 } as const;
 
-// Escala unica de texto — 3 papeis, alinhada com paleta oficial (#FFF/grafite).
 const TEXT = {
   critical: "#FFFFFF",
   secondary: "rgba(255,255,255,0.72)",
@@ -56,10 +55,23 @@ const TEXT = {
   disabled: "rgba(255,255,255,0.28)",
 } as const;
 
-// Icone flat de ficha de poker — 2 discos empilhados com anel fino de
-// borda (sem gradiente radial "brilhante" que dava ar cartoon). Estilo
-// alinhado com o que replayers de referencia usam (Hand2Note, PokerTracker,
-// GTO Wizard): disco solido + friso de borda, nunca gloss/glow.
+// Paleta de feltro por variante da mesa (pedido explicito, 2026-08):
+// Modo Treino usa AZUL, Hand Replayer mantem o BORDÔ original. So a
+// cor/glow do feltro muda — geometria, seats, cartas e pote continuam
+// identicos entre variantes.
+const FELT_PALETTES = {
+  replay: {
+    background: "radial-gradient(65% 75% at 50% 40%, #7A1830 0%, #5C1224 30%, #3D0C18 60%, #1F0509 100%)",
+    glow: "rgba(122,24,48,.35)",
+  },
+  treino: {
+    background: "radial-gradient(65% 75% at 50% 40%, #123A6E 0%, #0F2C54 30%, #0A1D38 60%, #05101F 100%)",
+    glow: "rgba(24,88,168,.38)",
+  },
+} as const;
+
+export type TableVariant = keyof typeof FELT_PALETTES;
+
 function ChipStackIcon({ size = 13 }: { size?: number }) {
   const disc = (bottom: number, z: number) => (
     <div
@@ -85,10 +97,6 @@ function ChipStackIcon({ size = 13 }: { size?: number }) {
   );
 }
 
-// Pilha de fichas do POTE — 3 discos empilhados em verde (distinto do
-// dourado usado nos seats), pra leitura instantanea "essas fichas ja
-// estao consolidadas no meio da mesa". Substitui o antigo ponto verde
-// solto por um empilhamento de verdade.
 function PotChipStack() {
   const disc = (bottom: number, z: number) => (
     <div
@@ -140,44 +148,11 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
   );
 }
 
-// Pilha de fichas PARADA em frente ao seat, representando quanto esse
-// jogador ja colocou na rua atual. Diferente de ChipAnimation (que voa e
-// some) — essa fica visivel ate a rua terminar (fixo durante toda a rua,
-// confirmado).
-// Limite minimo pra exibir a pilha — pedido explicito: "pode tirar o
-// rake (0.1 de fichas no pre flop), desnecessario na nossa mesa". 0.1bb
-// e' tipicamente o ante de MTT, postado por todos os jogadores igual —
-// nao carrega informacao de decisao, so poluia a mesa. Apostas/calls/
-// raises reais (>= 0.5bb) continuam aparecendo normalmente.
 const MIN_COMMITTED_TO_SHOW = 0.5;
 
-// 2026-08 v7: as fichas estavam "soltas" na mesa — posicionadas no fluxo
-// normal do card do assento, sem relacao com a geometria da mesa.
-// Assentos perto da borda empurravam a ficha praticamente pra fora do
-// feltro. A ficha e' ancorada em coordenadas absolutas, calculadas a
-// partir do proprio x/y do assento na direcao do centro da mesa.
-const TABLE_CENTER = { x: 50, y: 44 }; // mesmo ponto onde o pote e' desenhado
-// Deslocamento em PIXELS fixos (nao mais %) — o card de nome/stack tem
-// largura fixa em px, entao um deslocamento percentual encolhe em telas
-// menores e a ficha acaba caindo em cima do nome. Pixel fixo garante a
-// mesma folga real em qualquer tamanho de tela.
-//
-// 2026-08 v9 (ajuste fino, pedido explicito: "tente manter a aposta nao
-// tao longe do apostador, mas que nao sobreponha"): offset v8 (78px +
-// 20px extra em "above") deixou a ficha longe demais do jogador. Reduz
-// pra ficar mais proxima, mantendo so a folga extra minima nos seats
-// "above" (onde o chip de posicao fica mais perto do centro, unico caso
-// real de colisao observado).
+const TABLE_CENTER = { x: 50, y: 44 };
 const COMMITTED_OFFSET_PX = 56;
-// Hero tem um bloco mais alto (cartas + chip nome/stack empilhados) —
-// o mesmo offset generico dos demais assentos nao limpa a altura das
-// cartas do hero e a ficha cai em cima delas. Hero fica sempre no
-// centro-baixo (dx=0), entao um offset vertical maior, so pra ele,
-// resolve sem afetar os outros assentos.
 const HERO_COMMITTED_OFFSET_PX = 104;
-// Assentos com cardSide "above" (cartas empilhadas acima do chip de
-// posicao) precisam de folga extra — sem isso a pill nasce em cima do
-// proprio posLabel nesses slots.
 const ABOVE_SEAT_EXTRA_OFFSET_PX = 14;
 
 function CommittedPill({ amount }: { amount: number }) {
@@ -205,10 +180,6 @@ function CommittedPill({ amount }: { amount: number }) {
   );
 }
 
-// Ancora a CommittedPill num ponto absoluto da mesa, entre o assento e o
-// centro (fracao pequena = fica perto do assento). Renderizada como
-// irma do <Seat>, no mesmo sistema de coordenadas em % usado por
-// ChipAnimation — por isso nunca escapa do oval da mesa.
 function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number }) {
   const dx = TABLE_CENTER.x - seat.x;
   const dy = TABLE_CENTER.y - seat.y;
@@ -225,9 +196,6 @@ function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number 
         position: "absolute",
         left: `${seat.x}%`,
         top: `${seat.y}%`,
-        // Base no proprio ponto do assento, depois empurra um valor fixo
-        // em px na direcao do centro — nunca sobrepoe as cartas nem o
-        // card de nome/stack, independente do tamanho da tela.
         transform: `translate(-50%,-50%) translate(${ux * offsetPx}px, ${uy * offsetPx}px)`,
         zIndex: 3,
         pointerEvents: "none",
@@ -243,8 +211,6 @@ function Seat({
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
-  // BTN — badge do dealer agora vive ANCORADO no proprio avatar (ver
-  // abaixo), nao mais como elemento flutuante calculado por x/y.
   isDealer?: boolean;
 }) {
   const posCol = POS[seat.posLabel];
@@ -257,10 +223,6 @@ function Seat({
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = SEAT_OPACITY[status];
 
-  // Hero usa o MESMO padrao vertical dos demais seats na parte de baixo
-  // da mesa (cardSide "below": cartas em cima, seatInfo embaixo) —
-  // pedido explicito: "cartas em cima e nome em baixo como as outras
-  // posicoes".
   const layout: React.CSSProperties = hero
     ? { flexDirection: "column", alignItems: "center", gap: 6 }
     : (
@@ -272,31 +234,12 @@ function Seat({
         } as const
       )[seat.cardSide];
 
-  // FIX (2026-08, bug real): antes badgeArea virava `null` quando o
-  // seat estava "acting" — isso REMOVIA os ~17px reservados pro badge
-  // de acao, encolhendo a altura total do bloco do seat. Como o seat
-  // inteiro e' posicionado com translate(-50%,-50%), uma mudanca de
-  // altura desloca o ponto visual (o "centro" recalcula), causando a
-  // "baixada" reportada — e no hero (perto da borda inferior da mesa,
-  // y=92%), esse deslocamento cortava as cartas/chip. Agora o container
-  // sempre existe com a mesma altura minima; so o CONTEUDO (ActionBadge)
-  // e' condicional. Layout nunca muda de tamanho ao entrar/sair de "acting".
   const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
       {!acting && <ActionBadge action={action} />}
     </div>
   );
 
-  // Redesenho estilo GG Poker: 2 chips empilhados, ambos no MESMO
-  // formato pill:
-  //  1) chip da posicao sozinha, em cima;
-  //  2) chip combinado nome + stack, embaixo — com uma linha fina
-  //     separando nome e stack (pedido explicito), pra deixar claro que
-  //     sao dois dados diferentes dentro do mesmo chip.
-  // Hero agora usa exatamente o mesmo chip 2 (nome + linha + stack) que
-  // os demais assentos, em vez do nameplate sobreposto nas cartas —
-  // pedido explicito: "hero com posicao em cima + nome e stack embaixo,
-  // igual as outras posicoes".
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
       <div style={{ position: "relative" }}>
@@ -376,9 +319,6 @@ function Seat({
               >
                 {truncateName(seat.playerName)}
               </span>
-              {/* Risco fino separando nome e stack (pedido explicito) —
-                  deixa visualmente claro que sao 2 dados distintos dentro
-                  do mesmo chip. */}
               <div
                 style={{
                   width: "100%",
@@ -389,7 +329,7 @@ function Seat({
               />
             </>
           )}
-          <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack} bb</span>
+          <span style={{ fontSize: 11, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} bb</span>
         </div>
       )}
 
@@ -463,7 +403,6 @@ function Seat({
   );
 }
 
-// Pilha de fichas que anima do seat de quem agiu ate o pote central.
 function ChipAnimation({
   fromSeat,
   amount,
@@ -500,26 +439,61 @@ function ChipAnimation({
   );
 }
 
+// Badge de SPR — antes vivia como linha de texto dentro da caixa de
+// ruas (acima da mesa). Pedido explicito: mover pra DENTRO do layout
+// da mesa, no espaço preto da moldura (canto superior esquerdo, fora
+// do oval do feltro — mesma área onde ficaria um HUD de replayer
+// tradicional). Ancorado no wrapper externo do PokerTable (fora do
+// container com overflow:hidden do feltro), pra nunca ser clipado.
+function SprBadge({ spr }: { spr: number }) {
+  return (
+    <div
+      style={{
+        position: "absolute",
+        top: 10,
+        left: 10,
+        zIndex: 6,
+        display: "flex",
+        alignItems: "baseline",
+        gap: 5,
+        padding: "4px 10px",
+        borderRadius: 8,
+        fontFamily: F,
+        background: "rgba(255,255,255,0.04)",
+        border: "1px solid rgba(255,255,255,0.10)",
+        pointerEvents: "none",
+      }}
+    >
+      <span style={{ fontSize: 9, fontWeight: 700, letterSpacing: 0.6, color: TEXT.decorative }}>SPR</span>
+      <span style={{ fontSize: 12.5, fontWeight: 600, color: TEXT.secondary, ...num }}>{spr}</span>
+    </div>
+  );
+}
+
 export function PokerTable({
   hand,
   seats,
   onStreetClick,
   chipAnimation,
   streetCommitments,
+  variant = "replay",
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
   onStreetClick?: (streetIndex: number) => void;
   chipAnimation?: { fromPosLabel: string; amount: number; key: string | number } | null;
   streetCommitments?: Record<string, number>;
+  variant?: TableVariant;
 }) {
   const active = !!hand;
   const history = hand?.history || [];
   const hasHistory = history.length > 0;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
+  const felt = FELT_PALETTES[variant];
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div style={{ position: "relative", display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
       <style>{`
         @keyframes seatPulse { 0%, 100% { filter: drop-shadow(0 0 0px rgba(255,255,255,0)); } 50% { filter: drop-shadow(0 0 6px rgba(255,255,255,0.15)); } }
         @keyframes cardDeal { from { opacity: 0; transform: translateY(-8px) rotate(-4deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
@@ -532,13 +506,8 @@ export function PokerTable({
         }
       `}</style>
 
-      {/* Barra de ruas — refeita (pedido explicito): "as ruas pode vir
-          fixa as linhas... desta forma a mesa em baixo fica fixa, nao
-          precisa se mover". SEMPRE 4 linhas (preflop/flop/turn/river),
-          mesmo as ainda nao alcancadas (mostram "—") — altura constante
-          do primeiro ao ultimo step da mao, a mesa embaixo nunca pula.
-          Cada linha compacta (~20px), rotulo fixo a esquerda + acoes em
-          scroll horizontal proprio. */}
+      {active && hand.spr != null && <SprBadge spr={hand.spr} />}
+
       {active && (
         <div
           style={{
@@ -551,9 +520,6 @@ export function PokerTable({
             border: "1px solid rgba(255,255,255,0.08)",
             flexShrink: 0,
             background: "rgba(255,255,255,0.03)",
-            // Sempre 4 linhas fixas agora (Preflop/Flop/Turn/River,
-            // mesmo as ainda nao alcancadas) — altura constante, nunca
-            // precisa de scroll interno.
             minHeight: 108,
           }}
         >
@@ -607,33 +573,9 @@ export function PokerTable({
           ) : (
             <span style={{ fontFamily: F, fontSize: 11, color: TEXT.decorative }}>Nenhuma ação ainda</span>
           )}
-
-          {hand.spr != null && (
-            <div
-              style={{
-                fontFamily: F,
-                fontSize: 10,
-                fontWeight: 500,
-                letterSpacing: 0.6,
-                color: TEXT.secondary,
-                marginTop: 2,
-                ...num,
-              }}
-            >
-              SPR {hand.spr}
-            </div>
-          )}
         </div>
       )}
 
-      {/* Container do feltro — recebeu a borda "carbono/grafite moderno"
-          pedida: friso metalico fino (linear-gradient cinza sutil) por
-          fora do preto solido que ja existia, textura de fibra de
-          carbono discreta (repeating-linear-gradient em baixa opacidade)
-          e a logo do projeto no fundo, bem apagada, atras do feltro.
-          Camadas separadas (wrapper > textura > feltro) pra nao alterar
-          nada da geometria interna da mesa (seats, board, pote) — so
-          adiciona moldura por fora. */}
       <div
         style={{
           position: "relative",
@@ -644,13 +586,6 @@ export function PokerTable({
           borderRadius: "50%",
         }}
       >
-        {/* Friso metalico fino — anel entre a moldura de carbono e o
-            preto que ja envolvia o feltro. Margem horizontal reduzida
-            (pedido explicito: "diminua os espacos em preto no lado
-            esquerdo e direito") — inset vertical intacto (governa a
-            folga acima/abaixo, que estava ok), so o horizontal (6%→1.5%
-            aqui, e nos aneis seguintes) encolheu pra mesa ocupar mais
-            largura do card. */}
         <div
           style={{
             position: "absolute",
@@ -661,9 +596,6 @@ export function PokerTable({
             opacity: 0.9,
           }}
         />
-        {/* Moldura carbono/grafite — textura de fibra sutil (linhas
-            diagonais repetidas em baixa opacidade sobre grafite escuro)
-            + logo do projeto no fundo, bem leve, atras de tudo. */}
         <div
           style={{
             position: "absolute",
@@ -678,9 +610,6 @@ export function PokerTable({
             boxShadow: "inset 0 0 24px rgba(0,0,0,.7)",
           }}
         />
-        {/* Logo do projeto — marca d'agua bem leve no fundo da moldura,
-            atras do feltro (feltro fica opaco por cima, entao a logo so
-            aparece na faixa da borda, nunca competindo com o jogo). */}
         <div
           style={{
             position: "absolute",
@@ -714,15 +643,12 @@ export function PokerTable({
             position: "absolute",
             inset: "9% 2%",
             borderRadius: "50%",
-            // Feltro BORDÔ (pedido explicito) — mesmas 4 paradas de
-            // profundidade que o verde original tinha, so trocando a
-            // paleta pra tons de vinho/bordô.
-            background: "radial-gradient(65% 75% at 50% 40%, #7A1830 0%, #5C1224 30%, #3D0C18 60%, #1F0509 100%)",
+            background: felt.background,
             border: "2px solid #000000",
             boxShadow: [
               "0 0 0 6px #000000",
               "0 0 0 7px rgba(255,255,255,.08)",
-              "0 0 40px rgba(122,24,48,.35)",
+              `0 0 40px ${felt.glow}`,
               "0 24px 60px rgba(0,0,0,.75)",
               "inset 0 2px 30px rgba(255,255,255,.06)",
               "inset 0 -30px 80px rgba(0,0,0,.65)",
@@ -795,9 +721,6 @@ export function PokerTable({
           />
         ))}
 
-        {/* Fichas de aposta ancoradas por assento — sempre dentro do
-            oval, na direcao do centro, bem proximas de cada posicao,
-            sem invadir o chip do posLabel (offset corrigido acima). */}
         {seats.map((s) => {
           const amt = streetCommitments?.[s.posLabel];
           if (!amt || amt < MIN_COMMITTED_TO_SHOW) return null;
