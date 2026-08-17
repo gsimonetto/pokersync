@@ -592,7 +592,7 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "8% 1.5%",
+            inset: "2% 1.5%",
             borderRadius: "50%",
             pointerEvents: "none",
             background: "conic-gradient(from 200deg, #4A4E55, #8A8F98, #3A3D42, #6E727A, #4A4E55)",
@@ -602,7 +602,7 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "9.6% 2.6%",
+            inset: "3.4% 2.6%",
             borderRadius: "50%",
             pointerEvents: "none",
             background: [
@@ -616,7 +616,7 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "9.6% 2.6%",
+            inset: "3.4% 2.6%",
             borderRadius: "50%",
             pointerEvents: "none",
             display: "flex",
@@ -644,7 +644,7 @@ export function PokerTable({
         <div
           style={{
             position: "absolute",
-            inset: "9% 2%",
+            inset: "2.8% 2%",
             borderRadius: "50%",
             background: felt.background,
             border: "2px solid #000000",
