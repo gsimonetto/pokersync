@@ -1,3 +1,4 @@
+// app/login/login-form.tsx
 "use client";
 
 import { useState, type ComponentType } from "react";
@@ -136,8 +137,8 @@ export default function LoginForm() {
   const submit = isSignup ? handleSignUp : handleSignIn;
 
   return (
-    <div className="flex min-h-screen items-center justify-center px-6 py-8">
-      <main className="w-full max-w-sm">
+    <div className="flex min-h-screen items-center justify-center overflow-y-auto px-6 py-8 sm:py-10">
+      <main className="w-full max-w-sm sm:max-w-md">
         <section className="relative rounded-xl border border-hairline bg-surface/70 p-6 shadow-2xl shadow-black/50 backdrop-blur-xl">
           {isSignup && (
             <button
@@ -150,26 +151,26 @@ export default function LoginForm() {
           )}
 
           <div className="mb-6 flex justify-center">
-            <Logo className="h-11 w-auto sm:h-12" />
+            <Logo className="h-8 w-auto sm:h-10" />
           </div>
 
           <div className="flex flex-col gap-3.5">
             {isSignup && (
               <>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                  <span className="text-xs font-bold uppercase tracking-[0.08em] text-muted">
                     Nome completo
                   </span>
                   <Field icon={User} value={name} onChange={setName} placeholder="Seu nome" />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                  <span className="text-xs font-bold uppercase tracking-[0.08em] text-muted">
                     Apelido
                   </span>
                   <Field icon={AtSign} value={nickname} onChange={setNickname} placeholder="Como quer ser chamado" />
                 </div>
                 <div className="flex flex-col gap-1.5">
-                  <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+                  <span className="text-xs font-bold uppercase tracking-[0.08em] text-muted">
                     WhatsApp
                   </span>
                   <Field
@@ -184,14 +185,14 @@ export default function LoginForm() {
             )}
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+              <span className="text-xs font-bold uppercase tracking-[0.08em] text-muted">
                 E-mail
               </span>
               <Field icon={User} value={email} onChange={setEmail} placeholder="exemplo@pokersync.com" />
             </div>
 
             <div className="flex flex-col gap-1.5">
-              <span className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+              <span className="text-xs font-bold uppercase tracking-[0.08em] text-muted">
                 Senha
               </span>
               <Field
@@ -209,7 +210,7 @@ export default function LoginForm() {
             </div>
 
             {!isSignup && (
-              <a
+              
                 href="/esqueci-senha"
                 className="self-end text-xs text-muted transition hover:text-ink"
               >
@@ -223,7 +224,7 @@ export default function LoginForm() {
             <button
               onClick={submit}
               disabled={loading}
-              className="mt-1 rounded-lg bg-ink py-3 text-xs font-bold uppercase tracking-[0.14em] text-void transition hover:bg-white/90 disabled:opacity-80"
+              className="mt-1 rounded-lg bg-ink py-3 text-xs font-bold uppercase tracking-[0.08em] text-void transition hover:bg-white/90 disabled:opacity-80"
             >
               {loading
                 ? isSignup
@@ -240,7 +241,7 @@ export default function LoginForm() {
               <span className="w-full border-t border-hairline" />
             </div>
             <div className="relative flex justify-center">
-              <span className="bg-surface px-3 text-xs font-bold uppercase tracking-[0.14em] text-muted">
+              <span className="bg-surface px-3 text-xs font-bold uppercase tracking-[0.08em] text-muted">
                 Ou
               </span>
             </div>
@@ -248,7 +249,7 @@ export default function LoginForm() {
 
           <button
             onClick={() => switchMode(isSignup ? "signin" : "signup")}
-            className="w-full rounded-lg border border-hairline py-3 text-xs font-bold uppercase tracking-[0.14em] transition hover:bg-white/5"
+            className="w-full rounded-lg border border-hairline py-3 text-xs font-bold uppercase tracking-[0.08em] transition hover:bg-white/5"
           >
             {isSignup ? "Ja tenho conta" : "Criar conta"}
           </button>
