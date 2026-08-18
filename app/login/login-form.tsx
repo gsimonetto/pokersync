@@ -5,7 +5,6 @@ import React, { useState, useRef, type ComponentType } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
-  Spade,
   Mail,
   Lock,
   Eye,
@@ -18,6 +17,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { Logo } from "@/components/logo";
 
 type Mode = "login" | "register";
 
@@ -37,20 +37,20 @@ function Field({ icon: Icon, value, onChange, placeholder, type = "text", right,
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-neutral-400">{label}</label>
+        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</label>
         {labelRight}
       </div>
       <div className="relative">
-        <Icon className="pointer-events-none w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-neutral-500" />
+        <Icon className="pointer-events-none w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
         <input
           type={type}
           required
           value={value}
           onChange={(e) => onChange(e.target.value)}
           placeholder={placeholder}
-          className={`w-full bg-neutral-950/80 border border-neutral-800 rounded-lg pl-10 ${
+          className={`w-full bg-elevated border border-hairline rounded-lg pl-10 ${
             right ? "pr-10" : "pr-4"
-          } py-2 text-sm text-white placeholder-neutral-600 outline-none focus:border-emerald-500/50 transition-all ${
+          } py-2 text-sm text-ink placeholder-muted/50 outline-none focus:border-white/30 transition-all ${
             mono ? "font-mono" : "font-sans"
           }`}
         />
@@ -171,10 +171,10 @@ export default function LoginForm() {
   };
 
   return (
-    <div className="relative min-h-screen w-full bg-neutral-950 text-neutral-100 flex items-center justify-center p-4 overflow-hidden font-sans selection:bg-emerald-500 selection:text-black">
-      {/* Background Grid & Glows */}
-      <div className="absolute inset-0 bg-[radial-gradient(#22c55e_1px,transparent_1px)] [background-size:32px_32px] opacity-10 pointer-events-none" />
-      <div className="absolute -top-32 -left-32 w-96 h-96 bg-emerald-500/15 rounded-full blur-[140px] pointer-events-none" />
+    <div className="relative min-h-screen w-full bg-void text-ink flex items-center justify-center p-4 overflow-hidden font-sans selection:bg-white selection:text-black">
+      {/* Background Grid & Glow — monocromático */}
+      <div className="absolute inset-0 bg-[radial-gradient(#ffffff_1px,transparent_1px)] [background-size:32px_32px] opacity-[0.04] pointer-events-none" />
+      <div className="absolute -top-32 -left-32 w-96 h-96 bg-white/[0.06] rounded-full blur-[140px] pointer-events-none" />
 
       {/* Card Principal */}
       <motion.div
@@ -184,42 +184,35 @@ export default function LoginForm() {
         initial={{ opacity: 0, y: 20, scale: 0.98 }}
         animate={{ opacity: 1, y: 0, scale: 1 }}
         transition={{ duration: 0.4, ease: [0.16, 1, 0.3, 1] }}
-        className="relative z-10 w-full max-w-md rounded-xl border border-hairline bg-surface p-8 backdrop-blur-2xl shadow-2xl overflow-hidden group"
+        className="relative z-10 w-full max-w-md rounded-xl border border-hairline bg-surface p-8 backdrop-blur-2xl shadow-2xl shadow-black/60 overflow-hidden group"
       >
-        {/* Spotlight do Mouse */}
+        {/* Spotlight do Mouse — branco sutil */}
         <div
           className="pointer-events-none absolute -inset-px transition-opacity duration-300 opacity-0 group-hover:opacity-100"
           style={{
-            background: `radial-gradient(400px circle at ${mousePos.x}px ${mousePos.y}px, rgba(16, 185, 129, 0.12), transparent 40%)`,
+            background: `radial-gradient(400px circle at ${mousePos.x}px ${mousePos.y}px, rgba(255, 255, 255, 0.06), transparent 40%)`,
           }}
         />
 
         {/* Cabeçalho */}
-        <div className="flex flex-col items-center space-y-2 text-center mb-6">
-          <motion.div
-            whileHover={{ rotate: 180, scale: 1.05 }}
-            transition={{ type: "spring", stiffness: 300, damping: 15 }}
-            className="w-12 h-12 rounded-xl bg-emerald-500/10 border border-emerald-500/30 flex items-center justify-center text-emerald-400 shadow-inner"
-          >
-            <Spade className="w-6 h-6 fill-current" />
-          </motion.div>
-          <h1 className="text-2xl font-bold tracking-tight text-white">PokerSync</h1>
-          <p className="text-xs text-neutral-400">Workspace de Alta Performance GTO</p>
+        <div className="flex flex-col items-center space-y-3 text-center mb-6">
+          <Logo className="h-10 w-auto" />
         </div>
 
         {/* Seletor de Abas */}
-        <div className="relative flex rounded-lg bg-neutral-950/80 p-1 border border-neutral-800/80 mb-6">
+        <div className="relative flex rounded-lg bg-void/60 p-1 border border-hairline mb-6">
           {(["login", "register"] as const).map((tab) => (
             <button
               key={tab}
               type="button"
               onClick={() => switchTab(tab)}
-              className="relative flex-1 py-1.5 text-xs font-medium transition-colors z-10 cursor-pointer text-neutral-300"
+              className="relative flex-1 py-1.5 text-xs font-medium transition-colors z-10 cursor-pointer text-muted data-[active=true]:text-ink"
+              data-active={activeTab === tab}
             >
               {activeTab === tab && (
                 <motion.div
                   layoutId="activeTabPill"
-                  className="absolute inset-0 bg-neutral-800 rounded-md border border-white/10 shadow-sm"
+                  className="absolute inset-0 bg-elevated rounded-md border border-white/10 shadow-sm"
                   transition={{ type: "spring", stiffness: 400, damping: 30 }}
                 />
               )}
@@ -272,7 +265,7 @@ export default function LoginForm() {
               mono
               labelRight={
                 !isRegister ? (
-                  <a href="/esqueci-senha" className="text-xs text-emerald-400 hover:underline">
+                  <a href="/esqueci-senha" className="text-xs text-muted hover:text-ink transition-colors">
                     Esqueceu?
                   </a>
                 ) : undefined
@@ -281,7 +274,7 @@ export default function LoginForm() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((s) => !s)}
-                  className="text-neutral-500 hover:text-neutral-300"
+                  className="text-muted hover:text-ink transition-colors"
                   aria-label={showPassword ? "Ocultar senha" : "Mostrar senha"}
                 >
                   {showPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
@@ -321,13 +314,13 @@ export default function LoginForm() {
               whileTap={{ scale: isLoading ? 1 : 0.99 }}
               type="submit"
               disabled={isLoading}
-              className="w-full mt-2 bg-emerald-600 hover:bg-emerald-500 text-white font-medium text-sm py-2.5 px-4 rounded-lg shadow-lg shadow-emerald-950/50 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+              className="w-full mt-2 bg-ink hover:bg-white/90 text-void font-semibold text-sm py-2.5 px-4 rounded-lg shadow-lg shadow-black/40 flex items-center justify-center gap-2 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
             >
               {isLoading ? (
-                <div className="w-5 h-5 border-2 border-white/30 border-t-white rounded-full animate-spin" />
+                <div className="w-5 h-5 border-2 border-void/30 border-t-void rounded-full animate-spin" />
               ) : (
                 <>
-                  <span>{isRegister ? "Criar Conta" : "Acessar Workspace"}</span>
+                  <span>{isRegister ? "Criar Conta" : "Entrar"}</span>
                   <ArrowRight className="w-4 h-4" />
                 </>
               )}
