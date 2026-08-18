@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { TopNav } from "@/components/top-nav";
+import { Analytics } from "@vercel/analytics/next";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -24,6 +25,7 @@ export default function RootLayout({
       <body className="min-h-screen bg-void text-ink antialiased">
         <TopNav />
         {children}
+        <Analytics />
       </body>
     </html>
   );
