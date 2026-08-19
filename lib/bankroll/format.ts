@@ -13,6 +13,30 @@ export function fmtSignedMoney(v: number) {
   return (n > 0 ? "+" : "") + money.format(n);
 }
 
+// --- Multi-moeda -------------------------------------------------------
+// A maioria dos jogadores so' usa uma moeda (BRL) — esses formatters so'
+// entram em cena quando a tela detecta mais de uma moeda nos dados
+// (ver `currencyFilter` em app/banca/page.tsx), pra nunca somar R$ com
+// $ como se fossem a mesma unidade.
+export const CURRENCIES = ["BRL", "USD", "EUR"] as const;
+export type Currency = (typeof CURRENCIES)[number];
+
+const CURRENCY_FORMATTERS: Record<Currency, Intl.NumberFormat> = {
+  BRL: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
+  USD: new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }),
+  EUR: new Intl.NumberFormat("de-DE", { style: "currency", currency: "EUR" }),
+};
+
+export function fmtMoneyIn(v: number, currency: string) {
+  const fmt = CURRENCY_FORMATTERS[currency as Currency] ?? CURRENCY_FORMATTERS.BRL;
+  return fmt.format(Number(v) || 0);
+}
+
+export function fmtSignedMoneyIn(v: number, currency: string) {
+  const n = Number(v) || 0;
+  return (n > 0 ? "+" : "") + fmtMoneyIn(n, currency);
+}
+
 export function fmtPct(v: number, digits = 1) {
   const n = Number(v) || 0;
   return (n > 0 ? "+" : "") + n.toFixed(digits) + "%";
@@ -70,14 +94,21 @@ export function todayISO() {
 // campos entre aspas (escapa aspas internas dobrando, padrao RFC4180).
 // Cobre o pedido de "relatorio por periodo" — a UI ja filtra `sessions`
 // pelo range antes de chamar isso.
-export function sessionsToCSV(sessions: Session[]): string {
-  const header = ["Data", "Formato", "Buy-in", "Reentradas", "Cashout", "Resultado", "Stake", "Local", "Notas"];
+export function sessionsToCSV(sessions: Session[], resultOf: (s: Session) => number): string {
+  const header = ["Data", "Formato", "Buy-in", "Reentradas", "Cashout", "Resultado", "Stake", "Moeda", "Local", "Notas"];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
-  const rows = sessions.map((s) => {
-    const invested = (Number(s.buyIn) || 0) * (1 + (Number(s.reentries) || 0));
-    const result = (Number(s.cashout) || 0) - invested;
-    return [s.date, s.format, s.buyIn, s.reentries, s.cashout, result.toFixed(2), s.stake || "", s.venue || "", s.notes || ""];
-  });
+  const rows = sessions.map((s) => [
+    s.date,
+    s.format,
+    s.buyIn,
+    s.reentries,
+    s.cashout,
+    resultOf(s).toFixed(2),
+    s.stake || "",
+    s.currency || "BRL",
+    s.venue || "",
+    s.notes || "",
+  ]);
   return [header, ...rows].map((r) => r.map(esc).join(",")).join("\n");
 }
 

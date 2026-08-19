@@ -19,6 +19,13 @@ function rowToSession(r: any): Session {
     mood: r.mood || undefined,
     tilt: r.tilt != null ? Number(r.tilt) : undefined,
     diaryNote: r.diary_note || undefined,
+    rake: r.rake != null ? Number(r.rake) : undefined,
+    rakeback: r.rakeback != null ? Number(r.rakeback) : undefined,
+    bigBlind: r.big_blind != null ? Number(r.big_blind) : undefined,
+    currency: r.currency || "BRL",
+    ownPct: r.own_pct != null ? Number(r.own_pct) : undefined,
+    markup: r.markup != null ? Number(r.markup) : undefined,
+    backerName: r.backer_name || undefined,
   };
 }
 
@@ -38,6 +45,13 @@ function sessionToRow(s: Partial<Session>, userId: string) {
     mood: s.mood || null,
     tilt: s.tilt != null ? Number(s.tilt) : null,
     diary_note: s.diaryNote || null,
+    rake: s.rake != null && String(s.rake) !== "" ? Number(s.rake) : null,
+    rakeback: s.rakeback != null && String(s.rakeback) !== "" ? Number(s.rakeback) : null,
+    big_blind: s.bigBlind != null && String(s.bigBlind) !== "" ? Number(s.bigBlind) : null,
+    currency: s.currency || "BRL",
+    own_pct: s.ownPct != null && String(s.ownPct) !== "" ? Number(s.ownPct) : null,
+    markup: s.markup != null && String(s.markup) !== "" ? Number(s.markup) : null,
+    backer_name: s.backerName || null,
   };
 }
 
@@ -143,6 +157,7 @@ function rowToTransaction(r: any): Transaction {
     amount: Number(r.amount) || 0,
     note: r.note || undefined,
     venue: r.venue || undefined,
+    currency: r.currency || "BRL",
   };
 }
 
@@ -162,6 +177,7 @@ export async function addTransaction(t: {
   amount: number;
   note?: string;
   venue?: string;
+  currency?: string;
 }): Promise<Transaction> {
   const supabase = createClient();
   const userId = await getUserId();
@@ -174,6 +190,7 @@ export async function addTransaction(t: {
       amount: Number(t.amount) || 0,
       note: t.note || null,
       venue: t.venue || null,
+      currency: t.currency || "BRL",
     })
     .select()
     .single();
