@@ -73,6 +73,14 @@ const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
   call: "Pagar (call)",
 };
 
+const VERDICT_LABEL: Record<Verdict, string> = {
+  OTIMA: "Jogada Ótima",
+  ACEITAVEL: "Aceitável",
+  ERRO_LEVE: "Erro Leve",
+  ERRO_GRAVE: "Erro Grave",
+  UNKNOWN: "Sem dados do solver",
+};
+
 // Ordem pedida explicitamente: UTG ... até BB. Token usado nos spot_ids
 // gerados pelo motor (ex "btn_vs_bb") segue lib/poker/... já usada em
 // app/treino/page.tsx pro lado pós-flop (VILLAIN_TOKEN_TO_POS).
@@ -250,8 +258,14 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
       ),
     [spots, heroPos, villainPos]
   );
-  const heroHasAnyData = useCallback(
-    (pos: string) => spots.some((s) => parseMatchup(s.matchup).hero === pos),
+  // Contagem de stacks disponíveis por posição -- vira o "(4)" ao lado
+  // do chip, pra escanear sem precisar clicar em cada um.
+  const stackCountForHero = useCallback(
+    (pos: string) => new Set(spots.filter((s) => parseMatchup(s.matchup).hero === pos).map((s) => s.stackBb)).size,
+    [spots]
+  );
+  const stackCountForHeroVillain = useCallback(
+    (h: string, v: string) => new Set(spots.filter((s) => s.matchup === matchupKey(h, v)).map((s) => s.stackBb)).size,
     [spots]
   );
 
@@ -320,10 +334,26 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
     return classifyFrequency(chosenFreq);
   }, [round, chosen]);
 
-  const displayLabel = isMarginal && verdict ? "MARGINAL" : verdict?.replace("_", " ");
-  const displayColor = isMarginal ? "#f5a524" : verdict ? verdictColor(verdict) : undefined;
+  // O veredito real (acertei/errei) NUNCA é substituído por "MARGINAL" --
+  // antes o rótulo virava "MARGINAL" sempre que o gap era pequeno,
+  // escondendo se a jogada escolhida era boa ou ruim (dois jogadores
+  // podem cair num spot "marginal" e um ter acertado, outro não -- o
+  // rótulo não podia dizer isso). "Marginal" agora é uma tag SEPARADA,
+  // ao lado do veredito, não no lugar dele.
+  const displayLabel = verdict ? VERDICT_LABEL[verdict] : undefined;
+  const displayColor = verdict ? verdictColor(verdict) : undefined;
   const isGoodVerdict = verdict === "OTIMA" || verdict === "ACEITAVEL";
   const chosenFreqPct = round && chosen ? Math.round((chosen === "fold" ? 1 - round.freq : round.freq) * 100) : null;
+  // Gap relativo ao que está em jogo -- em vez do valor absoluto (que
+  // depende da escala de ICM/premiação daquele torneio especifico, sem
+  // significado isolado), a DIFERENÇA em % de uma opção pra outra é
+  // comparável entre spots, independente da escala.
+  const gapRelativePct = round && currentPhase
+    ? (() => {
+        const denom = (currentPhase.ev_fold + round.ev) / 2;
+        return denom > 0 ? (round.gap / denom) * 100 : 0;
+      })()
+    : null;
 
   useEffect(() => {
     if (!chosen || !verdict) return;
@@ -388,10 +418,18 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
   }, [spot, round, chosen, activeHeroSeat, activeVillainSeat]);
 
   return (
-    <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 12, height: "100%", minHeight: 0, position: "relative" }}>
+    <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 8, height: "100%", minHeight: 0, position: "relative" }}>
       <TreinoResponsiveStyles />
 
-      <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minHeight: 40 }}>
+      {/* Cabeçalho sempre com conteúdo visível -- antes ficava
+          literalmente vazio (uma faixa preta sem nada) enquanto o
+          primeiro spot ainda não tinha carregado e nenhuma mão tinha
+          sido respondida ainda, parecendo um container quebrado.
+          Contexto do spot usa heroPos/villainPos/stackBb (estado
+          local, disponível na hora) em vez de esperar `spot` do banco;
+          contador de sessão mostra um placeholder em 0/0 em vez de
+          sumir. */}
+      <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minHeight: 34 }}>
         <button
           className="ps-tr-filters-toggle"
           onClick={() => setFiltersOpen(true)}
@@ -400,12 +438,14 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
           <SlidersHorizontal size={15} strokeWidth={1.5} />
         </button>
 
+        <span style={{ fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)", flexShrink: 0, whiteSpace: "nowrap" }}>
+          {heroPos} vs {villainPos} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>· {stackBb}bb</span>
+        </span>
+
         <div className="ps-tr-session" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
-          {stats.total > 0 && (
-            <span style={{ fontFamily: F, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
-              {stats.hits}/{stats.total} ótimas · {sessionPct}%
-            </span>
-          )}
+          <span style={{ fontFamily: F, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
+            {stats.hits}/{stats.total} ótimas{stats.total > 0 ? ` · ${sessionPct}%` : ""}
+          </span>
         </div>
 
         {tabs}
@@ -422,22 +462,33 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
             </button>
           )}
 
-          <aside style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto" }}>
+          {/* height:100% -- sem isso o aside fica do tamanho do próprio
+              conteúdo (5 seções de chips) e sobra um bloco morto vazio
+              embaixo dele na coluna, já que a mesa ao lado é bem mais
+              alta. O grid já estica o WRAPPER pra altura toda; faltava
+              o aside herdar isso. */}
+          <aside style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
             <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
               Filtros
             </span>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
               <FilterSection label="Posição herói">
-                {ALL_POSITIONS.map((p) => (
-                  <FilterChip key={p} label={p} active={p === heroPos} disabled={!heroHasAnyData(p)} onClick={() => { setStats({ hits: 0, total: 0 }); setHeroPos(p); }} />
-                ))}
+                {ALL_POSITIONS.map((p) => {
+                  const n = stackCountForHero(p);
+                  return (
+                    <FilterChip key={p} label={n > 0 ? `${p} (${n})` : p} active={p === heroPos} disabled={n === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setHeroPos(p); }} />
+                  );
+                })}
               </FilterSection>
 
               <FilterSection label="Posição vilão">
-                {ALL_POSITIONS.map((p) => (
-                  <FilterChip key={p} label={p} active={p === villainPos} disabled={!villainsForHero.has(p)} onClick={() => { setStats({ hits: 0, total: 0 }); setVillainPos(p); }} />
-                ))}
+                {ALL_POSITIONS.map((p) => {
+                  const n = stackCountForHeroVillain(heroPos, p);
+                  return (
+                    <FilterChip key={p} label={n > 0 ? `${p} (${n})` : p} active={p === villainPos} disabled={n === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setVillainPos(p); }} />
+                  );
+                })}
               </FilterSection>
 
               <FilterSection label="Stack">
@@ -464,6 +515,31 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
                   />
                 ))}
               </FilterSection>
+            </div>
+
+            {/* Rodapé fixo no fim do card -- ocupa o espaço que sobra
+                agora que o aside estica pra altura toda, em vez de
+                deixar em branco. Reset rápido é o tipo de atalho que
+                um grinder usa toda hora entre sessões de treino. */}
+            <div style={{ marginTop: "auto", paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.06)", display: "flex", flexDirection: "column", gap: 8 }}>
+              <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>
+                {spots.length} spot{spots.length !== 1 ? "s" : ""} disponíve{spots.length !== 1 ? "is" : "l"} no total
+              </span>
+              <button
+                onClick={() => {
+                  setStats({ hits: 0, total: 0 });
+                  if (spots.length > 0) {
+                    const { hero, villain } = parseMatchup(spots[0].matchup);
+                    if (hero) setHeroPos(hero);
+                    if (villain) setVillainPos(villain);
+                    setStackBb(spots[0].stackBb);
+                  }
+                  setPhaseKey("sbOpen");
+                }}
+                style={{ fontFamily: F, fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.5)", background: "transparent", border: "1px solid rgba(255,255,255,0.10)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", textAlign: "left" }}
+              >
+                Limpar filtros
+              </button>
             </div>
           </aside>
         </div>
@@ -497,31 +573,54 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
                 )}
 
                 {chosen && verdict && (
-                  <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ maxHeight: 130, overflowY: "auto", background: "#0A0A0A", position: "relative", fontFamily: F, padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                  <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ maxHeight: 150, overflowY: "auto", background: "#0A0A0A", position: "relative", fontFamily: F, padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+                    {/* Linha 1 -- "eu acertei ou errei?": veredito REAL da
+                        jogada escolhida, nunca escondido atrás de
+                        "MARGINAL" (isso agora é só uma tag secundária,
+                        ao lado, não substitui a resposta). */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
                       <span style={{ fontSize: 15, fontWeight: 700, color: displayColor }}>{displayLabel}</span>
-                      <div style={{ display: "flex", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
-                        <span>Fold <b style={{ color: "#FFFFFF" }}>{Math.round((1 - round.freq) * 100)}%</b></span>
-                        <span style={{ opacity: 0.3 }}>·</span>
-                        <span>{actionLabel} <b style={{ color: "#FFFFFF" }}>{Math.round(round.freq * 100)}%</b></span>
-                      </div>
+                      {isMarginal && (
+                        <span style={{ fontSize: 9.5, fontWeight: 700, letterSpacing: "0.04em", color: "#f5a524", background: "rgba(245,165,36,0.12)", border: "1px solid rgba(245,165,36,0.4)", borderRadius: 999, padding: "2px 8px" }}>
+                          EQUILÍBRIO MISTO
+                        </span>
+                      )}
                     </div>
 
-                    {/* "Equity ICM", não EV da mão isolada: é a fatia do
-                        prêmio do torneio inteiro que cada opção deixa o
-                        jogador com, considerando os stacks de todo mundo
-                        na mesa (não fichas nem $ só desta mão). Por isso
-                        os dois valores são grandes e parecidos -- o que
-                        importa pra decisão é o Gap (diferença) entre
-                        eles, não o valor absoluto de cada um. */}
-                    <div style={{ display: "flex", gap: 14, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
-                      <span>Equity ICM fold <b style={{ color: "#FFFFFF", fontWeight: 600 }}>{currentPhase.ev_fold.toFixed(1)}</b></span>
-                      <span>Equity ICM {actionLabel.toLowerCase()} <b style={{ color: "#FFFFFF", fontWeight: 600 }}>{round.ev.toFixed(1)}</b></span>
-                      <span>Gap <b style={{ color: isMarginal ? "#f5a524" : "#FFFFFF", fontWeight: 600 }}>{round.gap.toFixed(2)}</b></span>
+                    {/* Linha 2 -- "o que o GTO recomenda?": frequência,
+                        separada do veredito acima (pergunta diferente:
+                        uma é sobre a jogada do jogador, outra é sobre a
+                        estratégia ótima em geral). */}
+                    <div style={{ display: "flex", gap: 6, marginTop: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+                      <span>GTO recomenda: Fold <b style={{ color: chosen === "fold" ? "#FFFFFF" : "rgba(255,255,255,0.55)" }}>{Math.round((1 - round.freq) * 100)}%</b></span>
+                      <span style={{ opacity: 0.3 }}>·</span>
+                      <span>{actionLabel} <b style={{ color: chosen === "action" ? "#FFFFFF" : "rgba(255,255,255,0.55)" }}>{Math.round(round.freq * 100)}%</b></span>
                     </div>
-                    <p style={{ marginTop: 6, fontSize: 9.5, color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>
-                      Equity ICM = fatia do prêmio do torneio (não fichas nem $ só desta mão) — o que decide é o Gap entre as opções.
-                      {isMarginal && <span style={{ color: "#f5a524" }}> Decisão marginal: as duas opções valem quase o mesmo.</span>}
+
+                    {/* Linha 3 -- "qual o peso disso?": número PRINCIPAL
+                        agora é o Gap relativo em % (mesmo princípio do
+                        GTOWizard -- sempre bb ou % do pote, nunca um
+                        número cru sem unidade). O valor absoluto de
+                        equity ICM vira nota secundária pequena, já que
+                        é uma escala específica daquele torneio (não
+                        convertível pra bb sem saber a premiação exata,
+                        que não ficou registrada) -- não serve pra
+                        comparar entre spots diferentes. */}
+                    <div style={{ display: "flex", alignItems: "baseline", gap: 8, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                      <span style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.04em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+                        Diferença de valor
+                      </span>
+                      <span style={{ fontSize: 20, fontWeight: 800, color: isMarginal ? "#f5a524" : "#FFFFFF" }}>
+                        {gapRelativePct != null ? `${gapRelativePct.toFixed(1)}%` : "—"}
+                      </span>
+                      <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>entre fold e {actionLabel.toLowerCase()}</span>
+                    </div>
+                    <p style={{ marginTop: 4, fontSize: 9.5, color: "rgba(255,255,255,0.3)", lineHeight: 1.4 }}>
+                      Equity ICM: fold <b style={{ color: "rgba(255,255,255,0.55)" }}>{currentPhase.ev_fold.toFixed(1)}</b> · {actionLabel.toLowerCase()} <b style={{ color: "rgba(255,255,255,0.55)" }}>{round.ev.toFixed(1)}</b>
+                      {" "}— unidade específica desse torneio (fatia do prêmio, não fichas nem $ da mão isolada); não compare esses dois números com outro spot, só a % acima.
+                      {isMarginal && (
+                        <span style={{ color: "#f5a524" }}> Diferença ≈ 0%: as duas opções valem praticamente o mesmo (indiferença matemática) — por isso o GTO mistura {Math.round(round.freq * 100)}/{Math.round((1 - round.freq) * 100)} em vez de escolher só uma. Não é indecisão, é assim que o equilíbrio funciona nesse spot.</span>
+                      )}
                     </p>
                   </div>
                 )}
@@ -533,19 +632,19 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
                   )}
                 </div>
 
-                <div className="ps-tr-actions" style={{ height: 62, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
+                <div className="ps-tr-actions" style={{ height: 68, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
                   {!chosen ? (
                     <div style={{ display: "flex", gap: 10, flex: 1, justifyContent: "center" }}>
                       <button
                         onClick={() => setChosen("fold")}
-                        style={{ fontFamily: F, minWidth: 110, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "10px 20px", fontSize: 14, fontWeight: 500, color: "#FFFFFF", cursor: "pointer" }}
+                        style={{ fontFamily: F, minWidth: 130, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "13px 22px", fontSize: 14.5, fontWeight: 600, color: "#FFFFFF", cursor: "pointer" }}
                       >
                         Fold
                         <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Q</span>
                       </button>
                       <button
                         onClick={() => setChosen("action")}
-                        style={{ fontFamily: F, minWidth: 110, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "10px 20px", fontSize: 14, fontWeight: 500, color: "#FFFFFF", cursor: "pointer" }}
+                        style={{ fontFamily: F, minWidth: 130, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "13px 22px", fontSize: 14.5, fontWeight: 600, color: "#FFFFFF", cursor: "pointer" }}
                       >
                         {actionLabel}
                         <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>W</span>
