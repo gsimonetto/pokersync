@@ -16,6 +16,7 @@ export interface RfiJamSpot {
   matchup: string;
   stackBb: number;
   effectiveStack: number;
+  pot: number;
   exploitability: number | null;
   sbOpen: RfiJamPhaseRaw;
   bbJam: RfiJamPhaseRaw;
@@ -76,7 +77,7 @@ export async function getRfiJamSpot(spotId: string): Promise<RfiJamSpot | null> 
   const supabase = createClient();
   const { data, error } = await supabase
     .from("drills")
-    .select("spot_id, position, stack_bb, effective_stack, exploitability, gto_nodes")
+    .select("spot_id, position, stack_bb, effective_stack, pot, exploitability, gto_nodes")
     .eq("spot_id", spotId)
     .eq("action", "rfi_jam")
     .single();
@@ -98,6 +99,7 @@ export async function getRfiJamSpot(spotId: string): Promise<RfiJamSpot | null> 
     matchup: data.position as string,
     stackBb: data.stack_bb as number,
     effectiveStack: data.effective_stack as number,
+    pot: data.pot as number,
     exploitability: (data.exploitability as number | null) ?? null,
     sbOpen: nodes.sb_open,
     bbJam: nodes.bb_jam,
