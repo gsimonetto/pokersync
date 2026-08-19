@@ -41,11 +41,15 @@ function TreinoShell() {
         fontFamily: F,
         height: availableHeight ? `${availableHeight}px` : "100vh",
         background: "#050505",
-        padding: 16,
+        padding: 0,
         boxSizing: "border-box",
         overflow: "hidden",
       }}
     >
+      {/* Moldura única (antes: padding aqui NESTA página + padding de
+          novo no card = 28px de margem morta empilhada). Só o card
+          enquadra agora -- pedido explícito: nada de margem "sobrando"
+          sem função, telinha de alta densidade. */}
       <div
         className="ps-treino-card"
         style={{
@@ -60,7 +64,7 @@ function TreinoShell() {
           display: "flex",
           flexDirection: "column",
           gap: 8,
-          padding: 12,
+          padding: 14,
           boxSizing: "border-box",
           overflow: "hidden",
         }}
