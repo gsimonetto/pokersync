@@ -581,6 +581,39 @@ export async function fetchPlayerFinancialSeries(playerId: string, days = 30): P
   }));
 }
 
+// Staking/backing (2026-08): sessoes onde o jogador vendeu parte da acao —
+// da' visibilidade pro coach/backer, que antes so' via o resultado bruto
+// (o painel financeiro contava o swing inteiro, mesmo quando so' uma fatia
+// era do jogador). resultadoLiquido ja' vem calculado no banco com a mesma
+// formula do net() do frontend (ver migracao bankroll_session_net).
+export interface PlayerStakingSession {
+  id: string;
+  dia: string;
+  formato: string;
+  ownPct: number;
+  markup: number;
+  backerName: string | null;
+  resultadoLiquido: number;
+  resultadoBruto: number;
+}
+
+export async function fetchPlayerStakingSessions(playerId: string, limit = 20): Promise<PlayerStakingSession[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_player_staking_sessions", { p_player: playerId, p_limit: limit });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    id: r.id,
+    dia: r.dia,
+    formato: r.formato,
+    ownPct: Number(r.own_pct ?? 100),
+    markup: Number(r.markup ?? 1),
+    backerName: r.backer_name || null,
+    resultadoLiquido: Number(r.resultado_liquido ?? 0),
+    resultadoBruto: Number(r.resultado_bruto ?? 0),
+  }));
+}
+
 export async function fetchPeriodComparison(days = 30): Promise<PeriodComparison> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("team_period_comparison", { p_days: days });

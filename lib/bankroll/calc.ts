@@ -3,16 +3,52 @@ import type { Session, Transaction, Goal, StudyLog, BrmThreshold, BrmFormat } fr
 
 const TOURNEY = new Set(["MTT", "SNG", "Spin"]);
 
-export function invested(s: Session) {
+function grossInvested(s: Session) {
   return (Number(s.buyIn) || 0) * (1 + (Number(s.reentries) || 0));
+}
+
+// % da acao que o proprio jogador ficou (100 = banca 100% propria, sem
+// staking). Fora do intervalo (0,100] cai no default — dado invalido nao
+// pode fazer o jogador "desaparecer" da propria sessao.
+export function ownPct(s: Session) {
+  const p = Number(s.ownPct);
+  return p > 0 && p <= 100 ? p : 100;
+}
+
+export function markupOf(s: Session) {
+  const m = Number(s.markup);
+  return m > 0 ? m : 1;
+}
+
+// Investimento que sai do bolso do proprio jogador (o resto foi bancado
+// pelo backer, se houver staking).
+export function invested(s: Session) {
+  return grossInvested(s) * (ownPct(s) / 100);
 }
 
 export function entries(s: Session) {
   return 1 + (Number(s.reentries) || 0);
 }
 
+// Receita de markup: o backer paga (markup - 1) sobre a fatia que comprou,
+// independente do resultado da sessao — e' o "lucro" do jogador por vender
+// acao acima do valor de face. Zero quando nao ha staking.
+export function markupIncome(s: Session) {
+  const backerShare = grossInvested(s) * (1 - ownPct(s) / 100);
+  return backerShare * (markupOf(s) - 1);
+}
+
+// Retorno economico do proprio jogador: sua fatia do cashout + o que
+// ganhou vendendo acao. Sem staking (ownPct=100) e' identico a s.cashout.
+export function ownCashout(s: Session) {
+  return (Number(s.cashout) || 0) * (ownPct(s) / 100) + markupIncome(s);
+}
+
+// Resultado liquido do jogador (ja' considerando staking, se houver).
+// Todo o resto do app (ROI, leaks, R$/hora, grafico...) consome isto e
+// automaticamente fica correto sem precisar saber que staking existe.
 export function net(s: Session) {
-  return (Number(s.cashout) || 0) - invested(s);
+  return ownCashout(s) - invested(s);
 }
 
 export interface Aggregate {
@@ -25,6 +61,8 @@ export interface Aggregate {
   avgBuyIn: number;
   tourneyCount: number;
   itmCount: number;
+  totalRake: number;
+  totalRakeback: number;
 }
 
 export function aggregate(sessions: Session[]): Aggregate {
@@ -33,11 +71,15 @@ export function aggregate(sessions: Session[]): Aggregate {
     totalCashout = 0,
     buyInSum = 0,
     tourneyCount = 0,
-    itmCount = 0;
+    itmCount = 0,
+    totalRake = 0,
+    totalRakeback = 0;
   for (const s of list) {
     totalInvested += invested(s);
-    totalCashout += Number(s.cashout) || 0;
+    totalCashout += ownCashout(s);
     buyInSum += Number(s.buyIn) || 0;
+    totalRake += Number(s.rake) || 0;
+    totalRakeback += Number(s.rakeback) || 0;
     if (TOURNEY.has(s.format)) {
       tourneyCount += 1;
       if ((Number(s.cashout) || 0) > 0) itmCount += 1;
@@ -55,6 +97,8 @@ export function aggregate(sessions: Session[]): Aggregate {
     avgBuyIn: n > 0 ? buyInSum / n : 0,
     tourneyCount,
     itmCount,
+    totalRake,
+    totalRakeback,
   };
 }
 
@@ -173,6 +217,51 @@ export function hourlyRate(sessions: Session[]): { value: number; hoursLogged: n
   const totalNet = withHours.reduce((sum, s) => sum + net(s), 0);
   if (totalHours <= 0) return null;
   return { value: totalNet / totalHours, hoursLogged: totalHours, n: withHours.length };
+}
+
+// --- bb/hora com intervalo de confianca -------------------------------
+// bb/100 de verdade precisa de contagem de maos (so' vem quando o import
+// automatico de hand history entrar — item separado no backlog). Sem
+// isso, bb/hora e' a metrica honesta que da' pra calcular hoje: normaliza
+// por tamanho de stake (o R$/hora sozinho nao deixa comparar NL50 com
+// NL200), so' entra Cash com bigBlind preenchido. O intervalo de 95% usa
+// desvio padrao da amostra — sem ele, "8bb/h" de 5 sessoes parece tao
+// solido quanto "8bb/h" de 500, o que e' enganoso.
+export interface BbRateResult {
+  value: number;
+  n: number;
+  hoursLogged: number;
+  stdDev: number;
+  ciLow: number;
+  ciHigh: number;
+}
+
+export function bbHourlyRate(sessions: Session[]): BbRateResult | null {
+  const eligible = (sessions || []).filter(
+    (s) => s.format === "Cash" && Number(s.hours) > 0 && Number(s.bigBlind) > 0
+  );
+  if (eligible.length === 0) return null;
+  const perSessionBbPerHour = eligible.map((s) => net(s) / Number(s.bigBlind) / Number(s.hours));
+  const n = perSessionBbPerHour.length;
+  const mean = perSessionBbPerHour.reduce((a, b) => a + b, 0) / n;
+  const totalHours = eligible.reduce((sum, s) => sum + (Number(s.hours) || 0), 0);
+  if (n < 2) {
+    return { value: mean, n, hoursLogged: totalHours, stdDev: 0, ciLow: mean, ciHigh: mean };
+  }
+  const variance = perSessionBbPerHour.reduce((sum, v) => sum + (v - mean) ** 2, 0) / (n - 1);
+  const stdDev = Math.sqrt(variance);
+  const margin = 1.96 * (stdDev / Math.sqrt(n));
+  return { value: mean, n, hoursLogged: totalHours, stdDev, ciLow: mean - margin, ciHigh: mean + margin };
+}
+
+// --- Saldo por moeda -----------------------------------------------------
+// So' relevante quando o jogador de fato usa mais de uma moeda — a tela
+// esconde o filtro de moeda inteiro quando isso devolve 1 item so'.
+export function currenciesInUse(sessions: Session[], transactions: Transaction[]): string[] {
+  const set = new Set<string>();
+  for (const s of sessions || []) set.add(s.currency || "BRL");
+  for (const t of transactions || []) set.add(t.currency || "BRL");
+  return Array.from(set);
 }
 
 // --- Saldo por plataforma ----------------------------------------------

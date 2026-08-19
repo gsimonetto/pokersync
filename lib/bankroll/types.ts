@@ -16,6 +16,27 @@ export interface Session {
   mood?: string;
   tilt?: number;
   diaryNote?: string;
+  // Rake/rakeback (2026-08): opcionais, so' faz sentido em cash/formatos
+  // com rake explicito. Sem eles, resultado (cashout-buyin) ja' inclui o
+  // rake implicitamente — aqui e' so' pra separar visualmente o quanto foi
+  // pago de rake vs devolvido de rakeback.
+  rake?: number;
+  rakeback?: number;
+  // Big blind da sessao (2026-08): so' aplicavel a Cash — alimenta bb/hora,
+  // a metrica que grinder de cash realmente usa pra comparar stakes
+  // diferentes (R$/hora nao normaliza, bb/hora sim).
+  bigBlind?: number;
+  // Moeda da sessao (2026-08): default BRL, so' aparece na UI quando o
+  // jogador de fato usa mais de uma moeda — nao mistura na soma.
+  currency?: string;
+  // Staking/backing (2026-08): ownPct = % da acao que o proprio jogador
+  // ficou (100 = sem staking, banca 100% propria). O resto foi vendido a
+  // um backer com o markup informado. net() ja' calcula o resultado
+  // liquido do jogador considerando isso — o resto do app nao precisa
+  // saber que staking existe.
+  ownPct?: number;
+  markup?: number;
+  backerName?: string;
 }
 
 export type TransactionType = "deposito" | "saque" | "caixinha";
@@ -30,6 +51,7 @@ export interface Transaction {
   amount: number;
   note?: string;
   venue?: string;
+  currency?: string;
 }
 
 export type GoalType = "volume" | "estudo";

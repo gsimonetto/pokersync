@@ -203,13 +203,17 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
 
 interface RfiJamDrillProps {
   tabs?: React.ReactNode;
+  // Sugestao vinda de fora (hoje: leak da Gestao de Banca — "voce perde
+  // em MTT" aponta pra praticar stack curto). So' aplica se existir spot
+  // de verdade com esse stack; senao cai no default de sempre.
+  initialStackBb?: number;
 }
 
 // Tela única de treino (pré-flop RFI/Jam por enquanto -- é o único
 // tipo de spot com dado real no banco hoje). Sem abas: filtros à
 // esquerda, mesa (com o herói de verdade sentado, feltro azul) no
 // meio, resultado GTO numa linha acima da mesa.
-export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
+export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   const [heroPos, setHeroPos] = useState<string>("SB");
   const [villainPos, setVillainPos] = useState<string>("BB");
@@ -229,10 +233,12 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
       .then((rows) => {
         setSpots(rows);
         if (rows.length > 0) {
-          const { hero, villain } = parseMatchup(rows[0].matchup);
+          const suggested = initialStackBb != null ? rows.find((r) => r.stackBb === initialStackBb) : undefined;
+          const base = suggested ?? rows[0];
+          const { hero, villain } = parseMatchup(base.matchup);
           if (hero) setHeroPos(hero);
           if (villain) setVillainPos(villain);
-          setStackBb(rows[0].stackBb);
+          setStackBb(base.stackBb);
         } else {
           setLoading(false);
         }
@@ -241,7 +247,8 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
         setError("Erro ao listar spots RFI/Jam.");
         setLoading(false);
       });
-  }, []);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [initialStackBb]);
 
   // Disponibilidade de cada dimensão do filtro, dado o que já está
   // selecionado nas outras -- mesmo padrão do FilterSidebar da aba

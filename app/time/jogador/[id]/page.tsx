@@ -17,6 +17,7 @@ import {
   TrendingUp,
   TrendingDown,
   Minus,
+  Handshake,
 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
@@ -31,6 +32,7 @@ import {
   fetchPlayerFinancialSeries,
   fetchPlayerLeaks,
   fetchPlayerSharedHands,
+  fetchPlayerStakingSessions,
   fetchMyMembership,
   traduzErroTime,
   type FinancialDay,
@@ -39,6 +41,7 @@ import {
   type PlayerDetail,
   type PlayerSharedHand,
   type PlayerLeak,
+  type PlayerStakingSession,
 } from "@/lib/services/team-service";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -65,6 +68,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const [maos, setMaos] = useState<PlayerSharedHand[]>([]);
   const [alertas, setAlertas] = useState<TeamAlert[]>([]);
   const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
+  const [staking, setStaking] = useState<PlayerStakingSession[]>([]);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [meuPapel, setMeuPapel] = useState<string | null>(null);
 
@@ -72,13 +76,14 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, fin, mem, auth] = await Promise.all([
+      const [d, a, l, m, al, fin, stk, mem, auth] = await Promise.all([
         fetchPlayerDetail(id, dias),
         fetchPlayerActivity(id, dias),
         fetchPlayerLeaks(id, dias),
         fetchPlayerSharedHands(id),
         fetchPlayerAlerts(id).catch(() => []),
         fetchPlayerFinancialSeries(id, dias).catch(() => []),
+        fetchPlayerStakingSessions(id).catch(() => []),
         fetchMyMembership().catch(() => null),
         createClient().auth.getUser(),
       ]);
@@ -88,6 +93,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
       setMaos(m);
       setAlertas(al);
       setFinanceiro(fin);
+      setStaking(stk);
       setMeuPapel(mem?.role ?? null);
       setMeuId(auth.data.user?.id ?? null);
     } catch (e) {
@@ -180,7 +186,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
               icon={Wallet}
               label="Resultado no time"
               value={p.jogosNoTime > 0 ? BRL.format(p.lucroNoTime) : "—"}
-              hint="desde que entrou"
+              hint={staking.length > 0 ? "líquido — já descontado o staking" : "desde que entrou"}
               tom={p.lucroNoTime > 0 ? "positivo" : p.lucroNoTime < 0 ? "negativo" : undefined}
               destaque
             />
@@ -258,6 +264,37 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
             </div>
             </div>
           </section>
+
+          {staking.length > 0 && (
+            <section className="rounded-xl border border-hairline bg-surface p-6">
+              <h2 className="flex items-center gap-1.5 text-base font-semibold">
+                <Handshake size={15} className="text-training" />
+                Staking recente
+              </h2>
+              <p className="mt-1 text-sm text-muted">
+                Sessões em que o jogador vendeu parte da ação — resultado líquido é o que fica com ele, bruto é o
+                tamanho real do swing da sessão.
+              </p>
+              <ul className="mt-4 divide-y divide-hairline">
+                {staking.map((s) => (
+                  <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[13px]">
+                    <span className="text-muted">{new Date(s.dia).toLocaleDateString("pt-BR")}</span>
+                    <span className="font-medium">{s.formato}</span>
+                    <span className="rounded-full border border-training/40 bg-training/10 px-2 py-0.5 text-[10.5px] font-semibold text-training">
+                      {s.ownPct}% dele · markup {s.markup.toFixed(2)}
+                    </span>
+                    {s.backerName && <span className="text-muted">backer: {s.backerName}</span>}
+                    <span className="ml-auto flex items-center gap-3 tnum">
+                      <span className={s.resultadoLiquido >= 0 ? "text-positive" : "text-negative"}>
+                        líquido {BRL.format(s.resultadoLiquido)}
+                      </span>
+                      <span className="text-xs text-muted">bruto {BRL.format(s.resultadoBruto)}</span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          )}
 
           <MetasCard
             playerId={id}
