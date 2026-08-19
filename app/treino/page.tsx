@@ -810,14 +810,19 @@ function TreinoPageInner({ tabs }: { tabs?: React.ReactNode }) {
   );
 }
 
-type Tab = "gto" | "ranges" | "rfi_jam";
+type Tab = "gto" | "ranges";
+type GtoMode = "postflop" | "preflop";
 
 function TreinoTabs() {
   const searchParams = useSearchParams();
-  const tabParam = searchParams.get("tab");
-  const initialTab: Tab = tabParam === "ranges" ? "ranges" : tabParam === "rfi_jam" ? "rfi_jam" : "gto";
+  const initialTab: Tab = searchParams.get("tab") === "ranges" ? "ranges" : "gto";
   const initialRangeId = searchParams.get("rangeId");
   const [tab, setTab] = useState<Tab>(initialTab);
+  // Sub-modo só existe dentro da aba GTO: Pós-flop é o drill que já
+  // existia (PokerTable/ActionBar), Pré-flop é o RFI/Jam novo. Não é
+  // uma aba própria de propósito — o pedido foi manter só uma tela
+  // "GTO" no nível principal.
+  const [gtoMode, setGtoMode] = useState<GtoMode>("postflop");
 
   // Altura disponível medida, não chutada. Antes o card usava
   // `calc(100vh - 32px)`, ignorando o header global do app que fica
@@ -842,7 +847,7 @@ function TreinoTabs() {
 
   const tabsNode = (
     <div className="ps-treino-tabs" style={{ display: "inline-flex", gap: 4, padding: 3, borderRadius: 10, background: "#111111", border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-      {(["gto", "ranges", "rfi_jam"] as Tab[]).map((t) => (
+      {(["gto", "ranges"] as Tab[]).map((t) => (
         <button
           key={t}
           onClick={() => setTab(t)}
@@ -857,11 +862,38 @@ function TreinoTabs() {
             color: tab === t ? "#111111" : "rgba(255,255,255,0.55)",
           }}
         >
-          {t === "gto" ? "GTO" : t === "ranges" ? "Ranges" : "RFI/Jam"}
+          {t === "gto" ? "GTO" : "Ranges"}
         </button>
       ))}
     </div>
   );
+
+  // Sub-toggle Pós-flop/Pré-flop, só visível dentro da aba GTO — visual
+  // mais discreto que as tabs principais, pra deixar claro que é um
+  // sub-modo, não uma aba de mesmo nível.
+  const gtoModeToggle =
+    tab === "gto" ? (
+      <div style={{ display: "inline-flex", gap: 4, padding: 3, borderRadius: 10, background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.06)", flexShrink: 0 }}>
+        {(["postflop", "preflop"] as GtoMode[]).map((m) => (
+          <button
+            key={m}
+            onClick={() => setGtoMode(m)}
+            style={{
+              padding: "6px 12px",
+              borderRadius: 7,
+              fontSize: 11.5,
+              fontWeight: 600,
+              border: "none",
+              cursor: "pointer",
+              background: gtoMode === m ? "rgba(255,255,255,0.9)" : "transparent",
+              color: gtoMode === m ? "#111111" : "rgba(255,255,255,0.45)",
+            }}
+          >
+            {m === "postflop" ? "Pós-flop" : "Pré-flop"}
+          </button>
+        ))}
+      </div>
+    ) : null;
 
   return (
     <div
@@ -908,18 +940,30 @@ function TreinoTabs() {
             empilhadas). Na aba Ranges, que não tem header próprio, ele
             volta a ser renderizado direto. */}
         {tab === "gto" ? (
-          <div style={{ flex: 1, minHeight: 0 }}>
-            <TreinoPageInner tabs={tabsNode} />
-          </div>
-        ) : tab === "rfi_jam" ? (
-          <>
-            <div style={{ display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>{tabsNode}</div>
-            <div style={{ flex: 1, minHeight: 0 }}>
-              <div className="h-full overflow-y-auto text-ink">
-                <RfiJamDrill />
+          gtoMode === "preflop" ? (
+            <>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 8, flexShrink: 0 }}>
+                {gtoModeToggle}
+                {tabsNode}
               </div>
+              <div style={{ flex: 1, minHeight: 0 }}>
+                <div className="h-full overflow-y-auto text-ink">
+                  <RfiJamDrill />
+                </div>
+              </div>
+            </>
+          ) : (
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <TreinoPageInner
+                tabs={
+                  <div style={{ display: "flex", gap: 8 }}>
+                    {gtoModeToggle}
+                    {tabsNode}
+                  </div>
+                }
+              />
             </div>
-          </>
+          )
         ) : (
           <>
             <div style={{ display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>{tabsNode}</div>

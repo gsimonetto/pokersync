@@ -54,6 +54,22 @@ const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
   call: "Pagar (call)",
 };
 
+// "sb_vs_bb" -> "SB vs BB" -- os valores crus do banco (snake_case,
+// pensados pra filtro/query) não são o que o jogador deve ver na tela.
+function formatMatchup(matchup: string): string {
+  return matchup
+    .split("_vs_")
+    .map((p) => p.toUpperCase())
+    .join(" vs ");
+}
+
+// Gap abaixo desse valor = as duas opções têm EV praticamente igual
+// (mesmo limiar usado no motor pra marcar "marginal" nos dados
+// gravados). Nesse caso não faz sentido dizer "OTIMA" ou "ERRO" com a
+// mesma força de uma decisão onde uma opção é claramente melhor —
+// isso ignorava o gap que a gente calcula especificamente pra isso.
+const MARGINAL_GAP_THRESHOLD = 0.5;
+
 interface Round {
   label: string;
   freq: number;
@@ -61,9 +77,26 @@ interface Round {
   gap: number;
 }
 
+function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+  return (
+    <button
+      onClick={onClick}
+      className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
+      style={{
+        border: active ? "1px solid rgba(255,255,255,0.9)" : "1px solid rgba(255,255,255,0.10)",
+        background: active ? "#FFFFFF" : "rgba(255,255,255,0.02)",
+        color: active ? "#111111" : "rgba(255,255,255,0.55)",
+      }}
+    >
+      {label}
+    </button>
+  );
+}
+
 export function RfiJamDrill() {
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
-  const [spotId, setSpotId] = useState<string>("");
+  const [matchup, setMatchup] = useState<string>("");
+  const [stackBb, setStackBb] = useState<number | null>(null);
   const [spot, setSpot] = useState<RfiJamSpot | null>(null);
   const [phaseKey, setPhaseKey] = useState<(typeof PHASES)[number]["key"]>("sbOpen");
   const [loading, setLoading] = useState(true);
@@ -77,14 +110,41 @@ export function RfiJamDrill() {
     listRfiJamSpots()
       .then((rows) => {
         setSpots(rows);
-        if (rows.length > 0) setSpotId(rows[0].spotId);
-        else setLoading(false);
+        if (rows.length > 0) {
+          setMatchup(rows[0].matchup);
+          setStackBb(rows[0].stackBb);
+        } else {
+          setLoading(false);
+        }
       })
       .catch(() => {
         setError("Erro ao listar spots RFI/Jam.");
         setLoading(false);
       });
   }, []);
+
+  const matchups = useMemo(() => Array.from(new Set(spots.map((s) => s.matchup))), [spots]);
+  const stacksForMatchup = useMemo(
+    () =>
+      Array.from(new Set(spots.filter((s) => s.matchup === matchup).map((s) => s.stackBb))).sort(
+        (a, b) => a - b
+      ),
+    [spots, matchup]
+  );
+
+  // Se o stack selecionado não existir mais pro matchup escolhido
+  // (ex: trocou de BTN vs BB pra SB vs BB e só tem 15/25/40bb lá),
+  // cai pro primeiro disponível em vez de mostrar spot vazio.
+  useEffect(() => {
+    if (stacksForMatchup.length > 0 && !stacksForMatchup.includes(stackBb ?? -1)) {
+      setStackBb(stacksForMatchup[0]);
+    }
+  }, [stacksForMatchup, stackBb]);
+
+  const spotId = useMemo(() => {
+    const found = spots.find((s) => s.matchup === matchup && s.stackBb === stackBb);
+    return found?.spotId ?? "";
+  }, [spots, matchup, stackBb]);
 
   useEffect(() => {
     if (!spotId) return;
@@ -116,11 +176,21 @@ export function RfiJamDrill() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [currentPhase]);
 
+  const isMarginal = round ? round.gap < MARGINAL_GAP_THRESHOLD : false;
+
   const verdict: Verdict | null = useMemo(() => {
     if (!round || !chosen) return null;
     const chosenFreq = chosen === "fold" ? 1 - round.freq : round.freq;
     return classifyFrequency(chosenFreq);
   }, [round, chosen]);
+
+  // Rótulo mostrado na tela: se a decisão é marginal (gap baixo — as
+  // duas opções valem quase o mesmo EV), não faz sentido bater
+  // "OTIMA"/"ERRO" com a mesma força de uma decisão clara. As
+  // estatísticas de acerto continuam usando o veredito real (mesma
+  // regra do resto do produto) — só a etiqueta visual muda.
+  const displayLabel = isMarginal && verdict ? "MARGINAL" : verdict?.replace("_", " ");
+  const displayColor = isMarginal ? "#f5a524" : verdict ? verdictColor(verdict) : undefined;
 
   useEffect(() => {
     if (!chosen || !verdict) return;
@@ -159,37 +229,50 @@ export function RfiJamDrill() {
 
   return (
     <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap gap-2">
-          <select
-            value={spotId}
-            onChange={(e) => {
-              setStats({ hits: 0, total: 0 });
-              setSpotId(e.target.value);
-            }}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm"
-          >
-            {spots.map((s) => (
-              <option key={s.spotId} value={s.spotId}>
-                {s.matchup} — {s.stackBb}bb
-              </option>
-            ))}
-          </select>
+      <div className="mb-4 flex flex-col gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] uppercase tracking-wide text-muted">Matchup</span>
+          {matchups.map((m) => (
+            <Chip
+              key={m}
+              label={formatMatchup(m)}
+              active={m === matchup}
+              onClick={() => {
+                setStats({ hits: 0, total: 0 });
+                setMatchup(m);
+              }}
+            />
+          ))}
+        </div>
 
-          <select
-            value={phaseKey}
-            onChange={(e) => {
-              setStats({ hits: 0, total: 0 });
-              setPhaseKey(e.target.value as typeof phaseKey);
-            }}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm"
-          >
-            {PHASES.map((p) => (
-              <option key={p.key} value={p.key}>
-                {p.label}
-              </option>
-            ))}
-          </select>
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] uppercase tracking-wide text-muted">Stack</span>
+          {stacksForMatchup.map((s) => (
+            <Chip
+              key={s}
+              label={`${s}bb`}
+              active={s === stackBb}
+              onClick={() => {
+                setStats({ hits: 0, total: 0 });
+                setStackBb(s);
+              }}
+            />
+          ))}
+        </div>
+
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="mr-1 text-[11px] uppercase tracking-wide text-muted">Decisão</span>
+          {PHASES.map((p) => (
+            <Chip
+              key={p.key}
+              label={p.label}
+              active={p.key === phaseKey}
+              onClick={() => {
+                setStats({ hits: 0, total: 0 });
+                setPhaseKey(p.key);
+              }}
+            />
+          ))}
         </div>
 
         {stats.total > 0 && (
@@ -233,8 +316,8 @@ export function RfiJamDrill() {
 
           {chosen && verdict && (
             <div className="w-full max-w-sm text-center">
-              <p className="mb-3 text-lg font-semibold" style={{ color: verdictColor(verdict) }}>
-                {verdict.replace("_", " ")}
+              <p className="mb-3 text-lg font-semibold" style={{ color: displayColor }}>
+                {displayLabel}
               </p>
               <div className="mb-1 flex justify-center gap-4 text-xs text-muted">
                 <span>Fold {Math.round((1 - round.freq) * 100)}%</span>
@@ -244,7 +327,7 @@ export function RfiJamDrill() {
               </div>
               <p className="mb-4 text-[11px] text-muted">
                 EV fold {currentPhase.ev_fold.toFixed(1)} · EV {actionLabel.toLowerCase()} {round.ev.toFixed(1)} · gap {round.gap.toFixed(2)}
-                {round.gap < 0.5 && <span className="ml-1 text-evolution">(decisão marginal)</span>}
+                {isMarginal && <span className="ml-1" style={{ color: "#f5a524" }}>(decisão marginal — as duas opções valem quase o mesmo)</span>}
               </p>
               <button
                 onClick={() => nextRound(currentPhase)}
