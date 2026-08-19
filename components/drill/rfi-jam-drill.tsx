@@ -121,13 +121,13 @@ interface Round {
 }
 
 function FilterChip({
-  label, active, disabled, onClick,
-}: { label: string; active: boolean; disabled?: boolean; onClick: () => void }) {
+  label, active, disabled, onClick, disabledReason,
+}: { label: string; active: boolean; disabled?: boolean; onClick: () => void; disabledReason?: string }) {
   return (
     <button
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
-      title={disabled ? "Sem mãos geradas para essa combinação ainda" : undefined}
+      title={disabled ? disabledReason ?? "Sem mãos geradas para essa combinação ainda" : undefined}
       style={{
         fontFamily: F,
         padding: "6px 12px",
@@ -157,7 +157,7 @@ function FilterChip({
 function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color: string; isGood: boolean; freqPct: number | null }) {
   const Icon = isGood ? CheckCircle2 : XCircle;
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "10%", pointerEvents: "none", zIndex: 50 }}>
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 2, pointerEvents: "none", zIndex: 50 }}>
       <div
         style={{
           fontFamily: F,
@@ -383,7 +383,8 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
         seats[pos] = { status: "empty" };
       }
     });
-    return { pot: spot.pot, spr: null, board: [], history: [], seats };
+    const spr = spot.pot > 0 ? Math.round((spot.effectiveStack / spot.pot) * 10) / 10 : null;
+    return { pot: spot.pot, spr, board: [], history: [], seats };
   }, [spot, round, chosen, activeHeroSeat, activeVillainSeat]);
 
   return (
@@ -453,7 +454,14 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
 
               <FilterSection label="Tipo">
                 {TYPE_OPTIONS.map((t) => (
-                  <FilterChip key={t.key} label={t.label} active={t.key === "icm"} disabled={t.key !== "icm"} onClick={() => {}} />
+                  <FilterChip
+                    key={t.key}
+                    label={t.label}
+                    active={t.key === "icm"}
+                    disabled={t.key !== "icm"}
+                    disabledReason={t.key !== "icm" ? "ChipEV puro (sem considerar premiação) ainda não foi gerado pelo motor -- só ICM por enquanto" : undefined}
+                    onClick={() => {}}
+                  />
                 ))}
               </FilterSection>
             </div>
@@ -477,37 +485,44 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
               </p>
             ) : round && currentPhase && tableHand && seatLayout ? (
               <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 900, maxHeight: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* "vs Jam" testa a decisão do DEFENSOR, não do abridor
+                    selecionado em "Posição herói" -- sem isso o jogador
+                    pode ficar sem entender por que as cartas viradas
+                    aparecem numa cadeira diferente da que ele escolheu
+                    no filtro. Só aparece quando os dois divergem. */}
+                {activeHeroSeat !== heroPos && (
+                  <div style={{ fontFamily: F, fontSize: 10.5, fontWeight: 600, letterSpacing: "0.06em", color: "rgba(255,255,255,0.4)", textAlign: "center", flexShrink: 0 }}>
+                    Nessa situação, quem decide é o <span style={{ color: "#FFFFFF" }}>{activeHeroSeat}</span> (defensor)
+                  </div>
+                )}
+
                 {chosen && verdict && (
-                  <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ maxHeight: 220, overflowY: "auto", background: "#0A0A0A", position: "relative", fontFamily: F, padding: "16px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-                    <p style={{ marginBottom: 12, fontSize: 18, fontWeight: 600, color: displayColor }}>{displayLabel}</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>Fold</span>
-                        <span style={{ color: "#FFFFFF" }}>{Math.round((1 - round.freq) * 100)}%</span>
+                  <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ maxHeight: 130, overflowY: "auto", background: "#0A0A0A", position: "relative", fontFamily: F, padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: displayColor }}>{displayLabel}</span>
+                      <div style={{ display: "flex", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+                        <span>Fold <b style={{ color: "#FFFFFF" }}>{Math.round((1 - round.freq) * 100)}%</b></span>
+                        <span style={{ opacity: 0.3 }}>·</span>
+                        <span>{actionLabel} <b style={{ color: "#FFFFFF" }}>{Math.round(round.freq * 100)}%</b></span>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>{actionLabel}</span>
-                        <span style={{ color: "#FFFFFF" }}>{Math.round(round.freq * 100)}%</span>
-                      </div>
-                      <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>EV fold</span>
-                        <span style={{ color: "#FFFFFF" }}>{currentPhase.ev_fold.toFixed(1)}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>EV {actionLabel.toLowerCase()}</span>
-                        <span style={{ color: "#FFFFFF" }}>{round.ev.toFixed(1)}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>Gap</span>
-                        <span style={{ color: isMarginal ? "#f5a524" : "#FFFFFF" }}>{round.gap.toFixed(2)}</span>
-                      </div>
-                      {isMarginal && (
-                        <p style={{ marginTop: 4, fontSize: 11, color: "#f5a524", lineHeight: 1.5 }}>
-                          Decisão marginal — as duas opções valem quase o mesmo EV.
-                        </p>
-                      )}
                     </div>
+
+                    {/* "Equity ICM", não EV da mão isolada: é a fatia do
+                        prêmio do torneio inteiro que cada opção deixa o
+                        jogador com, considerando os stacks de todo mundo
+                        na mesa (não fichas nem $ só desta mão). Por isso
+                        os dois valores são grandes e parecidos -- o que
+                        importa pra decisão é o Gap (diferença) entre
+                        eles, não o valor absoluto de cada um. */}
+                    <div style={{ display: "flex", gap: 14, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                      <span>Equity ICM fold <b style={{ color: "#FFFFFF", fontWeight: 600 }}>{currentPhase.ev_fold.toFixed(1)}</b></span>
+                      <span>Equity ICM {actionLabel.toLowerCase()} <b style={{ color: "#FFFFFF", fontWeight: 600 }}>{round.ev.toFixed(1)}</b></span>
+                      <span>Gap <b style={{ color: isMarginal ? "#f5a524" : "#FFFFFF", fontWeight: 600 }}>{round.gap.toFixed(2)}</b></span>
+                    </div>
+                    <p style={{ marginTop: 6, fontSize: 9.5, color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>
+                      Equity ICM = fatia do prêmio do torneio (não fichas nem $ só desta mão) — o que decide é o Gap entre as opções.
+                      {isMarginal && <span style={{ color: "#f5a524" }}> Decisão marginal: as duas opções valem quase o mesmo.</span>}
+                    </p>
                   </div>
                 )}
 
@@ -537,12 +552,20 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
                       </button>
                     </div>
                   ) : (
-                    <button
-                      onClick={() => nextRound(currentPhase)}
-                      style={{ fontFamily: F, flex: 1, background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 500, fontSize: 13 }}
-                    >
-                      Próxima mão <span style={{ fontSize: 11, color: "rgba(0,0,0,0.5)" }}>(espaço)</span>
-                    </button>
+                    <>
+                      {/* Mesmo padrão de transição já usado no pós-flop
+                          ("Você jogou X — detalhe completo no painel"),
+                          em vez de só o botão sozinho. */}
+                      <div style={{ fontFamily: F, flex: 1, padding: "10px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
+                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : actionLabel}</span> — detalhe completo acima.
+                      </div>
+                      <button
+                        onClick={() => nextRound(currentPhase)}
+                        style={{ fontFamily: F, background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 500, fontSize: 13, flexShrink: 0 }}
+                      >
+                        Próxima <span style={{ fontSize: 11, color: "rgba(0,0,0,0.5)" }}>(espaço)</span>
+                      </button>
+                    </>
                   )}
                 </div>
               </div>
