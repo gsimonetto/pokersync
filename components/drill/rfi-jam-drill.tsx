@@ -157,7 +157,7 @@ function FilterChip({
 function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color: string; isGood: boolean; freqPct: number | null }) {
   const Icon = isGood ? CheckCircle2 : XCircle;
   return (
-    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "10%", pointerEvents: "none", zIndex: 50 }}>
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: 2, pointerEvents: "none", zIndex: 50 }}>
       <div
         style={{
           fontFamily: F,
@@ -478,36 +478,32 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
             ) : round && currentPhase && tableHand && seatLayout ? (
               <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 900, maxHeight: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
                 {chosen && verdict && (
-                  <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ maxHeight: 220, overflowY: "auto", background: "#0A0A0A", position: "relative", fontFamily: F, padding: "16px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-                    <p style={{ marginBottom: 12, fontSize: 18, fontWeight: 600, color: displayColor }}>{displayLabel}</p>
-                    <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>Fold</span>
-                        <span style={{ color: "#FFFFFF" }}>{Math.round((1 - round.freq) * 100)}%</span>
+                  <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ maxHeight: 130, overflowY: "auto", background: "#0A0A0A", position: "relative", fontFamily: F, padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+                    <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, flexWrap: "wrap" }}>
+                      <span style={{ fontSize: 15, fontWeight: 700, color: displayColor }}>{displayLabel}</span>
+                      <div style={{ display: "flex", gap: 6, fontSize: 11, color: "rgba(255,255,255,0.55)" }}>
+                        <span>Fold <b style={{ color: "#FFFFFF" }}>{Math.round((1 - round.freq) * 100)}%</b></span>
+                        <span style={{ opacity: 0.3 }}>·</span>
+                        <span>{actionLabel} <b style={{ color: "#FFFFFF" }}>{Math.round(round.freq * 100)}%</b></span>
                       </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>{actionLabel}</span>
-                        <span style={{ color: "#FFFFFF" }}>{Math.round(round.freq * 100)}%</span>
-                      </div>
-                      <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>EV fold</span>
-                        <span style={{ color: "#FFFFFF" }}>{currentPhase.ev_fold.toFixed(1)}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>EV {actionLabel.toLowerCase()}</span>
-                        <span style={{ color: "#FFFFFF" }}>{round.ev.toFixed(1)}</span>
-                      </div>
-                      <div style={{ display: "flex", justifyContent: "space-between" }}>
-                        <span>Gap</span>
-                        <span style={{ color: isMarginal ? "#f5a524" : "#FFFFFF" }}>{round.gap.toFixed(2)}</span>
-                      </div>
-                      {isMarginal && (
-                        <p style={{ marginTop: 4, fontSize: 11, color: "#f5a524", lineHeight: 1.5 }}>
-                          Decisão marginal — as duas opções valem quase o mesmo EV.
-                        </p>
-                      )}
                     </div>
+
+                    {/* "Equity ICM", não EV da mão isolada: é a fatia do
+                        prêmio do torneio inteiro que cada opção deixa o
+                        jogador com, considerando os stacks de todo mundo
+                        na mesa (não fichas nem $ só desta mão). Por isso
+                        os dois valores são grandes e parecidos -- o que
+                        importa pra decisão é o Gap (diferença) entre
+                        eles, não o valor absoluto de cada um. */}
+                    <div style={{ display: "flex", gap: 14, marginTop: 8, paddingTop: 8, borderTop: "1px solid rgba(255,255,255,0.08)", fontSize: 11, color: "rgba(255,255,255,0.5)" }}>
+                      <span>Equity ICM fold <b style={{ color: "#FFFFFF", fontWeight: 600 }}>{currentPhase.ev_fold.toFixed(1)}</b></span>
+                      <span>Equity ICM {actionLabel.toLowerCase()} <b style={{ color: "#FFFFFF", fontWeight: 600 }}>{round.ev.toFixed(1)}</b></span>
+                      <span>Gap <b style={{ color: isMarginal ? "#f5a524" : "#FFFFFF", fontWeight: 600 }}>{round.gap.toFixed(2)}</b></span>
+                    </div>
+                    <p style={{ marginTop: 6, fontSize: 9.5, color: "rgba(255,255,255,0.35)", lineHeight: 1.4 }}>
+                      Equity ICM = fatia do prêmio do torneio (não fichas nem $ só desta mão) — o que decide é o Gap entre as opções.
+                      {isMarginal && <span style={{ color: "#f5a524" }}> Decisão marginal: as duas opções valem quase o mesmo.</span>}
+                    </p>
                   </div>
                 )}
 
