@@ -1,8 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2 } from "lucide-react";
+import { Loader2, SlidersHorizontal, X } from "lucide-react";
 import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
+import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import {
   getRfiJamSpot,
   listRfiJamSpots,
@@ -12,6 +13,7 @@ import {
 } from "@/lib/services/rfi-jam-service";
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
+const F = '"Space Grotesk", sans-serif';
 
 function allLabels(): string[] {
   const out: string[] = [];
@@ -43,9 +45,9 @@ function dealWeightedHand(): string {
 }
 
 const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam"; label: string }[] = [
-  { key: "sbOpen", label: "SB decide abrir" },
-  { key: "bbJam", label: "BB responde à abertura" },
-  { key: "sbCallJam", label: "SB responde ao jam" },
+  { key: "sbOpen", label: "vs Open (abrir)" },
+  { key: "bbJam", label: "vs Jam (responder)" },
+  { key: "sbCallJam", label: "vs All-in (pagar)" },
 ];
 
 const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
@@ -54,8 +56,6 @@ const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
   call: "Pagar (call)",
 };
 
-// "sb_vs_bb" -> "SB vs BB" -- os valores crus do banco (snake_case,
-// pensados pra filtro/query) não são o que o jogador deve ver na tela.
 function formatMatchup(matchup: string): string {
   return matchup
     .split("_vs_")
@@ -63,11 +63,6 @@ function formatMatchup(matchup: string): string {
     .join(" vs ");
 }
 
-// Gap abaixo desse valor = as duas opções têm EV praticamente igual
-// (mesmo limiar usado no motor pra marcar "marginal" nos dados
-// gravados). Nesse caso não faz sentido dizer "OTIMA" ou "ERRO" com a
-// mesma força de uma decisão onde uma opção é claramente melhor —
-// isso ignorava o gap que a gente calcula especificamente pra isso.
 const MARGINAL_GAP_THRESHOLD = 0.5;
 
 interface Round {
@@ -77,15 +72,25 @@ interface Round {
   gap: number;
 }
 
-function Chip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
+// Mesmo visual do FilterChip da aba Pós-flop (componente local, não
+// exportado de lá) — replicado aqui pra não acoplar os dois arquivos,
+// mantendo pixel a pixel a mesma aparência.
+function FilterChip({ label, active, onClick }: { label: string; active: boolean; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className="rounded-full border px-3 py-1.5 text-xs font-medium transition-colors"
       style={{
+        fontFamily: F,
+        padding: "6px 12px",
+        borderRadius: 8,
+        fontSize: 12,
+        fontWeight: 500,
+        cursor: "pointer",
         border: active ? "1px solid rgba(255,255,255,0.9)" : "1px solid rgba(255,255,255,0.10)",
         background: active ? "#FFFFFF" : "rgba(255,255,255,0.02)",
         color: active ? "#111111" : "rgba(255,255,255,0.55)",
+        transition: "all 160ms ease",
+        whiteSpace: "nowrap",
       }}
     >
       {label}
@@ -93,7 +98,26 @@ function Chip({ label, active, onClick }: { label: string; active: boolean; onCl
   );
 }
 
-export function RfiJamDrill() {
+function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
+      <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.35)" }}>
+        {label}
+      </span>
+      <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>{children}</div>
+    </div>
+  );
+}
+
+interface RfiJamDrillProps {
+  tabs?: React.ReactNode;
+}
+
+// Mesmo shell visual da aba GTO Pós-flop (header + grid de 3 colunas,
+// mesmas classes CSS ps-tr-*) -- só troca o conteúdo de cada coluna.
+// Isso garante que os dois modos (Pós-flop/Pré-flop) fiquem dentro do
+// MESMO layout, não dois componentes com cara diferente.
+export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   const [matchup, setMatchup] = useState<string>("");
   const [stackBb, setStackBb] = useState<number | null>(null);
@@ -101,6 +125,7 @@ export function RfiJamDrill() {
   const [phaseKey, setPhaseKey] = useState<(typeof PHASES)[number]["key"]>("sbOpen");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+  const [filtersOpen, setFiltersOpen] = useState(false);
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<"fold" | "action" | null>(null);
@@ -126,15 +151,10 @@ export function RfiJamDrill() {
   const matchups = useMemo(() => Array.from(new Set(spots.map((s) => s.matchup))), [spots]);
   const stacksForMatchup = useMemo(
     () =>
-      Array.from(new Set(spots.filter((s) => s.matchup === matchup).map((s) => s.stackBb))).sort(
-        (a, b) => a - b
-      ),
+      Array.from(new Set(spots.filter((s) => s.matchup === matchup).map((s) => s.stackBb))).sort((a, b) => a - b),
     [spots, matchup]
   );
 
-  // Se o stack selecionado não existir mais pro matchup escolhido
-  // (ex: trocou de BTN vs BB pra SB vs BB e só tem 15/25/40bb lá),
-  // cai pro primeiro disponível em vez de mostrar spot vazio.
   useEffect(() => {
     if (stacksForMatchup.length > 0 && !stacksForMatchup.includes(stackBb ?? -1)) {
       setStackBb(stacksForMatchup[0]);
@@ -169,6 +189,7 @@ export function RfiJamDrill() {
     const [freq, ev, gap] = hand;
     setRound({ label, freq, ev, gap });
     setChosen(null);
+    setFiltersOpen(false);
   }, []);
 
   useEffect(() => {
@@ -184,11 +205,6 @@ export function RfiJamDrill() {
     return classifyFrequency(chosenFreq);
   }, [round, chosen]);
 
-  // Rótulo mostrado na tela: se a decisão é marginal (gap baixo — as
-  // duas opções valem quase o mesmo EV), não faz sentido bater
-  // "OTIMA"/"ERRO" com a mesma força de uma decisão clara. As
-  // estatísticas de acerto continuam usando o veredito real (mesma
-  // regra do resto do produto) — só a etiqueta visual muda.
   const displayLabel = isMarginal && verdict ? "MARGINAL" : verdict?.replace("_", " ");
   const displayColor = isMarginal ? "#f5a524" : verdict ? verdictColor(verdict) : undefined;
 
@@ -216,129 +232,162 @@ export function RfiJamDrill() {
     return () => window.removeEventListener("keydown", onKey);
   }, [chosen, currentPhase, nextRound]);
 
-  if (spots.length === 0 && !loading) {
-    return (
-      <div className="rounded-xl border border-hairline bg-surface p-10 text-center">
-        <p className="text-sm text-muted">Nenhum spot RFI/Jam encontrado no Supabase ainda.</p>
-      </div>
-    );
-  }
-
   const sessionPct = stats.total > 0 ? Math.round((stats.hits / stats.total) * 100) : 0;
   const actionLabel = currentPhase ? ACTION_LABEL[currentPhase.action] : "";
+  const emptyMessage = spots.length === 0 ? "Nenhum spot RFI/Jam encontrado no Supabase ainda." : "";
 
   return (
-    <div>
-      <div className="mb-4 flex flex-col gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[11px] uppercase tracking-wide text-muted">Matchup</span>
-          {matchups.map((m) => (
-            <Chip
-              key={m}
-              label={formatMatchup(m)}
-              active={m === matchup}
-              onClick={() => {
-                setStats({ hits: 0, total: 0 });
-                setMatchup(m);
-              }}
-            />
-          ))}
+    <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 12, height: "100%", minHeight: 0, position: "relative" }}>
+      <TreinoResponsiveStyles />
+
+      <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minHeight: 40 }}>
+        <button
+          className="ps-tr-filters-toggle"
+          onClick={() => setFiltersOpen(true)}
+          style={{ alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0 }}
+        >
+          <SlidersHorizontal size={15} strokeWidth={1.5} />
+        </button>
+
+        <div className="ps-tr-session" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
+          {stats.total > 0 && (
+            <span style={{ fontFamily: F, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
+              {stats.hits}/{stats.total} ótimas · {sessionPct}%
+            </span>
+          )}
         </div>
 
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[11px] uppercase tracking-wide text-muted">Stack</span>
-          {stacksForMatchup.map((s) => (
-            <Chip
-              key={s}
-              label={`${s}bb`}
-              active={s === stackBb}
-              onClick={() => {
-                setStats({ hits: 0, total: 0 });
-                setStackBb(s);
-              }}
-            />
-          ))}
-        </div>
-
-        <div className="flex flex-wrap items-center gap-2">
-          <span className="mr-1 text-[11px] uppercase tracking-wide text-muted">Decisão</span>
-          {PHASES.map((p) => (
-            <Chip
-              key={p.key}
-              label={p.label}
-              active={p.key === phaseKey}
-              onClick={() => {
-                setStats({ hits: 0, total: 0 });
-                setPhaseKey(p.key);
-              }}
-            />
-          ))}
-        </div>
-
-        {stats.total > 0 && (
-          <p className="text-sm text-muted">
-            {stats.hits}/{stats.total} ótimas · {sessionPct}%
-          </p>
-        )}
+        {tabs}
       </div>
 
-      {error && <p className="mb-4 text-sm text-negative">{error}</p>}
-
-      {loading && (
-        <div className="flex items-center justify-center gap-2 py-16 text-muted">
-          <Loader2 size={18} className="animate-spin" />
-          Carregando…
-        </div>
-      )}
-
-      {!loading && round && currentPhase && (
-        <div className="flex flex-col items-center gap-6 rounded-xl border border-hairline bg-surface py-16">
-          <p className="text-5xl font-semibold tracking-wide">{round.label}</p>
-
-          {!chosen && (
-            <div className="flex gap-3">
-              <button
-                onClick={() => setChosen("fold")}
-                className="flex min-w-[110px] flex-col items-center gap-1 rounded-lg border border-hairline bg-elevated px-5 py-3 text-sm font-medium hover:bg-void"
-              >
-                Fold
-                <span className="text-[10px] text-muted">Q</span>
-              </button>
-              <button
-                onClick={() => setChosen("action")}
-                className="flex min-w-[110px] flex-col items-center gap-1 rounded-lg border border-hairline bg-elevated px-5 py-3 text-sm font-medium hover:bg-void"
-              >
-                {actionLabel}
-                <span className="text-[10px] text-muted">W</span>
-              </button>
-            </div>
+      <div className="ps-tr-body" style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr) 280px", gap: 12, minHeight: 0 }}>
+        <div className={`ps-tr-filters${filtersOpen ? " ps-tr-filters--open" : ""}`} style={{ position: "relative", minHeight: 0 }}>
+          {filtersOpen && (
+            <button
+              onClick={() => setFiltersOpen(false)}
+              style={{ position: "absolute", top: 10, right: 10, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)" }}
+            >
+              <X size={15} />
+            </button>
           )}
 
-          {chosen && verdict && (
-            <div className="w-full max-w-sm text-center">
-              <p className="mb-3 text-lg font-semibold" style={{ color: displayColor }}>
-                {displayLabel}
-              </p>
-              <div className="mb-1 flex justify-center gap-4 text-xs text-muted">
-                <span>Fold {Math.round((1 - round.freq) * 100)}%</span>
-                <span>
-                  {actionLabel} {Math.round(round.freq * 100)}%
-                </span>
+          <aside style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto" }}>
+            <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+              Filtros RFI/Jam
+            </span>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
+              <FilterSection label="Matchup">
+                {matchups.map((m) => (
+                  <FilterChip key={m} label={formatMatchup(m)} active={m === matchup} onClick={() => { setStats({ hits: 0, total: 0 }); setMatchup(m); }} />
+                ))}
+              </FilterSection>
+
+              <FilterSection label="Stack">
+                {stacksForMatchup.map((s) => (
+                  <FilterChip key={s} label={`${s}bb`} active={s === stackBb} onClick={() => { setStats({ hits: 0, total: 0 }); setStackBb(s); }} />
+                ))}
+              </FilterSection>
+
+              <FilterSection label="Situação">
+                {PHASES.map((p) => (
+                  <FilterChip key={p.key} label={p.label} active={p.key === phaseKey} onClick={() => { setStats({ hits: 0, total: 0 }); setPhaseKey(p.key); }} />
+                ))}
+              </FilterSection>
+            </div>
+          </aside>
+        </div>
+
+        {filtersOpen && (
+          <div onClick={() => setFiltersOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 39 }} />
+        )}
+
+        <div className="ps-tr-table-col" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>
+          <div className="ps-tr-table-inner" style={{ display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", flex: 1, minHeight: 0, paddingTop: 6 }}>
+            {loading ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 16 }}>
+                <Loader2 size={32} color="rgba(255,255,255,0.5)" />
+                <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14 }}>Carregando…</p>
               </div>
-              <p className="mb-4 text-[11px] text-muted">
-                EV fold {currentPhase.ev_fold.toFixed(1)} · EV {actionLabel.toLowerCase()} {round.ev.toFixed(1)} · gap {round.gap.toFixed(2)}
-                {isMarginal && <span className="ml-1" style={{ color: "#f5a524" }}>(decisão marginal — as duas opções valem quase o mesmo)</span>}
-              </p>
-              <button
-                onClick={() => nextRound(currentPhase)}
-                className="rounded-lg bg-ink px-5 py-2 text-sm font-medium text-void"
-              >
-                Próxima mão <span className="ml-1 text-xs text-muted">(espaço)</span>
-              </button>
-            </div>
-          )}
+            ) : error || emptyMessage ? (
+              <p style={{ color: "rgba(255,255,255,0.4)", fontSize: 14, textAlign: "center", maxWidth: 320 }}>{error || emptyMessage}</p>
+            ) : round && currentPhase ? (
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 24 }}>
+                <p style={{ fontFamily: F, fontSize: 56, fontWeight: 600, letterSpacing: 2, color: "#FFFFFF" }}>{round.label}</p>
+
+                {!chosen && (
+                  <div style={{ display: "flex", gap: 12 }}>
+                    <button
+                      onClick={() => setChosen("fold")}
+                      style={{ fontFamily: F, minWidth: 110, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "12px 20px", fontSize: 14, fontWeight: 500, color: "#FFFFFF", cursor: "pointer" }}
+                    >
+                      Fold
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>Q</span>
+                    </button>
+                    <button
+                      onClick={() => setChosen("action")}
+                      style={{ fontFamily: F, minWidth: 110, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "12px 20px", fontSize: 14, fontWeight: 500, color: "#FFFFFF", cursor: "pointer" }}
+                    >
+                      {actionLabel}
+                      <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>W</span>
+                    </button>
+                  </div>
+                )}
+
+                {chosen && verdict && (
+                  <button
+                    onClick={() => nextRound(currentPhase)}
+                    style={{ fontFamily: F, background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 500, fontSize: 13 }}
+                  >
+                    Próxima mão <span style={{ fontSize: 11, color: "rgba(0,0,0,0.5)" }}>(espaço)</span>
+                  </button>
+                )}
+              </div>
+            ) : null}
+          </div>
         </div>
-      )}
+
+        {chosen && round && currentPhase && verdict ? (
+          <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ overflowY: "auto", background: "#0A0A0A", position: "relative", fontFamily: F, padding: "16px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }}>
+            <p style={{ marginBottom: 12, fontSize: 18, fontWeight: 600, color: displayColor }}>{displayLabel}</p>
+
+            <div style={{ display: "flex", flexDirection: "column", gap: 8, fontSize: 12, color: "rgba(255,255,255,0.55)" }}>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Fold</span>
+                <span style={{ color: "#FFFFFF" }}>{Math.round((1 - round.freq) * 100)}%</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>{actionLabel}</span>
+                <span style={{ color: "#FFFFFF" }}>{Math.round(round.freq * 100)}%</span>
+              </div>
+              <div style={{ height: 1, background: "rgba(255,255,255,0.08)", margin: "4px 0" }} />
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>EV fold</span>
+                <span style={{ color: "#FFFFFF" }}>{currentPhase.ev_fold.toFixed(1)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>EV {actionLabel.toLowerCase()}</span>
+                <span style={{ color: "#FFFFFF" }}>{round.ev.toFixed(1)}</span>
+              </div>
+              <div style={{ display: "flex", justifyContent: "space-between" }}>
+                <span>Gap</span>
+                <span style={{ color: isMarginal ? "#f5a524" : "#FFFFFF" }}>{round.gap.toFixed(2)}</span>
+              </div>
+              {isMarginal && (
+                <p style={{ marginTop: 4, fontSize: 11, color: "#f5a524", lineHeight: 1.5 }}>
+                  Decisão marginal — as duas opções valem quase o mesmo EV.
+                </p>
+              )}
+            </div>
+          </div>
+        ) : (
+          <div className="ps-tr-feedback ps-tr-feedback-idle" style={{ overflowY: "auto" }}>
+            <div style={{ fontFamily: F, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
+              {round ? "Escolha uma ação abaixo — o feedback aparece aqui." : emptyMessage}
+            </div>
+          </div>
+        )}
+      </div>
     </div>
   );
 }
