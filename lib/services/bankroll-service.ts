@@ -136,7 +136,14 @@ export async function saveSettings({ bankroll, profile }: { bankroll: number; pr
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToTransaction(r: any): Transaction {
-  return { id: r.id, date: r.date, type: r.type, amount: Number(r.amount) || 0, note: r.note || undefined };
+  return {
+    id: r.id,
+    date: r.date,
+    type: r.type,
+    amount: Number(r.amount) || 0,
+    note: r.note || undefined,
+    venue: r.venue || undefined,
+  };
 }
 
 export async function fetchTransactions(): Promise<Transaction[]> {
@@ -154,12 +161,20 @@ export async function addTransaction(t: {
   type: TransactionType;
   amount: number;
   note?: string;
+  venue?: string;
 }): Promise<Transaction> {
   const supabase = createClient();
   const userId = await getUserId();
   const { data, error } = await supabase
     .from("bankroll_transactions")
-    .insert({ user_id: userId, date: t.date, type: t.type, amount: Number(t.amount) || 0, note: t.note || null })
+    .insert({
+      user_id: userId,
+      date: t.date,
+      type: t.type,
+      amount: Number(t.amount) || 0,
+      note: t.note || null,
+      venue: t.venue || null,
+    })
     .select()
     .single();
   if (error) throw error;

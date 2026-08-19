@@ -112,6 +112,25 @@ export function groupStats(sessions: Session[], dimension: "format" | "weekday" 
     .sort((a, b) => a.net - b.net);
 }
 
+// --- Volume por dia (heatmap estilo GitHub) --------------------------------
+// Agrega sessoes por data pra visualizar consistencia de volume — util pra
+// grinder identificar buracos na rotina, nao so o resultado.
+export interface DayActivity {
+  date: string;
+  n: number;
+  net: number;
+}
+
+export function dailyActivity(sessions: Session[]): Record<string, DayActivity> {
+  const byDate: Record<string, DayActivity> = {};
+  for (const s of sessions || []) {
+    const d = (byDate[s.date] ||= { date: s.date, n: 0, net: 0 });
+    d.n += 1;
+    d.net += net(s);
+  }
+  return byDate;
+}
+
 // --- Leak comportamental: tilt/mood (diario pos-sessao) -------------------
 // Cruza o diario (mood registrado na sessao) com o resultado — pra
 // responder "eu realmente jogo pior quando marco tilt?" com numero, nao
@@ -141,6 +160,62 @@ export function tiltImpact(sessions: Session[]): TiltImpact | null {
     otherRoi: aOther.roi,
     otherNet: aOther.profit,
   };
+}
+
+// --- R$/hora ---------------------------------------------------------------
+// So considera sessoes com `hours` preenchido (campo opcional) — sessoes
+// sem hora registrada nao entram no calculo, entao o numero fica correto
+// mesmo em bancas com historico misto (parte com hora, parte sem).
+export function hourlyRate(sessions: Session[]): { value: number; hoursLogged: number; n: number } | null {
+  const withHours = (sessions || []).filter((s) => Number(s.hours) > 0);
+  if (withHours.length === 0) return null;
+  const totalHours = withHours.reduce((sum, s) => sum + (Number(s.hours) || 0), 0);
+  const totalNet = withHours.reduce((sum, s) => sum + net(s), 0);
+  if (totalHours <= 0) return null;
+  return { value: totalNet / totalHours, hoursLogged: totalHours, n: withHours.length };
+}
+
+// --- Saldo por plataforma ----------------------------------------------
+// Responde "quanto eu tenho na GGPoker" cruzando resultado de sessoes
+// (Session.venue) com transacoes (Transaction.venue) daquela plataforma.
+// Sessoes/transacoes sem plataforma definida caem em "Sem plataforma" —
+// nao ficam escondidas, mas tambem nao se misturam com o resto.
+export interface PlatformBalance {
+  platform: string;
+  balance: number;
+  sessionsN: number;
+  sessionsNet: number;
+  deposits: number;
+  withdrawn: number;
+}
+
+export function platformBalances(sessions: Session[], transactions: Transaction[]): PlatformBalance[] {
+  const byPlatform: Record<string, { sessions: Session[]; deposits: number; withdrawn: number }> = {};
+  const bucket = (key: string) => (byPlatform[key] ||= { sessions: [], deposits: 0, withdrawn: 0 });
+
+  for (const s of sessions || []) {
+    bucket(s.venue?.trim() || "Sem plataforma").sessions.push(s);
+  }
+  for (const t of transactions || []) {
+    const b = bucket(t.venue?.trim() || "Sem plataforma");
+    const v = Number(t.amount) || 0;
+    if (t.type === "deposito") b.deposits += v;
+    else b.withdrawn += v;
+  }
+
+  return Object.entries(byPlatform)
+    .map(([platform, { sessions: sess, deposits, withdrawn }]) => {
+      const sessionsNet = sess.reduce((sum, s) => sum + net(s), 0);
+      return {
+        platform,
+        balance: sessionsNet + deposits - withdrawn,
+        sessionsN: sess.length,
+        sessionsNet,
+        deposits,
+        withdrawn,
+      };
+    })
+    .sort((a, b) => b.balance - a.balance);
 }
 
 export type RangeOption = "7D" | "30D" | "1Y" | "all";
