@@ -521,14 +521,17 @@ export default function BankrollPage() {
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
+      <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
+      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
         <StatCard
+          size="lg"
           label="Resultado"
           value={fmtSignedMoney(agg.profit)}
           tone={agg.profit >= 0 ? "positive" : "negative"}
           accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
         />
         <StatCard
+          size="lg"
           label="ROI"
           value={fmtPct(agg.roi)}
           accent="#22d3ee"
@@ -538,6 +541,19 @@ export default function BankrollPage() {
               : undefined
           }
         />
+        <StatCard
+          size="lg"
+          label="R$/hora"
+          value={rate ? fmtMoney(rate.value) : "—"}
+          tone={rate ? (rate.value >= 0 ? "positive" : "negative") : undefined}
+          icon={<Clock size={12} />}
+          accent={rate ? (rate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
+          hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
+        />
+      </div>
+
+      <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Atividade &amp; risco</p>
+      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
         <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
         <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
         <StatCard label="Buy-in médio" value={fmtMoney(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
@@ -548,26 +564,13 @@ export default function BankrollPage() {
           icon={<History size={11} />}
           accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
         />
-        <StatCard
-          label="R$/hora"
-          value={rate ? fmtMoney(rate.value) : "—"}
-          tone={rate ? (rate.value >= 0 ? "positive" : "negative") : undefined}
-          icon={<Clock size={11} />}
-          accent={rate ? (rate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
-        />
+        {nw.withdrawn > 0 && (
+          <StatCard label="Sacado" value={fmtMoney(nw.withdrawn)} icon={<Wallet size={11} />} accent="#e0555a" />
+        )}
+        {nw.caixinha > 0 && (
+          <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={11} />} accent="#ec4899" />
+        )}
       </div>
-      {!rate && (
-        <p className="mt-2 text-[11px] text-muted">
-          R$/hora aparece quando voce registra as horas jogadas ao salvar uma sessao.
-        </p>
-      )}
-
-      {(nw.withdrawn > 0 || nw.caixinha > 0) && (
-        <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
-          <StatCard label="Sacado" value={fmtMoney(nw.withdrawn)} icon={<Wallet size={13} />} accent="#e0555a" />
-          <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={13} />} accent="#ec4899" />
-        </div>
-      )}
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
         <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20 lg:col-span-2">
@@ -1336,6 +1339,8 @@ function StatCard({
   icon,
   accent,
   delta,
+  size = "sm",
+  hint,
 }: {
   label: string;
   value: string;
@@ -1343,6 +1348,8 @@ function StatCard({
   icon?: React.ReactNode;
   accent: string;
   delta?: { text: string; positive: boolean };
+  size?: "sm" | "lg";
+  hint?: string;
 }) {
   const color =
     tone === "positive"
@@ -1354,22 +1361,24 @@ function StatCard({
           : tone === "evolution"
             ? "text-evolution"
             : "text-ink";
+  const lg = size === "lg";
   return (
     <div
       style={{ "--acc": accent } as React.CSSProperties}
-      className="acc-card acc-lift group relative cursor-pointer overflow-hidden rounded-xl border border-hairline bg-surface p-3.5"
+      className={`acc-card acc-lift group relative cursor-pointer overflow-hidden rounded-xl border border-hairline bg-surface ${lg ? "p-4" : "p-3.5"}`}
     >
-      <div aria-hidden="true" className="acc-glow pointer-events-none absolute -right-6 -top-6 size-20 rounded-full blur-2xl" />
-      <p className="relative flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">
+      <div aria-hidden="true" className={`acc-glow pointer-events-none absolute -right-6 -top-6 rounded-full blur-2xl ${lg ? "size-24" : "size-20"}`} />
+      <p className={`relative flex items-center gap-1.5 font-bold uppercase tracking-[0.12em] text-muted ${lg ? "text-[10.5px]" : "text-[10px]"}`}>
         {icon}
         {label}
       </p>
-      <p className={`relative mt-1 text-2xl font-bold tabular-nums ${color}`}>{value}</p>
+      <p className={`relative mt-1 font-bold tabular-nums ${color} ${lg ? "text-3xl" : "text-2xl"}`}>{value}</p>
       {delta && (
         <p className={`relative mt-1 text-[11px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
           {delta.positive ? "▲" : "▼"} {delta.text}
         </p>
       )}
+      {hint && !delta && <p className="relative mt-1 text-[10.5px] text-muted">{hint}</p>}
     </div>
   );
 }
