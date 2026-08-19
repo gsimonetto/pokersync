@@ -29,6 +29,7 @@ export interface Transaction {
   type: TransactionType;
   amount: number;
   note?: string;
+  venue?: string;
 }
 
 export type GoalType = "volume" | "estudo";

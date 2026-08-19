@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Flame, Download, StickyNote, GitCompare, ShieldAlert, Hash, History } from "lucide-react";
+import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Flame, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
+import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import {
   fetchSessions,
   fetchSettings,
@@ -54,14 +55,18 @@ export default function BankrollPage() {
   const [view, setView] = useState<"jogo" | "patrimonio">("jogo");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
+  const [platformFilter, setPlatformFilter] = useState<string>("todas");
 
   const [format, setFormat] = useState(FORMATS[0]);
   const [date, setDate] = useState(todayISO());
+  const [time, setTime] = useState("");
   const [buyIn, setBuyIn] = useState("");
   const [reentries, setReentries] = useState("0");
   const [cashout, setCashout] = useState("");
   const [stake, setStake] = useState("");
-  const [venue, setVenue] = useState("");
+  const [venue, setVenue] = useState<string>(PLATFORMS[0]);
+  const [venueOther, setVenueOther] = useState("");
+  const [hours, setHours] = useState("");
   const [notes, setNotes] = useState("");
   const [showDiary, setShowDiary] = useState(false);
   const [mood, setMood] = useState("");
@@ -72,6 +77,11 @@ export default function BankrollPage() {
   const [txAmount, setTxAmount] = useState("");
   const [txDate, setTxDate] = useState(todayISO());
   const [txNote, setTxNote] = useState("");
+  const [txVenue, setTxVenue] = useState<string>(PLATFORMS[0]);
+  const [txVenueOther, setTxVenueOther] = useState("");
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historySearch, setHistorySearch] = useState("");
 
   const [goalType, setGoalType] = useState<GoalType>("volume");
   const [goalPeriod, setGoalPeriod] = useState<GoalPeriod>("semanal");
@@ -127,10 +137,37 @@ export default function BankrollPage() {
   }, []);
 
   const base = Number(bankroll) || 0;
-  const agg = useMemo(() => aggregate(sessions), [sessions]);
-  const nw = useMemo(() => netWorth(base, agg.profit, transactions), [base, agg.profit, transactions]);
-  const currentBankroll = view === "jogo" ? nw.playingBankroll : nw.netWorth;
-  const series = useMemo(() => evolutionSeries(sessions, base), [sessions, base]);
+
+  const platforms = useMemo(() => platformBalances(sessions, transactions), [sessions, transactions]);
+  const platformNames = useMemo(() => {
+    const known = new Set<string>(PLATFORMS as readonly string[]);
+    for (const p of platforms) known.add(p.platform);
+    return Array.from(known);
+  }, [platforms]);
+  const isPlatformFiltered = platformFilter !== "todas";
+  const platformSessions = useMemo(
+    () => (isPlatformFiltered ? sessions.filter((s) => (s.venue?.trim() || "Sem plataforma") === platformFilter) : sessions),
+    [sessions, platformFilter, isPlatformFiltered]
+  );
+  const platformTransactions = useMemo(
+    () => (isPlatformFiltered ? transactions.filter((t) => (t.venue?.trim() || "Sem plataforma") === platformFilter) : transactions),
+    [transactions, platformFilter, isPlatformFiltered]
+  );
+
+  const agg = useMemo(() => aggregate(platformSessions), [platformSessions]);
+  const nw = useMemo(
+    () => (isPlatformFiltered ? netWorth(0, agg.profit, platformTransactions) : netWorth(base, agg.profit, transactions)),
+    [isPlatformFiltered, base, agg.profit, transactions, platformTransactions]
+  );
+  const currentBankroll = isPlatformFiltered
+    ? platforms.find((p) => p.platform === platformFilter)?.balance ?? 0
+    : view === "jogo"
+      ? nw.playingBankroll
+      : nw.netWorth;
+  const series = useMemo(
+    () => evolutionSeries(platformSessions, isPlatformFiltered ? 0 : base),
+    [platformSessions, isPlatformFiltered, base]
+  );
   const filteredSeries = useMemo(() => filterSeriesByRange(series, range), [series, range]);
   const tips = useMemo(
     () => buildCoachTips(sessions, { bankroll: nw.playingBankroll, brmThresholds }),
@@ -140,12 +177,13 @@ export default function BankrollPage() {
     () => brmReading(sessions, nw.playingBankroll, brmThresholds),
     [sessions, nw.playingBankroll, brmThresholds]
   );
-  const leakStats = useMemo(() => groupStats(sessions, leakDimension), [sessions, leakDimension]);
-  const tiltStats = useMemo(() => tiltImpact(sessions), [sessions]);
+  const leakStats = useMemo(() => groupStats(platformSessions, leakDimension), [platformSessions, leakDimension]);
+  const tiltStats = useMemo(() => tiltImpact(platformSessions), [platformSessions]);
+  const rate = useMemo(() => hourlyRate(platformSessions), [platformSessions]);
   const calcThreshold = useMemo(() => thresholdFor(brmThresholds, calcFormat), [brmThresholds, calcFormat]);
   const ruin = useMemo(() => riskOfRuin(sessions, nw.playingBankroll), [sessions, nw.playingBankroll]);
-  const comparison = useMemo(() => compareMonths(sessions), [sessions]);
-  const currentDrawdown = useMemo(() => drawdownBuyIns(sessions, agg.avgBuyIn), [sessions, agg.avgBuyIn]);
+  const comparison = useMemo(() => compareMonths(platformSessions), [platformSessions]);
+  const currentDrawdown = useMemo(() => drawdownBuyIns(platformSessions, agg.avgBuyIn), [platformSessions, agg.avgBuyIn]);
   const profitDelta = comparison.current.profit - comparison.previous.profit;
   const roiDelta = comparison.current.roi - comparison.previous.roi;
   const calcBuyInsCovered = Number(calcBuyIn) > 0 ? nw.playingBankroll / Number(calcBuyIn) : null;
@@ -157,8 +195,16 @@ export default function BankrollPage() {
         : calcBuyInsCovered < calcThreshold.movedownBuyins
           ? "movedown"
           : "hold";
-  const recent = [...sessions].reverse().slice(0, 8);
-  const recentTx = [...transactions].reverse().slice(0, 6);
+  const recent = [...platformSessions].reverse().slice(0, 8);
+  const recentTx = [...platformTransactions].reverse().slice(0, 6);
+  const historyFiltered = useMemo(() => {
+    const q = historySearch.trim().toLowerCase();
+    const list = [...platformSessions].reverse();
+    if (!q) return list;
+    return list.filter((s) =>
+      [s.format, s.date, s.stake, s.venue, s.notes, s.mood].filter(Boolean).some((f) => String(f).toLowerCase().includes(q))
+    );
+  }, [platformSessions, historySearch]);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
 
   const featuredTip = useFeaturedCoachTip(tips);
@@ -184,15 +230,18 @@ export default function BankrollPage() {
       setErr("Preencha data, buy-in e cashout.");
       return;
     }
+    const resolvedVenue = venue === OUTRO_PLATFORM ? venueOther.trim() : venue;
     const draft: Session = {
       id: `tmp-${Date.now()}`,
       date,
+      time: time || undefined,
       format,
       buyIn: Number(buyIn),
       reentries: Number(reentries) || 0,
       cashout: Number(cashout),
       stake,
-      venue,
+      hours: hours ? Number(hours) : undefined,
+      venue: resolvedVenue || undefined,
       notes,
       mood: mood || undefined,
       tilt: tilt ? Number(tilt) : undefined,
@@ -202,7 +251,10 @@ export default function BankrollPage() {
     setBuyIn("");
     setCashout("");
     setStake("");
-    setVenue("");
+    setVenue(PLATFORMS[0]);
+    setVenueOther("");
+    setHours("");
+    setTime("");
     setNotes("");
     setReentries("0");
     setMood("");
@@ -236,10 +288,20 @@ export default function BankrollPage() {
       setErr("Preencha valor e data da transacao.");
       return;
     }
-    const draft: Transaction = { id: `tmp-${Date.now()}`, date: txDate, type: txType, amount: Number(txAmount), note: txNote };
+    const resolvedTxVenue = txVenue === OUTRO_PLATFORM ? txVenueOther.trim() : txVenue;
+    const draft: Transaction = {
+      id: `tmp-${Date.now()}`,
+      date: txDate,
+      type: txType,
+      amount: Number(txAmount),
+      note: txNote,
+      venue: resolvedTxVenue || undefined,
+    };
     setTransactions((prev) => [...prev, draft]);
     setTxAmount("");
     setTxNote("");
+    setTxVenue(PLATFORMS[0]);
+    setTxVenueOther("");
     setErr("");
     setTxModalOpen(false);
     try {
@@ -384,6 +446,21 @@ export default function BankrollPage() {
         </div>
 
         <div className="flex items-center gap-2.5">
+          <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
+            <Landmark size={13} className="text-muted" />
+            <select
+              value={platformFilter}
+              onChange={(e) => setPlatformFilter(e.target.value)}
+              className="bg-transparent text-[11px] font-semibold uppercase tracking-[0.06em] text-ink outline-none"
+            >
+              <option value="todas">Todas as plataformas</option>
+              {platformNames.map((p) => (
+                <option key={p} value={p}>
+                  {p}
+                </option>
+              ))}
+            </select>
+          </div>
           <button
             onClick={() => setSessionModalOpen(true)}
             aria-label="Registrar sessao"
@@ -443,7 +520,7 @@ export default function BankrollPage() {
         />
       </div>
 
-      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-7">
         <StatCard
           label="Resultado"
           value={fmtSignedMoney(agg.profit)}
@@ -470,7 +547,19 @@ export default function BankrollPage() {
           icon={<History size={11} />}
           accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
         />
+        <StatCard
+          label="R$/hora"
+          value={rate ? fmtMoney(rate.value) : "—"}
+          tone={rate ? (rate.value >= 0 ? "positive" : "negative") : undefined}
+          icon={<Clock size={11} />}
+          accent={rate ? (rate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
+        />
       </div>
+      {!rate && (
+        <p className="mt-2 text-[11px] text-muted">
+          R$/hora aparece quando voce registra as horas jogadas ao salvar uma sessao.
+        </p>
+      )}
 
       {(nw.withdrawn > 0 || nw.caixinha > 0) && (
         <div className="mt-3 grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -586,6 +675,31 @@ export default function BankrollPage() {
               </button>
             )}
           </section>
+
+          {platforms.length > 0 && (
+            <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+              <div className="flex items-center gap-1.5">
+                <Landmark size={12} className="text-evolution" />
+                <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Saldo por plataforma</h2>
+              </div>
+              <div className="mt-2 flex flex-col gap-1">
+                {platforms.map((p) => (
+                  <button
+                    key={p.platform}
+                    onClick={() => setPlatformFilter(platformFilter === p.platform ? "todas" : p.platform)}
+                    className={`flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all duration-150 hover:bg-elevated ${
+                      platformFilter === p.platform ? "bg-elevated ring-1 ring-inset ring-evolution/40" : ""
+                    }`}
+                  >
+                    <span className="truncate text-[11px] font-semibold text-ink">{p.platform}</span>
+                    <span className={`shrink-0 text-[11px] font-bold tabular-nums ${p.balance >= 0 ? "text-positive" : "text-negative"}`}>
+                      {fmtMoney(p.balance)}
+                    </span>
+                  </button>
+                ))}
+              </div>
+            </section>
+          )}
 
           <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
             <div className="flex items-center gap-1.5">
@@ -818,6 +932,22 @@ export default function BankrollPage() {
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
           />
           <input
+            type="time"
+            value={time}
+            onChange={(e) => setTime(e.target.value)}
+            title="Horario que a sessao comecou"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-muted transition-colors hover:border-ink/30"
+          />
+          <input
+            type="number"
+            step="0.1"
+            min="0"
+            placeholder="Horas jogadas"
+            value={hours}
+            onChange={(e) => setHours(e.target.value)}
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+          />
+          <input
             placeholder="Buy-in"
             value={buyIn}
             onChange={(e) => setBuyIn(e.target.value)}
@@ -841,12 +971,26 @@ export default function BankrollPage() {
             onChange={(e) => setStake(e.target.value)}
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
           />
-          <input
-            placeholder="Local"
+          <select
             value={venue}
             onChange={(e) => setVenue(e.target.value)}
-            className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
-          />
+            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30 ${venue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
+          >
+            {PLATFORMS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+            <option value={OUTRO_PLATFORM}>{OUTRO_PLATFORM}</option>
+          </select>
+          {venue === OUTRO_PLATFORM && (
+            <input
+              placeholder="Qual plataforma?"
+              value={venueOther}
+              onChange={(e) => setVenueOther(e.target.value)}
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            />
+          )}
           <input
             placeholder="Notas"
             value={notes}
@@ -896,12 +1040,37 @@ export default function BankrollPage() {
       </Modal>
 
       <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Sessoes recentes</h2>
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+            {historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
+          </h2>
+          <div className="flex items-center gap-2">
+            {historyOpen && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
+                <Search size={12} className="text-muted" />
+                <input
+                  placeholder="Buscar por formato, stake, plataforma..."
+                  value={historySearch}
+                  onChange={(e) => setHistorySearch(e.target.value)}
+                  className="w-52 bg-transparent text-[11px] text-ink outline-none placeholder:text-muted"
+                />
+              </div>
+            )}
+            {platformSessions.length > 8 && (
+              <button
+                onClick={() => setHistoryOpen((v) => !v)}
+                className="text-[11px] font-semibold text-muted transition-colors hover:text-ink"
+              >
+                {historyOpen ? "Mostrar recentes" : `Ver todas (${platformSessions.length})`}
+              </button>
+            )}
+          </div>
+        </div>
         {recent.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
         ) : (
-          <div className="mt-2 flex flex-col">
-            {recent.map((s) => {
+          <div className={`mt-2 flex flex-col ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
+            {(historyOpen ? historyFiltered : recent).map((s) => {
               const result = net(s);
               return (
                 <div
@@ -965,6 +1134,26 @@ export default function BankrollPage() {
             onChange={(e) => setTxNote(e.target.value)}
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
           />
+          <select
+            value={txVenue}
+            onChange={(e) => setTxVenue(e.target.value)}
+            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30 ${txVenue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
+          >
+            {PLATFORMS.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+            <option value={OUTRO_PLATFORM}>{OUTRO_PLATFORM}</option>
+          </select>
+          {txVenue === OUTRO_PLATFORM && (
+            <input
+              placeholder="Qual plataforma?"
+              value={txVenueOther}
+              onChange={(e) => setTxVenueOther(e.target.value)}
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            />
+          )}
         </div>
         <button
           onClick={handleAddTransaction}
@@ -997,6 +1186,7 @@ export default function BankrollPage() {
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-sm font-semibold">
                     {TX_LABELS[t.type]} · {t.date}
+                    {t.venue ? ` · ${t.venue}` : ""}
                   </p>
                   {t.note && <p className="truncate text-xs text-muted">{t.note}</p>}
                 </div>
@@ -1316,6 +1506,7 @@ function Modal({
 const Y_TICKS = 4;
 
 function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; annotations?: Annotation[] }) {
+  const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   if (series.length < 2) {
     return <p className="text-sm text-muted">Registre ao menos 2 sessoes para ver o grafico.</p>;
   }
@@ -1363,6 +1554,24 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
       return idx === -1 ? null : { ...a, x: xAt(idx) };
     })
     .filter((a): a is Annotation & { x: number } => a !== null);
+
+  const hoverPoint = hoverIdx != null ? coords[hoverIdx] : null;
+  const hoverData = hoverIdx != null ? series[hoverIdx] : null;
+
+  function handleMove(e: React.MouseEvent<SVGRectElement>) {
+    const rect = e.currentTarget.getBoundingClientRect();
+    const relX = ((e.clientX - rect.left) / rect.width) * w;
+    let nearest = 0;
+    let best = Infinity;
+    for (let i = 0; i < coords.length; i++) {
+      const d = Math.abs(coords[i].x - relX);
+      if (d < best) {
+        best = d;
+        nearest = i;
+      }
+    }
+    setHoverIdx(nearest);
+  }
 
   return (
     <svg viewBox={`0 0 ${w} ${h}`} className="h-56 w-full overflow-visible">
@@ -1430,6 +1639,33 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
         <animate attributeName="opacity" values="0.9;0.45;0.9" dur="1.8s" repeatCount="indefinite" />
       </circle>
       <circle cx={lastPoint.x} cy={lastPoint.y} r={2.5} fill="#fff" />
+
+      {hoverPoint && hoverData && (
+        <g pointerEvents="none">
+          <line x1={hoverPoint.x} y1={padT} x2={hoverPoint.x} y2={padT + plotH} stroke="var(--color-hairline)" strokeWidth={1} strokeDasharray="2,2" />
+          <circle cx={hoverPoint.x} cy={hoverPoint.y} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
+          <g transform={`translate(${Math.min(Math.max(hoverPoint.x - 46, padL), w - padR - 92)}, ${Math.max(hoverPoint.y - 46, padT)})`}>
+            <rect width={92} height={34} rx={6} fill="var(--color-elevated)" stroke="var(--color-hairline)" strokeWidth={1} />
+            <text x={8} y={14} fontSize={9} fill="var(--color-muted)">
+              {hoverData.date}
+            </text>
+            <text x={8} y={26} fontSize={10.5} fontWeight={700} fill={hoverData.net >= 0 ? "#22c55e" : "#e0555a"}>
+              {fmtMoney(hoverData.value)} ({hoverData.net >= 0 ? "+" : ""}
+              {fmtMoney(hoverData.net)})
+            </text>
+          </g>
+        </g>
+      )}
+
+      <rect
+        x={padL}
+        y={padT}
+        width={plotW}
+        height={plotH}
+        fill="transparent"
+        onMouseMove={handleMove}
+        onMouseLeave={() => setHoverIdx(null)}
+      />
     </svg>
   );
 }
