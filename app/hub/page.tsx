@@ -1,16 +1,17 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft, Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
-  Clock, Spade, BookOpen, HelpCircle, Scale, X, Medal,
+  Clock, Spade, BookOpen, HelpCircle, Scale, Medal,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboard, xpForNextLevel, levelColor, MAX_LEVEL, type Progress, type LeaderboardEntry,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, xpForNextLevel, levelColor, MAX_LEVEL,
+  type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank,
 } from "@/lib/services/xp-service";
 import { createClient } from "@/lib/supabase/client";
 
@@ -74,13 +75,33 @@ export default function HubPage() {
   const [err, setErr] = useState("");
   const [tab, setTab] = useState<MissionTab>("daily");
 
-  // Ranking global (filtro lateral de Trofeu) — carregado so quando o
-  // painel abre pela primeira vez, nao no load inicial da tela (evita
-  // custo de RPC extra pra quem nunca abre o ranking).
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  // Ranking global -- agora secao fixa da tela (nao mais drawer escondido
+  // atras do trofeu: pedido explicito, "hoje e' so uma tela ao lado").
+  // O botao de trofeu vira atalho de scroll, igual ao padrao ja usado no
+  // painel de leaks da Gestao de Banca (leaksRef).
+  const rankingRef = useRef<HTMLElement | null>(null);
+  const [rankingPeriod, setRankingPeriod] = useState<LeaderboardPeriod>("week");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [myRank, setMyRank] = useState<MyRank | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+
+  useEffect(() => {
+    let alive = true;
+    setLeaderboardLoading(true);
+    Promise.all([
+      fetchLeaderboardPeriod(rankingPeriod, 50).catch(() => []),
+      fetchMyLeaderboardRank(rankingPeriod).catch(() => null),
+    ]).then(([lb, mine]) => {
+      if (!alive) return;
+      setLeaderboard(lb);
+      setMyRank(mine);
+      setLeaderboardLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [rankingPeriod]);
 
   useEffect(() => {
     let alive = true;
@@ -107,19 +128,6 @@ export default function HubPage() {
       alive = false;
     };
   }, []);
-
-  async function openLeaderboard() {
-    setLeaderboardOpen(true);
-    if (leaderboard) return;
-    setLeaderboardLoading(true);
-    try {
-      setLeaderboard(await fetchLeaderboard(100));
-    } catch {
-      setLeaderboard([]);
-    } finally {
-      setLeaderboardLoading(false);
-    }
-  }
 
   if (loading) return <main className="p-10 text-center text-sm text-muted">Carregando Hub...</main>;
   if (err || !progress) return <main className="p-10 text-center text-sm text-negative">{err}</main>;
@@ -173,10 +181,6 @@ export default function HubPage() {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes hubDrawerIn {
-          from { opacity: 0; transform: translateX(24px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
         .hub-flame-icon { animation: hubFlameFlicker var(--flame-speed, 2.4s) ease-in-out infinite; }
         .hub-flame-glow { animation: hubFlameGlow var(--flame-speed, 2.4s) ease-in-out infinite; }
         .hub-ember { animation: hubEmberRise var(--ember-speed, 1.6s) ease-in infinite; }
@@ -228,10 +232,10 @@ export default function HubPage() {
           </div>
         </div>
 
-        {/* Filtro lateral de Trofeu (pedido explicito): ranking de todos
-            os membros PokerSync, abre em drawer pela direita. */}
+        {/* Ranking de todos os membros PokerSync -- secao fixa la embaixo,
+            isso aqui so' rola ate' ela. */}
         <button
-          onClick={openLeaderboard}
+          onClick={() => rankingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
           title="Ranking PokerSync"
           className="hub-trophy-btn grid h-10 w-10 place-items-center rounded-xl border"
           style={{ borderColor: `${ACCENT}55`, background: `${ACCENT}15`, color: ACCENT }}
@@ -357,14 +361,15 @@ export default function HubPage() {
         )}
       </div>
 
-      {leaderboardOpen && (
-        <LeaderboardDrawer
-          onClose={() => setLeaderboardOpen(false)}
-          entries={leaderboard}
-          loading={leaderboardLoading}
-          meId={meId}
-        />
-      )}
+      <RankingSection
+        forwardedRef={rankingRef}
+        entries={leaderboard}
+        loading={leaderboardLoading}
+        meId={meId}
+        period={rankingPeriod}
+        onPeriodChange={setRankingPeriod}
+        myRank={myRank}
+      />
     </main>
   );
 }
@@ -498,86 +503,114 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   );
 }
 
-// Ranking global (pedido explicito: "criar rankeamento de todos os
-// membros pokersync em um filtro lateral de Trofeu dentro do hub") —
-// drawer deslizando da direita, ordenado por XP total. Usa a RPC
-// get_leaderboard (security definer) pois user_progress e' privada por
-// RLS — a RPC expoe so o necessario pro ranking (nome, nivel, xp,
-// streak), nada sensivel.
-function LeaderboardDrawer({
-  onClose,
+const RANKING_PERIODS: { value: LeaderboardPeriod; label: string }[] = [
+  { value: "week", label: "Semana" },
+  { value: "month", label: "Mês" },
+  { value: "all", label: "Geral" },
+];
+
+// Ranking global -- secao fixa do Hub (nao mais escondida atras de um
+// botao). Ganhou filtro por periodo (antes so xp_total vitalicio, o que
+// travava sempre nos mesmos nomes de quem entrou primeiro) e a posicao
+// do proprio jogador mesmo quando ele nao esta no top exibido.
+function RankingSection({
+  forwardedRef,
   entries,
   loading,
   meId,
+  period,
+  onPeriodChange,
+  myRank,
 }: {
-  onClose: () => void;
+  forwardedRef: React.RefObject<HTMLElement | null>;
   entries: LeaderboardEntry[] | null;
   loading: boolean;
   meId: string | null;
+  period: LeaderboardPeriod;
+  onPeriodChange: (p: LeaderboardPeriod) => void;
+  myRank: MyRank | null;
 }) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const meInList = entries?.some((e) => e.userId === meId) ?? false;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-void/70 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div
-        className="relative flex h-full w-full max-w-sm flex-col border-l border-hairline bg-surface p-5"
-        style={{ animation: "hubDrawerIn .22s ease-out both" }}
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
-            <Trophy size={16} /> Ranking PokerSync
-          </h2>
-          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="mt-4 flex-1 overflow-y-auto">
-          {loading ? (
-            <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
-          ) : !entries || entries.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">Ninguém no ranking ainda.</p>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {entries.map((e) => {
-                const isMe = e.userId === meId;
-                const medalColor = e.rank === 1 ? "#F5D48C" : e.rank === 2 ? "#C0C6CC" : e.rank === 3 ? "#CD7F32" : null;
-                return (
-                  <div
-                    key={e.userId}
-                    className={`hub-lb-row flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
-                      isMe ? "border-review/50 bg-review/[0.08]" : "border-hairline bg-void/40 hover:bg-elevated"
-                    }`}
-                    style={{ animationDelay: `${Math.min(e.rank, 20) * 0.02}s` }}
-                  >
-                    <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
-                      {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
-                        {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
-                      </p>
-                      <p className="text-[11px] text-muted">
-                        <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span> · {e.streakDays} dias de streak
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
-                      {e.xpTotal.toLocaleString("pt-BR")} XP
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+    <section ref={forwardedRef} className="mt-6 scroll-mt-6 rounded-xl border border-hairline bg-surface p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
+          <Trophy size={16} /> Ranking PokerSync
+        </h2>
+        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+          {RANKING_PERIODS.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => onPeriodChange(p.value)}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
+                period === p.value ? "bg-ink text-void" : "text-muted hover:text-ink"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      <div className="mt-4">
+        {loading ? (
+          <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
+        ) : !entries || entries.length === 0 ? (
+          <p className="p-6 text-center text-sm text-muted">
+            {period === "all" ? "Ninguém no ranking ainda." : "Ninguém ganhou XP nesse período ainda."}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {entries.map((e) => (
+              <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} />
+            ))}
+            {myRank && !meInList && (
+              <>
+                <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
+                  <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
+                  <p className="min-w-0 flex-1 text-sm font-semibold">
+                    Sua posição <span className="text-[10px] text-review">(você)</span>
+                  </p>
+                  <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+                    {myRank.xp.toLocaleString("pt-BR")} XP
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function RankingRow({ entry: e, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+  const medalColor = e.rank === 1 ? "#F5D48C" : e.rank === 2 ? "#C0C6CC" : e.rank === 3 ? "#CD7F32" : null;
+  return (
+    <div
+      className={`hub-lb-row flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+        isMe ? "border-review/50 bg-review/[0.08]" : "border-hairline bg-void/40 hover:bg-elevated"
+      }`}
+      style={{ animationDelay: `${Math.min(e.rank, 20) * 0.02}s` }}
+    >
+      <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
+        {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">
+          {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
+        </p>
+        <p className="text-[11px] text-muted">
+          <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span> · {e.streakDays} dias de streak
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+        {e.xpTotal.toLocaleString("pt-BR")} XP
+      </span>
     </div>
   );
 }

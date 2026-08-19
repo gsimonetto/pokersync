@@ -6,6 +6,7 @@ import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-v
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
+import { registerTraining } from "@/lib/services/xp-service";
 import {
   getRfiJamSpot,
   listRfiJamSpots,
@@ -120,6 +121,20 @@ const TYPE_OPTIONS = [
 ];
 
 const MARGINAL_GAP_THRESHOLD = 0.5;
+
+// register_training (RPC) so reconhece 'PERFECT'/'OK'/'BLUNDER' -- strings
+// diferentes do Verdict do frontend ('OTIMA'/'ACEITAVEL'/...). Sem esse
+// mapa, ERRO_GRAVE nunca cai no `else 10` do banco... pior, nunca reseta o
+// combo (so' 'BLUNDER' reseta) e nunca conta pra missao "clean_streak".
+// ERRO_LEVE fica no meio-termo de proposito: nao e' erro grave o bastante
+// pra quebrar o combo, mas tambem nao conta como acerto.
+const VERDICT_TO_RPC: Record<Verdict, string> = {
+  OTIMA: "PERFECT",
+  ACEITAVEL: "OK",
+  ERRO_LEVE: "MEDIOCRE",
+  ERRO_GRAVE: "BLUNDER",
+  UNKNOWN: "MEDIOCRE",
+};
 
 interface Round {
   label: string;
@@ -363,8 +378,17 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
     : null;
 
   useEffect(() => {
-    if (!chosen || !verdict) return;
+    if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
     setStats((prev) => ({ hits: prev.hits + (verdict === "OTIMA" ? 1 : 0), total: prev.total + 1 }));
+    const isGood = verdict === "OTIMA" || verdict === "ACEITAVEL";
+    registerTraining({
+      spotId: spot?.spotId ?? null,
+      verdict: VERDICT_TO_RPC[verdict],
+      evLoss: isGood ? 0 : Math.max(0, round.gap),
+      userAction: chosen === "fold" ? "FOLD" : currentPhase?.action ?? null,
+    }).catch(() => {
+      // XP e' um bonus, nao pode travar o treino se a rede falhar
+    });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [chosen]);
 
