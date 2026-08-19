@@ -1,10 +1,10 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Flame, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoney, fmtSignedMoney, fmtPct, FORMATS, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
@@ -93,7 +93,7 @@ export default function BankrollPage() {
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [goalsModalOpen, setGoalsModalOpen] = useState(false);
   const [brmModalOpen, setBrmModalOpen] = useState(false);
-  const [leaksModalOpen, setLeaksModalOpen] = useState(false);
+  const leaksRef = useRef<HTMLElement | null>(null);
   const [calcFormat, setCalcFormat] = useState<BrmFormat>("Cash");
   const [calcBuyIn, setCalcBuyIn] = useState("");
 
@@ -180,6 +180,7 @@ export default function BankrollPage() {
   const leakStats = useMemo(() => groupStats(platformSessions, leakDimension), [platformSessions, leakDimension]);
   const tiltStats = useMemo(() => tiltImpact(platformSessions), [platformSessions]);
   const rate = useMemo(() => hourlyRate(platformSessions), [platformSessions]);
+  const activity = useMemo(() => dailyActivity(platformSessions), [platformSessions]);
   const calcThreshold = useMemo(() => thresholdFor(brmThresholds, calcFormat), [brmThresholds, calcFormat]);
   const ruin = useMemo(() => riskOfRuin(sessions, nw.playingBankroll), [sessions, nw.playingBankroll]);
   const comparison = useMemo(() => compareMonths(platformSessions), [platformSessions]);
@@ -497,9 +498,9 @@ export default function BankrollPage() {
             <Gauge size={16} className="transition-transform duration-200 group-hover:-rotate-12" />
           </button>
           <button
-            onClick={() => setLeaksModalOpen(true)}
-            aria-label="Painel de leaks"
-            title="Painel de leaks"
+            onClick={() => leaksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
+            aria-label="Ir pro painel de leaks"
+            title="Ir pro painel de leaks"
             className="group flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-all duration-200 hover:scale-110 hover:border-evolution/50 hover:text-evolution hover:shadow-[0_0_12px_rgba(245,158,11,.35)] active:scale-90"
           >
             <Flame size={16} className="transition-transform duration-200 group-hover:scale-110" />
@@ -1203,8 +1204,17 @@ export default function BankrollPage() {
         )}
       </section>
 
-      <Modal open={leaksModalOpen} onClose={() => setLeaksModalOpen(false)} title="Painel de leaks">
-        <div className="flex justify-end">
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Consistência de volume</h2>
+        <VolumeHeatmap activity={activity} />
+      </section>
+
+      <section ref={leaksRef} className="mt-6 scroll-mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <div className="flex items-center gap-1.5">
+            <Flame size={13} className="text-evolution" />
+            <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Painel de leaks</h2>
+          </div>
           <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
             {[
               { value: "format" as const, label: "Formato" },
@@ -1227,30 +1237,38 @@ export default function BankrollPage() {
         {leakStats.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
         ) : (
-          <div className="mt-4 flex flex-col gap-2">
+          <div className="mt-4 flex flex-col gap-1.5">
             {leakStats.map((g: GroupStat) => {
               const maxAbs = Math.max(...leakStats.map((x) => Math.abs(x.net)), 1);
-              const width = Math.max(4, (Math.abs(g.net) / maxAbs) * 100);
+              const halfWidth = Math.max(2, (Math.abs(g.net) / maxAbs) * 50);
               const negative = g.net < 0;
+              const lowSample = g.n < 5;
               return (
-                <div key={g.key} className="rounded-lg border border-hairline bg-elevated p-3 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
-                  <div className="flex items-center justify-between">
-                    <p className="text-sm font-semibold">{g.key}</p>
-                    <p className="text-xs text-muted">
+                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{g.key}</p>
+                    <p className="text-[10.5px] text-muted">
                       {g.n} {g.n === 1 ? "sessao" : "sessoes"} · ROI {fmtPct(g.roi)}
+                      {lowSample && <span className="ml-1 text-evolution">· amostra pequena</span>}
                     </p>
                   </div>
-                  <div className="mt-1.5 flex items-center gap-2">
-                    <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-void/40">
+                  <div className="relative h-2 w-full rounded-full bg-void/40">
+                    <div className="absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-hairline" />
+                    {negative ? (
                       <div
-                        className={`h-full rounded-full transition-[width] duration-500 ease-out ${negative ? "bg-negative" : "bg-positive"}`}
-                        style={{ width: `${width}%` }}
+                        className="absolute right-1/2 top-0 h-full rounded-l-full bg-negative transition-[width] duration-500 ease-out"
+                        style={{ width: `${halfWidth}%`, opacity: lowSample ? 0.55 : 1 }}
                       />
-                    </div>
-                    <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
-                      {fmtSignedMoney(g.net)}
-                    </span>
+                    ) : (
+                      <div
+                        className="absolute left-1/2 top-0 h-full rounded-r-full bg-positive transition-[width] duration-500 ease-out"
+                        style={{ width: `${halfWidth}%`, opacity: lowSample ? 0.55 : 1 }}
+                      />
+                    )}
                   </div>
+                  <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
+                    {fmtSignedMoney(g.net)}
+                  </span>
                 </div>
               );
             })}
@@ -1276,7 +1294,7 @@ export default function BankrollPage() {
             </div>
           </div>
         )}
-      </Modal>
+      </section>
 
     </main>
   );
@@ -1667,5 +1685,74 @@ function EvolutionChart({ series, annotations = [] }: { series: SeriesPoint[]; a
         onMouseLeave={() => setHoverIdx(null)}
       />
     </svg>
+  );
+}
+
+// Heatmap estilo GitHub: cada coluna e' uma semana, cada celula um dia.
+// Cor = resultado (verde/vermelho), intensidade = magnitude do resultado
+// do dia — mostra consistencia de volume, nao so o quanto ganhou/perdeu.
+function VolumeHeatmap({ activity }: { activity: Record<string, DayActivity> }) {
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
+  const weeksCount = 20;
+  const today = new Date();
+  today.setHours(0, 0, 0, 0);
+  const endOfWeek = new Date(today);
+  endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
+  const totalDays = weeksCount * 7;
+  const start = new Date(endOfWeek);
+  start.setDate(endOfWeek.getDate() - totalDays + 1);
+
+  const days: { date: string; d: Date }[] = [];
+  for (let i = 0; i < totalDays; i++) {
+    const d = new Date(start);
+    d.setDate(start.getDate() + i);
+    days.push({ date: d.toISOString().slice(0, 10), d });
+  }
+
+  const maxAbsNet = Math.max(...Object.values(activity).map((a) => Math.abs(a.net)), 1);
+
+  function cellColor(a: DayActivity | undefined) {
+    if (!a || a.n === 0) return "var(--color-hairline)";
+    const intensity = Math.min(1, Math.abs(a.net) / maxAbsNet);
+    const alpha = 0.25 + intensity * 0.65;
+    return a.net >= 0 ? `rgba(34,197,94,${alpha})` : `rgba(224,85,90,${alpha})`;
+  }
+
+  const weeks: { date: string; d: Date }[][] = [];
+  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
+
+  const hovered = hoverKey ? activity[hoverKey] : null;
+
+  return (
+    <div className="mt-3">
+      <div className="flex gap-[3px] overflow-x-auto pb-1">
+        {weeks.map((week, wi) => (
+          <div key={wi} className="flex flex-col gap-[3px]">
+            {week.map(({ date, d }) => {
+              const a = activity[date];
+              const future = d > today;
+              return (
+                <div
+                  key={date}
+                  onMouseEnter={() => !future && setHoverKey(date)}
+                  onMouseLeave={() => setHoverKey((k) => (k === date ? null : k))}
+                  className="size-[11px] rounded-[2px] transition-transform duration-100 hover:scale-125"
+                  style={{ background: future ? "transparent" : cellColor(a) }}
+                  title={a ? `${date} · ${a.n} sessão(ões) · ${fmtSignedMoney(a.net)}` : date}
+                />
+              );
+            })}
+          </div>
+        ))}
+      </div>
+      <div className="mt-2 flex items-center justify-between text-[10px] text-muted">
+        <span>{weeksCount} semanas · verde = dia positivo, vermelho = dia negativo, cinza = sem sessão</span>
+        {hovered && (
+          <span className="font-semibold text-ink">
+            {hovered.date} · {hovered.n} {hovered.n === 1 ? "sessão" : "sessões"} · {fmtSignedMoney(hovered.net)}
+          </span>
+        )}
+      </div>
+    </div>
   );
 }

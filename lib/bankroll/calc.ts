@@ -112,6 +112,25 @@ export function groupStats(sessions: Session[], dimension: "format" | "weekday" 
     .sort((a, b) => a.net - b.net);
 }
 
+// --- Volume por dia (heatmap estilo GitHub) --------------------------------
+// Agrega sessoes por data pra visualizar consistencia de volume — util pra
+// grinder identificar buracos na rotina, nao so o resultado.
+export interface DayActivity {
+  date: string;
+  n: number;
+  net: number;
+}
+
+export function dailyActivity(sessions: Session[]): Record<string, DayActivity> {
+  const byDate: Record<string, DayActivity> = {};
+  for (const s of sessions || []) {
+    const d = (byDate[s.date] ||= { date: s.date, n: 0, net: 0 });
+    d.n += 1;
+    d.net += net(s);
+  }
+  return byDate;
+}
+
 // --- Leak comportamental: tilt/mood (diario pos-sessao) -------------------
 // Cruza o diario (mood registrado na sessao) com o resultado — pra
 // responder "eu realmente jogo pior quando marco tilt?" com numero, nao
