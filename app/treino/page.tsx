@@ -581,7 +581,7 @@ function TreinoPageInner({ tabs }: { tabs?: React.ReactNode }) {
         {tabs}
       </div>
 
-      <div className="ps-tr-body" style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr) 280px", gap: 12, minHeight: 0 }}>
+      <div className="ps-tr-body" style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr)", gap: 12, minHeight: 0 }}>
         {/* Filtros — no desktop e' coluna normal do grid. No mobile vira
             um drawer fixo (CSS cuida da posição/transform); o botão de
             filtro no header e o X aqui dentro so existem visualmente
@@ -628,6 +628,26 @@ function TreinoPageInner({ tabs }: { tabs?: React.ReactNode }) {
               // relação com a mesa (pedido explícito: "trazer os botões
               // pra dentro do layout da mesa").
               <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 900, maxHeight: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
+                {/* GTO info numa linha ACIMA da mesa — antes vivia numa 3a
+                    coluna à direita, longe de onde o olho do jogador está
+                    fixo (a mesa). Pedido explícito: filtros à esquerda,
+                    mesa no meio, info do GTO logo acima da mesa (não do
+                    lado). Some por completo enquanto não há resposta —
+                    a mesa + barra de apostas já comunicam isso sozinhas. */}
+                {chosen && result && !sheetCollapsed && (
+                  <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ maxHeight: 220, overflowY: "auto", background: "#0A0A0A", position: "relative", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
+                    <button
+                      onClick={() => setSheetCollapsed(true)}
+                      className="ps-tr-sheet-close"
+                      style={{ position: "absolute", top: 10, right: 10, zIndex: 2, display: "none", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)" }}
+                      aria-label="Fechar resultado"
+                    >
+                      <X size={15} />
+                    </button>
+                    <GtoFeedback pot={hand.pot} stack={hand.effectiveStack} spr={tableHand?.spr ?? null} heroLabel={heroCardsParsed.filter(Boolean).join(" ")} gtoNodes={hand.gtoNodes} heroCards={hand.heroCards} chosenRawAction={result.chosenAction} result={result} chosenLabel={chosen.label} />
+                  </div>
+                )}
+
                 <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
                   <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
                   {/* Veredito imediato NA mesa — antes o "acertei/errei" só
@@ -691,32 +711,6 @@ function TreinoPageInner({ tabs }: { tabs?: React.ReactNode }) {
           </div>
         </div>
 
-        {/* Resultado do drill — no desktop segue como coluna à direita.
-            No mobile (sem espaço pra 3ª coluna com a mesa em tela cheia)
-            vira um bottom sheet: some por completo enquanto não há
-            escolha (a mesa + barra de apostas já comunicam isso sozinhas)
-            e sobe de baixo, com scroll próprio, assim que o jogador age.
-            Tem um X pra recolher sem precisar avançar de mão (bug
-            reportado: sheet não fechava depois da resposta). */}
-        {chosen && hand && result && !sheetCollapsed ? (
-          <div className="ps-tr-feedback ps-tr-feedback-sheet" style={{ overflowY: "auto", background: "#0A0A0A", position: "relative" }}>
-            <button
-              onClick={() => setSheetCollapsed(true)}
-              className="ps-tr-sheet-close"
-              style={{ position: "absolute", top: 10, right: 10, zIndex: 2, display: "none", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)" }}
-              aria-label="Fechar resultado"
-            >
-              <X size={15} />
-            </button>
-            <GtoFeedback pot={hand.pot} stack={hand.effectiveStack} spr={tableHand?.spr ?? null} heroLabel={heroCardsParsed.filter(Boolean).join(" ")} gtoNodes={hand.gtoNodes} heroCards={hand.heroCards} chosenRawAction={result.chosenAction} result={result} chosenLabel={chosen.label} />
-          </div>
-        ) : (
-          <div className="ps-tr-feedback ps-tr-feedback-idle" style={{ overflowY: "auto" }}>
-            <div style={{ fontFamily: F, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", fontSize: 11, color: "rgba(255,255,255,0.4)", lineHeight: 1.5 }}>
-              {hand ? "Escolha uma ação na barra abaixo — o feedback GTO aparece aqui." : emptyMessage}
-            </div>
-          </div>
-        )}
       </div>
     </div>
   );
