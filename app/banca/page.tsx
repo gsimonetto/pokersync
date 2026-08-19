@@ -521,56 +521,60 @@ export default function BankrollPage() {
         />
       </div>
 
-      <p className="mt-5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
-      <div className="mt-2 grid grid-cols-1 gap-3 sm:grid-cols-3">
-        <StatCard
-          size="lg"
-          label="Resultado"
-          value={fmtSignedMoney(agg.profit)}
-          tone={agg.profit >= 0 ? "positive" : "negative"}
-          accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
-        />
-        <StatCard
-          size="lg"
-          label="ROI"
-          value={fmtPct(agg.roi)}
-          accent="#22d3ee"
-          delta={
-            comparison.previous.n > 0
-              ? { text: `${fmtPct(roiDelta)} vs mês passado`, positive: roiDelta >= 0 }
-              : undefined
-          }
-        />
-        <StatCard
-          size="lg"
-          label="R$/hora"
-          value={rate ? fmtMoney(rate.value) : "—"}
-          tone={rate ? (rate.value >= 0 ? "positive" : "negative") : undefined}
-          icon={<Clock size={12} />}
-          accent={rate ? (rate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
-          hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
-        />
-      </div>
+      <section className="mt-4 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
+        <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-3">
+          <StatCard
+            size="lg"
+            label="Resultado"
+            value={fmtSignedMoney(agg.profit)}
+            tone={agg.profit >= 0 ? "positive" : "negative"}
+            accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
+          />
+          <StatCard
+            size="lg"
+            label="ROI"
+            value={fmtPct(agg.roi)}
+            accent="#22d3ee"
+            delta={
+              comparison.previous.n > 0
+                ? { text: `${fmtPct(roiDelta)} vs mês passado`, positive: roiDelta >= 0 }
+                : undefined
+            }
+          />
+          <StatCard
+            size="lg"
+            label="R$/hora"
+            value={rate ? fmtMoney(rate.value) : "—"}
+            tone={rate ? (rate.value >= 0 ? "positive" : "negative") : undefined}
+            icon={<Clock size={12} />}
+            accent={rate ? (rate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
+            hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
+          />
+        </div>
 
-      <p className="mt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Atividade &amp; risco</p>
-      <div className="mt-2 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-        <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
-        <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
-        <StatCard label="Buy-in médio" value={fmtMoney(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
-        <StatCard
-          label="Drawdown atual"
-          value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
-          tone={currentDrawdown >= 15 ? "negative" : undefined}
-          icon={<History size={11} />}
-          accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
-        />
-        {nw.withdrawn > 0 && (
-          <StatCard label="Sacado" value={fmtMoney(nw.withdrawn)} icon={<Wallet size={11} />} accent="#e0555a" />
-        )}
-        {nw.caixinha > 0 && (
-          <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={11} />} accent="#ec4899" />
-        )}
-      </div>
+        <p className="mt-5 border-t border-hairline pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+          Atividade &amp; risco
+        </p>
+        <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+          <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
+          <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
+          <StatCard label="Buy-in médio" value={fmtMoney(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
+          <StatCard
+            label="Drawdown atual"
+            value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+            tone={currentDrawdown >= 15 ? "negative" : undefined}
+            icon={<History size={11} />}
+            accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
+          />
+          {nw.withdrawn > 0 && (
+            <StatCard label="Sacado" value={fmtMoney(nw.withdrawn)} icon={<Wallet size={11} />} accent="#e0555a" />
+          )}
+          {nw.caixinha > 0 && (
+            <StatCard label="Guardado (caixinha)" value={fmtMoney(nw.caixinha)} icon={<PiggyBank size={11} />} accent="#ec4899" />
+          )}
+        </div>
+      </section>
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
         <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20 lg:col-span-2">
