@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, SlidersHorizontal, X } from "lucide-react";
+import { Loader2, SlidersHorizontal, X, CheckCircle2, XCircle } from "lucide-react";
 import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
@@ -148,6 +148,40 @@ function FilterChip({
   );
 }
 
+// Veredito flutuando NA PRÓPRIA MESA -- feedback imediato de "acertei/
+// errei" no lugar onde o olho do jogador está fixo assim que ele age
+// (fundamental, pedido explícito: existia antes e some com a troca de
+// mão). Complementa (não substitui) o painel com os números, que fica
+// acima da mesa. `isGood`/label/color já vêm resolvidos de fora pra
+// respeitar o caso "MARGINAL" (que não é bem um Verdict do banco).
+function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color: string; isGood: boolean; freqPct: number | null }) {
+  const Icon = isGood ? CheckCircle2 : XCircle;
+  return (
+    <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "flex-start", justifyContent: "center", paddingTop: "10%", pointerEvents: "none", zIndex: 50 }}>
+      <div
+        style={{
+          fontFamily: F,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          padding: "9px 18px",
+          borderRadius: 999,
+          background: "rgba(5,5,5,0.9)",
+          border: `1.5px solid ${color}`,
+          boxShadow: `0 0 28px ${color}55, 0 6px 16px rgba(0,0,0,.6)`,
+          animation: "fadeInUp 220ms ease-out both",
+        }}
+      >
+        <Icon size={17} color={color} strokeWidth={2.2} />
+        <span style={{ color, fontWeight: 700, fontSize: 14 }}>{label}</span>
+        {freqPct != null && (
+          <span style={{ color: "rgba(255,255,255,.5)", fontSize: 11.5, fontWeight: 600, fontVariantNumeric: "tabular-nums" }}>{freqPct}%</span>
+        )}
+      </div>
+    </div>
+  );
+}
+
 function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -288,6 +322,8 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
 
   const displayLabel = isMarginal && verdict ? "MARGINAL" : verdict?.replace("_", " ");
   const displayColor = isMarginal ? "#f5a524" : verdict ? verdictColor(verdict) : undefined;
+  const isGoodVerdict = verdict === "OTIMA" || verdict === "ACEITAVEL";
+  const chosenFreqPct = round && chosen ? Math.round((chosen === "fold" ? 1 - round.freq : round.freq) * 100) : null;
 
   useEffect(() => {
     if (!chosen || !verdict) return;
@@ -477,6 +513,9 @@ export function RfiJamDrill({ tabs }: RfiJamDrillProps) {
 
                 <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
                   <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
+                  {chosen && verdict && displayLabel && displayColor && (
+                    <VerdictFlash label={displayLabel} color={displayColor} isGood={isGoodVerdict} freqPct={chosenFreqPct} />
+                  )}
                 </div>
 
                 <div className="ps-tr-actions" style={{ height: 62, display: "flex", alignItems: "center", gap: 10, flexShrink: 0 }}>
