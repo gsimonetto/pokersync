@@ -8,6 +8,7 @@ import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { ActionBar, type DrillAction } from "@/components/drill/action-bar";
 import { GtoFeedback } from "@/components/drill/gto-feedback";
 import { RangeDrill } from "@/components/drill/range-drill";
+import { RfiJamDrill } from "@/components/drill/rfi-jam-drill";
 import {
   fetchDrillBatch,
   fetchDrillBatchBySuggestion,
@@ -809,11 +810,12 @@ function TreinoPageInner({ tabs }: { tabs?: React.ReactNode }) {
   );
 }
 
-type Tab = "gto" | "ranges";
+type Tab = "gto" | "ranges" | "rfi_jam";
 
 function TreinoTabs() {
   const searchParams = useSearchParams();
-  const initialTab = searchParams.get("tab") === "ranges" ? "ranges" : "gto";
+  const tabParam = searchParams.get("tab");
+  const initialTab: Tab = tabParam === "ranges" ? "ranges" : tabParam === "rfi_jam" ? "rfi_jam" : "gto";
   const initialRangeId = searchParams.get("rangeId");
   const [tab, setTab] = useState<Tab>(initialTab);
 
@@ -840,7 +842,7 @@ function TreinoTabs() {
 
   const tabsNode = (
     <div className="ps-treino-tabs" style={{ display: "inline-flex", gap: 4, padding: 3, borderRadius: 10, background: "#111111", border: "1px solid rgba(255,255,255,0.08)", flexShrink: 0 }}>
-      {(["gto", "ranges"] as Tab[]).map((t) => (
+      {(["gto", "ranges", "rfi_jam"] as Tab[]).map((t) => (
         <button
           key={t}
           onClick={() => setTab(t)}
@@ -855,7 +857,7 @@ function TreinoTabs() {
             color: tab === t ? "#111111" : "rgba(255,255,255,0.55)",
           }}
         >
-          {t === "gto" ? "GTO" : "Ranges"}
+          {t === "gto" ? "GTO" : t === "ranges" ? "Ranges" : "RFI/Jam"}
         </button>
       ))}
     </div>
@@ -909,6 +911,15 @@ function TreinoTabs() {
           <div style={{ flex: 1, minHeight: 0 }}>
             <TreinoPageInner tabs={tabsNode} />
           </div>
+        ) : tab === "rfi_jam" ? (
+          <>
+            <div style={{ display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>{tabsNode}</div>
+            <div style={{ flex: 1, minHeight: 0 }}>
+              <div className="h-full overflow-y-auto text-ink">
+                <RfiJamDrill />
+              </div>
+            </div>
+          </>
         ) : (
           <>
             <div style={{ display: "flex", justifyContent: "flex-end", flexShrink: 0 }}>{tabsNode}</div>
