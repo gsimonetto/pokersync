@@ -32,6 +32,20 @@ body {
   -webkit-font-smoothing: antialiased;
 }
 
+/* Bug reportado: "a listagem do filtro está vindo em branco".
+   Todo <option> do app herdava fundo TRANSPARENTE com texto branco
+   (medido: optBg=rgba(0,0,0,0), optColor=#fff em todos os 44 selects).
+   A lista suspensa de um <select> nativo é desenhada pelo sistema, não
+   pela página: com fundo transparente ela cai no padrão do SO — branco
+   no Windows, no macOS claro e na maioria dos temas GTK — e aí é texto
+   branco sobre fundo branco, ou seja, a lista aparece vazia mesmo tendo
+   itens. Fixar fundo e cor no próprio <option> resolve em todo select
+   de uma vez, independente de SO/tema do usuário. */
+select option {
+  background-color: var(--color-elevated);
+  color: var(--color-ink);
+}
+
 /* `color-scheme: dark` acima faz o Chrome/Edge no Windows desenhar a
    barra de rolagem classica (nao-overlay) com botoes de seta ▲▼ nas
    pontas — sobra destacada e sem função clara numa interface flat como
