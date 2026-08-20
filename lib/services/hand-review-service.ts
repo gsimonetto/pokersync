@@ -395,11 +395,35 @@ export async function fetchUserLeaksWithDrills(days = 30, minOccurrences = 3): P
   return data ?? [];
 }
 
-export async function fetchReviewSummary(days = 30) {
+export interface ReviewSummary {
+  totalReviews: number;
+  totalConcluded: number;
+  totalErrors: number;
+  totalCorrect: number;
+  totalDoubts: number;
+  worstStreet: string | null;
+  worstCategory: string | null;
+}
+
+// RPC ja existia pronta no banco (contagens + pior rua/categoria dos
+// ultimos N dias) mas nunca era chamada -- o Revisor era so uma lista de
+// maos, sem nenhum numero consolidado (diferente da Banca, que sempre
+// teve Resultado/ROI/ITM no topo).
+export async function fetchReviewSummary(days = 30): Promise<ReviewSummary | null> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("user_review_summary", { p_days: days });
   if (error) throw error;
-  return data?.[0] ?? null;
+  const r = data?.[0];
+  if (!r) return null;
+  return {
+    totalReviews: r.total_reviews ?? 0,
+    totalConcluded: r.total_concluded ?? 0,
+    totalErrors: r.total_errors ?? 0,
+    totalCorrect: r.total_correct ?? 0,
+    totalDoubts: r.total_doubts ?? 0,
+    worstStreet: r.worst_street ?? null,
+    worstCategory: r.worst_category ?? null,
+  };
 }
 
 // ============================================================
