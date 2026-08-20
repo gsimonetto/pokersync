@@ -1,32 +1,48 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, Clock, MessageCircleWarning, Plus, Sparkles, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, Circle, Clock, ListChecks, MessageCircleWarning, MessageSquare, Plus, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Campo } from "@/components/time/campo";
 import {
+  addCardComment,
+  addChecklistItem,
+  deleteChecklistItem,
+  fetchCardComments,
+  fetchCardLabels,
+  fetchCardLabelsForCards,
+  fetchChecklist,
+  fetchChecklistProgressForCards,
   fetchFunnelPhases,
   fetchPlayerCards,
   movePlayerCard,
   progressoPronto,
   seedDefaultPhases,
+  setCardLabel,
+  toggleChecklistItem,
   traduzErroFunil,
   updateCardDetails,
   STAT_METRIC_LABEL,
+  type CardComment,
+  type CardLabel,
+  type ChecklistItem,
   type FunnelPhase,
   type PlayerCard,
   type StatMetric,
 } from "@/lib/services/team-funnel-service";
 import {
   fetchTeamAlerts,
+  fetchTeamLabels,
   ALERTA_LABEL,
   type TeamAlert,
   type TeamDashboardRow,
+  type TeamLabel,
 } from "@/lib/services/team-service";
 
-// Kanban simples (sem drag-and-drop — mobile-first): mover fase e' um
-// select dentro do proprio card. Coach abre o card pra editar meta e
-// deixar anotacao; presenca/drills/reviews sao so leitura (vem do banco).
+// Kanban estilo Trello: arrastar o card entre colunas move de fase (drag
+// nativo HTML5, sem lib extra); o card tambem pode ser aberto pra editar
+// meta, checklist, etiquetas e comentarios. Presenca/drills/reviews sao
+// so leitura (vem do banco).
 
 export function TabKanban({
   teamId,
@@ -42,28 +58,50 @@ export function TabKanban({
   const [fases, setFases] = useState<FunnelPhase[]>([]);
   const [cards, setCards] = useState<PlayerCard[]>([]);
   const [alertas, setAlertas] = useState<TeamAlert[]>([]);
+  const [labelsDoTime, setLabelsDoTime] = useState<TeamLabel[]>([]);
+  const [labelsPorCard, setLabelsPorCard] = useState<Map<string, CardLabel[]>>(new Map());
+  const [checklistPorCard, setChecklistPorCard] = useState<Map<string, { done: number; total: number }>>(new Map());
   const [loading, setLoading] = useState(true);
   const [cardAberto, setCardAberto] = useState<PlayerCard | null>(null);
   const [modalAdicionar, setModalAdicionar] = useState(false);
   const [criandoFases, setCriandoFases] = useState(false);
+  const [faseArrastando, setFaseArrastando] = useState<string | null>(null);
 
   const carregar = async () => {
     setLoading(true);
     try {
-      const [f, c, al] = await Promise.all([
+      const [f, c, al, tl] = await Promise.all([
         fetchFunnelPhases(teamId),
         fetchPlayerCards(),
         fetchTeamAlerts(14).catch(() => []),
+        fetchTeamLabels(teamId).catch(() => []),
       ]);
       setFases(f);
       setCards(c);
       setAlertas(al);
+      setLabelsDoTime(tl);
+      const cardIds = c.map((card) => card.cardId);
+      const [lbl, chk] = await Promise.all([
+        fetchCardLabelsForCards(cardIds).catch(() => new Map()),
+        fetchChecklistProgressForCards(cardIds).catch(() => new Map()),
+      ]);
+      setLabelsPorCard(lbl);
+      setChecklistPorCard(chk);
     } catch (e) {
       onErro(traduzErroFunil(e));
     } finally {
       setLoading(false);
     }
   };
+
+  async function moverParaFase(playerId: string, phaseId: string) {
+    try {
+      await movePlayerCard(playerId, phaseId);
+      await carregar();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    }
+  }
 
   useEffect(() => {
     carregar();
@@ -168,27 +206,71 @@ export function TabKanban({
       <div className="flex gap-4 overflow-x-auto pb-2">
         {fases.map((fase) => {
           const lista = (cardsPorFase.get(fase.id) ?? []).sort((a, b) => a.movedAt.localeCompare(b.movedAt));
+          const recebendoDrop = faseArrastando === fase.id;
           return (
-            <div key={fase.id} className="w-72 shrink-0">
+            <div
+              key={fase.id}
+              className="w-72 shrink-0"
+              onDragOver={(e) => {
+                e.preventDefault();
+                setFaseArrastando(fase.id);
+              }}
+              onDragLeave={() => setFaseArrastando((cur) => (cur === fase.id ? null : cur))}
+              onDrop={(e) => {
+                e.preventDefault();
+                setFaseArrastando(null);
+                const playerId = e.dataTransfer.getData("text/player-id");
+                const faseOrigem = e.dataTransfer.getData("text/fase-origem");
+                if (playerId && faseOrigem !== fase.id) moverParaFase(playerId, fase.id);
+              }}
+            >
               <div className="mb-2 flex items-center gap-2 px-1">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: fase.color }} />
                 <h3 className="text-[13px] font-semibold">{fase.name}</h3>
                 <span className="text-xs text-muted">{lista.length}</span>
               </div>
 
-              <div className="space-y-2">
+              <div
+                className={`space-y-2 rounded-xl p-1 transition-colors ${
+                  recebendoDrop ? "bg-ink/5 ring-2 ring-ink/20" : ""
+                }`}
+              >
                 {lista.length === 0 ? (
-                  <p className="rounded-lg border border-dashed border-hairline p-3 text-center text-xs text-muted">Vazio</p>
+                  <p className="rounded-lg border border-dashed border-hairline p-3 text-center text-xs text-muted">
+                    {recebendoDrop ? "Solte aqui" : "Vazio"}
+                  </p>
                 ) : (
                   lista.map((card) => {
                     const j = porNome.get(card.playerId);
                     const pronto = progressoPronto(card);
+                    const labels = labelsPorCard.get(card.cardId) ?? [];
+                    const chk = checklistPorCard.get(card.cardId);
                     return (
                       <button
                         key={card.cardId}
+                        draggable
+                        onDragStart={(e) => {
+                          e.dataTransfer.setData("text/player-id", card.playerId);
+                          e.dataTransfer.setData("text/fase-origem", card.phaseId);
+                          e.dataTransfer.effectAllowed = "move";
+                        }}
                         onClick={() => setCardAberto(card)}
-                        className="block w-full rounded-xl border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/30"
+                        className="block w-full cursor-grab rounded-xl border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/30 active:cursor-grabbing"
                       >
+                        {labels.length > 0 && (
+                          <div className="mb-1.5 flex flex-wrap gap-1">
+                            {labels.map((l) => (
+                              <span
+                                key={l.id}
+                                className="rounded-full px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wide"
+                                style={{ backgroundColor: `${l.color}22`, color: l.color, border: `1px solid ${l.color}55` }}
+                              >
+                                {l.name}
+                              </span>
+                            ))}
+                          </div>
+                        )}
+
                         <div className="flex items-center gap-2">
                           <Avatar id={j?.avatarId ?? 1} url={j?.avatarUrl} size={26} />
                           <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{j?.nome ?? "Jogador"}</span>
@@ -214,6 +296,13 @@ export function TabKanban({
                             {card.eventosAusente >= 2 && <AlertTriangle size={11} className="text-negative" />}
                           </p>
                         )}
+
+                        {chk && chk.total > 0 && (
+                          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted">
+                            <ListChecks size={11} />
+                            {chk.done}/{chk.total}
+                          </p>
+                        )}
                       </button>
                     );
                   })
@@ -229,6 +318,7 @@ export function TabKanban({
           card={cardAberto}
           fases={fases}
           jogador={porNome.get(cardAberto.playerId)}
+          labelsDoTime={labelsDoTime}
           onFechar={() => setCardAberto(null)}
           onChange={async () => {
             await carregar();
@@ -406,6 +496,7 @@ function ModalCard({
   card,
   fases,
   jogador,
+  labelsDoTime,
   onFechar,
   onChange,
   onErro,
@@ -414,6 +505,7 @@ function ModalCard({
   card: PlayerCard;
   fases: FunnelPhase[];
   jogador?: TeamDashboardRow;
+  labelsDoTime: TeamLabel[];
   onFechar: () => void;
   onChange: () => void;
   onErro: (s: string) => void;
@@ -426,6 +518,94 @@ function ModalCard({
   const [statMetric, setStatMetric] = useState<StatMetric | "">(card.statMetric ?? "");
   const [statAlvo, setStatAlvo] = useState<number | "">(card.statTarget ?? "");
   const [salvando, setSalvando] = useState(false);
+
+  const [labelsAtivas, setLabelsAtivas] = useState<Set<string>>(new Set());
+  const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
+  const [novoItem, setNovoItem] = useState("");
+  const [comentarios, setComentarios] = useState<CardComment[]>([]);
+  const [novoComentario, setNovoComentario] = useState("");
+  const [carregandoExtras, setCarregandoExtras] = useState(true);
+
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      try {
+        const [lbl, chk, com] = await Promise.all([
+          fetchCardLabels(card.cardId).catch(() => []),
+          fetchChecklist(card.cardId).catch(() => []),
+          fetchCardComments(card.cardId).catch(() => []),
+        ]);
+        if (!ativo) return;
+        setLabelsAtivas(new Set(lbl.map((l) => l.id)));
+        setChecklist(chk);
+        setComentarios(com);
+      } finally {
+        if (ativo) setCarregandoExtras(false);
+      }
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [card.cardId]);
+
+  async function alternarLabel(labelId: string) {
+    const ativa = labelsAtivas.has(labelId);
+    const prev = new Set(labelsAtivas);
+    const next = new Set(labelsAtivas);
+    ativa ? next.delete(labelId) : next.add(labelId);
+    setLabelsAtivas(next);
+    try {
+      await setCardLabel(card.cardId, labelId, !ativa);
+    } catch (e) {
+      setLabelsAtivas(prev);
+      onErro(traduzErroFunil(e));
+    }
+  }
+
+  async function adicionarItem() {
+    if (!novoItem.trim()) return;
+    const texto = novoItem.trim();
+    setNovoItem("");
+    try {
+      await addChecklistItem(card.cardId, texto, checklist.length);
+      setChecklist(await fetchChecklist(card.cardId));
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    }
+  }
+
+  async function alternarItem(item: ChecklistItem) {
+    setChecklist((prev) => prev.map((i) => (i.id === item.id ? { ...i, done: !i.done } : i)));
+    try {
+      await toggleChecklistItem(item.id, !item.done);
+    } catch (e) {
+      setChecklist((prev) => prev.map((i) => (i.id === item.id ? { ...i, done: item.done } : i)));
+      onErro(traduzErroFunil(e));
+    }
+  }
+
+  async function removerItem(itemId: string) {
+    const prev = checklist;
+    setChecklist((cur) => cur.filter((i) => i.id !== itemId));
+    try {
+      await deleteChecklistItem(itemId);
+    } catch (e) {
+      setChecklist(prev);
+      onErro(traduzErroFunil(e));
+    }
+  }
+
+  async function enviarComentario() {
+    if (!novoComentario.trim()) return;
+    const texto = novoComentario.trim();
+    setNovoComentario("");
+    try {
+      await addCardComment(card.cardId, texto);
+      setComentarios(await fetchCardComments(card.cardId));
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    }
+  }
 
   async function salvar() {
     setSalvando(true);
@@ -470,6 +650,69 @@ function ModalCard({
             </select>
           </Campo>
 
+          {labelsDoTime.length > 0 && (
+            <Campo label="Etiquetas">
+              <div className="flex flex-wrap gap-1.5">
+                {labelsDoTime.map((l) => {
+                  const ativa = labelsAtivas.has(l.id);
+                  return (
+                    <button
+                      key={l.id}
+                      type="button"
+                      onClick={() => alternarLabel(l.id)}
+                      className={`flex items-center gap-1 rounded-full border px-2.5 py-1 text-[11px] font-semibold transition-all ${
+                        ativa ? "" : "border-hairline text-muted hover:text-ink"
+                      }`}
+                      style={ativa ? { backgroundColor: `${l.color}22`, color: l.color, borderColor: `${l.color}55` } : undefined}
+                    >
+                      <Tag size={11} />
+                      {l.name}
+                    </button>
+                  );
+                })}
+              </div>
+            </Campo>
+          )}
+
+          <div>
+            <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+              <ListChecks size={12} /> Checklist
+              {checklist.length > 0 && (
+                <span className="normal-case tracking-normal text-muted/80">
+                  {checklist.filter((i) => i.done).length}/{checklist.length}
+                </span>
+              )}
+            </label>
+            {!carregandoExtras && checklist.length > 0 && (
+              <ul className="mb-2 space-y-1">
+                {checklist.map((item) => (
+                  <li key={item.id} className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
+                    <button type="button" onClick={() => alternarItem(item)} className="shrink-0 text-muted hover:text-ink" aria-label={item.done ? "Desmarcar" : "Marcar"}>
+                      {item.done ? <CheckCircle2 size={16} className="text-positive" /> : <Circle size={16} />}
+                    </button>
+                    <span className={`min-w-0 flex-1 text-[13px] ${item.done ? "text-muted line-through" : "text-ink"}`}>{item.text}</span>
+                    <button type="button" onClick={() => removerItem(item.id)} className="shrink-0 text-muted hover:text-negative" aria-label="Remover item">
+                      <Trash2 size={13} />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={novoItem}
+                onChange={(e) => setNovoItem(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), adicionarItem())}
+                placeholder="Adicionar item…"
+                className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
+              />
+              <button type="button" onClick={adicionarItem} disabled={!novoItem.trim()}
+                className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40">
+                <Plus size={14} />
+              </button>
+            </div>
+          </div>
+
           <div className="grid grid-cols-2 gap-3">
             <Campo label="Meta de drills">
               <input type="number" min={0} value={drillsAlvo} onChange={(e) => setDrillsAlvo(Number(e.target.value))}
@@ -511,6 +754,40 @@ function ModalCard({
               {card.eventosPresente} presenças e {card.eventosAusente} faltas em {card.eventosTotal} eventos desde que entrou nesta fase.
             </p>
           )}
+
+          <div className="border-t border-hairline pt-4">
+            <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+              <MessageSquare size={12} /> Atividade
+            </label>
+            {!carregandoExtras && comentarios.length > 0 && (
+              <ul className="mb-2 max-h-40 space-y-2 overflow-y-auto pr-1">
+                {comentarios.map((c) => (
+                  <li key={c.id} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2">
+                    <div className="flex items-center justify-between gap-2">
+                      <span className="text-[11px] font-semibold text-ink">{c.authorName}</span>
+                      <span className="text-[10px] text-muted">
+                        {new Date(c.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                      </span>
+                    </div>
+                    <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-ink/85">{c.body}</p>
+                  </li>
+                ))}
+              </ul>
+            )}
+            <div className="flex gap-2">
+              <input
+                value={novoComentario}
+                onChange={(e) => setNovoComentario(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), enviarComentario())}
+                placeholder="Deixar um comentário…"
+                className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
+              />
+              <button type="button" onClick={enviarComentario} disabled={!novoComentario.trim()}
+                className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40">
+                <MessageSquare size={14} />
+              </button>
+            </div>
+          </div>
 
           <button onClick={onAgendarConversa} type="button"
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-hairline px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-ink/40">

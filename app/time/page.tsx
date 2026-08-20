@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, Users, Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
 import { ACCENT } from "@/lib/modules-data";
+import { TeamBanner } from "@/components/time/team-banner";
 import { fetchDrillFacets } from "@/lib/services/drill-service";
 import {
   createTeam,
@@ -135,28 +136,18 @@ function VisaoJogador({ data }: { data: MyTeam }) {
 
   return (
     <div className="max-w-2xl space-y-5">
+      <TeamBanner
+        name={data.team.name}
+        accent={data.team.accent}
+        logoUrl={data.team.logoUrl}
+        bannerUrl={data.team.bannerUrl}
+      />
+
       <section className="rounded-xl border border-hairline bg-surface p-6">
-        <div className="flex items-start gap-4">
-          <div className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-hairline"
-            style={{ backgroundColor: `${data.team.accent}18` }}>
-            {data.team.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={data.team.logoUrl} alt={data.team.name} className="h-full w-full object-cover" />
-            ) : (
-              <Users size={22} style={{ color: data.team.accent }} />
-            )}
-          </div>
-          <div className="min-w-0">
-            <h2 className="text-base font-semibold">{data.team.name}</h2>
-            {data.team.description && (
-              <p className="mt-1 text-[13px] leading-relaxed text-muted">{data.team.description}</p>
-            )}
-            <p className="mt-2 text-xs text-muted">
-              Você entrou em {eu ? new Date(eu.joinedAt).toLocaleDateString("pt-BR") : "—"}
-              {meuCoach ? ` · seu coach é ${meuCoach.name}` : " · ainda sem coach atribuído"}
-            </p>
-          </div>
-        </div>
+        <p className="text-xs text-muted">
+          Você entrou em {eu ? new Date(eu.joinedAt).toLocaleDateString("pt-BR") : "—"}
+          {meuCoach ? ` · seu coach é ${meuCoach.name}` : " · ainda sem coach atribuído"}
+        </p>
       </section>
 
       <section className="rounded-xl border border-hairline bg-surface p-6">

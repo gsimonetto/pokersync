@@ -13,6 +13,7 @@ export interface Team {
   ownerId: string | null;
   description: string | null;
   logoUrl: string | null;
+  bannerUrl: string | null;
   createdAt: string | null;
 }
 
@@ -162,7 +163,7 @@ export async function fetchMyTeam(): Promise<MyTeam | null> {
   const [{ data: teamRow, error: eTeam }, { data: memberRows, error: eMembers }] = await Promise.all([
     supabase
       .from("teams")
-      .select("id, name, accent, owner_id, description, logo_url, created_at")
+      .select("id, name, accent, owner_id, description, logo_url, banner_url, created_at")
       .eq("id", mine.team_id)
       .maybeSingle(),
     supabase
@@ -207,6 +208,7 @@ export async function fetchMyTeam(): Promise<MyTeam | null> {
       ownerId: teamRow.owner_id,
       description: teamRow.description ?? null,
       logoUrl: teamRow.logo_url ?? null,
+      bannerUrl: teamRow.banner_url ?? null,
       createdAt: teamRow.created_at ?? null,
     },
     role: mine.role as TeamRole,
@@ -769,6 +771,7 @@ export async function fetchTeamInfo(): Promise<TeamInfo | null> {
     ownerId: r.owner_id ?? null,
     description: r.description ?? null,
     logoUrl: r.logo_url ?? null,
+    bannerUrl: r.banner_url ?? null,
     createdAt: r.created_at ?? null,
     totalJogadores: r.total_jogadores ?? 0,
     totalCoaches: r.total_coaches ?? 0,
@@ -798,6 +801,7 @@ export async function updateTeamInfo(patch: {
   description?: string | null;
   accent?: string;
   logoUrl?: string | null;
+  bannerUrl?: string | null;
 }) {
   const supabase = createClient();
   const teamId = (await fetchTeamInfo())?.id;
@@ -807,6 +811,7 @@ export async function updateTeamInfo(patch: {
   if (patch.description !== undefined) row.description = patch.description;
   if (patch.accent !== undefined) row.accent = patch.accent;
   if (patch.logoUrl !== undefined) row.logo_url = patch.logoUrl;
+  if (patch.bannerUrl !== undefined) row.banner_url = patch.bannerUrl;
   const { error } = await supabase.from("teams").update(row).eq("id", teamId);
   if (error) throw error;
 }
@@ -819,6 +824,20 @@ export async function uploadTeamLogo(teamId: string, file: File): Promise<string
   if (error) throw error;
   const { data } = supabase.storage.from("team-logos").getPublicUrl(path);
   await updateTeamInfo({ logoUrl: data.publicUrl });
+  return data.publicUrl;
+}
+
+// Banner customizavel do time (mesmo bucket/regra do logo — so' um
+// prefixo de arquivo diferente). Mostrado na entrada do modo Time,
+// mesmo tamanho do hero de boas-vindas dos Modulos.
+export async function uploadTeamBanner(teamId: string, file: File): Promise<string> {
+  const supabase = createClient();
+  const ext = (file.name.split(".").pop() || "png").toLowerCase();
+  const path = `${teamId}/banner-${Date.now()}.${ext}`;
+  const { error } = await supabase.storage.from("team-logos").upload(path, file, { upsert: true });
+  if (error) throw error;
+  const { data } = supabase.storage.from("team-logos").getPublicUrl(path);
+  await updateTeamInfo({ bannerUrl: data.publicUrl });
   return data.publicUrl;
 }
 
