@@ -1,14 +1,18 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock, ListChecks, MessageCircleWarning, MessageSquare, Plus, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock, GripVertical, ListChecks, MessageCircleWarning, MessageSquare, Plus, Settings2, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
 import {
   addCardComment,
   addChecklistItem,
+  archiveCard,
+  createPhase,
   deleteChecklistItem,
+  deletePhase,
+  fetchArchivedCards,
   fetchCardComments,
   fetchCardLabels,
   fetchCardLabelsForCards,
@@ -20,10 +24,15 @@ import {
   progressoPronto,
   seedDefaultPhases,
   setCardLabel,
+  swapPhaseOrder,
   toggleChecklistItem,
   traduzErroFunil,
   updateCardDetails,
+  updatePhase,
+  ARCHIVE_REASON_LABEL,
   STAT_METRIC_LABEL,
+  type ArchivedCard,
+  type ArchiveReason,
   type CardComment,
   type CardLabel,
   type ChecklistItem,
@@ -39,6 +48,7 @@ import {
   type TeamDashboardRow,
   type TeamLabel,
 } from "@/lib/services/team-service";
+import { ACCENT } from "@/lib/modules-data";
 
 // Kanban estilo Trello: arrastar o card entre colunas move de fase (drag
 // nativo HTML5, sem lib extra); o card tambem pode ser aberto pra editar
@@ -48,11 +58,16 @@ import {
 export function TabKanban({
   teamId,
   jogadores,
+  coaches,
+  isAdmin,
   onErro,
   onAgendarConversa,
 }: {
   teamId: string;
   jogadores: TeamDashboardRow[];
+  coaches: { userId: string; nome: string }[];
+  /** So' admin mexe em fases (mesma regra da RLS de team_funnel_phases). */
+  isAdmin: boolean;
   onErro: (s: string) => void;
   onAgendarConversa: (playerId: string) => void;
 }) {
@@ -65,8 +80,19 @@ export function TabKanban({
   const [loading, setLoading] = useState(true);
   const [cardAberto, setCardAberto] = useState<PlayerCard | null>(null);
   const [modalAdicionar, setModalAdicionar] = useState(false);
+  const [modalConfig, setModalConfig] = useState(false);
   const [criandoFases, setCriandoFases] = useState(false);
   const [faseArrastando, setFaseArrastando] = useState<string | null>(null);
+
+  // Filtros: com 50 jogadores no funil, sem isso o board vira uma
+  // parede de cards. "Tarefas pendentes" olha o checklist (item aberto).
+  const [filtroLabel, setFiltroLabel] = useState<string>("todas");
+  const [filtroCoach, setFiltroCoach] = useState<string>("todos");
+  const [soTarefasPendentes, setSoTarefasPendentes] = useState(false);
+
+  const [modo, setModo] = useState<"board" | "arquivados">("board");
+  const [arquivados, setArquivados] = useState<ArchivedCard[]>([]);
+  const [carregandoArquivados, setCarregandoArquivados] = useState(false);
 
   const carregar = async () => {
     setLoading(true);
@@ -95,6 +121,22 @@ export function TabKanban({
     }
   };
 
+  async function carregarArquivados() {
+    setCarregandoArquivados(true);
+    try {
+      setArquivados(await fetchArchivedCards());
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    } finally {
+      setCarregandoArquivados(false);
+    }
+  }
+
+  useEffect(() => {
+    if (modo === "arquivados") carregarArquivados();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [modo]);
+
   async function moverParaFase(playerId: string, phaseId: string) {
     try {
       await movePlayerCard(playerId, phaseId);
@@ -120,16 +162,34 @@ export function TabKanban({
     return jogadores.filter((j) => !comCard.has(j.userId));
   }, [jogadores, cards]);
 
+  const cardsFiltrados = useMemo(() => {
+    return cards.filter((c) => {
+      if (filtroLabel !== "todas") {
+        const labels = labelsPorCard.get(c.cardId) ?? [];
+        if (!labels.some((l) => l.id === filtroLabel)) return false;
+      }
+      if (filtroCoach !== "todos") {
+        const j = porNome.get(c.playerId);
+        if (j?.coachId !== filtroCoach) return false;
+      }
+      if (soTarefasPendentes) {
+        const chk = checklistPorCard.get(c.cardId);
+        if (!chk || chk.total === 0 || chk.done >= chk.total) return false;
+      }
+      return true;
+    });
+  }, [cards, filtroLabel, filtroCoach, soTarefasPendentes, labelsPorCard, checklistPorCard, porNome]);
+
   const cardsPorFase = useMemo(() => {
     const m = new Map<string, PlayerCard[]>();
     fases.forEach((f) => m.set(f.id, []));
-    cards.forEach((c) => {
+    cardsFiltrados.forEach((c) => {
       const arr = m.get(c.phaseId) ?? [];
       arr.push(c);
       m.set(c.phaseId, arr);
     });
     return m;
-  }, [fases, cards]);
+  }, [fases, cardsFiltrados]);
 
   const prontos = useMemo(() => cards.filter(progressoPronto), [cards]);
   const estagnados = useMemo(() => {
@@ -194,16 +254,98 @@ export function TabKanban({
         onAbrirCard={setCardAberto}
       />
 
-      <div className="flex justify-end">
-        <button
-          onClick={() => setModalAdicionar(true)}
-          className="flex items-center gap-2 rounded-xl border border-hairline bg-elevated px-3 py-2 text-[13px] font-medium text-ink transition-colors hover:border-ink/40"
-        >
-          <UserPlus size={15} />
-          Adicionar ao funil
-        </button>
+      <div className="flex flex-wrap items-center gap-2">
+        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+          <button
+            onClick={() => setModo("board")}
+            className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
+              modo === "board" ? "bg-ink text-void" : "text-muted hover:text-ink"
+            }`}
+          >
+            Board
+          </button>
+          <button
+            onClick={() => setModo("arquivados")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
+              modo === "arquivados" ? "bg-ink text-void" : "text-muted hover:text-ink"
+            }`}
+          >
+            <ArchiveRestore size={13} />
+            Arquivados
+          </button>
+        </div>
+
+        {modo === "board" && (
+          <>
+            <select
+              value={filtroLabel}
+              onChange={(e) => setFiltroLabel(e.target.value)}
+              className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
+            >
+              <option value="todas">Todas as etiquetas</option>
+              {labelsDoTime.map((l) => (
+                <option key={l.id} value={l.id}>{l.name}</option>
+              ))}
+            </select>
+
+            {coaches.length > 0 && (
+              <select
+                value={filtroCoach}
+                onChange={(e) => setFiltroCoach(e.target.value)}
+                className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
+              >
+                <option value="todos">Todos os coaches</option>
+                {coaches.map((c) => (
+                  <option key={c.userId} value={c.userId}>{c.nome}</option>
+                ))}
+              </select>
+            )}
+
+            <button
+              onClick={() => setSoTarefasPendentes((v) => !v)}
+              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
+                soTarefasPendentes ? "border-training/50 bg-training/10 text-training" : "border-hairline text-muted hover:text-ink"
+              }`}
+            >
+              <CheckSquare size={13} />
+              Com tarefas pendentes
+            </button>
+          </>
+        )}
+
+        <div className="ml-auto flex items-center gap-2">
+          {isAdmin && (
+            <button
+              onClick={() => setModalConfig(true)}
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
+              aria-label="Configurações do funil"
+              title="Configurações do funil"
+            >
+              <Settings2 size={15} />
+            </button>
+          )}
+          <button
+            onClick={() => setModalAdicionar(true)}
+            className="flex items-center gap-2 rounded-xl border border-hairline bg-elevated px-3 py-2 text-[13px] font-medium text-ink transition-colors hover:border-ink/40"
+          >
+            <UserPlus size={15} />
+            Adicionar ao funil
+          </button>
+        </div>
       </div>
 
+      {modo === "arquivados" ? (
+        <ListaArquivados
+          arquivados={arquivados}
+          carregando={carregandoArquivados}
+          onRestaurar={async (playerId, phaseId) => {
+            await moverParaFase(playerId, phaseId);
+            await carregarArquivados();
+          }}
+          fases={fases}
+          onErro={onErro}
+        />
+      ) : (
       <div className="flex gap-4 overflow-x-auto pb-2">
         {fases.map((fase, faseIdx) => {
           const lista = (cardsPorFase.get(fase.id) ?? []).sort((a, b) => a.movedAt.localeCompare(b.movedAt));
@@ -346,6 +488,7 @@ export function TabKanban({
           );
         })}
       </div>
+      )}
 
       {cardAberto && (
         <ModalCard
@@ -375,6 +518,16 @@ export function TabKanban({
             await carregar();
             setModalAdicionar(false);
           }}
+          onErro={onErro}
+        />
+      )}
+
+      {modalConfig && (
+        <ModalConfigFunil
+          teamId={teamId}
+          fases={fases}
+          onFechar={() => setModalConfig(false)}
+          onChange={carregar}
           onErro={onErro}
         />
       )}
@@ -671,6 +824,20 @@ function ModalCard({
     }
   }
 
+  const [confirmarArquivar, setConfirmarArquivar] = useState(false);
+  const [arquivando, setArquivando] = useState(false);
+
+  async function arquivar(motivo: ArchiveReason) {
+    setArquivando(true);
+    try {
+      await archiveCard(card.playerId, motivo);
+      onChange();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+      setArquivando(false);
+    }
+  }
+
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
       <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
@@ -842,6 +1009,39 @@ function ModalCard({
             className="flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02] disabled:opacity-50">
             {salvando ? "Salvando…" : "Salvar"}
           </button>
+
+          {/* Sair do funil ativo — a pergunta "o que eu faco com esse
+              lead na ultima fase?" vira essas duas opcoes, e o card some
+              do board sem perder historico (fica em "Arquivados"). */}
+          <div className="border-t border-hairline pt-4">
+            {!confirmarArquivar ? (
+              <button onClick={() => setConfirmarArquivar(true)} type="button"
+                className="flex w-full items-center justify-center gap-2 rounded-xl border border-hairline px-4 py-2.5 text-sm font-medium text-muted transition-colors hover:border-ink/40 hover:text-ink">
+                <ArchiveRestore size={15} />
+                Sair do funil
+              </button>
+            ) : (
+              <div className="rounded-lg border border-hairline bg-elevated p-3">
+                <p className="text-[13px] text-ink/85">O que fazer com {jogador?.nome ?? "esse jogador"}?</p>
+                <div className="mt-2 flex flex-col gap-2">
+                  <button onClick={() => arquivar("concluido")} disabled={arquivando} type="button"
+                    className="flex items-center justify-center gap-2 rounded-lg border border-positive/40 px-3 py-2 text-[13px] font-semibold text-positive transition-colors hover:bg-positive/10 disabled:opacity-50">
+                    <CheckCircle2 size={14} />
+                    {ARCHIVE_REASON_LABEL.concluido}
+                  </button>
+                  <button onClick={() => arquivar("removido")} disabled={arquivando} type="button"
+                    className="flex items-center justify-center gap-2 rounded-lg border border-negative/40 px-3 py-2 text-[13px] font-semibold text-negative transition-colors hover:bg-negative/10 disabled:opacity-50">
+                    <X size={14} />
+                    {ARCHIVE_REASON_LABEL.removido}
+                  </button>
+                  <button onClick={() => setConfirmarArquivar(false)} type="button"
+                    className="rounded-lg px-3 py-1.5 text-[12px] text-muted hover:text-ink">
+                    Cancelar
+                  </button>
+                </div>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </div>
@@ -912,6 +1112,277 @@ function ModalAdicionar({
             </button>
           </div>
         )}
+      </div>
+    </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Arquivados: quem saiu do funil ativo (formado ou removido do time),
+// sem sumir da vista — restaurar manda de volta pra uma fase escolhida.
+// ------------------------------------------------------------
+function ListaArquivados({
+  arquivados,
+  carregando,
+  fases,
+  onRestaurar,
+  onErro,
+}: {
+  arquivados: ArchivedCard[];
+  carregando: boolean;
+  fases: FunnelPhase[];
+  onRestaurar: (playerId: string, phaseId: string) => Promise<void>;
+  onErro: (s: string) => void;
+}) {
+  const [faseEscolhida, setFaseEscolhida] = useState<Record<string, string>>({});
+  const [restaurando, setRestaurando] = useState<string | null>(null);
+
+  async function restaurar(a: ArchivedCard) {
+    const phaseId = faseEscolhida[a.playerId] ?? fases[0]?.id;
+    if (!phaseId) return;
+    setRestaurando(a.playerId);
+    try {
+      await onRestaurar(a.playerId, phaseId);
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    } finally {
+      setRestaurando(null);
+    }
+  }
+
+  if (carregando) return <p className="text-sm text-muted">Carregando…</p>;
+
+  if (arquivados.length === 0) {
+    return (
+      <section className="rounded-xl border border-hairline bg-surface p-6 text-center">
+        <ArchiveRestore size={22} className="mx-auto text-muted" />
+        <p className="mt-2 text-sm text-muted">Ninguém arquivado ainda — quem sai do funil (formado ou removido) aparece aqui.</p>
+      </section>
+    );
+  }
+
+  return (
+    <section className="rounded-xl border border-hairline bg-surface p-5">
+      <ul className="divide-y divide-hairline">
+        {arquivados.map((a) => (
+          <li key={a.cardId} className="flex flex-wrap items-center gap-3 py-3.5">
+            <Avatar id={a.avatarId} url={a.avatarUrl} size={34} />
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="truncate text-sm font-medium">{a.nome}</span>
+                <Chip color={a.archivedReason === "concluido" ? "#2FB89A" : "#8b8b8b"} size="sm">
+                  {ARCHIVE_REASON_LABEL[a.archivedReason]}
+                </Chip>
+              </div>
+              <p className="mt-0.5 text-xs text-muted">
+                Última fase: {a.phaseName} · saiu em {new Date(a.archivedAt).toLocaleDateString("pt-BR")}
+              </p>
+              {a.notes && <p className="mt-0.5 truncate text-xs text-muted">{a.notes}</p>}
+            </div>
+
+            <div className="flex shrink-0 items-center gap-1.5">
+              <select
+                value={faseEscolhida[a.playerId] ?? fases[0]?.id ?? ""}
+                onChange={(e) => setFaseEscolhida((prev) => ({ ...prev, [a.playerId]: e.target.value }))}
+                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[12px] text-ink outline-none"
+              >
+                {fases.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
+              </select>
+              <button
+                onClick={() => restaurar(a)}
+                disabled={restaurando === a.playerId}
+                className="flex items-center gap-1.5 rounded-lg border border-hairline px-2.5 py-1.5 text-[12px] font-medium text-ink transition-colors hover:border-ink/40 disabled:opacity-50"
+              >
+                <ArchiveRestore size={13} />
+                {restaurando === a.playerId ? "Restaurando…" : "Restaurar"}
+              </button>
+            </div>
+          </li>
+        ))}
+      </ul>
+    </section>
+  );
+}
+
+// ------------------------------------------------------------
+// Configuracoes do funil: gerenciar fases (criar, renomear, cor, metas
+// padrao, reordenar, excluir) — "todas as mudancas que podemos fazer"
+// no funil, num so lugar em vez de espalhado. So' admin (mesma regra
+// da RLS de team_funnel_phases).
+// ------------------------------------------------------------
+function ModalConfigFunil({
+  teamId,
+  fases,
+  onFechar,
+  onChange,
+  onErro,
+}: {
+  teamId: string;
+  fases: FunnelPhase[];
+  onFechar: () => void;
+  onChange: () => Promise<void> | void;
+  onErro: (s: string) => void;
+}) {
+  const [editandoId, setEditandoId] = useState<string | null>(null);
+  const [nome, setNome] = useState("");
+  const [cor, setCor] = useState(ACCENT.blue);
+  const [drills, setDrills] = useState(0);
+  const [reviews, setReviews] = useState(0);
+  const [salvando, setSalvando] = useState(false);
+
+  const [novaFase, setNovaFase] = useState("");
+  const [criando, setCriando] = useState(false);
+
+  function abrirEdicao(f: FunnelPhase) {
+    setEditandoId(f.id);
+    setNome(f.name);
+    setCor(f.color);
+    setDrills(f.defaultDrillsTarget);
+    setReviews(f.defaultReviewsTarget);
+  }
+
+  async function salvarEdicao() {
+    if (!editandoId || !nome.trim()) return;
+    setSalvando(true);
+    try {
+      await updatePhase(editandoId, { name: nome, color: cor, defaultDrillsTarget: drills, defaultReviewsTarget: reviews });
+      setEditandoId(null);
+      await onChange();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  async function mover(f: FunnelPhase, direcao: -1 | 1) {
+    const idx = fases.findIndex((x) => x.id === f.id);
+    const vizinho = fases[idx + direcao];
+    if (!vizinho) return;
+    try {
+      await swapPhaseOrder(f, vizinho);
+      await onChange();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    }
+  }
+
+  async function excluir(f: FunnelPhase) {
+    if (!confirm(`Excluir a fase "${f.name}"? Só funciona se não houver ninguém nela.`)) return;
+    try {
+      await deletePhase(f.id);
+      await onChange();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    }
+  }
+
+  async function criar() {
+    if (!novaFase.trim()) return;
+    setCriando(true);
+    try {
+      await createPhase(teamId, novaFase, ACCENT.blue, fases.length);
+      setNovaFase("");
+      await onChange();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    } finally {
+      setCriando(false);
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
+      <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <Settings2 size={17} />
+            Configurações do funil
+          </h2>
+          <button onClick={onFechar} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
+            <X size={16} />
+          </button>
+        </div>
+
+        <p className="mt-1 text-[13px] text-muted">Fases do funil, na ordem em que aparecem no board.</p>
+
+        <ul className="mt-4 space-y-2">
+          {fases.map((f, idx) => (
+            <li key={f.id} className="rounded-lg border border-hairline bg-elevated p-3">
+              {editandoId === f.id ? (
+                <div className="space-y-2.5">
+                  <input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={30}
+                    className="w-full rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none" />
+                  <div className="flex gap-1.5">
+                    {Object.values(ACCENT).map((c) => (
+                      <button key={c} onClick={() => setCor(c)} aria-label={`Cor ${c}`}
+                        className={`h-6 w-6 rounded-full transition-transform hover:scale-110 ${cor === c ? "ring-2 ring-ink ring-offset-2 ring-offset-elevated" : ""}`}
+                        style={{ backgroundColor: c }} />
+                    ))}
+                  </div>
+                  <div className="grid grid-cols-2 gap-2">
+                    <label className="text-[11px] text-muted">
+                      Meta drills
+                      <input type="number" min={0} value={drills} onChange={(e) => setDrills(Number(e.target.value))}
+                        className="mt-1 w-full rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-sm text-ink outline-none" />
+                    </label>
+                    <label className="text-[11px] text-muted">
+                      Meta reviews
+                      <input type="number" min={0} value={reviews} onChange={(e) => setReviews(Number(e.target.value))}
+                        className="mt-1 w-full rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-sm text-ink outline-none" />
+                    </label>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => setEditandoId(null)} className="flex-1 rounded-lg border border-hairline px-3 py-1.5 text-[12px] text-ink hover:border-ink/40">Cancelar</button>
+                    <button onClick={salvarEdicao} disabled={salvando} className="flex-1 rounded-lg bg-ink px-3 py-1.5 text-[12px] font-semibold text-void disabled:opacity-50">
+                      {salvando ? "Salvando…" : "Salvar"}
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                <div className="flex items-center gap-2">
+                  <GripVertical size={14} className="shrink-0 text-muted/50" />
+                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: f.color }} />
+                  <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{f.name}</span>
+                  <div className="flex shrink-0 items-center gap-1">
+                    <button onClick={() => mover(f, -1)} disabled={idx === 0} aria-label="Mover pra cima"
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-ink disabled:pointer-events-none disabled:opacity-20">
+                      <ChevronLeft size={13} className="rotate-90" />
+                    </button>
+                    <button onClick={() => mover(f, 1)} disabled={idx === fases.length - 1} aria-label="Mover pra baixo"
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-ink disabled:pointer-events-none disabled:opacity-20">
+                      <ChevronRight size={13} className="rotate-90" />
+                    </button>
+                    <button onClick={() => abrirEdicao(f)} aria-label={`Editar ${f.name}`}
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-ink">
+                      <Settings2 size={13} />
+                    </button>
+                    <button onClick={() => excluir(f)} aria-label={`Excluir ${f.name}`}
+                      className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-negative">
+                      <Trash2 size={13} />
+                    </button>
+                  </div>
+                </div>
+              )}
+            </li>
+          ))}
+        </ul>
+
+        <div className="mt-4 flex gap-2 border-t border-hairline pt-4">
+          <input
+            value={novaFase}
+            onChange={(e) => setNovaFase(e.target.value)}
+            onKeyDown={(e) => e.key === "Enter" && criar()}
+            placeholder="Nova fase…"
+            maxLength={30}
+            className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none placeholder:text-muted/50"
+          />
+          <button onClick={criar} disabled={criando || !novaFase.trim()}
+            className="flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40">
+            <Plus size={14} />
+            {criando ? "Criando…" : "Fase"}
+          </button>
+        </div>
       </div>
     </div>
   );

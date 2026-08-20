@@ -1,4 +1,5 @@
-import { ImagePlus, Users } from "lucide-react";
+import Link from "next/link";
+import { ArrowLeft, ImagePlus, Users } from "lucide-react";
 
 // Proporcao fixa (4:1) pra quem for montar a arte saber exatamente o
 // tamanho — sem isso a imagem escala pra cobrir a caixa e corta de
@@ -19,6 +20,7 @@ export function TeamBanner({
   editable,
   uploading,
   onUploadClick,
+  backHref,
   right,
 }: {
   name: string;
@@ -30,6 +32,8 @@ export function TeamBanner({
   editable?: boolean;
   uploading?: boolean;
   onUploadClick?: () => void;
+  /** Banner faz as vezes do header nas telas de entrada — voltar fica sobreposto nele. */
+  backHref?: string;
   right?: React.ReactNode;
 }) {
   const semBannerEditavel = editable && !bannerUrl;
@@ -114,6 +118,16 @@ export function TeamBanner({
           <ImagePlus size={13} />
           {uploading ? "Enviando…" : "Trocar banner"}
         </button>
+      )}
+
+      {backHref && (
+        <Link
+          href={backHref}
+          aria-label="Voltar"
+          className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-void/60 text-white backdrop-blur-sm transition-colors hover:bg-void/80 print:hidden"
+        >
+          <ArrowLeft size={18} />
+        </Link>
       )}
     </section>
   );
