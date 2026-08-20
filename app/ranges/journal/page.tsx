@@ -7,7 +7,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 
 export default function JournalPage() {
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader backHref="/modulos" icon={NotebookPen} iconColor="var(--color-review)" title="Range Journal"
         right={<RangesTabs active="journal" />} />
 

@@ -481,7 +481,7 @@ export default function BankrollPage() {
   }
 
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-10">
+    <main className="mx-auto max-w-[1280px] px-6 py-10">
       <AppHeader backHref="/modulos" title="Gestão de Banca" subtitle="Controle de risco, ROI e coach de bankroll." />
 
       {err && (
