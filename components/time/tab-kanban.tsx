@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, Clock, MessageCircleWarning, Plus, Sparkles, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Campo } from "@/components/time/campo";
 import {
   fetchFunnelPhases,
   fetchPlayerCards,
@@ -596,11 +597,3 @@ function ModalAdicionar({
   );
 }
 
-function Campo({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</label>
-      {children}
-    </div>
-  );
-}

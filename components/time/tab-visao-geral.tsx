@@ -1,8 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, TrendingUp, TrendingDown, Minus, Trophy, Send, Info, Kanban, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
+import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Trophy, Send, Info, Kanban, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
+import { Kpi } from "@/components/time/kpi";
 import { Avatar } from "@/components/avatar";
 import {
   assignTeamDrill,
@@ -14,6 +15,7 @@ import {
   type TeamLeak,
 } from "@/lib/services/team-service";
 import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-service";
+import { BRL, variacao } from "@/lib/format";
 
 // Visao geral do time. Hierarquia visual proposital:
 // 1. KPIs (leitura de 2s) -> 2. graficos lado a lado (dinheiro e estudo,
@@ -21,8 +23,6 @@ import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-se
 // Dinheiro vem primeiro da esquerda porque e' a metrica de resultado;
 // estudo a direita porque e' a metrica de causa.
 
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const BRL_CURTO = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 const INATIVO_DIAS = 7;
 
 export function TabVisaoGeral({
@@ -363,55 +363,6 @@ function GraficoEstudo({ dados, pronto }: { dados: TeamActivityDay[]; pronto: bo
         <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-training" /> Treinos ({totalTreinos})</span>
         <span className="flex items-center gap-1.5"><span className="h-2 w-2 rounded-sm bg-review" /> Revisões ({totalRev})</span>
       </div>
-    </div>
-  );
-}
-
-function variacao(atual?: number, anterior?: number): number | null {
-  if (atual === undefined || anterior === undefined) return null;
-  if (anterior === 0) return atual > 0 ? 100 : null;
-  return Math.round(((atual - anterior) / anterior) * 100);
-}
-
-function Kpi({
-  icon: Icon, label, value, hint, tom, pronto, d = 0, destaque, tendencia, tendenciaSufixo = "%",
-}: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  icon: any; label: string; value: string; hint?: string;
-  tom?: "positivo" | "negativo"; pronto: boolean; d?: number; destaque?: boolean;
-  tendencia?: number | null; tendenciaSufixo?: string;
-}) {
-  const cor = tom === "positivo" ? "text-positive" : tom === "negativo" ? "text-negative" : "text-ink";
-  const TendIcon = tendencia === null || tendencia === undefined || tendencia === 0
-    ? Minus
-    : tendencia > 0 ? TrendingUp : TrendingDown;
-  const tendCor = tendencia === null || tendencia === undefined || tendencia === 0
-    ? "text-muted"
-    : tendencia > 0 ? "text-positive" : "text-negative";
-  return (
-    <div
-      className={`rounded-xl border bg-surface p-4 transition-all ease-out print:break-inside-avoid ${
-        destaque ? "border-ink/20" : "border-hairline"
-      }`}
-      style={{
-        opacity: pronto ? 1 : 0,
-        transform: pronto ? "translateY(0)" : "translateY(6px)",
-        transitionDuration: "450ms",
-        transitionDelay: `${d}ms`,
-      }}
-    >
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-        <Icon size={13} className={tom === "negativo" ? "text-negative" : ""} />
-        {label}
-      </div>
-      <p className={`mt-1.5 text-2xl font-semibold tnum ${cor}`}>{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
-      {tendencia !== undefined && (
-        <p className={`mt-1 flex items-center gap-1 text-[11px] font-medium tnum ${tendCor}`}>
-          <TendIcon size={11} />
-          {tendencia === null ? "sem comparação" : `${tendencia > 0 ? "+" : ""}${tendencia}${tendenciaSufixo} vs período anterior`}
-        </p>
-      )}
     </div>
   );
 }

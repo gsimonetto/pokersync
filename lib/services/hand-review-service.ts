@@ -745,6 +745,15 @@ export async function fetchShareThreads(reviewId: string): Promise<ShareThread[]
   });
 }
 
+// Revoga um compartilhamento (so' quem compartilhou pode desfazer — RLS
+// hrs_delete restringe a shared_by). Some tambem os comentarios da
+// conversa (FK on delete cascade em hand_review_share_comments).
+export async function revokeHandShare(shareId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("hand_review_shares").delete().eq("id", shareId);
+  if (error) throw error;
+}
+
 // Marca como visto quando o coach abre a mao — usado depois no painel
 // do coach pra separar o que ja foi analisado do que esta na fila.
 export async function markShareViewed(shareId: string) {

@@ -36,6 +36,7 @@ import { TabConvites } from "@/components/time/tab-convites";
 import { TabTime } from "@/components/time/tab-time";
 import { TabCalendario } from "@/components/time/tab-calendario";
 import { TabKanban } from "@/components/time/tab-kanban";
+import { TeamPrintStyles } from "@/components/time/print-styles";
 
 // Painel do time: um so lugar, quatro abas. A aba fica na URL (?tab=)
 // para que notificacao e link externo abram direto no ponto certo.
@@ -231,7 +232,8 @@ function PainelConteudo() {
                 onAbrirFunil={() => trocarAba("kanban")} />
             )}
             {aba === "jogadores" && (
-              <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)} coaches={coaches}
+              <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
+                podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
                 onChange={carregar} onErro={setErro} />
             )}
             {aba === "convites" && time && (
@@ -261,16 +263,7 @@ function PainelConteudo() {
         )}
       </main>
 
-      <style jsx global>{`
-        @media print {
-          body { background: #fff !important; color: #111 !important; }
-          .text-ink, .text-ink\\/90, .font-medium, .font-semibold { color: #111 !important; }
-          .text-muted { color: #555 !important; }
-          .bg-surface, .bg-elevated { background: #fff !important; border-color: #ddd !important; }
-          .border-hairline { border-color: #ddd !important; }
-          @page { margin: 14mm; }
-        }
-      `}</style>
+      <TeamPrintStyles />
     </>
   );
 }

@@ -14,15 +14,15 @@ import {
   Wallet,
   Gamepad2,
   Printer,
-  TrendingUp,
-  TrendingDown,
-  Minus,
   Handshake,
 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { MetasCard } from "@/components/time/metas-card";
+import { Kpi } from "@/components/time/kpi";
+import { TeamPrintStyles } from "@/components/time/print-styles";
 import { createClient } from "@/lib/supabase/client";
+import { BRL, variacao } from "@/lib/format";
 import {
   ALERTA_LABEL,
   diasSemAtividade,
@@ -43,8 +43,6 @@ import {
   type PlayerLeak,
   type PlayerStakingSession,
 } from "@/lib/services/team-service";
-
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 // Ficha individual do jogador. Quem pode abrir: admin do time, o coach
 // responsavel, ou o proprio jogador — a checagem esta nas RPCs, esta
@@ -399,69 +397,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
       )}
     </main>
 
-    <style jsx global>{`
-      @media print {
-        body { background: #fff !important; color: #111 !important; }
-        .text-ink, .text-ink\\/90, .font-medium, .font-semibold { color: #111 !important; }
-        .text-muted { color: #555 !important; }
-        .bg-surface, .bg-elevated { background: #fff !important; border-color: #ddd !important; }
-        .border-hairline { border-color: #ddd !important; }
-        @page { margin: 14mm; }
-      }
-    `}</style>
+    <TeamPrintStyles />
     </>
-  );
-}
-
-function variacao(atual?: number | null, anterior?: number | null): number | null {
-  if (atual === undefined || atual === null || anterior === undefined || anterior === null) return null;
-  if (anterior === 0) return atual > 0 ? 100 : null;
-  return Math.round(((atual - anterior) / anterior) * 100);
-}
-
-function Kpi({
-  icon: Icon,
-  label,
-  value,
-  hint,
-  tom,
-  destaque,
-  tendencia,
-  tendenciaSufixo = "%",
-}: {
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  icon: any;
-  label: string;
-  value: string;
-  hint?: string;
-  tom?: "positivo" | "negativo";
-  destaque?: boolean;
-  tendencia?: number | null;
-  tendenciaSufixo?: string;
-}) {
-  const cor = tom === "positivo" ? "text-positive" : tom === "negativo" ? "text-negative" : "text-ink";
-  const TendIcon =
-    tendencia === null || tendencia === undefined || tendencia === 0 ? Minus : tendencia > 0 ? TrendingUp : TrendingDown;
-  const tendCor =
-    tendencia === null || tendencia === undefined || tendencia === 0
-      ? "text-muted"
-      : tendencia > 0
-      ? "text-positive"
-      : "text-negative";
-  return (
-    <div className={`rounded-xl border bg-surface p-4 ${destaque ? "border-ink/20" : "border-hairline"}`}>
-      <div className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-        <Icon size={13} />
-        {label}
-      </div>
-      <p className={`mt-1.5 text-2xl font-semibold tnum ${cor}`}>{value}</p>
-      {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
-      {tendencia !== undefined && (
-        <p className={`mt-1 flex items-center gap-1 text-[11px] font-medium tnum ${tendCor}`}>
-          <TendIcon size={11} />
-          {tendencia === null ? "sem comparação" : `${tendencia > 0 ? "+" : ""}${tendencia}${tendenciaSufixo} vs período anterior`}
-        </p>
-      )}
-    </div>
   );
 }

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, CheckCircle2, Clock, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Campo } from "@/components/time/campo";
 import {
   cancelEventSeries,
   cancelTeamEvent,
@@ -262,7 +263,11 @@ function ModalNovoEvento({
   const [ateData, setAteData] = useState("");
   const [salvando, setSalvando] = useState(false);
 
-  // Coach so agenda pra quem e' dele; admin enxerga o time todo.
+  // Calendario e' compartilhado entre todo o staff do time (qualquer
+  // coach pode agendar/editar/cancelar evento de qualquer jogador — sem
+  // isso, ninguem cobre a aula de um colega que faltou). "meusJogadores"
+  // e' so' uma conveniencia de UI pra pre-selecionar os jogadores do
+  // coach que esta' criando o evento, nao uma restricao de permissao.
   const meusJogadores = useMemo(
     () => (meuPapel === "coach" ? jogadores.filter((j) => j.coachId === meuUserId) : jogadores),
     [jogadores, meuPapel, meuUserId]
@@ -495,11 +500,3 @@ function ModalNovoEvento({
   );
 }
 
-function Campo({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</label>
-      {children}
-    </div>
-  );
-}
