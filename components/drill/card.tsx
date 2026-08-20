@@ -118,10 +118,52 @@ function CornerMark({
   // canto oposto -- perde a convencao de carta fisica (pensada pra mao
   // em leque), mas essa e' uma UI digital, nunca segurada em leque, e
   // legibilidade sem ambiguidade vale mais que a convencao.
+  //
+  // Fix (2026-08 v9): tirar a rotacao (v7) fez o canto inferior parar
+  // de bater com a convencao de carta fisica -- la', girar 180 o bloco
+  // inteiro colocava o naipe mais perto da quina (por cima) e o rank
+  // mais pro meio da carta (por baixo). Sem rotacao, a ORDEM dos dois
+  // elementos e' o que decide isso agora: pra reproduzir a mesma leitura
+  // visual de antes (naipe em cima, rank embaixo) sem reintroduzir a
+  // ambiguidade do 6/9, o canto inferior-direito inverte a ORDEM (naipe
+  // primeiro, rank depois) em vez de rotacionar o bloco.
   const style: React.CSSProperties =
     position === "tl"
       ? { top: offset, left: offset + 1, alignItems: "flex-start" }
       : { bottom: offset, right: offset + 1, alignItems: "flex-end" };
+  const rankSpan = (
+    <span
+      key="rank"
+      style={{
+        fontSize: isDoubleDigit ? rankSize * 0.86 : rankSize,
+        fontWeight: 500,
+        letterSpacing: isDoubleDigit ? -0.4 : 0,
+        marginTop: position === "br" ? gap : 0,
+        ...num,
+      }}
+    >
+      {/* rank == "T" e' 10 no vocabulario interno (parser usa 1 char). No
+          canto exibimos "10" mesmo pra caber e ser reconhecivel. */}
+      {rank === "T" ? "10" : rank}
+    </span>
+  );
+  // O naipe (diferente do rank) nao tem ambiguidade nenhuma girado 180 --
+  // e' so' o dígito 6/9 que colide consigo mesmo rotacionado. Girar so'
+  // o naipe do canto inferior (de ponta-cabeça) devolve o acabamento de
+  // carta fisica no unico elemento onde isso e' seguro fazer.
+  const suitSpan = !hideSuitGlyph && (
+    <span
+      key="suit"
+      style={{
+        fontSize: suitSize,
+        marginTop: position === "tl" ? gap : 0,
+        lineHeight: 1,
+        transform: position === "br" ? "rotate(180deg)" : undefined,
+      }}
+    >
+      {textGlyph(suitGlyph)}
+    </span>
+  );
   return (
     <div
       style={{
@@ -133,20 +175,16 @@ function CornerMark({
         ...style,
       }}
     >
-      {/* rank == "T" e' 10 no vocabulario interno (parser usa 1 char). No
-          canto exibimos "10" mesmo pra caber e ser reconhecivel. */}
-      <span
-        style={{
-          fontSize: isDoubleDigit ? rankSize * 0.86 : rankSize,
-          fontWeight: 500,
-          letterSpacing: isDoubleDigit ? -0.4 : 0,
-          ...num,
-        }}
-      >
-        {rank === "T" ? "10" : rank}
-      </span>
-      {!hideSuitGlyph && (
-        <span style={{ fontSize: suitSize, marginTop: gap, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
+      {position === "tl" ? (
+        <>
+          {rankSpan}
+          {suitSpan}
+        </>
+      ) : (
+        <>
+          {suitSpan}
+          {rankSpan}
+        </>
       )}
     </div>
   );
