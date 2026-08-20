@@ -1,6 +1,5 @@
 "use client";
 
-import { Layers } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { RangeEditor } from "@/components/ranges/range-editor";
 import { RangesTabs } from "@/components/ranges/ranges-tabs";
@@ -12,8 +11,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 export default function RangesPage() {
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <AppHeader backHref="/modulos" icon={Layers} iconColor="var(--color-review)" title="Construtor de Ranges"
-        right={<RangesTabs active="ranges" />} />
+      <AppHeader backHref="/modulos" right={<RangesTabs active="ranges" />} />
 
       <RangeEditor id="novo" />
     </main>

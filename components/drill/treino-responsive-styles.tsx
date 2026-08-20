@@ -8,7 +8,12 @@
 export function TreinoResponsiveStyles() {
   return (
     <style>{`
-      .ps-tr-filters-toggle { display: none; }
+      /* Botao de esconder/mostrar filtros — visivel em qualquer tamanho
+         de tela agora (antes so' existia no mobile; no desktop os
+         filtros ficavam sempre abertos ocupando os 240px fixos, sem
+         opcao de recolher pra sobrar mais espaco pra mesa). */
+      .ps-tr-filters-toggle { display: flex; }
+      .ps-tr-filters-backdrop { display: none; }
 
       @media (max-width: 768px) {
         /* Tela travada em 100dvh com overflow hidden: o jogador não
@@ -62,6 +67,7 @@ export function TreinoResponsiveStyles() {
           transition: transform 220ms ease;
         }
         .ps-tr-filters--open { transform: translateX(0); }
+        .ps-tr-filters-backdrop { display: block; }
         .ps-tr-feedback-idle { display: none !important; }
         .ps-tr-feedback-sheet {
           position: fixed;

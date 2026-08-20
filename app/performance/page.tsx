@@ -156,9 +156,6 @@ export default function PerformancePage() {
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader
         backHref="/modulos"
-        icon={LineChart}
-        iconColor="var(--color-evolution)"
-        title="Player Evolution"
         subtitle="Banca, jogo e estudo em um só lugar"
         right={
           data?.score_geral !== null && data?.score_geral !== undefined ? (

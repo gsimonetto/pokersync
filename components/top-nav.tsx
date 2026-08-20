@@ -76,7 +76,9 @@ export function TopNav() {
           "recuados" enquanto o corpo da pagina esticava quase ate a borda,
           dando a impressao de margem desalinhada/colada. */}
       <div className="mx-auto flex h-16 sm:h-18 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo className="h-8 w-auto sm:h-10" />
+        <Link href="/modulos" aria-label="Ir para Módulos" className="shrink-0">
+          <Logo className="h-8 w-auto sm:h-10" />
+        </Link>
 
         <div className="flex items-center gap-1.5">
           {TABS.map((tab) => {

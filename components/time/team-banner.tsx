@@ -1,5 +1,7 @@
-import Link from "next/link";
-import { ArrowLeft, ImagePlus, Users } from "lucide-react";
+"use client";
+
+import { useRouter } from "next/navigation";
+import { ArrowLeft, ImagePlus, Trash2, Users } from "lucide-react";
 
 // Proporcao fixa (4:1) pra quem for montar a arte saber exatamente o
 // tamanho — sem isso a imagem escala pra cobrir a caixa e corta de
@@ -9,6 +11,12 @@ export const BANNER_DIMENSOES = "1600 × 400px";
 // deixava o banner gigante em desktop, empurrando as estatisticas do time
 // pra fora da tela sem rolar.
 export const BANNER_PROPORCAO_CLASS = "aspect-[4/1] max-h-[220px]";
+
+// Fundo padrao (minimalista, tema de time/poker) pra quando o time ainda
+// nao subiu um banner proprio — antes era so' um degrade vazio, meio sem
+// vida; agora ja preenche o espaco inteiro com algo pronto, e o time
+// troca quando quiser pelo botao "Adicionar/Trocar banner".
+const DEFAULT_BANNER_URL = "/team-banner-default.svg";
 
 // Banner do time, customizavel pelo proprio time. Sem banner: cai num
 // degrade na cor do time; se quem esta' vendo pode editar, o degrade
@@ -23,6 +31,7 @@ export function TeamBanner({
   editable,
   uploading,
   onUploadClick,
+  onRemoveClick,
   backHref,
   right,
 }: {
@@ -35,37 +44,33 @@ export function TeamBanner({
   editable?: boolean;
   uploading?: boolean;
   onUploadClick?: () => void;
-  /** Banner faz as vezes do header nas telas de entrada — voltar fica sobreposto nele. */
+  /** So' aparece quando ha' banner customizado — volta pro degrade padrao. */
+  onRemoveClick?: () => void;
+  /** Fallback so' usado sem historico de navegacao — o clique normal volta pra tela anterior de verdade. */
   backHref?: string;
   right?: React.ReactNode;
 }) {
+  const router = useRouter();
   const semBannerEditavel = editable && !bannerUrl;
 
   return (
     <section
-      className={`relative overflow-hidden rounded-2xl border bg-surface ${
+      className={`relative w-full overflow-hidden rounded-2xl border bg-surface ${
         semBannerEditavel ? "border-dashed border-hairline" : "border-hairline"
       } ${BANNER_PROPORCAO_CLASS}`}
-      style={
-        bannerUrl
-          ? { backgroundImage: `url(${bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
-          : undefined
-      }
+      style={{
+        backgroundImage: `url(${bannerUrl || DEFAULT_BANNER_URL})`,
+        backgroundSize: "cover",
+        backgroundPosition: "center",
+      }}
     >
-      {bannerUrl ? (
-        <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-void/85 via-void/40 to-void/10" />
-      ) : (
-        <>
-          <div
-            aria-hidden="true"
-            className="glow-breathe pointer-events-none absolute -right-16 -top-24 size-80 rounded-full blur-3xl"
-            style={{ backgroundColor: `${accent}22` }}
-          />
-          <div
-            aria-hidden="true"
-            className="pointer-events-none absolute inset-0 opacity-[0.4] [background-image:radial-gradient(circle_at_1px_1px,rgba(255,255,255,0.05)_1px,transparent_0)] [background-size:22px_22px]"
-          />
-        </>
+      <div aria-hidden="true" className="pointer-events-none absolute inset-0 bg-gradient-to-t from-void/85 via-void/40 to-void/10" />
+      {!bannerUrl && (
+        <div
+          aria-hidden="true"
+          className="glow-breathe pointer-events-none absolute -right-16 -top-24 size-80 rounded-full blur-3xl"
+          style={{ backgroundColor: `${accent}22` }}
+        />
       )}
 
       <div className="relative flex h-full flex-col justify-end p-4 sm:p-6">
@@ -83,11 +88,11 @@ export function TeamBanner({
               )}
             </div>
             <div className="min-w-0">
-              <h1 className={`truncate text-xl font-bold tracking-tight sm:text-3xl ${bannerUrl ? "text-white drop-shadow" : "text-ink"}`}>
+              <h1 className="truncate text-xl font-bold tracking-tight text-white drop-shadow sm:text-3xl">
                 {name}
               </h1>
               {description && (
-                <p className={`mt-1 hidden max-w-xl truncate text-[13px] leading-relaxed sm:block ${bannerUrl ? "text-white/85" : "text-muted"}`}>
+                <p className="mt-1 hidden max-w-xl truncate text-[13px] leading-relaxed text-white/85 sm:block">
                   {description}
                 </p>
               )}
@@ -112,25 +117,43 @@ export function TeamBanner({
       )}
 
       {editable && bannerUrl && (
-        <button
-          type="button"
-          onClick={onUploadClick}
-          disabled={uploading}
-          className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg border border-white/25 bg-void/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-void/80 disabled:opacity-60 print:hidden"
-        >
-          <ImagePlus size={13} />
-          {uploading ? "Enviando…" : "Trocar banner"}
-        </button>
+        <div className="absolute right-3 top-3 flex items-center gap-1.5 print:hidden">
+          <button
+            type="button"
+            onClick={onUploadClick}
+            disabled={uploading}
+            className="flex items-center gap-1.5 rounded-lg border border-white/25 bg-void/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-void/80 disabled:opacity-60"
+          >
+            <ImagePlus size={13} />
+            {uploading ? "Enviando…" : "Trocar banner"}
+          </button>
+          {onRemoveClick && (
+            <button
+              type="button"
+              onClick={onRemoveClick}
+              disabled={uploading}
+              title="Remover banner (volta pro degradê padrão)"
+              aria-label="Remover banner"
+              className="grid h-8 w-8 place-items-center rounded-lg border border-white/25 bg-void/60 text-white backdrop-blur-sm transition-colors hover:bg-negative/80 disabled:opacity-60"
+            >
+              <Trash2 size={13} />
+            </button>
+          )}
+        </div>
       )}
 
       {backHref && (
-        <Link
-          href={backHref}
+        <button
+          type="button"
+          onClick={() => {
+            if (typeof window !== "undefined" && window.history.length > 1) router.back();
+            else router.push(backHref);
+          }}
           aria-label="Voltar"
           className="absolute left-3 top-3 grid h-9 w-9 place-items-center rounded-lg border border-white/25 bg-void/60 text-white backdrop-blur-sm transition-colors hover:bg-void/80 print:hidden"
         >
           <ArrowLeft size={18} />
-        </Link>
+        </button>
       )}
     </section>
   );

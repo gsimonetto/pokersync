@@ -75,9 +75,6 @@ function RevisorPageInner() {
       <AppHeader
         backHref={screen === "fila" || screen === "aderencia" ? "/modulos" : undefined}
         onBack={screen === "fila" || screen === "aderencia" ? undefined : (screen === "detalhe" ? backFromDetalhe : goFila)}
-        icon={BookOpen}
-        iconColor="var(--color-review)"
-        title="Revisão de Mãos"
         right={
           (screen === "fila" || screen === "aderencia") && (
             <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
