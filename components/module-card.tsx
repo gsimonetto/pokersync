@@ -11,6 +11,12 @@ export interface ModuleDef {
   accent: string;
   available: boolean;
   href?: string;
+  // Dado vivo opcional (ex: "Nível 12", nome do time) -- so os modulos
+  // que tem informacao barata/relevante pra mostrar aqui recebem isso,
+  // o resto do card continua igual sem exigir dado nenhum.
+  badge?: string;
+  // Bolinha de alerta discreta (ex: notificacao nao lida) no canto do icone.
+  dot?: boolean;
 }
 
 // Server Component: resolve o icone aqui (JSX ja renderizado), so o
@@ -22,6 +28,8 @@ export function ModuleCard({
   accent,
   available,
   href,
+  badge,
+  dot,
 }: Omit<ModuleDef, "key">) {
   const content = (
     <ModuleCardShell accent={accent} available={available}>
@@ -31,11 +39,23 @@ export function ModuleCard({
         className="acc-glow pointer-events-none absolute -left-10 -top-10 size-32 rounded-full blur-2xl"
       />
 
-      <div className="relative flex items-start justify-between">
-        <div className="acc-border flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-elevated">
-          <Icon size={20} className="acc-fg" />
+      <div className="relative flex items-start justify-between gap-2">
+        <div className="relative shrink-0">
+          <div className="acc-border flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-elevated">
+            <Icon size={20} className="acc-fg" />
+          </div>
+          {dot && (
+            <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
+          )}
         </div>
-        {!available && <Lock size={14} className="text-muted" />}
+        <div className="flex items-center gap-1.5">
+          {badge && (
+            <span className="acc-fg acc-border truncate rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide">
+              {badge}
+            </span>
+          )}
+          {!available && <Lock size={14} className="text-muted" />}
+        </div>
       </div>
       <div className="relative mt-4">
         <h3 className="acc-fg text-sm font-semibold text-ink">{title}</h3>
