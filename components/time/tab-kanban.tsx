@@ -545,6 +545,64 @@ const ALERTA_ICON: Record<string, typeof AlertTriangle> = {
   lembrete_estudo: Clock,
 };
 
+// Memoria de "ja vi isso" do Assistente — guardada no navegador (nao no
+// banco: e' so' preferencia de leitura, nao precisa sincronizar entre
+// dispositivos). Cada item some assim que o coach clica nele (via
+// dismiss()) ou sozinho depois de 24h do primeiro aparecimento, o que
+// vier primeiro — libera espaco pros proximos itens da fila em vez de
+// empilhar aviso velho pra sempre.
+const ASSISTENTE_MEMORIA_KEY = "ps_funil_assistente_memoria";
+const ASSISTENTE_EXPIRA_MS = 24 * 60 * 60 * 1000;
+
+function useAssistenteMemoria() {
+  const [memoria, setMemoria] = useState<Record<string, { primeiraVezEm: number; dispensadoEm?: number }>>({});
+
+  useEffect(() => {
+    try {
+      setMemoria(JSON.parse(localStorage.getItem(ASSISTENTE_MEMORIA_KEY) ?? "{}"));
+    } catch {
+      setMemoria({});
+    }
+  }, []);
+
+  function persistir(next: typeof memoria) {
+    setMemoria(next);
+    try {
+      localStorage.setItem(ASSISTENTE_MEMORIA_KEY, JSON.stringify(next));
+    } catch {
+      // localStorage indisponivel (modo privado etc.) — degrada pra "sempre visivel", sem quebrar a tela.
+    }
+  }
+
+  // Registra o primeiro aparecimento das chaves que ainda nao tem
+  // memoria — chamado com a lista completa (antes do filtro) toda vez
+  // que os dados recarregam.
+  function registrarVistas(chaves: string[]) {
+    let mudou = false;
+    const next = { ...memoria };
+    for (const k of chaves) {
+      if (!next[k]) {
+        next[k] = { primeiraVezEm: Date.now() };
+        mudou = true;
+      }
+    }
+    if (mudou) persistir(next);
+  }
+
+  function dispensar(chave: string) {
+    persistir({ ...memoria, [chave]: { primeiraVezEm: memoria[chave]?.primeiraVezEm ?? Date.now(), dispensadoEm: Date.now() } });
+  }
+
+  function visivel(chave: string): boolean {
+    const m = memoria[chave];
+    if (!m) return true;
+    if (m.dispensadoEm) return false;
+    return Date.now() - m.primeiraVezEm < ASSISTENTE_EXPIRA_MS;
+  }
+
+  return { registrarVistas, dispensar, visivel };
+}
+
 // Resumo do coach: o que precisa de decisao agora. So aparece o que
 // existe (secoes vazias somem) — nada de placeholder vazio ocupando
 // espaco em tela pequena.
@@ -568,9 +626,25 @@ function AssistenteResumo({
   onAbrirCard: (card: PlayerCard) => void;
 }) {
   const [aberto, setAberto] = useState(false);
-  const total = prontos.length + estagnados.length + comFaltas.length + alertas.length;
-  const nada = total === 0;
-  if (nada) return null;
+  const { registrarVistas, dispensar, visivel } = useAssistenteMemoria();
+
+  useEffect(() => {
+    registrarVistas([
+      ...prontos.map((c) => `pronto:${c.cardId}`),
+      ...comFaltas.map((c) => `falta:${c.cardId}`),
+      ...estagnados.map((c) => `estagnado:${c.cardId}`),
+      ...alertas.map((a) => `alerta:${a.id}`),
+    ]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [prontos, comFaltas, estagnados, alertas]);
+
+  const prontosVisiveis = prontos.filter((c) => visivel(`pronto:${c.cardId}`));
+  const comFaltasVisiveis = comFaltas.filter((c) => visivel(`falta:${c.cardId}`));
+  const estagnadosVisiveis = estagnados.filter((c) => visivel(`estagnado:${c.cardId}`));
+  const alertasVisiveis = alertas.filter((a) => visivel(`alerta:${a.id}`)).slice(0, 6);
+
+  const total = prontosVisiveis.length + estagnadosVisiveis.length + comFaltasVisiveis.length + alertasVisiveis.length;
+  if (total === 0) return null;
 
   return (
     <section className="rounded-xl border border-hairline bg-surface p-5">
@@ -586,44 +660,27 @@ function AssistenteResumo({
 
       {aberto && (
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        {prontos.length > 0 && (
+        {prontosVisiveis.length > 0 && (
           <div className="rounded-lg border border-positive/30 bg-positive/5 p-3">
             <p className="flex items-center gap-1.5 text-[12px] font-semibold text-positive">
               <CheckCircle2 size={13} /> Prontos pra subir de fase
             </p>
             <ul className="mt-2 space-y-1.5">
-              {prontos.map((c) => {
+              {prontosVisiveis.map((c) => {
                 const j = porNome.get(c.playerId);
                 const idx = fases.findIndex((f) => f.id === c.phaseId);
                 const proxima = fases[idx + 1];
                 return (
                   <li key={c.cardId} className="flex items-center justify-between gap-2 text-[13px]">
-                    <button onClick={() => onAbrirCard(c)} className="min-w-0 truncate text-left hover:underline">{j?.nome ?? "Jogador"}</button>
+                    <button onClick={() => { dispensar(`pronto:${c.cardId}`); onAbrirCard(c); }} className="min-w-0 truncate text-left hover:underline">{j?.nome ?? "Jogador"}</button>
                     {proxima && (
-                      <button onClick={() => onMoverProximaFase(c)}
+                      <button onClick={() => { dispensar(`pronto:${c.cardId}`); onMoverProximaFase(c); }}
                         className="flex shrink-0 items-center gap-1 rounded-full border border-positive/40 px-2 py-0.5 text-[11px] text-positive transition-colors hover:bg-positive/10">
                         {proxima.name} <ArrowRight size={11} />
                       </button>
                     )}
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        {comFaltas.length > 0 && (
-          <div className="rounded-lg border border-negative/30 bg-negative/5 p-3">
-            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-negative">
-              <AlertTriangle size={13} /> Faltando às reuniões
-            </p>
-            <ul className="mt-2 space-y-1.5">
-              {comFaltas.map((c) => {
-                const j = porNome.get(c.playerId);
-                return (
-                  <li key={c.cardId}>
-                    <button onClick={() => onAbrirCard(c)} className="text-left text-[13px] hover:underline">
-                      {j?.nome ?? "Jogador"} <span className="text-muted">· {c.eventosAusente} faltas</span>
+                    <button onClick={() => dispensar(`pronto:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
+                      <X size={12} />
                     </button>
                   </li>
                 );
@@ -632,17 +689,22 @@ function AssistenteResumo({
           </div>
         )}
 
-        {estagnados.length > 0 && (
-          <div className="rounded-lg border border-evolution/30 bg-evolution/5 p-3">
-            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-evolution">
-              <Clock size={13} /> Sem progresso há 14+ dias na fase
+        {comFaltasVisiveis.length > 0 && (
+          <div className="rounded-lg border border-negative/30 bg-negative/5 p-3">
+            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-negative">
+              <AlertTriangle size={13} /> Faltando às reuniões
             </p>
             <ul className="mt-2 space-y-1.5">
-              {estagnados.map((c) => {
+              {comFaltasVisiveis.map((c) => {
                 const j = porNome.get(c.playerId);
                 return (
-                  <li key={c.cardId}>
-                    <button onClick={() => onAbrirCard(c)} className="text-left text-[13px] hover:underline">{j?.nome ?? "Jogador"}</button>
+                  <li key={c.cardId} className="flex items-center justify-between gap-2">
+                    <button onClick={() => { dispensar(`falta:${c.cardId}`); onAbrirCard(c); }} className="min-w-0 truncate text-left text-[13px] hover:underline">
+                      {j?.nome ?? "Jogador"} <span className="text-muted">· {c.eventosAusente} faltas</span>
+                    </button>
+                    <button onClick={() => dispensar(`falta:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
+                      <X size={12} />
+                    </button>
                   </li>
                 );
               })}
@@ -650,17 +712,43 @@ function AssistenteResumo({
           </div>
         )}
 
-        {alertas.length > 0 && (
+        {estagnadosVisiveis.length > 0 && (
+          <div className="rounded-lg border border-evolution/30 bg-evolution/5 p-3">
+            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-evolution">
+              <Clock size={13} /> Sem progresso há 14+ dias na fase
+            </p>
+            <ul className="mt-2 space-y-1.5">
+              {estagnadosVisiveis.map((c) => {
+                const j = porNome.get(c.playerId);
+                return (
+                  <li key={c.cardId} className="flex items-center justify-between gap-2">
+                    <button onClick={() => { dispensar(`estagnado:${c.cardId}`); onAbrirCard(c); }} className="min-w-0 truncate text-left text-[13px] hover:underline">{j?.nome ?? "Jogador"}</button>
+                    <button onClick={() => dispensar(`estagnado:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
+                      <X size={12} />
+                    </button>
+                  </li>
+                );
+              })}
+            </ul>
+          </div>
+        )}
+
+        {alertasVisiveis.length > 0 && (
           <div className="rounded-lg border border-hairline bg-elevated p-3">
             <p className="text-[12px] font-semibold text-muted">Últimos alertas do sistema</p>
             <ul className="mt-2 space-y-1.5">
-              {alertas.slice(0, 6).map((a) => {
+              {alertasVisiveis.map((a) => {
                 const j = porNome.get(a.playerId);
                 const Icon = ALERTA_ICON[a.kind] ?? AlertTriangle;
                 return (
-                  <li key={a.id} className="flex items-start gap-1.5 text-[12px] text-muted">
-                    <Icon size={12} className="mt-0.5 shrink-0" />
-                    <span><strong className="text-ink/80">{j?.nome ?? "Jogador"}</strong> · {ALERTA_LABEL[a.kind]}</span>
+                  <li key={a.id} className="flex items-start justify-between gap-1.5">
+                    <span className="flex min-w-0 items-start gap-1.5 text-[12px] text-muted">
+                      <Icon size={12} className="mt-0.5 shrink-0" />
+                      <span><strong className="text-ink/80">{j?.nome ?? "Jogador"}</strong> · {ALERTA_LABEL[a.kind]}</span>
+                    </span>
+                    <button onClick={() => dispensar(`alerta:${a.id}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
+                      <X size={12} />
+                    </button>
                   </li>
                 );
               })}
