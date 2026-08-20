@@ -1010,7 +1010,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       )}
 
       {xpFeedback && (
-        <div className="fixed bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 flex-col items-center gap-1 rounded-xl bg-gradient-to-br from-review to-[#7c3aed] px-5 py-3 font-semibold text-white shadow-[0_8px_24px_rgba(168,85,247,0.4)]">
+        <div className="fixed bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 flex-col items-center gap-1 rounded-xl bg-positive px-5 py-3 font-semibold text-void shadow-[0_8px_24px_rgba(34,197,94,0.4)]">
           <span className="text-base">+{xpFeedback.xp} XP</span>
           {xpFeedback.missions.map((m, i) => (
             <span key={i} className="text-[11px] opacity-90">
