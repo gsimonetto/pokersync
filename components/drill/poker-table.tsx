@@ -123,9 +123,19 @@ function PotChipStack() {
   );
 }
 
-function ActionBadge({ action }: { action?: SeatState["action"] }) {
+// % do pote ao lado do bb -- e' assim que quem joga em nivel avancado
+// pensa sizing (padrao GTOWizard/PIOSolver), bb sozinho exige fazer a
+// conta de cabeca toda hora. So calcula quando ha pote de verdade pra
+// dividir (pot<=0 no preflop antes de qualquer aposta, por exemplo).
+function formatPotPct(size: number, pot: number): string | null {
+  if (pot <= 0) return null;
+  return `${Math.round((size / pot) * 100)}%`;
+}
+
+function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: number }) {
   if (!action) return null;
   const a = ACT[action.type.toLowerCase()] || ACT.check;
+  const potPct = action.size ? formatPotPct(action.size, pot) : null;
   return (
     <div
       style={{
@@ -144,6 +154,7 @@ function ActionBadge({ action }: { action?: SeatState["action"] }) {
     >
       {a.label}
       {action.size ? ` ${action.size}bb` : ""}
+      {potPct && <span style={{ opacity: 0.7 }}> · {potPct} pot</span>}
     </div>
   );
 }
@@ -207,11 +218,12 @@ function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number 
 }
 
 function Seat({
-  seat, state, isDealer,
+  seat, state, isDealer, pot,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
   isDealer?: boolean;
+  pot: number;
 }) {
   const posCol = POS[seat.posLabel];
   const { status = "empty", stack, action, cards } = state;
@@ -236,7 +248,7 @@ function Seat({
 
   const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
-      {!acting && <ActionBadge action={action} />}
+      {!acting && <ActionBadge action={action} pot={pot} />}
     </div>
   );
 
@@ -579,12 +591,20 @@ export function PokerTable({
         </div>
       )}
 
+      {/* aspectRatio fixo -- antes a mesa era so' "flex:1; width:100%",
+          esticando pra qualquer proporcao que a caixa disponivel tivesse
+          (bug reportado: "mesa esticada"). Com proporcao travada e auto
+          margins, ela sempre desenha uma oval de mesa de verdade, do
+          maior tamanho que couber sem estourar largura nem altura. */}
       <div
         style={{
           position: "relative",
-          flex: 1,
-          minHeight: 0,
+          flex: "0 1 auto",
           width: "100%",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          aspectRatio: "8 / 5",
+          margin: "auto",
           overflow: "hidden",
           borderRadius: "50%",
         }}
@@ -722,6 +742,7 @@ export function PokerTable({
             seat={s}
             state={seatData(s.posLabel)}
             isDealer={s.posLabel === "BTN"}
+            pot={hand?.pot ?? 0}
           />
         ))}
 

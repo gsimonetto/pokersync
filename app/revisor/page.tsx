@@ -2,15 +2,16 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { BookOpen } from "lucide-react";
+import { Bookmark } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { RevisorFila } from "@/components/revisor/revisor-fila";
 import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
 import { RevisorSessao } from "@/components/revisor/revisor-sessao";
 import { AderenciaRange } from "@/components/revisor/aderencia-range";
+import { RevisorSpotsSalvos } from "@/components/revisor/revisor-spots-salvos";
 
-type Screen = "fila" | "nova" | "sessao" | "detalhe" | "aderencia";
+type Screen = "fila" | "salvos" | "nova" | "sessao" | "detalhe" | "aderencia";
 
 // Navegacao interna do Revisor de Maos (2026-08 v2): agora inclui a tela
 // "sessao" (master-detail de torneio/cash). Fluxo esperado:
@@ -33,6 +34,10 @@ function RevisorPageInner() {
   const [screen, setScreen] = useState<Screen>("fila");
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
+  // De onde "detalhe" foi aberto (fila normal ou biblioteca de salvos) —
+  // sem isso, voltar de um spot salvo caia sempre na fila em vez de
+  // voltar pra biblioteca de onde o usuario realmente veio.
+  const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos">("fila");
 
   useEffect(() => {
     const shared = searchParams.get("shared");
@@ -48,6 +53,11 @@ function RevisorPageInner() {
     setSelectedSessionId(null);
     setScreen("fila");
   }
+  function goSalvos() {
+    setSelectedReviewId(null);
+    setSelectedSessionId(null);
+    setScreen("salvos");
+  }
   function goNova() {
     setScreen("nova");
   }
@@ -56,15 +66,24 @@ function RevisorPageInner() {
     setScreen("sessao");
   }
   function goDetalhe(reviewId: string) {
+    setDetalheOrigin("fila");
+    setSelectedReviewId(reviewId);
+    setScreen("detalhe");
+  }
+  function goDetalheFromSalvos(reviewId: string) {
+    setDetalheOrigin("salvos");
     setSelectedReviewId(reviewId);
     setScreen("detalhe");
   }
   // Voltar do detalhe: se ha sessao ativa no contexto, volta pra ela;
-  // senao (fluxo antigo de mao avulsa), volta direto pra fila.
+  // senao volta pra onde a mao foi aberta (fila normal ou biblioteca de
+  // salvos).
   function backFromDetalhe() {
     if (selectedSessionId) {
       setSelectedReviewId(null);
       setScreen("sessao");
+    } else if (detalheOrigin === "salvos") {
+      goSalvos();
     } else {
       goFila();
     }
@@ -73,16 +92,27 @@ function RevisorPageInner() {
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader
-        backHref={screen === "fila" || screen === "aderencia" ? "/modulos" : undefined}
-        onBack={screen === "fila" || screen === "aderencia" ? undefined : (screen === "detalhe" ? backFromDetalhe : goFila)}
+        onBack={
+          screen === "fila" || screen === "salvos" || screen === "aderencia"
+            ? undefined
+            : screen === "detalhe"
+            ? backFromDetalhe
+            : goFila
+        }
         right={
-          (screen === "fila" || screen === "aderencia") && (
+          (screen === "fila" || screen === "salvos" || screen === "aderencia") && (
             <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
               <button
                 onClick={goFila}
                 className={`rounded-md px-3 py-1 text-xs font-medium ${screen === "fila" ? "bg-ink text-void" : "text-muted"}`}
               >
                 Fila
+              </button>
+              <button
+                onClick={goSalvos}
+                className={`flex items-center gap-1 rounded-md px-3 py-1 text-xs font-medium ${screen === "salvos" ? "bg-ink text-void" : "text-muted"}`}
+              >
+                <Bookmark size={12} /> Salvos
               </button>
               <button
                 onClick={() => setScreen("aderencia")}
@@ -96,6 +126,7 @@ function RevisorPageInner() {
       />
 
       {screen === "fila" && <RevisorFila onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />}
+      {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
       {screen === "aderencia" && <AderenciaRange />}
       {screen === "nova" && (
         <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />

@@ -301,8 +301,8 @@ export function RevisorSessao({
                 style={{
                   all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
                   width: 22, height: 22, borderRadius: 6,
-                  background: searchOpen ? "rgba(168,85,247,0.18)" : "transparent",
-                  color: searchOpen ? "#C4B5FD" : "rgba(255,255,255,0.4)",
+                  background: searchOpen ? "rgba(255,255,255,0.14)" : "transparent",
+                  color: searchOpen ? "#FFFFFF" : "rgba(255,255,255,0.4)",
                 }}
               >
                 <Search size={13} />
@@ -380,9 +380,9 @@ export function RevisorSessao({
                         all: "unset", cursor: "pointer",
                         fontFamily: F, fontSize: 10.5, fontWeight: 500,
                         padding: "4px 9px", borderRadius: 999,
-                        border: `1px solid ${active ? "#C4B5FD" : "rgba(255,255,255,0.14)"}`,
-                        background: active ? "rgba(168,85,247,0.18)" : "transparent",
-                        color: active ? "#C4B5FD" : "rgba(255,255,255,0.5)",
+                        border: `1px solid ${active ? "#FFFFFF" : "rgba(255,255,255,0.14)"}`,
+                        background: active ? "rgba(255,255,255,0.14)" : "transparent",
+                        color: active ? "#FFFFFF" : "rgba(255,255,255,0.5)",
                       }}
                     >
                       {t.label}
@@ -415,8 +415,8 @@ export function RevisorSessao({
                       filteredHands.findIndex((f) => f.hand.id === h.id) < filteredHands.length - 1
                         ? "1px solid rgba(255,255,255,0.04)"
                         : "none",
-                    background: active ? "rgba(168,85,247,0.12)" : "transparent",
-                    borderLeft: active ? "2px solid #A855F7" : "2px solid transparent",
+                    background: active ? "rgba(255,255,255,0.06)" : "transparent",
+                    borderLeft: active ? "2px solid #FFFFFF" : "2px solid transparent",
                   }}
                 >
                   {/* alignItems "flex-end" (era "center") — pedido

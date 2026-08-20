@@ -261,6 +261,28 @@ export function RevisorHandTable({
     return () => clearTimeout(timer);
   }, [autoplay, stepIndex, nextStep]);
 
+  // Atalhos de teclado (setas + espaço) -- padrao de qualquer replayer
+  // de mao (Hand2Note, PokerTracker): navegar so no mouse era o unico
+  // jeito antes, mesmo o Treino ja tendo atalhos (Q/W/espaço) pro drill.
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      const target = e.target as HTMLElement;
+      if (target.matches("input, textarea, select")) return;
+      if (e.code === "ArrowRight") {
+        e.preventDefault();
+        nextStep();
+      } else if (e.code === "ArrowLeft") {
+        e.preventDefault();
+        prevStep();
+      } else if (e.code === "Space") {
+        e.preventDefault();
+        setAutoplay((v) => !v);
+      }
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nextStep, prevStep]);
+
   // Link "Treinar esse spot" — so existe quando rua e' postflop, posicao
   // suportada pelos drills, e a situacao preflop foi resolvida com sucesso.
   const trainHref = useMemo(() => {
@@ -383,7 +405,7 @@ export function RevisorHandTable({
                 onClick={prevStep}
                 disabled={replayState.stepIndex === 0}
                 aria-label="Passo anterior"
-                title="Anterior"
+                title="Anterior (←)"
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
                   color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
@@ -397,7 +419,7 @@ export function RevisorHandTable({
                 onClick={() => setAutoplay((v) => !v)}
                 disabled={replayState.stepIndex >= replayState.stepCount - 1}
                 aria-label={autoplay ? "Pausar" : "Reproduzir"}
-                title={autoplay ? "Pausar" : "Reproduzir"}
+                title={autoplay ? "Pausar (espaço)" : "Reproduzir (espaço)"}
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center", border: 0,
                   background: autoplay ? "rgba(52,211,153,0.18)" : "transparent",
@@ -412,7 +434,7 @@ export function RevisorHandTable({
                 onClick={nextStep}
                 disabled={replayState.stepIndex >= replayState.stepCount - 1}
                 aria-label="Próximo passo"
-                title="Próximo"
+                title="Próximo (→)"
                 style={{
                   display: "flex", alignItems: "center", justifyContent: "center", border: 0,
                   background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "rgba(255,255,255,0.85)",
@@ -456,8 +478,8 @@ export function RevisorHandTable({
             href={trainHref}
             style={{
               display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(168,85,247,0.15)", border: "1px solid rgba(168,85,247,0.4)",
-              color: "#C4B5FD", borderRadius: 10, padding: "8px 14px",
+              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.25)",
+              color: "#FFFFFF", borderRadius: 10, padding: "8px 14px",
               fontFamily: F, fontSize: 12.5, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap",
             }}
           >

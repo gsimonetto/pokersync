@@ -4,7 +4,6 @@ import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "rea
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { Chip } from "@/components/chip";
 import { PrintButton } from "@/components/period-selector";
 import { TeamBanner } from "@/components/time/team-banner";
@@ -222,7 +221,6 @@ function PainelConteudo() {
                 uploading={enviandoBanner}
                 onUploadClick={() => bannerRef.current?.click()}
                 onRemoveClick={removerBanner}
-                backHref="/modulos"
                 right={<PrintButton />}
               />
               {podeEditarTime && (
@@ -240,11 +238,17 @@ function PainelConteudo() {
               )}
             </div>
           )
-        ) : (
-          <AppHeader backHref="/modulos" right={<PrintButton />} />
-        )}
+        ) : null}
 
-        <nav className="mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline print:hidden">
+        {/* Print fica dentro da propria barra de abas (canto direito) nas
+            demais abas — antes vinha num AppHeader vazio (so' esse botao),
+            que virava uma faixa preta sem nada mais em cima da barra. */}
+        <nav className="relative mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline pt-4 print:hidden">
+          {aba !== "visao" && (
+            <div className="absolute right-0 top-1/2 -translate-y-1/2">
+              <PrintButton />
+            </div>
+          )}
           {ABAS.map((a) => {
             const Icon = a.icon;
             const pend = a.key === "convites" ? pendentes.length : 0;

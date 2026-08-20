@@ -165,7 +165,7 @@ export function ShareHandModal({
                     onChange={(e) => updateAnswer(i, e.target.value)}
                     rows={2}
                     placeholder="Sua análise…"
-                    className={`mt-1 w-full resize-y rounded-lg border bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review ${
+                    className={`mt-1 w-full resize-y rounded-lg border bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40 ${
                       !q.answer.trim() ? "border-negative/40" : "border-hairline"
                     }`}
                   />
@@ -186,7 +186,7 @@ export function ShareHandModal({
                         onChange={(e) => updateAnswer(idx, e.target.value)}
                         rows={2}
                         placeholder="Sua análise (opcional)…"
-                        className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
+                        className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
                       />
                     </div>
                   );
@@ -211,7 +211,7 @@ export function ShareHandModal({
                       key={c.userId}
                       onClick={() => handleShare(c)}
                       disabled={saving || requiredMissing}
-                      className="flex items-center justify-center gap-2 rounded-[10px] bg-review px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
+                      className="flex items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
                     >
                       {saving ? <Loader2 size={16} className="animate-spin" /> : <Users size={16} />}
                       Compartilhar com {c.name}

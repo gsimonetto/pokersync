@@ -4,7 +4,6 @@ import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { Chip } from "@/components/chip";
 import { ACCENT } from "@/lib/modules-data";
 import { TeamBanner } from "@/components/time/team-banner";
@@ -79,10 +78,6 @@ export default function TimePage() {
 
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      {/* Quando o time carregou, o banner (dentro de VisaoJogador) vira o
-          header — leva o voltar embutido, sem repetir nome/subtitulo. */}
-      {!data && <AppHeader backHref="/modulos" />}
-
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
       )}
@@ -145,7 +140,6 @@ function VisaoJogador({ data }: { data: MyTeam }) {
         accent={data.team.accent}
         logoUrl={data.team.logoUrl}
         bannerUrl={data.team.bannerUrl}
-        backHref="/modulos"
       />
 
       <section className="rounded-xl border border-hairline bg-surface p-6">

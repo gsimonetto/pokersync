@@ -93,7 +93,7 @@ function TreinoShell() {
       style={{
         fontFamily: F,
         height: availableHeight ? `${availableHeight}px` : "100vh",
-        background: "#050505",
+        background: "transparent",
         padding: 0,
         boxSizing: "border-box",
         overflow: "hidden",
@@ -106,9 +106,13 @@ function TreinoShell() {
           maxWidth: "100%",
           height: "100%",
           margin: "0 auto",
-          background: "#050505",
+          // Antes #050505 -- praticamente identico ao void (#000000) do
+          // resto do app, a margem existia no layout mas era invisivel a
+          // olho nu por falta de contraste. bg-surface (#111111) e' o
+          // mesmo tom que todo outro painel do produto usa contra o void.
+          background: "#111111",
           borderRadius: 18,
-          border: "1px solid rgba(255,255,255,0.06)",
+          border: "1px solid rgba(255,255,255,0.10)",
           boxShadow: "0 30px 80px rgba(0,0,0,0.7)",
           display: "flex",
           flexDirection: "column",

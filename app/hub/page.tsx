@@ -249,7 +249,6 @@ export default function HubPage() {
       `}</style>
 
       <AppHeader
-        backHref="/modulos"
         subtitle={
           <>
             {view === "missoes" ? "Ganhe XP, mantenha a ofensiva e suba de nível." : "Ranking de todos os membros PokerSync."}
