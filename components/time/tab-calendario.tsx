@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, CheckCircle2, Clock, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
+import { CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Campo } from "@/components/time/campo";
 import {
@@ -55,6 +55,7 @@ export function TabCalendario({
   onErro: (s: string) => void;
 }) {
   const [modalAberto, setModalAberto] = useState(false);
+  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
 
   useEffect(() => {
     if (prefillPlayerId) setModalAberto(true);
@@ -65,6 +66,11 @@ export function TabCalendario({
     jogadores.forEach((j) => m.set(j.userId, j));
     return m;
   }, [jogadores]);
+
+  const eventosDoDia = useMemo(
+    () => (diaSelecionado ? eventos.filter((e) => new Date(e.startsAt).toDateString() === diaSelecionado) : eventos),
+    [eventos, diaSelecionado]
+  );
 
   async function cancelar(ev: TeamEvent) {
     const ehSerie = Boolean(ev.recurrenceGroupId);
@@ -83,11 +89,25 @@ export function TabCalendario({
 
   return (
     <div className="space-y-5">
+      <CalendarioMensal eventos={eventos} diaSelecionado={diaSelecionado} onSelecionarDia={setDiaSelecionado} />
+
       <section className="rounded-xl border border-hairline bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-[15px] font-semibold">Próximos eventos</h2>
-            <p className="mt-0.5 text-sm text-muted">Aulas e reuniões agendadas com o time.</p>
+            <h2 className="text-[15px] font-semibold">
+              {diaSelecionado
+                ? new Date(diaSelecionado).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })
+                : "Próximos eventos"}
+            </h2>
+            <p className="mt-0.5 text-sm text-muted">
+              {diaSelecionado ? (
+                <button onClick={() => setDiaSelecionado(null)} className="underline hover:text-ink">
+                  ver todos os eventos
+                </button>
+              ) : (
+                "Aulas e reuniões agendadas com o time."
+              )}
+            </p>
           </div>
           {podeCriar && (
             <button
@@ -100,11 +120,11 @@ export function TabCalendario({
           )}
         </div>
 
-        {eventos.length === 0 ? (
-          <p className="mt-5 text-sm text-muted">Nenhum evento agendado.</p>
+        {eventosDoDia.length === 0 ? (
+          <p className="mt-5 text-sm text-muted">{diaSelecionado ? "Nenhum evento neste dia." : "Nenhum evento agendado."}</p>
         ) : (
           <ul className="mt-4 divide-y divide-hairline">
-            {eventos.map((ev) => (
+            {eventosDoDia.map((ev) => (
               <li key={ev.id} className="flex flex-wrap items-start gap-3 py-3.5">
                 <div className="grid h-11 w-14 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-center">
                   <span className="text-[11px] font-semibold uppercase leading-tight text-muted">{fmtData(ev.startsAt)}</span>
@@ -229,6 +249,108 @@ export function TabCalendario({
         />
       )}
     </div>
+  );
+}
+
+// Grade de mes de verdade (dias da semana + numeros), em vez de so' uma
+// lista dos proximos eventos. Clicar num dia filtra a lista abaixo;
+// clicar de novo (ou "ver todos") volta a mostrar tudo.
+const DIAS_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+function CalendarioMensal({
+  eventos,
+  diaSelecionado,
+  onSelecionarDia,
+}: {
+  eventos: TeamEvent[];
+  diaSelecionado: string | null;
+  onSelecionarDia: (dia: string | null) => void;
+}) {
+  const [mesRef, setMesRef] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+
+  const eventosPorDia = useMemo(() => {
+    const m = new Map<string, number>();
+    eventos.forEach((ev) => {
+      const key = new Date(ev.startsAt).toDateString();
+      m.set(key, (m.get(key) ?? 0) + 1);
+    });
+    return m;
+  }, [eventos]);
+
+  const celulas = useMemo(() => {
+    const ano = mesRef.getFullYear();
+    const mes = mesRef.getMonth();
+    const offset = new Date(ano, mes, 1).getDay();
+    const totalDias = new Date(ano, mes + 1, 0).getDate();
+    const arr: (Date | null)[] = Array(offset).fill(null);
+    for (let d = 1; d <= totalDias; d++) arr.push(new Date(ano, mes, d));
+    return arr;
+  }, [mesRef]);
+
+  const hojeStr = new Date().toDateString();
+
+  return (
+    <section className="rounded-xl border border-hairline bg-surface p-5">
+      <div className="flex items-center justify-between">
+        <h2 className="text-[15px] font-semibold capitalize">
+          {mesRef.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
+        </h2>
+        <div className="flex gap-1">
+          <button
+            onClick={() => setMesRef((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+            aria-label="Mês anterior"
+            className="grid h-7 w-7 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          >
+            <ChevronLeft size={14} />
+          </button>
+          <button
+            onClick={() => setMesRef((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            aria-label="Próximo mês"
+            className="grid h-7 w-7 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          >
+            <ChevronRight size={14} />
+          </button>
+        </div>
+      </div>
+
+      <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted">
+        {DIAS_SEMANA.map((d, i) => (
+          <span key={i}>{d}</span>
+        ))}
+      </div>
+
+      <div className="mt-1 grid grid-cols-7 gap-1">
+        {celulas.map((d, i) => {
+          if (!d) return <div key={i} />;
+          const key = d.toDateString();
+          const n = eventosPorDia.get(key) ?? 0;
+          const selecionado = diaSelecionado === key;
+          const hoje = key === hojeStr;
+          return (
+            <button
+              key={i}
+              onClick={() => onSelecionarDia(selecionado ? null : key)}
+              className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] transition-colors ${
+                selecionado
+                  ? "bg-ink text-void"
+                  : hoje
+                  ? "border border-ink/40 text-ink"
+                  : n > 0
+                  ? "text-ink hover:bg-elevated"
+                  : "text-muted/70 hover:bg-elevated"
+              }`}
+            >
+              <span className="tnum">{d.getDate()}</span>
+              {n > 0 && <span className={`h-1 w-1 rounded-full ${selecionado ? "bg-void" : "bg-training"}`} />}
+            </button>
+          );
+        })}
+      </div>
+    </section>
   );
 }
 

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, ListChecks, MessageCircleWarning, MessageSquare, Plus, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock, ListChecks, MessageCircleWarning, MessageSquare, Plus, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Campo } from "@/components/time/campo";
 import {
@@ -419,16 +419,24 @@ function AssistenteResumo({
   onMoverProximaFase: (card: PlayerCard) => void;
   onAbrirCard: (card: PlayerCard) => void;
 }) {
-  const nada = prontos.length === 0 && estagnados.length === 0 && comFaltas.length === 0 && alertas.length === 0;
+  const [aberto, setAberto] = useState(false);
+  const total = prontos.length + estagnados.length + comFaltas.length + alertas.length;
+  const nada = total === 0;
   if (nada) return null;
 
   return (
     <section className="rounded-xl border border-hairline bg-surface p-5">
-      <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+      <button
+        onClick={() => setAberto((v) => !v)}
+        className="flex w-full items-center gap-2 text-left text-[15px] font-semibold"
+      >
         <Sparkles size={16} />
         Assistente do coach
-      </h2>
+        <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{total}</span>
+        <ChevronDown size={16} className={`ml-auto text-muted transition-transform ${aberto ? "rotate-180" : ""}`} />
+      </button>
 
+      {aberto && (
       <div className="mt-3 grid gap-3 sm:grid-cols-2">
         {prontos.length > 0 && (
           <div className="rounded-lg border border-positive/30 bg-positive/5 p-3">
@@ -512,6 +520,7 @@ function AssistenteResumo({
           </div>
         )}
       </div>
+      )}
     </section>
   );
 }

@@ -5,6 +5,7 @@ import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Trophy, Send,
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { Kpi } from "@/components/time/kpi";
 import { Avatar } from "@/components/avatar";
+import { PeriodSelector } from "@/components/period-selector";
 import {
   assignTeamDrill,
   diasSemAtividade,
@@ -33,6 +34,8 @@ export function TabVisaoGeral({
   comparacao,
   pronto,
   dias,
+  periodos,
+  onDiasChange,
   onAtribuido,
   onAbrirFunil,
 }: {
@@ -43,6 +46,8 @@ export function TabVisaoGeral({
   comparacao: PeriodComparison | null;
   pronto: boolean;
   dias: number;
+  periodos: { label: string; days: number }[];
+  onDiasChange: (dias: number) => void;
   onAtribuido: () => void;
   onAbrirFunil: () => void;
 }) {
@@ -68,6 +73,10 @@ export function TabVisaoGeral({
 
   return (
     <div className="space-y-5">
+      <div className="flex justify-end print:hidden">
+        <PeriodSelector value={dias} onChange={onDiasChange} options={periodos} />
+      </div>
+
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 print:grid-cols-3">
         <Kpi d={0} pronto={pronto} icon={Wallet} label="Resultado no time" value={BRL.format(lucro)}
           hint="desde a entrada de cada um" tom={lucro > 0 ? "positivo" : lucro < 0 ? "negativo" : undefined} destaque />

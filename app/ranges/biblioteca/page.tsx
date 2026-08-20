@@ -7,7 +7,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 
 export default function BibliotecaPage() {
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader backHref="/modulos" icon={BookMarked} iconColor="var(--color-review)" title="Biblioteca"
         right={<RangesTabs active="biblioteca" />} />
 

@@ -12,7 +12,7 @@ function RangeComparePageInner() {
   const b = searchParams.get("b");
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader backHref="/ranges" icon={GitCompare} iconColor="var(--color-review)" title="Comparar Ranges" />
 
       <RangeCompare initialA={a} initialB={b} />
@@ -24,7 +24,7 @@ export default function RangeComparePage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+        <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
           <p className="text-sm text-muted">Carregando…</p>
         </main>
       }

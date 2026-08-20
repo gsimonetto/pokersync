@@ -77,7 +77,7 @@ export default function TimePage() {
   }, [carregar]);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader
         backHref="/modulos"
         icon={Users}

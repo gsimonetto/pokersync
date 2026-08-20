@@ -9,7 +9,7 @@ export default function RangeEditPage({ params }: { params: Promise<{ id: string
   const { id } = use(params);
 
   return (
-    <main className="mx-auto max-w-[1440px] px-4 py-3 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader backHref="/ranges" icon={Layers} iconColor="var(--color-review)"
         title={id === "novo" ? "Novo Range" : "Editar Range"} />
 

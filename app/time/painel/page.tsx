@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Users, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
-import { PeriodSelector, PrintButton } from "@/components/period-selector";
+import { PrintButton } from "@/components/period-selector";
 import {
   fetchFinancialSeries,
   fetchMyTeam,
@@ -62,7 +62,7 @@ const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
 
 export default function PainelPage() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-6xl px-6 py-10 text-sm text-muted">Carregando…</main>}>
+    <Suspense fallback={<main className="mx-auto max-w-[1600px] px-6 py-10 text-sm text-muted">Carregando…</main>}>
       <PainelConteudo />
     </Suspense>
   );
@@ -160,19 +160,14 @@ function PainelConteudo() {
 
   return (
     <>
-      <main className="mx-auto max-w-6xl px-6 py-10 text-ink print:max-w-full print:p-0">
+      <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink print:max-w-full print:p-0">
         <AppHeader
           backHref="/modulos"
           icon={Users}
           iconColor={info?.accent ?? "#5AA6E0"}
           title={info?.name ?? "Painel do time"}
           subtitle={time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
-          right={
-            <div className="flex items-center gap-2 print:hidden">
-              <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
-              <PrintButton />
-            </div>
-          }
+          right={<PrintButton />}
         />
 
         <nav className="mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline print:hidden">
@@ -212,7 +207,7 @@ function PainelConteudo() {
         ) : (
           <>
             {aba === "visao" && (
-              <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} leaks={leaks} comparacao={comparacao} pronto={pronto} dias={dias} onAtribuido={carregar}
+              <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} leaks={leaks} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias} onAtribuido={carregar}
                 onAbrirFunil={() => router.push("/time/painel/funil")} />
             )}
             {aba === "jogadores" && (

@@ -9,7 +9,13 @@ import type { ComponentType, ReactNode } from "react";
 // que a pagina rola, pra sobrar mais espaco de conteudo em telas com
 // bastante coisa (Funil, Banca, etc.) sem cada modulo reinventar o
 // proprio cabecalho. Usar em todo `app/**/page.tsx` no lugar de um
-// <header> proprio — mesma margem (mx-auto max-w-6xl px-6) em todo canto.
+// <header> proprio — mesma margem (mx-auto max-w-[1600px] px-6) em
+// todo canto.
+//
+// `top-0 sm:top-18`: existe um TopNav global (components/top-nav.tsx)
+// que so' fica sticky a partir do breakpoint sm (`sm:sticky sm:top-0`,
+// h-16/h-18). Sem esse offset aqui, os dois headers competiam pelo
+// mesmo `top: 0` no desktop e ficavam sobrepostos ao rolar.
 export function AppHeader({
   backHref,
   onBack,
@@ -27,7 +33,8 @@ export function AppHeader({
   iconColor?: string;
   /** Alternativa a `icon` pra quando o "icone" e' algo custom (ex: Avatar do jogador). */
   iconNode?: ReactNode;
-  title: string;
+  /** Omitir quando o titulo ja' e' obvio pelo contexto (ex: nav logo acima) — o header fica so' com voltar + acoes. */
+  title?: string;
   subtitle?: ReactNode;
   right?: ReactNode;
 }) {
@@ -57,7 +64,7 @@ export function AppHeader({
 
   return (
     <header
-      className={`sticky top-0 z-30 mb-6 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding,border-color] duration-300 ease-out print:static print:border-none print:bg-transparent ${
+      className={`sticky top-0 sm:top-18 z-20 mb-6 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding,border-color] duration-300 ease-out print:static print:border-none print:bg-transparent ${
         compacto ? "border-hairline py-2.5" : "border-transparent py-4"
       }`}
     >
@@ -83,9 +90,11 @@ export function AppHeader({
       {!compacto && !iconNode && Icon && <Icon size={20} style={iconColor ? { color: iconColor } : undefined} />}
 
       <div className="min-w-0 flex-1">
-        <h1 className={`m-0 truncate font-semibold tracking-tight transition-all duration-300 ease-out ${compacto ? "text-base" : "text-xl"}`}>
-          {title}
-        </h1>
+        {title && (
+          <h1 className={`m-0 truncate font-semibold tracking-tight transition-all duration-300 ease-out ${compacto ? "text-base" : "text-xl"}`}>
+            {title}
+          </h1>
+        )}
         {subtitle && !compacto && (
           <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted">{subtitle}</div>
         )}

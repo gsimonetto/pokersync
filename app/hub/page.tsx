@@ -183,7 +183,7 @@ export default function HubPage() {
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10">
+    <main className="mx-auto max-w-[1600px] px-6 py-10">
       {/* Animacoes escopadas neste arquivo: nao depende do globals.css do restante do projeto. */}
       <style>{`
         @keyframes hubFlameFlicker {

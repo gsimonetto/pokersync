@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Kanban } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { TabKanban } from "@/components/time/tab-kanban";
 import {
@@ -49,8 +48,11 @@ export default function FunilPage() {
   const jogadores = useMemo(() => linhas.filter((l) => l.role === "player"), [linhas]);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <AppHeader backHref="/time/painel" icon={Kanban} title="Funil" subtitle="Fases de evolução dos jogadores" />
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
+      {/* Sem titulo/subtitulo aqui de proposito — a barra de abas do
+          Painel ja' identifica "Funil"; repetir o nome + descricao so'
+          empurra os cards pra baixo sem agregar informacao nova. */}
+      <AppHeader backHref="/time/painel" />
 
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
