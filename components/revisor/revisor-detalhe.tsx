@@ -1,9 +1,10 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight, Link2, Wallet } from "lucide-react";
+import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight, Link2, Wallet, Gauge } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
+import { verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import {
   getReview,
   getThumbUrl,
@@ -249,6 +250,16 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [showChampion, setShowChampion] = useState(false);
 
   const [parsedHandForTable, setParsedHandForTable] = useState<ParsedHand | null>(null);
+  // So existe quando a mao veio da aba Aderencia a Range (ver
+  // aderencia-range.tsx) -- ja' calculado la' contra o range+posicao que
+  // o jogador escolheu explicitamente, nunca inferido aqui.
+  const [objectiveVerdict, setObjectiveVerdict] = useState<{
+    verdict: Verdict;
+    heroAction: string;
+    decision: { fold: number; call: number; raise: number };
+    rangeName: string | null;
+    position: string;
+  } | null>(null);
 
   const [ticket, setTicket] = useState<ManualTicket>({ format: "", street: "preflop" as Street, action: "" });
   const [ticketSaved, setTicketSaved] = useState(false);
@@ -314,6 +325,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
 
       if (r.parsed_data?.kind === "parsed") {
         setParsedHandForTable(r.parsed_data as ParsedHand);
+        setObjectiveVerdict(r.parsed_data.objectiveVerdict ?? null);
       } else if (r.hand_history) {
         try {
           const parsed = parseHand(r.hand_history);
@@ -324,8 +336,10 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             console.warn("[RevisorDetalhe] hand history nao parseavel:", e);
           }
         }
+        setObjectiveVerdict(null);
       } else {
         setParsedHandForTable(null);
+        setObjectiveVerdict(null);
       }
 
       const existing = r.answers || [];
@@ -673,6 +687,27 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                     </option>
                   ))}
                 </select>
+              )}
+
+              {/* Veredito objetivo do solver, so' quando a mao veio da
+                  Aderencia a Range -- compara sua autoavaliacao com o que
+                  o GTO realmente recomenda, em vez de confiar so no
+                  auto-relato. */}
+              {ev.street === "preflop" && objectiveVerdict && (
+                <div
+                  className="mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10.5px]"
+                  style={{ borderColor: `${verdictColor(objectiveVerdict.verdict)}40`, background: `${verdictColor(objectiveVerdict.verdict)}12` }}
+                >
+                  <Gauge size={11} style={{ color: verdictColor(objectiveVerdict.verdict) }} />
+                  <span style={{ color: verdictColor(objectiveVerdict.verdict) }} className="font-semibold">
+                    GTO: {objectiveVerdict.verdict.replace("_", " ")}
+                  </span>
+                  <span className="text-muted">
+                    fold {objectiveVerdict.decision.fold}% · call {objectiveVerdict.decision.call}% · raise{" "}
+                    {objectiveVerdict.decision.raise}%
+                    {objectiveVerdict.rangeName ? ` · vs ${objectiveVerdict.rangeName} (${objectiveVerdict.position})` : ""}
+                  </span>
+                </div>
               )}
             </div>
           ))}
