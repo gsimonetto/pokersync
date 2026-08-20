@@ -61,6 +61,12 @@ function TreinoShell() {
   // container, isso funciona com qualquer header, sem hardcode.
   const pageRef = useRef<HTMLDivElement | null>(null);
   const [availableHeight, setAvailableHeight] = useState<number | null>(null);
+  // Mesmo offset medido, exposto como CSS var pro breakpoint mobile
+  // (ver treino-responsive-styles.tsx): la a altura precisa sair de
+  // 100dvh -- pra acompanhar a barra de endereco que abre/fecha -- mas
+  // descontando o que fica acima do card, senao a tela estoura pra
+  // baixo e a barra de apostas cai fora da dobra.
+  const [topOffset, setTopOffset] = useState(0);
   const leakTip = useBankrollLeakTip();
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
@@ -75,6 +81,7 @@ function TreinoShell() {
       const el = pageRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top + window.scrollY;
+      setTopOffset(top);
       setAvailableHeight(Math.max(320, window.innerHeight - top - BOTTOM_PADDING_PX));
     }
     measure();
@@ -97,6 +104,7 @@ function TreinoShell() {
         padding: 0,
         boxSizing: "border-box",
         overflow: "hidden",
+        ["--ps-treino-top" as string]: `${topOffset}px`,
       }}
     >
       <div

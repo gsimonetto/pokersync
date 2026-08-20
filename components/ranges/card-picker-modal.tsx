@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { X, Check } from "lucide-react";
 import { Card } from "@/components/drill/card";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const SUITS = ["s", "h", "d", "c"] as const;
@@ -25,6 +26,7 @@ export function CardPickerModal({
   onClose: () => void;
 }) {
   const [selected, setSelected] = useState<string[]>(initialCards);
+  useEscapeToClose(onClose);
 
   function toggle(card: string) {
     if (excludeCards.includes(card)) return;

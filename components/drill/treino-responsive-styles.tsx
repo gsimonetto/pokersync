@@ -21,9 +21,18 @@ export function TreinoResponsiveStyles() {
            reportado). dvh em vez de vh porque a barra de endereço do
            navegador mobile encolhe a viewport e o vh não reage. */
         html, body { overflow: hidden; }
+        /* Altura util = viewport MENOS o que fica acima do card (TopNav
+           global + padding do container). Antes era 100dvh cravado, mas
+           o card comeca ~105px abaixo do topo: 100dvh estourava a tela
+           nesses mesmos 105px e jogava a barra de apostas pra fora do
+           campo de visao -- exatamente o bug que a medicao em JS de
+           app/treino/page.tsx existe pra evitar ("cade o botao de
+           aposta? sumiu"), reintroduzido aqui pelo !important. A var
+           --ps-treino-top vem dessa medicao; dvh continua sendo a base
+           pra acompanhar a barra de endereco do navegador mobile. */
         .ps-treino-page {
           padding: 0 !important;
-          height: 100dvh !important;
+          height: calc(100dvh - var(--ps-treino-top, 0px)) !important;
           min-height: 0 !important;
           overflow: hidden !important;
         }
@@ -32,7 +41,7 @@ export function TreinoResponsiveStyles() {
           border-radius: 0 !important;
           border: none !important;
           box-shadow: none !important;
-          height: 100dvh !important;
+          height: 100% !important;
           gap: 0 !important;
           overflow: hidden !important;
         }
@@ -54,15 +63,22 @@ export function TreinoResponsiveStyles() {
           min-height: 0 !important;
           overflow: hidden !important;
         }
+        /* !important em position/overflow: o elemento tem style inline
+           (position:relative + overflow) vindo do RfiJamDrill, e estilo
+           inline ganha de regra de folha sem !important -- sem isso a
+           gaveta NUNCA virava overlay no mobile: continuava no fluxo,
+           ocupando uma linha inteira da grid (~508px) e empurrando a
+           mesa pra baixo da dobra. Era a origem do "espaco vazio" gigante
+           no topo do Treino no celular. */
         .ps-tr-filters {
-          position: fixed;
+          position: fixed !important;
           inset: 0;
           z-index: 40;
           width: 82%;
           max-width: 320px;
           background: #050505;
           padding: 16px;
-          overflow-y: auto;
+          overflow-y: auto !important;
           transform: translateX(-100%);
           transition: transform 220ms ease;
         }

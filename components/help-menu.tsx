@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { ChevronDown, ChevronUp, X } from "lucide-react";
 import { ModalPortal } from "./modal-portal";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 
 const FAQS = [
   {
@@ -25,6 +26,7 @@ const FAQS = [
 
 export function HelpMenu({ onClose }: { onClose: () => void }) {
   const [expanded, setExpanded] = useState<number | null>(null);
+  useEscapeToClose(onClose);
 
   return (
     <ModalPortal>

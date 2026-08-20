@@ -2,8 +2,10 @@
 
 import { X } from "lucide-react";
 import { RangeList } from "@/components/ranges/range-list";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 
 export function RangeListModal({ onClose }: { onClose: () => void }) {
+  useEscapeToClose(onClose);
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-10" onClick={onClose}>
       <div

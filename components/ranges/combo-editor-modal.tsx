@@ -4,6 +4,7 @@ import { useMemo } from "react";
 import { RotateCcw, X } from "lucide-react";
 import { combosForLabel } from "@/lib/poker/range-board-analyzer";
 import type { RangeHands, HandDecision } from "@/components/ranges/range-grid";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 
 const SUIT_SYMBOL: Record<string, string> = { c: "♣", d: "♦", h: "♥", s: "♠" };
 const SUIT_COLOR: Record<string, string> = { c: "#22c55e", d: "#3b82f6", h: "#e0555a", s: "#c4c7c8" };
@@ -59,6 +60,8 @@ export function ComboEditorModal({
     delete next[key];
     onChange(next);
   }
+
+  useEscapeToClose(onClose);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
