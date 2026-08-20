@@ -153,7 +153,7 @@ export async function awardXP({
 }
 
 // --- Ranking global (todos os membros PokerSync) --------------------------
-export type LeaderboardPeriod = "week" | "month" | "all";
+export type LeaderboardPeriod = "week" | "month" | "season" | "all";
 
 export interface LeaderboardEntry {
   userId: string;
@@ -213,4 +213,32 @@ export async function fetchMyLeaderboardRank(period: LeaderboardPeriod): Promise
   const r = Array.isArray(data) ? data[0] : data;
   if (!r) return null;
   return { rank: Number(r.rank), xp: Number(r.xp), totalPlayers: Number(r.total_players) };
+}
+
+// --- Temporada de ranking (3 em 3 meses, premio configuravel) -------------
+export interface Season {
+  id: string;
+  startsAt: string;
+  endsAt: string;
+  rewardTitle: string | null;
+  rewardDescription: string | null;
+  daysRemaining: number;
+}
+
+// null quando nenhuma temporada esta configurada pro periodo atual --
+// tela trata isso mostrando "sem temporada ativa", nao cai no ranking geral.
+export async function fetchActiveSeason(): Promise<Season | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_active_season");
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) return null;
+  return {
+    id: r.id,
+    startsAt: r.starts_at,
+    endsAt: r.ends_at,
+    rewardTitle: r.reward_title || null,
+    rewardDescription: r.reward_description || null,
+    daysRemaining: Number(r.days_remaining),
+  };
 }
