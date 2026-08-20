@@ -1,6 +1,7 @@
 "use client";
 
 import type { FinancialDay } from "@/lib/services/team-service";
+import { BRL, BRL_CURTO } from "@/lib/format";
 
 // Grafico financeiro reutilizavel: barras diarias de ganho/perda + linha
 // de acumulado. Mesma leitura do Gestor de Banca (valor no eixo Y, data
@@ -12,8 +13,6 @@ import type { FinancialDay } from "@/lib/services/team-service";
 // valores em R$ (eixo Y) e datas no eixo X, mesmo padrao do
 // EvolutionChart da Gestao de Banca.
 
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-const BRL_CURTO = new Intl.NumberFormat("pt-BR", { notation: "compact", maximumFractionDigits: 1 });
 const Y_TICKS = 4;
 
 export function GraficoFinanceiro({

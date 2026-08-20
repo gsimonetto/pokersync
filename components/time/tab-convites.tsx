@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Link2, Copy, Check, Trash2, UserCheck, UserX, Clock } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Campo } from "@/components/time/campo";
 import {
   approveMember,
   createInvite,
@@ -221,11 +222,3 @@ export function TabConvites({
   );
 }
 
-function Campo({ label, children }: { label: string; children: React.ReactNode }) {
-  return (
-    <div>
-      <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">{label}</label>
-      {children}
-    </div>
-  );
-}

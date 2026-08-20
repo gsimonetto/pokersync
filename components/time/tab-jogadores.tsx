@@ -18,6 +18,7 @@ import {
   type TeamLabel,
   type TeamMessage,
 } from "@/lib/services/team-service";
+import { BRL } from "@/lib/format";
 
 // Lista de jogadores. Decisoes de UX:
 // - nivel colado ao nome (identidade do jogador, nao metrica);
@@ -29,7 +30,6 @@ import {
 //   buy-in e o coach quase sempre olha um recorte, nao a lista toda;
 // - linha inteira clicavel para a ficha — menos fricção que um botao.
 
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const INATIVO_DIAS = 7;
 
 type Ordem = "nome" | "treinos" | "acerto" | "revisadas" | "resultado";
@@ -46,6 +46,7 @@ export function TabJogadores({
   jogadores,
   labels,
   isAdmin,
+  podeConversar,
   coaches,
   onChange,
   onErro,
@@ -53,6 +54,8 @@ export function TabJogadores({
   jogadores: TeamDashboardRow[];
   labels: TeamLabel[];
   isAdmin: boolean;
+  /** Admin ou coach: quem pode abrir o menu de ações (ao menos pra conversar). */
+  podeConversar: boolean;
   coaches: { userId: string; nome: string }[];
   onChange: () => void;
   onErro: (s: string) => void;
@@ -176,7 +179,7 @@ export function TabJogadores({
                     </p>
                   </div>
 
-                  {isAdmin && (
+                  {podeConversar && (
                     <button
                       onClick={() => setAcaoAberta(j)}
                       className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden sm:hidden"
@@ -203,7 +206,7 @@ export function TabJogadores({
                 </div>
 
                 <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                  {isAdmin && (
+                  {podeConversar && (
                     <button
                       onClick={() => setAcaoAberta(j)}
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
@@ -230,6 +233,7 @@ export function TabJogadores({
           jogador={acaoAberta}
           labels={labels}
           coaches={coaches}
+          isAdmin={isAdmin}
           onFechar={() => setAcaoAberta(null)}
           onAbrirConversa={() => {
             setConversaCom(acaoAberta);
@@ -248,20 +252,15 @@ export function TabJogadores({
 }
 
 // ------------------------------------------------------------
-// Modal de ações administrativas por jogador. Etiqueta e coach usam
-// os services ja existentes (setMemberLabel / assignCoach).
-//
-// ATENÇÃO: "Remover do time" e "Enviar mensagem" ainda não têm uma
-// função correspondente confirmada em lib/services/team-service.ts
-// (não temos esse arquivo pra checar). A UI está pronta e chama
-// removeMember(userId) e sendTeamMessage(userId, texto) — preciso
-// que você confirme os nomes reais (ou me mande o arquivo) antes de
-// eu fechar essa parte, pra não assumir uma função que não existe.
+// Modal de ações por jogador. Etiqueta, coach e remoção são
+// exclusivas de admin; conversar é liberado também pro coach (o
+// backend send_team_message já aceita qualquer par do mesmo time).
 // ------------------------------------------------------------
 function AcoesJogadorModal({
   jogador,
   labels,
   coaches,
+  isAdmin,
   onFechar,
   onAbrirConversa,
   onChange,
@@ -270,6 +269,7 @@ function AcoesJogadorModal({
   jogador: TeamDashboardRow;
   labels: TeamLabel[];
   coaches: { userId: string; nome: string }[];
+  isAdmin: boolean;
   onFechar: () => void;
   onAbrirConversa: () => void;
   onChange: () => void;
@@ -326,49 +326,53 @@ function AcoesJogadorModal({
         </div>
 
         <div className="mt-5 space-y-4">
-          <div>
-            <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-              <Tag size={12} /> Etiqueta
-            </label>
-            <select
-              value={labelId}
-              onChange={(e) => setLabelId(e.target.value)}
-              className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
-            >
-              <option value="">Sem etiqueta</option>
-              {labels.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-          </div>
+          {isAdmin && (
+            <>
+              <div>
+                <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  <Tag size={12} /> Etiqueta
+                </label>
+                <select
+                  value={labelId}
+                  onChange={(e) => setLabelId(e.target.value)}
+                  className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
+                >
+                  <option value="">Sem etiqueta</option>
+                  {labels.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
 
-          {coaches.length > 0 && (
-            <div>
-              <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                <UserCog size={12} /> Coach
-              </label>
-              <select
-                value={coachId}
-                onChange={(e) => setCoachId(e.target.value)}
-                className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
+              {coaches.length > 0 && (
+                <div>
+                  <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+                    <UserCog size={12} /> Coach
+                  </label>
+                  <select
+                    value={coachId}
+                    onChange={(e) => setCoachId(e.target.value)}
+                    className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
+                  >
+                    <option value="">Sem coach</option>
+                    {coaches.map((c) => (
+                      <option key={c.userId} value={c.userId}>{c.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                onClick={salvarEtiquetaCoach}
+                disabled={salvando}
+                className="w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.01] disabled:opacity-50"
               >
-                <option value="">Sem coach</option>
-                {coaches.map((c) => (
-                  <option key={c.userId} value={c.userId}>{c.nome}</option>
-                ))}
-              </select>
-            </div>
+                {salvando ? "Salvando…" : "Salvar alterações"}
+              </button>
+            </>
           )}
 
-          <button
-            onClick={salvarEtiquetaCoach}
-            disabled={salvando}
-            className="w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.01] disabled:opacity-50"
-          >
-            {salvando ? "Salvando…" : "Salvar alterações"}
-          </button>
-
-          <div className="border-t border-hairline pt-4">
+          <div className={isAdmin ? "border-t border-hairline pt-4" : undefined}>
             <button
               onClick={onAbrirConversa}
               className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-hairline px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-ink/40"
@@ -378,36 +382,38 @@ function AcoesJogadorModal({
             </button>
           </div>
 
-          <div className="border-t border-hairline pt-4">
-            {!confirmarRemover ? (
-              <button
-                onClick={() => setConfirmarRemover(true)}
-                className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-negative/40 px-4 py-2 text-sm font-medium text-negative transition-colors hover:bg-negative/10"
-              >
-                <UserMinus size={14} />
-                Remover do time
-              </button>
-            ) : (
-              <div className="rounded-lg border border-negative/40 bg-negative/10 p-3">
-                <p className="text-[13px] text-negative">Remover {jogador.nome} do time? Essa ação não pode ser desfeita.</p>
-                <div className="mt-2 flex gap-2">
-                  <button
-                    onClick={() => setConfirmarRemover(false)}
-                    className="flex-1 rounded-lg border border-hairline px-3 py-1.5 text-[13px] text-ink hover:border-ink/40"
-                  >
-                    Cancelar
-                  </button>
-                  <button
-                    onClick={confirmarRemocao}
-                    disabled={removendo}
-                    className="flex-1 rounded-lg bg-negative px-3 py-1.5 text-[13px] font-semibold text-void transition-transform hover:scale-[1.01] disabled:opacity-50"
-                  >
-                    {removendo ? "Removendo…" : "Confirmar remoção"}
-                  </button>
+          {isAdmin && (
+            <div className="border-t border-hairline pt-4">
+              {!confirmarRemover ? (
+                <button
+                  onClick={() => setConfirmarRemover(true)}
+                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-negative/40 px-4 py-2 text-sm font-medium text-negative transition-colors hover:bg-negative/10"
+                >
+                  <UserMinus size={14} />
+                  Remover do time
+                </button>
+              ) : (
+                <div className="rounded-lg border border-negative/40 bg-negative/10 p-3">
+                  <p className="text-[13px] text-negative">Remover {jogador.nome} do time? Essa ação não pode ser desfeita.</p>
+                  <div className="mt-2 flex gap-2">
+                    <button
+                      onClick={() => setConfirmarRemover(false)}
+                      className="flex-1 rounded-lg border border-hairline px-3 py-1.5 text-[13px] text-ink hover:border-ink/40"
+                    >
+                      Cancelar
+                    </button>
+                    <button
+                      onClick={confirmarRemocao}
+                      disabled={removendo}
+                      className="flex-1 rounded-lg bg-negative px-3 py-1.5 text-[13px] font-semibold text-void transition-transform hover:scale-[1.01] disabled:opacity-50"
+                    >
+                      {removendo ? "Removendo…" : "Confirmar remoção"}
+                    </button>
+                  </div>
                 </div>
-              </div>
-            )}
-          </div>
+              )}
+            </div>
+          )}
         </div>
       </div>
     </div>

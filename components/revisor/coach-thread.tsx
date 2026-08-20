@@ -1,12 +1,13 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { MessageSquare, Send, Loader2 } from "lucide-react";
+import { MessageSquare, Send, Loader2, Ban } from "lucide-react";
 import {
   addShareComment,
   fetchShareComments,
   fetchShareThreads,
   markShareViewed,
+  revokeHandShare,
   type ShareComment,
   type ShareThread,
 } from "@/lib/services/hand-review-service";
@@ -24,6 +25,8 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
   const [loading, setLoading] = useState(true);
   const [enviando, setEnviando] = useState(false);
   const [erro, setErro] = useState("");
+  const [revogando, setRevogando] = useState(false);
+  const [confirmarRevogar, setConfirmarRevogar] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -63,6 +66,23 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
     }
   }
 
+  async function revogar() {
+    if (!ativo || ativo.iAmCoach) return;
+    setRevogando(true);
+    setErro("");
+    try {
+      await revokeHandShare(ativo.shareId);
+      const restantes = threads.filter((t) => t.shareId !== ativo.shareId);
+      setThreads(restantes);
+      setAtivo(restantes[0] ?? null);
+      setConfirmarRevogar(false);
+    } catch {
+      setErro("Não foi possível revogar o compartilhamento.");
+    } finally {
+      setRevogando(false);
+    }
+  }
+
   if (loading || threads.length === 0 || !ativo) return null;
 
   return (
@@ -72,6 +92,32 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
           <MessageSquare size={14} className="text-training" />
           {ativo.iAmCoach ? `Análise para ${ativo.counterpartName}` : "Conversa com o coach"}
         </h3>
+
+        {!ativo.iAmCoach && (
+          confirmarRevogar ? (
+            <div className="flex items-center gap-1.5 text-[11px]">
+              <span className="text-negative">Revogar acesso do coach a esta mão?</span>
+              <button
+                onClick={revogar}
+                disabled={revogando}
+                className="rounded-md bg-negative px-2 py-1 font-semibold text-void disabled:opacity-50"
+              >
+                {revogando ? "Revogando…" : "Confirmar"}
+              </button>
+              <button onClick={() => setConfirmarRevogar(false)} className="rounded-md border border-hairline px-2 py-1 text-muted">
+                Cancelar
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={() => setConfirmarRevogar(true)}
+              className="flex items-center gap-1 text-[11px] font-medium text-muted transition-colors hover:text-negative"
+              aria-label="Revogar compartilhamento"
+            >
+              <Ban size={12} /> Revogar
+            </button>
+          )
+        )}
 
         {threads.length > 1 && (
           <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
