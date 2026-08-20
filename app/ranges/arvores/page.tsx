@@ -7,7 +7,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 
 export default function ArvoresPage() {
   return (
-    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader backHref="/modulos" icon={GitBranch} iconColor="var(--color-review)" title="Árvores Estratégicas"
         right={<RangesTabs active="arvores" />} />
 

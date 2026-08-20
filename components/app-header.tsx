@@ -9,7 +9,7 @@ import type { ComponentType, ReactNode } from "react";
 // que a pagina rola, pra sobrar mais espaco de conteudo em telas com
 // bastante coisa (Funil, Banca, etc.) sem cada modulo reinventar o
 // proprio cabecalho. Usar em todo `app/**/page.tsx` no lugar de um
-// <header> proprio — mesma margem (mx-auto max-w-[1600px] px-6) em
+// <header> proprio — mesma margem (mx-auto max-w-[1280px] px-6) em
 // todo canto.
 //
 // `top-0 sm:top-18`: existe um TopNav global (components/top-nav.tsx)

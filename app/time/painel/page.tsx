@@ -65,7 +65,7 @@ const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
 
 export default function PainelPage() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-[1600px] px-6 py-10 text-sm text-muted">Carregando…</main>}>
+    <Suspense fallback={<main className="mx-auto max-w-[1280px] px-6 py-10 text-sm text-muted">Carregando…</main>}>
       <PainelConteudo />
     </Suspense>
   );
@@ -180,7 +180,7 @@ function PainelConteudo() {
 
   return (
     <>
-      <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink print:max-w-full print:p-0">
+      <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
         {/* Banner so' na Visao Geral (primeira tela) — nas outras abas ele
             so' empurrava conteudo pra baixo sem servir de navegacao real.
             Ali o banner substitui o header: leva o voltar embutido no
