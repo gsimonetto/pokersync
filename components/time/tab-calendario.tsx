@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
+import { Cake, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
@@ -10,9 +10,11 @@ import {
   cancelTeamEvent,
   createRecurringTeamEvents,
   createTeamEvent,
+  fetchTeamBirthdays,
   markAttendance,
   traduzErroCalendario,
   type EventType,
+  type TeamBirthday,
   type TeamEvent,
 } from "@/lib/services/team-calendar-service";
 import type { TeamDashboardRow, TeamRole } from "@/lib/services/team-service";
@@ -56,174 +58,91 @@ export function TabCalendario({
   onErro: (s: string) => void;
 }) {
   const [modalAberto, setModalAberto] = useState(false);
-  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
+  // Calendario completo (lista + grade) virou modal — antes ocupava a
+  // aba inteira, empurrando tudo mais pra baixo. Compacto por padrao,
+  // com so' os proximos eventos + um botao pra abrir o resto.
+  const [calendarioAberto, setCalendarioAberto] = useState(false);
 
   useEffect(() => {
     if (prefillPlayerId) setModalAberto(true);
   }, [prefillPlayerId]);
 
-  const porNome = useMemo(() => {
-    const m = new Map<string, TeamDashboardRow>();
-    jogadores.forEach((j) => m.set(j.userId, j));
-    return m;
-  }, [jogadores]);
-
-  const eventosDoDia = useMemo(
-    () => (diaSelecionado ? eventos.filter((e) => new Date(e.startsAt).toDateString() === diaSelecionado) : eventos),
-    [eventos, diaSelecionado]
-  );
-
-  async function cancelar(ev: TeamEvent) {
-    const ehSerie = Boolean(ev.recurrenceGroupId);
-    const msg = ehSerie
-      ? `Cancelar TODA a série de "${ev.title}" (esta e as próximas)? Quem confirmou presença será avisado.`
-      : `Cancelar o evento "${ev.title}"? Quem confirmou presença será avisado.`;
-    if (!confirm(msg)) return;
-    try {
-      if (ehSerie) await cancelEventSeries(ev.recurrenceGroupId as string);
-      else await cancelTeamEvent(ev.id);
-      onChange();
-    } catch (e) {
-      onErro(traduzErroCalendario(e));
-    }
-  }
+  const proximosEventos = useMemo(() => eventos.slice(0, 3), [eventos]);
 
   return (
     <div className="space-y-5">
-      <CalendarioMensal eventos={eventos} diaSelecionado={diaSelecionado} onSelecionarDia={setDiaSelecionado} />
-
       <section className="rounded-xl border border-hairline bg-surface p-5">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <div>
-            <h2 className="text-[15px] font-semibold">
-              {diaSelecionado
-                ? new Date(diaSelecionado).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })
-                : "Próximos eventos"}
+            <h2 className="flex items-center gap-2 text-[15px] font-semibold">
+              <CalendarDays size={16} />
+              Próximos eventos
             </h2>
-            <p className="mt-0.5 text-sm text-muted">
-              {diaSelecionado ? (
-                <button onClick={() => setDiaSelecionado(null)} className="underline hover:text-ink">
-                  ver todos os eventos
-                </button>
-              ) : (
-                "Aulas e reuniões agendadas com o time."
-              )}
-            </p>
+            <p className="mt-0.5 text-sm text-muted">Aulas e reuniões agendadas com o time.</p>
           </div>
-          {podeCriar && (
+          <div className="flex items-center gap-2">
             <button
-              onClick={() => setModalAberto(true)}
-              className="flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02]"
+              onClick={() => setCalendarioAberto(true)}
+              className="flex items-center gap-2 rounded-xl border border-hairline bg-elevated px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-ink/40"
             >
-              <CalendarPlus size={16} strokeWidth={2.5} />
-              Agendar
+              <CalendarDays size={16} />
+              Ver calendário completo
             </button>
-          )}
+            {podeCriar && (
+              <button
+                onClick={() => setModalAberto(true)}
+                className="flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02]"
+              >
+                <CalendarPlus size={16} strokeWidth={2.5} />
+                Agendar
+              </button>
+            )}
+          </div>
         </div>
 
-        {eventosDoDia.length === 0 ? (
-          <p className="mt-5 text-sm text-muted">{diaSelecionado ? "Nenhum evento neste dia." : "Nenhum evento agendado."}</p>
+        {proximosEventos.length === 0 ? (
+          <p className="mt-5 text-sm text-muted">Nenhum evento agendado.</p>
         ) : (
           <ul className="mt-4 divide-y divide-hairline">
-            {eventosDoDia.map((ev) => (
-              <li key={ev.id} className="flex flex-wrap items-start gap-3 py-3.5">
+            {proximosEventos.map((ev) => (
+              <li key={ev.id} className="flex flex-wrap items-center gap-3 py-3">
                 <div className="grid h-11 w-14 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-center">
                   <span className="text-[11px] font-semibold uppercase leading-tight text-muted">{fmtData(ev.startsAt)}</span>
                 </div>
-
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
                     <Chip color={TIPO_COR[ev.eventType]} size="sm">{TIPO_LABEL[ev.eventType]}</Chip>
-                    {ev.recurrenceGroupId && (
-                      <span className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
-                        <Repeat size={10} /> semanal
-                      </span>
-                    )}
                     <p className="truncate text-sm font-medium">{ev.title}</p>
                   </div>
-
                   <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                     <Clock size={12} />
                     {fmtHora(ev.startsAt)}
                     {ev.endsAt ? ` – ${fmtHora(ev.endsAt)}` : ""}
-                    {ev.locationUrl && (
-                      <>
-                        <span className="text-hairline">·</span>
-                        <a href={ev.locationUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-ink/80 hover:underline">
-                          <Video size={12} /> link
-                        </a>
-                      </>
-                    )}
                   </p>
-
-                  {ev.description && <p className="mt-1 text-[13px] text-muted">{ev.description}</p>}
-
-                  {ev.participants.length > 0 && (
-                    <div className="mt-2 space-y-1">
-                      <div className="flex items-center gap-1.5 text-[11px] text-muted">
-                        <Users size={12} />
-                        Participantes
-                        {podeCriar && <span className="text-muted/70">· presença fica visível só pra você</span>}
-                      </div>
-                      <div className="flex flex-wrap items-center gap-1.5">
-                        {ev.participants.map((p) => {
-                          const j = porNome.get(p.playerId);
-                          return (
-                            <span
-                              key={p.playerId}
-                              className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
-                                p.status === "confirmado"
-                                  ? "border-positive/40 text-positive"
-                                  : p.status === "recusado"
-                                  ? "border-negative/40 text-negative"
-                                  : "border-hairline text-muted"
-                              }`}
-                            >
-                              {j?.nome ?? "Jogador"}
-                              {podeCriar && (
-                                <span className="ml-1 flex items-center gap-0.5 border-l border-hairline pl-1">
-                                  <button
-                                    onClick={() => markAttendance(ev.id, p.playerId, p.attended === true ? null : true).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
-                                    title="Marcar presente"
-                                    className={`grid h-4 w-4 place-items-center rounded-full transition-colors ${
-                                      p.attended === true ? "text-positive" : "text-muted/50 hover:text-positive"
-                                    }`}
-                                  >
-                                    <CheckCircle2 size={12} />
-                                  </button>
-                                  <button
-                                    onClick={() => markAttendance(ev.id, p.playerId, p.attended === false ? null : false).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
-                                    title="Marcar ausente"
-                                    className={`grid h-4 w-4 place-items-center rounded-full transition-colors ${
-                                      p.attended === false ? "text-negative" : "text-muted/50 hover:text-negative"
-                                    }`}
-                                  >
-                                    <XCircle size={12} />
-                                  </button>
-                                </span>
-                              )}
-                            </span>
-                          );
-                        })}
-                      </div>
-                    </div>
-                  )}
                 </div>
-
-                {podeCriar && (
-                  <button
-                    onClick={() => cancelar(ev)}
-                    aria-label="Cancelar evento"
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-negative/50 hover:text-negative"
-                  >
-                    <Trash2 size={15} />
-                  </button>
-                )}
               </li>
             ))}
           </ul>
         )}
+        {eventos.length > proximosEventos.length && (
+          <button onClick={() => setCalendarioAberto(true)} className="mt-3 text-xs text-muted underline hover:text-ink">
+            +{eventos.length - proximosEventos.length} outros agendamentos
+          </button>
+        )}
       </section>
+
+      {calendarioAberto && (
+        <ModalCalendarioCompleto
+          eventos={eventos}
+          jogadores={jogadores}
+          teamId={teamId}
+          podeCriar={podeCriar}
+          onFechar={() => setCalendarioAberto(false)}
+          onAbrirAgendar={() => setModalAberto(true)}
+          onChange={onChange}
+          onErro={onErro}
+        />
+      )}
 
       {modalAberto && (
         <ModalNovoEvento
@@ -248,6 +167,278 @@ export function TabCalendario({
   );
 }
 
+// Modal com lista completa de agendamentos (topo/esquerda, prioridade)
+// e a grade do mes ao lado (direita) — cabe tudo numa tela so', sem
+// precisar abrir a aba inteira nem rolar a pagina toda. Filtro de
+// aniversario mora aqui tambem: aniversariantes do mes em exibicao,
+// vindo de profiles.data_nascimento dos membros do time.
+function ModalCalendarioCompleto({
+  eventos,
+  jogadores,
+  teamId,
+  podeCriar,
+  onFechar,
+  onAbrirAgendar,
+  onChange,
+  onErro,
+}: {
+  eventos: TeamEvent[];
+  jogadores: TeamDashboardRow[];
+  teamId: string;
+  podeCriar: boolean;
+  onFechar: () => void;
+  onAbrirAgendar: () => void;
+  onChange: () => void;
+  onErro: (s: string) => void;
+}) {
+  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
+  const [mostrarAniversarios, setMostrarAniversarios] = useState(false);
+  const [aniversarios, setAniversarios] = useState<TeamBirthday[] | null>(null);
+  const [mesRef, setMesRef] = useState(() => {
+    const d = new Date();
+    d.setDate(1);
+    return d;
+  });
+
+  const porNome = useMemo(() => {
+    const m = new Map<string, TeamDashboardRow>();
+    jogadores.forEach((j) => m.set(j.userId, j));
+    return m;
+  }, [jogadores]);
+
+  const eventosDoDia = useMemo(
+    () => (diaSelecionado ? eventos.filter((e) => new Date(e.startsAt).toDateString() === diaSelecionado) : eventos),
+    [eventos, diaSelecionado]
+  );
+
+  useEffect(() => {
+    if (!mostrarAniversarios || aniversarios !== null) return;
+    fetchTeamBirthdays(jogadores.map((j) => j.userId))
+      .then(setAniversarios)
+      .catch((e) => onErro(traduzErroCalendario(e)));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [mostrarAniversarios]);
+
+  const aniversariantesDoMes = useMemo(() => {
+    if (!aniversarios) return [];
+    const mes = mesRef.getMonth();
+    return aniversarios
+      .filter((a) => new Date(`${a.dataNascimento}T00:00:00`).getMonth() === mes)
+      .sort((a, b) => new Date(`${a.dataNascimento}T00:00:00`).getDate() - new Date(`${b.dataNascimento}T00:00:00`).getDate());
+  }, [aniversarios, mesRef]);
+
+  async function cancelar(ev: TeamEvent) {
+    const ehSerie = Boolean(ev.recurrenceGroupId);
+    const msg = ehSerie
+      ? `Cancelar TODA a série de "${ev.title}" (esta e as próximas)? Quem confirmou presença será avisado.`
+      : `Cancelar o evento "${ev.title}"? Quem confirmou presença será avisado.`;
+    if (!confirm(msg)) return;
+    try {
+      if (ehSerie) await cancelEventSeries(ev.recurrenceGroupId as string);
+      else await cancelTeamEvent(ev.id);
+      onChange();
+    } catch (e) {
+      onErro(traduzErroCalendario(e));
+    }
+  }
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-8" onClick={onFechar}>
+      <div
+        className="w-full max-w-6xl rounded-2xl border border-hairline bg-surface p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-4 flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-base font-semibold">
+            <CalendarDays size={18} />
+            Calendário do time
+          </h2>
+          <div className="flex items-center gap-2">
+            {podeCriar && (
+              <button
+                onClick={onAbrirAgendar}
+                className="flex items-center gap-2 rounded-xl bg-ink px-3 py-2 text-[13px] font-semibold text-void transition-transform hover:scale-[1.02]"
+              >
+                <CalendarPlus size={15} strokeWidth={2.5} />
+                Agendar
+              </button>
+            )}
+            <button onClick={onFechar} className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
+              <X size={18} />
+            </button>
+          </div>
+        </div>
+
+        {/* Lista em cima/a esquerda (prioridade pedida); grade do mes ao
+            lado — em telas estreitas empilha, em telas largas divide. */}
+        <div className="grid gap-4 lg:grid-cols-[1fr_320px] lg:items-start">
+          <section className="max-h-[70vh] overflow-y-auto rounded-xl border border-hairline bg-elevated/40 p-4">
+            <div className="mb-2 flex items-center justify-between gap-2">
+              <h3 className="text-[13px] font-semibold">
+                {diaSelecionado
+                  ? new Date(diaSelecionado).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })
+                  : "Todos os agendamentos"}
+              </h3>
+              {diaSelecionado && (
+                <button onClick={() => setDiaSelecionado(null)} className="text-xs text-muted underline hover:text-ink">
+                  ver todos
+                </button>
+              )}
+            </div>
+
+            {eventosDoDia.length === 0 ? (
+              <p className="text-sm text-muted">{diaSelecionado ? "Nenhum evento neste dia." : "Nenhum evento agendado."}</p>
+            ) : (
+              <ul className="divide-y divide-hairline">
+                {eventosDoDia.map((ev) => (
+                  <li key={ev.id} className="flex flex-wrap items-start gap-3 py-3.5">
+                    <div className="grid h-11 w-14 shrink-0 place-items-center rounded-lg border border-hairline bg-surface text-center">
+                      <span className="text-[11px] font-semibold uppercase leading-tight text-muted">{fmtData(ev.startsAt)}</span>
+                    </div>
+
+                    <div className="min-w-0 flex-1">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <Chip color={TIPO_COR[ev.eventType]} size="sm">{TIPO_LABEL[ev.eventType]}</Chip>
+                        {ev.recurrenceGroupId && (
+                          <span className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
+                            <Repeat size={10} /> semanal
+                          </span>
+                        )}
+                        <p className="truncate text-sm font-medium">{ev.title}</p>
+                      </div>
+
+                      <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
+                        <Clock size={12} />
+                        {fmtHora(ev.startsAt)}
+                        {ev.endsAt ? ` – ${fmtHora(ev.endsAt)}` : ""}
+                        {ev.locationUrl && (
+                          <>
+                            <span className="text-hairline">·</span>
+                            <a href={ev.locationUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-ink/80 hover:underline">
+                              <Video size={12} /> link
+                            </a>
+                          </>
+                        )}
+                      </p>
+
+                      {ev.description && <p className="mt-1 text-[13px] text-muted">{ev.description}</p>}
+
+                      {ev.participants.length > 0 && (
+                        <div className="mt-2 space-y-1">
+                          <div className="flex items-center gap-1.5 text-[11px] text-muted">
+                            <Users size={12} />
+                            Participantes
+                            {podeCriar && <span className="text-muted/70">· presença fica visível só pra você</span>}
+                          </div>
+                          <div className="flex flex-wrap items-center gap-1.5">
+                            {ev.participants.map((p) => {
+                              const j = porNome.get(p.playerId);
+                              return (
+                                <span
+                                  key={p.playerId}
+                                  className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                                    p.status === "confirmado"
+                                      ? "border-positive/40 text-positive"
+                                      : p.status === "recusado"
+                                      ? "border-negative/40 text-negative"
+                                      : "border-hairline text-muted"
+                                  }`}
+                                >
+                                  {j?.nome ?? "Jogador"}
+                                  {podeCriar && (
+                                    <span className="ml-1 flex items-center gap-0.5 border-l border-hairline pl-1">
+                                      <button
+                                        onClick={() => markAttendance(ev.id, p.playerId, p.attended === true ? null : true).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
+                                        title="Marcar presente"
+                                        className={`grid h-4 w-4 place-items-center rounded-full transition-colors ${
+                                          p.attended === true ? "text-positive" : "text-muted/50 hover:text-positive"
+                                        }`}
+                                      >
+                                        <CheckCircle2 size={12} />
+                                      </button>
+                                      <button
+                                        onClick={() => markAttendance(ev.id, p.playerId, p.attended === false ? null : false).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
+                                        title="Marcar ausente"
+                                        className={`grid h-4 w-4 place-items-center rounded-full transition-colors ${
+                                          p.attended === false ? "text-negative" : "text-muted/50 hover:text-negative"
+                                        }`}
+                                      >
+                                        <XCircle size={12} />
+                                      </button>
+                                    </span>
+                                  )}
+                                </span>
+                              );
+                            })}
+                          </div>
+                        </div>
+                      )}
+                    </div>
+
+                    {podeCriar && (
+                      <button
+                        onClick={() => cancelar(ev)}
+                        aria-label="Cancelar evento"
+                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-negative/50 hover:text-negative"
+                      >
+                        <Trash2 size={15} />
+                      </button>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+          </section>
+
+          <div className="space-y-3">
+            <CalendarioMensal
+              eventos={eventos}
+              diaSelecionado={diaSelecionado}
+              onSelecionarDia={setDiaSelecionado}
+              mesRef={mesRef}
+              onMesRefChange={setMesRef}
+            />
+
+            <section className="rounded-xl border border-hairline bg-elevated/40 p-3.5">
+              <button
+                onClick={() => setMostrarAniversarios((v) => !v)}
+                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-semibold transition-colors ${
+                  mostrarAniversarios ? "bg-training/10 text-training" : "text-muted hover:text-ink"
+                }`}
+              >
+                <Cake size={14} />
+                Aniversariantes do mês
+              </button>
+
+              {mostrarAniversarios && (
+                <div className="mt-2">
+                  {aniversarios === null ? (
+                    <p className="px-2 text-xs text-muted">Carregando…</p>
+                  ) : aniversariantesDoMes.length === 0 ? (
+                    <p className="px-2 text-xs text-muted">Ninguém faz aniversário neste mês (ou ainda não preencheu a data no perfil).</p>
+                  ) : (
+                    <ul className="space-y-1">
+                      {aniversariantesDoMes.map((a) => (
+                        <li key={a.userId} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px]">
+                          <Avatar id={a.avatarId} url={a.avatarUrl} size={24} />
+                          <span className="min-w-0 flex-1 truncate">{a.nome}</span>
+                          <span className="shrink-0 text-xs text-muted tnum">
+                            {new Date(`${a.dataNascimento}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                          </span>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </div>
+              )}
+            </section>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 // Grade de mes de verdade (dias da semana + numeros), em vez de so' uma
 // lista dos proximos eventos. Clicar num dia filtra a lista abaixo;
 // clicar de novo (ou "ver todos") volta a mostrar tudo.
@@ -257,17 +448,15 @@ function CalendarioMensal({
   eventos,
   diaSelecionado,
   onSelecionarDia,
+  mesRef,
+  onMesRefChange,
 }: {
   eventos: TeamEvent[];
   diaSelecionado: string | null;
   onSelecionarDia: (dia: string | null) => void;
+  mesRef: Date;
+  onMesRefChange: (d: Date) => void;
 }) {
-  const [mesRef, setMesRef] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
-  });
-
   const eventosPorDia = useMemo(() => {
     const m = new Map<string, number>();
     eventos.forEach((ev) => {
@@ -297,14 +486,14 @@ function CalendarioMensal({
         </h2>
         <div className="flex gap-1">
           <button
-            onClick={() => setMesRef((d) => new Date(d.getFullYear(), d.getMonth() - 1, 1))}
+            onClick={() => onMesRefChange(new Date(mesRef.getFullYear(), mesRef.getMonth() - 1, 1))}
             aria-label="Mês anterior"
             className="grid h-7 w-7 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
           >
             <ChevronLeft size={14} />
           </button>
           <button
-            onClick={() => setMesRef((d) => new Date(d.getFullYear(), d.getMonth() + 1, 1))}
+            onClick={() => onMesRefChange(new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 1))}
             aria-label="Próximo mês"
             className="grid h-7 w-7 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
           >
