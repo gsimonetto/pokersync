@@ -147,8 +147,20 @@ function CornerMark({
       {rank === "T" ? "10" : rank}
     </span>
   );
+  // O naipe (diferente do rank) nao tem ambiguidade nenhuma girado 180 --
+  // e' so' o dígito 6/9 que colide consigo mesmo rotacionado. Girar so'
+  // o naipe do canto inferior (de ponta-cabeça) devolve o acabamento de
+  // carta fisica no unico elemento onde isso e' seguro fazer.
   const suitSpan = !hideSuitGlyph && (
-    <span key="suit" style={{ fontSize: suitSize, marginTop: position === "tl" ? gap : 0, lineHeight: 1 }}>
+    <span
+      key="suit"
+      style={{
+        fontSize: suitSize,
+        marginTop: position === "tl" ? gap : 0,
+        lineHeight: 1,
+        transform: position === "br" ? "rotate(180deg)" : undefined,
+      }}
+    >
       {textGlyph(suitGlyph)}
     </span>
   );
