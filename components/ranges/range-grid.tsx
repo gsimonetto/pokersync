@@ -12,29 +12,65 @@ export interface HandDecision {
   fold: number;
   call: number;
   raise: number;
+  /** So' importa quando raise>0 — qual "sabor" de raise foi pintado
+      (raise simples, 3-bet ou all-in), so' pra cor/rotulo na grade.
+      undefined = raise generico (cor verde padrao), pra nao quebrar
+      ranges salvos antes dessa distincao existir. */
+  raiseType?: RaiseType;
 }
 
 export type RangeHands = Record<string, HandDecision>;
 
 // O modelo de dados por baixo continua so' fold/call/raise (todo o
 // resto do produto — board analyzer, equidade, drill, aderencia — le
-// esses 3 campos). Os botoes agora mostram 5 rotulos preflop comuns,
-// mas 3-bet e All-in sao formas mais precisas de descrever um "raise"
-// pro jogador — nao viram uma 4a/5a categoria nova no dado salvo.
+// esses 3 campos). Os botoes mostram 5 rotulos preflop comuns; 3-bet e
+// All-in sao formas mais precisas de descrever um "raise" pro jogador —
+// nao viram uma 4a/5a categoria no dado agregado, mas o raiseType acima
+// guarda qual delas foi usada pra pintar, so' pra distinguir na grade
+// (cor/tooltip) — sem isso os 3 botoes de raise ficavam visualmente
+// identicos e pareciam nao fazer nada.
 export type PaintAction = "fold" | "call" | "raise";
+export type RaiseType = "raise" | "threebet" | "allin";
 type ToolButton = "fold" | "call" | "raise" | "threebet" | "allin";
-const ACTIONS: PaintAction[] = ["fold", "call", "raise"];
 
-const TOOL_META: Record<ToolButton, { label: string; action: PaintAction; color: string }> = {
+const TOOL_META: Record<ToolButton, { label: string; action: PaintAction; color: string; raiseType?: RaiseType }> = {
   fold: { label: "Fold", action: "fold", color: "#c4c7c8" },
   call: { label: "Call", action: "call", color: "#3b82f6" },
-  raise: { label: "Raise", action: "raise", color: "#22c55e" },
-  threebet: { label: "3-bet", action: "raise", color: "#f59e0b" },
-  allin: { label: "All-in", action: "raise", color: "#e0555a" },
+  raise: { label: "Raise", action: "raise", color: "#22c55e", raiseType: "raise" },
+  threebet: { label: "3-bet", action: "raise", color: "#f59e0b", raiseType: "threebet" },
+  allin: { label: "All-in", action: "raise", color: "#e0555a", raiseType: "allin" },
 };
 const TOOL_ORDER: ToolButton[] = ["fold", "call", "raise", "threebet", "allin"];
+const RAISE_TYPE_COLOR: Record<RaiseType, string> = { raise: "#22c55e", threebet: "#f59e0b", allin: "#e0555a" };
+const RAISE_TYPE_LABEL: Record<RaiseType, string> = { raise: "Raise", threebet: "3-bet", allin: "All-in" };
 
 const EMPTY_DECISION: HandDecision = { fold: 100, call: 0, raise: 0 };
+
+// Decisao completa que a ferramenta ativa produz ao pintar uma celula —
+// centraliza a logica que antes so' setava call/raise e deixava fold
+// hardcoded em 0 (bug: a ferramenta "Fold" pintava fold:0/call:0/raise:0,
+// um estado que nao soma 100% e a grade renderizava como se fosse raise).
+function decisionForTool(tool: ToolButton): HandDecision {
+  const { action, raiseType } = TOOL_META[tool];
+  return {
+    fold: action === "fold" ? 100 : 0,
+    call: action === "call" ? 100 : 0,
+    raise: action === "raise" ? 100 : 0,
+    raiseType: action === "raise" ? raiseType : undefined,
+  };
+}
+
+// Se a celula ja' tem exatamente a decisao que essa ferramenta pintaria
+// (mesma acao E, no caso de raise, o mesmo sabor), a proxima pintada ali
+// vira "apagar" em vez de repintar em cima — sem checar o raiseType, o
+// botao 3-bet numa celula ja marcada como Raise simples entrava direto
+// em modo apagar ao inves de trocar pra 3-bet.
+function matchesTool(current: HandDecision, tool: ToolButton): boolean {
+  const { action, raiseType } = TOOL_META[tool];
+  if (action === "fold") return current.fold === 100;
+  if (action === "call") return current.call === 100;
+  return current.raise === 100 && (current.raiseType ?? "raise") === raiseType;
+}
 
 export function getDecision(hands: RangeHands, label: string): HandDecision {
   return hands[label] ?? EMPTY_DECISION;
@@ -76,7 +112,8 @@ function smartGroupCells(rowIdx: number, colIdx: number): [number, number][] {
 // raise (verde). Fold com peso 100 fica praticamente invisivel de
 // proposito — so o que tem acao chama atencao visual.
 function cellBackground(d: HandDecision): string {
-  const foldC = "#c4c7c8", callC = "#3b82f6", raiseC = "#22c55e";
+  const foldC = "#c4c7c8", callC = "#3b82f6";
+  const raiseC = RAISE_TYPE_COLOR[d.raiseType ?? "raise"];
   const foldEnd = d.fold;
   const callEnd = d.fold + d.call;
   return `linear-gradient(to top, ${foldC}22 0%, ${foldC}22 ${foldEnd}%, ${callC} ${foldEnd}%, ${callC} ${callEnd}%, ${raiseC} ${callEnd}%, ${raiseC} 100%)`;
@@ -98,7 +135,8 @@ const TOTAL_DECK_COMBOS = (() => {
 // percentual exato, em vez de arredondar pra mao inteira ou de fora.
 // Maos fora do top X% voltam pro fold 100% — o slider define o range
 // inteiro, nao soma em cima do que ja existia.
-function buildPercentSelection(percent: number, action: PaintAction): RangeHands {
+function buildPercentSelection(percent: number, tool: ToolButton): RangeHands {
+  const { action, raiseType } = TOOL_META[tool];
   const targetCombos = Math.round((TOTAL_DECK_COMBOS * percent) / 100);
   let used = 0;
   const result: RangeHands = {};
@@ -117,7 +155,12 @@ function buildPercentSelection(percent: number, action: PaintAction): RangeHands
     }
     result[label] =
       weight > 0
-        ? { fold: 100 - weight, call: action === "call" ? weight : 0, raise: action === "raise" ? weight : 0 }
+        ? {
+            fold: 100 - weight,
+            call: action === "call" ? weight : 0,
+            raise: action === "raise" ? weight : 0,
+            raiseType: action === "raise" ? raiseType : undefined,
+          }
         : EMPTY_DECISION;
   }
   return result;
@@ -148,23 +191,19 @@ export function RangeGrid({
   // "apagar" (volta pro fold 100%) em vez de pintar.
   const dragMode = useRef<"paint" | "erase">("paint");
 
-  const currentAction = TOOL_META[tool].action;
-
   const applyGroup = useCallback(
     (rowIdx: number, colIdx: number) => {
       if (readOnly) return;
       const cells = smartGroupCells(rowIdx, colIdx);
       const next = { ...value };
+      const painted = decisionForTool(tool);
       for (const [r, c] of cells) {
         const label = getHandLabel(r, c);
-        next[label] =
-          dragMode.current === "erase"
-            ? EMPTY_DECISION
-            : { fold: 0, call: currentAction === "call" ? 100 : 0, raise: currentAction === "raise" ? 100 : 0 };
+        next[label] = dragMode.current === "erase" ? EMPTY_DECISION : painted;
       }
       onChange(next);
     },
-    [value, onChange, readOnly, currentAction]
+    [value, onChange, readOnly, tool]
   );
 
   const startPaint = (rowIdx: number, colIdx: number) => {
@@ -172,7 +211,7 @@ export function RangeGrid({
     isDragging.current = true;
     const label = getHandLabel(rowIdx, colIdx);
     const current = getDecision(value, label);
-    dragMode.current = current[currentAction] === 100 ? "erase" : "paint";
+    dragMode.current = matchesTool(current, tool) ? "erase" : "paint";
     applyGroup(rowIdx, colIdx);
   };
   const continuePaint = (rowIdx: number, colIdx: number) => {
@@ -186,7 +225,7 @@ export function RangeGrid({
   function applyPercent(p: number) {
     setPercent(p);
     if (readOnly) return;
-    onChange(buildPercentSelection(p, currentAction));
+    onChange(buildPercentSelection(p, tool));
   }
 
   const summary = useMemo(() => {
@@ -265,7 +304,8 @@ export function RangeGrid({
               const label = getHandLabel(rowIdx, colIdx);
               const d = getDecision(value, label);
               const hasOverride = labelsWithOverrides?.has(label) ?? false;
-              const title = `${label} — Fold ${d.fold}% / Call ${d.call}% / Raise ${d.raise}%${hasOverride ? " (tem combo customizado)" : ""}`;
+              const raiseTypeLabel = d.raise > 0 && d.raiseType && d.raiseType !== "raise" ? ` (${RAISE_TYPE_LABEL[d.raiseType]})` : "";
+              const title = `${label} — Fold ${d.fold}% / Call ${d.call}% / Raise ${d.raise}%${raiseTypeLabel}${hasOverride ? " (tem combo customizado)" : ""}`;
               return (
                 <div
                   key={label}
