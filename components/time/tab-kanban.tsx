@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArchiveRestore, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock, GripVertical, ListChecks, MessageCircleWarning, MessageSquare, Plus, Settings2, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
+import Link from "next/link";
+import { AlertTriangle, ArchiveRestore, ArrowLeft, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock, GripVertical, ListChecks, MessageCircleWarning, MessageSquare, Plus, Settings2, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
@@ -60,6 +61,7 @@ export function TabKanban({
   jogadores,
   coaches,
   isAdmin,
+  backHref,
   onErro,
   onAgendarConversa,
 }: {
@@ -68,6 +70,8 @@ export function TabKanban({
   coaches: { userId: string; nome: string }[];
   /** So' admin mexe em fases (mesma regra da RLS de team_funnel_phases). */
   isAdmin: boolean;
+  /** Sem AppHeader nesta pagina — o voltar mora na propria barra de filtros. */
+  backHref?: string;
   onErro: (s: string) => void;
   onAgendarConversa: (playerId: string) => void;
 }) {
@@ -255,6 +259,16 @@ export function TabKanban({
       />
 
       <div className="flex flex-wrap items-center gap-2">
+        {backHref && (
+          <Link
+            href={backHref}
+            aria-label="Voltar"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          >
+            <ArrowLeft size={18} />
+          </Link>
+        )}
+
         <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
           <button
             onClick={() => setModo("board")}
