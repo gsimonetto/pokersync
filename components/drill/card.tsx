@@ -100,10 +100,19 @@ function CornerMark({
   // impressao de canto "colado". Encolhe soh o "10" um pouco (14%) e
   // aperta o letter-spacing, igualando o peso visual aos demais ranks.
   const isDoubleDigit = rank === "T";
+  // Fix (2026-08 v7): canto inferior-direito girava o MESMO texto do
+  // canto superior 180deg (convencao de carta fisica) -- mas "6" e "9"
+  // rotacionados 180 sao visualmente identicos um ao outro (glifos
+  // ponto-simetricos), entao uma carta "9" mostrava "6" nesse canto e
+  // vice-versa: risco real de o jogador ler a propria mao errada. Canto
+  // inferior-direito agora fica em pe (sem rotacao), so alinhado ao
+  // canto oposto -- perde a convencao de carta fisica (pensada pra mao
+  // em leque), mas essa e' uma UI digital, nunca segurada em leque, e
+  // legibilidade sem ambiguidade vale mais que a convencao.
   const style: React.CSSProperties =
     position === "tl"
       ? { top: 5, left: 6, alignItems: "flex-start" }
-      : { bottom: 5, right: 6, alignItems: "flex-end", transform: "rotate(180deg)" };
+      : { bottom: 5, right: 6, alignItems: "flex-end" };
   return (
     <div
       style={{
