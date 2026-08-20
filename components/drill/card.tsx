@@ -17,12 +17,19 @@ import { T, F, SUITS, num } from "@/lib/poker/drill-theme";
      com naipe central"). */
 
 const SIZES = {
-  board: { w: 50, h: 71, rank: 15, cornerSuit: 11, bigCenter: 34 },
+  board: { w: 50, h: 71, rank: 15, cornerSuit: 11, bigCenter: 34, cornerOffset: 5, cornerGap: 2 },
   // Hero maior — pedido explicito de aumentar mais uma vez. De 58x82
   // pra 72x100: quase 40% maior que a carta comunitaria, destaque de
   // "essas sao as suas cartas" sem precisar de rotacao ou selo extra.
-  hero: { w: 72, h: 100, rank: 22, cornerSuit: 16, bigCenter: 48 },
-  mini: { w: 34, h: 48, rank: 11, cornerSuit: 8, bigCenter: 22 },
+  hero: { w: 72, h: 100, rank: 22, cornerSuit: 16, bigCenter: 48, cornerOffset: 5, cornerGap: 2 },
+  // Fix (2026-08 v8): cantos usavam o mesmo offset/gap/fonte da carta
+  // "board" (50x71), so' escalado pro tamanho errado -- os dois blocos
+  // de canto (rank+naipe empilhados) sozinhos ja tomavam quase toda a
+  // altura de 48px, sobrando quase nada pro naipe central: eles
+  // "embolavam" (se sobrepunham) em vez de ficar cada um no seu canto.
+  // Fonte/gap/offset proprios e menores pra essa carta caber sem
+  // sobrepor, sem esconder nenhum elemento.
+  mini: { w: 34, h: 48, rank: 9, cornerSuit: 7, bigCenter: 15, cornerOffset: 3, cornerGap: 1 },
 };
 
 type Size = keyof typeof SIZES;
@@ -85,13 +92,15 @@ function SuitCenter({
 }
 
 function CornerMark({
-  rank, suitGlyph, rankSize, suitSize, position, hideSuitGlyph = false,
+  rank, suitGlyph, rankSize, suitSize, position, offset, gap, hideSuitGlyph = false,
 }: {
   rank: string;
   suitGlyph: string;
   rankSize: number;
   suitSize: number;
   position: "tl" | "br";
+  offset: number;
+  gap: number;
   hideSuitGlyph?: boolean;
 }) {
   // Fix (2026-08 v2): ranks de 2 digitos ("10") ficavam visualmente mais
@@ -111,8 +120,8 @@ function CornerMark({
   // legibilidade sem ambiguidade vale mais que a convencao.
   const style: React.CSSProperties =
     position === "tl"
-      ? { top: 5, left: 6, alignItems: "flex-start" }
-      : { bottom: 5, right: 6, alignItems: "flex-end" };
+      ? { top: offset, left: offset + 1, alignItems: "flex-start" }
+      : { bottom: offset, right: offset + 1, alignItems: "flex-end" };
   return (
     <div
       style={{
@@ -137,7 +146,7 @@ function CornerMark({
         {rank === "T" ? "10" : rank}
       </span>
       {!hideSuitGlyph && (
-        <span style={{ fontSize: suitSize, marginTop: 2, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
+        <span style={{ fontSize: suitSize, marginTop: gap, lineHeight: 1 }}>{textGlyph(suitGlyph)}</span>
       )}
     </div>
   );
@@ -229,6 +238,8 @@ export function Card({
           rankSize={s.rank}
           suitSize={s.cornerSuit}
           position="tl"
+          offset={s.cornerOffset}
+          gap={s.cornerGap}
           hideSuitGlyph={hideCornerSuitGlyph}
         />
       )}
@@ -242,7 +253,15 @@ export function Card({
         />
       )}
       {!hideCorners && !hideBottomRightCorner && (
-        <CornerMark rank={rank} suitGlyph={su.g} rankSize={s.rank} suitSize={s.cornerSuit} position="br" />
+        <CornerMark
+          rank={rank}
+          suitGlyph={su.g}
+          rankSize={s.rank}
+          suitSize={s.cornerSuit}
+          position="br"
+          offset={s.cornerOffset}
+          gap={s.cornerGap}
+        />
       )}
     </div>
   );
