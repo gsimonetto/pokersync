@@ -104,7 +104,26 @@ export function MotorLibraryPanel({ onLoad }: { onLoad: (hands: RangeHands) => v
     onLoad(handsDaFase);
   }
 
-  if (loading || spots.length === 0) return null;
+  if (loading) return null;
+
+  // Sem spots no catalogo (banco vazio/erro): antes sumia inteiro
+  // (`return null`), o que colapsava essa coluna da grid e deixava um
+  // vazio grande do lado da grade de maos, sem nenhuma pista do porque.
+  // Mantem a mesma caixa com uma mensagem — layout fica estavel e o
+  // usuario entende que a biblioteca so' esta vazia, nao quebrada.
+  if (spots.length === 0) {
+    return (
+      <section className="rounded-xl border border-hairline bg-surface p-4">
+        <div className="flex items-center gap-2 text-sm font-semibold">
+          <Library size={15} />
+          Biblioteca do motor
+        </div>
+        <p className="mt-1 text-[11px] text-muted">
+          {erro || "Nenhum range pré-flop resolvido pelo solver disponível ainda."}
+        </p>
+      </section>
+    );
+  }
 
   return (
     <section className="rounded-xl border border-hairline bg-surface p-4">
