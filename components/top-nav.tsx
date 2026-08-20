@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CircleHelp, House, ListChecks } from "lucide-react";
+import { Bell, CircleHelp, House, Trophy } from "lucide-react";
 import { Logo } from "./logo";
 import { Avatar } from "./avatar";
 import { ProfileMenu } from "./profile-menu";
@@ -14,9 +14,12 @@ import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
 
+// Icone do atalho "Tarefas" bate com o icone do card "Hub de Evolução"
+// (lib/modules-data.tsx) -- os dois levam pro mesmo /hub, entao usar
+// icones diferentes pra mesma tela so' confundia no reconhecimento.
 const TABS = [
   { label: "Início", href: "/modulos", icon: House },
-  { label: "Tarefas", href: "/hub", icon: ListChecks },
+  { label: "Tarefas", href: "/hub", icon: Trophy },
 ] as const;
 
 type OpenMenu = "profile" | "notifications" | "help" | null;
