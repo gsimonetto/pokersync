@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users, Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
+import { Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { ACCENT } from "@/lib/modules-data";
 import { TeamBanner } from "@/components/time/team-banner";
@@ -78,13 +78,7 @@ export default function TimePage() {
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
-      <AppHeader
-        backHref="/modulos"
-        icon={Users}
-        iconColor={data?.team.accent ?? ACCENT.blue}
-        title={data ? data.team.name : "Meu Time"}
-        subtitle="Times, papéis e convites"
-      />
+      <AppHeader backHref="/modulos" title={data ? data.team.name : "Meu Time"} subtitle="Times, papéis e convites" />
 
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>

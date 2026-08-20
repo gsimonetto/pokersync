@@ -3,10 +3,11 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { Flame, ChevronRight, ChevronDown, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
+import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import {
   assignCoach,
+  assignTeamDrill,
   diasSemAtividade,
   fetchTeamThread,
   markThreadRead,
@@ -16,6 +17,7 @@ import {
   traduzErroTime,
   type TeamDashboardRow,
   type TeamLabel,
+  type TeamLeak,
   type TeamMessage,
 } from "@/lib/services/team-service";
 import { BRL } from "@/lib/format";
@@ -32,10 +34,11 @@ import { BRL } from "@/lib/format";
 
 const INATIVO_DIAS = 7;
 
-type Ordem = "nome" | "treinos" | "acerto" | "revisadas" | "resultado";
+type Ordem = "nome" | "xp" | "treinos" | "acerto" | "revisadas" | "resultado";
 
 const OPCOES_ORDEM: { key: Ordem; label: string }[] = [
   { key: "nome", label: "Nome" },
+  { key: "xp", label: "Ranking (XP no período)" },
   { key: "treinos", label: "Mais treinos" },
   { key: "acerto", label: "Melhor acerto GTO" },
   { key: "revisadas", label: "Mais revisões" },
@@ -48,6 +51,9 @@ export function TabJogadores({
   isAdmin,
   podeConversar,
   coaches,
+  leaks,
+  dias,
+  onAtribuido,
   onChange,
   onErro,
 }: {
@@ -57,6 +63,9 @@ export function TabJogadores({
   /** Admin ou coach: quem pode abrir o menu de ações (ao menos pra conversar). */
   podeConversar: boolean;
   coaches: { userId: string; nome: string }[];
+  leaks: TeamLeak[];
+  dias: number;
+  onAtribuido: () => void;
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
@@ -85,6 +94,7 @@ export function TabJogadores({
     const acerto = (j: TeamDashboardRow) => (j.treinos > 0 ? j.acertosGto / j.treinos : -1);
     const sorters: Record<Ordem, (a: TeamDashboardRow, b: TeamDashboardRow) => number> = {
       nome: (a, b) => a.nome.localeCompare(b.nome),
+      xp: (a, b) => b.xpPeriodo - a.xpPeriodo || (b.streakDays ?? 0) - (a.streakDays ?? 0),
       treinos: (a, b) => b.treinos - a.treinos,
       acerto: (a, b) => acerto(b) - acerto(a),
       revisadas: (a, b) => b.maosRevisadas - a.maosRevisadas,
@@ -94,7 +104,10 @@ export function TabJogadores({
   }, [jogadores, filtroLabel, busca, ordem]);
 
   return (
-    <section className="rounded-xl border border-hairline bg-surface p-5">
+    <div className="space-y-4">
+      <LeaksSection leaks={leaks} dias={dias} onAtribuido={onAtribuido} />
+
+      <section className="rounded-xl border border-hairline bg-surface p-5">
       <div className="flex flex-wrap items-center gap-3">
         <h2 className="flex-1 text-[15px] font-semibold">
           Jogadores <span className="ml-1 text-sm font-normal text-muted">{lista.length}</span>
@@ -194,12 +207,21 @@ export function TabJogadores({
                   </div>
 
                   <div className="text-right">
-                    <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">Resultado</p>
-                    <p className={`text-[13px] font-medium tnum ${
-                      j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-ink/90"
-                    }`}>
-                      {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
-                    </p>
+                    {ordem === "xp" ? (
+                      <>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">XP no período</p>
+                        <p className="text-[13px] font-medium tnum text-evolution">{j.xpPeriodo} XP</p>
+                      </>
+                    ) : (
+                      <>
+                        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">Resultado</p>
+                        <p className={`text-[13px] font-medium tnum ${
+                          j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-ink/90"
+                        }`}>
+                          {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
+                        </p>
+                      </>
+                    )}
                   </div>
 
                   {podeConversar ? (
@@ -268,7 +290,8 @@ export function TabJogadores({
       {conversaCom && (
         <ConversaDrawer jogador={conversaCom} onFechar={() => setConversaCom(null)} onErro={onErro} />
       )}
-    </section>
+      </section>
+    </div>
   );
 }
 
@@ -590,5 +613,105 @@ function Chip({ children, ativo, cor, onClick }: { children: React.ReactNode; at
     >
       {children}
     </button>
+  );
+}
+
+// ------------------------------------------------------------
+// Leaks do time com atribuicao em massa — morava na Visao Geral, mas
+// faz mais sentido junto da lista de jogadores (o coach ja esta' olhando
+// pra quem precisa de treino). Recolhivel e fechado por padrao, igual
+// o Assistente do Kanban, pra nao competir com a lista logo abaixo.
+// ------------------------------------------------------------
+function severidade(indice: number, total: number): { label: string; cor: string; bg: string } {
+  const pct = total <= 1 ? 0 : indice / (total - 1);
+  if (pct <= 0.33) return { label: "Alta", cor: "#F26D6D", bg: "rgba(242,109,109,0.14)" };
+  if (pct <= 0.66) return { label: "Média", cor: "#F2B84C", bg: "rgba(242,184,76,0.14)" };
+  return { label: "Baixa", cor: "#8b8b8b", bg: "rgba(139,139,139,0.14)" };
+}
+
+function LeaksSection({ leaks, dias, onAtribuido }: { leaks: TeamLeak[]; dias: number; onAtribuido: () => void }) {
+  const [aberto, setAberto] = useState(false);
+  const [atribuindo, setAtribuindo] = useState<string | null>(null);
+  const [feedback, setFeedback] = useState<Record<string, string>>({});
+
+  if (leaks.length === 0) return null;
+
+  async function atribuir(l: TeamLeak) {
+    if (!l.drillId) return;
+    const chave = `${l.reasonCode}:${l.street}`;
+    setAtribuindo(chave);
+    try {
+      const n = await assignTeamDrill(l.reasonCode, l.street, l.drillId, dias);
+      setFeedback((prev) => ({
+        ...prev,
+        [chave]: n > 0 ? `Enviado para ${n} jogador${n === 1 ? "" : "es"}` : "Já estavam com esse treino recente",
+      }));
+      onAtribuido();
+    } catch {
+      setFeedback((prev) => ({ ...prev, [chave]: "Não foi possível atribuir" }));
+    } finally {
+      setAtribuindo(null);
+    }
+  }
+
+  return (
+    <section className="rounded-xl border border-hairline bg-surface p-5">
+      <button onClick={() => setAberto((v) => !v)} className="flex w-full items-center gap-2 text-left text-[15px] font-semibold">
+        Leaks mais frequentes
+        <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{leaks.length}</span>
+        <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted" title="Baseado nas autoavaliações de rua feitas no Revisor de Mãos">
+          <Info size={12} />
+          avaliações de rua no Revisor
+        </span>
+        <ChevronDown size={16} className={`text-muted transition-transform ${aberto ? "rotate-180" : ""}`} />
+      </button>
+
+      {aberto && (
+        <ul className="mt-4 space-y-2">
+          {leaks.map((l, i) => {
+            const chave = `${l.reasonCode}:${l.street}`;
+            const msg = feedback[chave];
+            const sev = severidade(i, leaks.length);
+            return (
+              <li key={chave} className="flex items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
+                <span
+                  className="shrink-0 rounded-md px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wider"
+                  style={{ color: sev.cor, backgroundColor: sev.bg }}
+                >
+                  {sev.label}
+                </span>
+
+                <div className="min-w-0 flex-1">
+                  <div className="flex flex-wrap items-center gap-1.5">
+                    <span className="truncate text-[13px] font-medium">{l.label}</span>
+                    <span className="text-[10px] uppercase tracking-wider text-muted">{l.street}</span>
+                  </div>
+                  {l.drillTitle && !msg && (
+                    <p className="mt-0.5 text-[11px] text-muted">→ {l.drillTitle}</p>
+                  )}
+                  {msg && <p className="mt-0.5 text-[11px] text-training">{msg}</p>}
+                </div>
+
+                <span className="shrink-0 text-xs text-muted tnum">
+                  {l.total}× · {l.jogadores} jogador(es)
+                </span>
+
+                {l.treinavel && (
+                  <button
+                    onClick={() => atribuir(l)}
+                    disabled={atribuindo === chave}
+                    title="Envia o drill correspondente a este leak para todos os jogadores afetados"
+                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-review/40 px-2.5 py-1.5 text-[11px] font-semibold text-review transition-colors hover:bg-review/10 disabled:opacity-50 print:hidden"
+                  >
+                    <Send size={12} />
+                    {atribuindo === chave ? "Enviando…" : "Enviar treino ao time"}
+                  </button>
+                )}
+              </li>
+            );
+          })}
+        </ul>
+      )}
+    </section>
   );
 }
