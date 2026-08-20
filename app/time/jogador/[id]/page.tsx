@@ -12,11 +12,11 @@ import {
   ChevronRight,
   Wallet,
   Gamepad2,
-  Printer,
   Handshake,
 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { AppHeader } from "@/components/app-header";
+import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { MetasCard } from "@/components/time/metas-card";
 import { Kpi } from "@/components/time/kpi";
@@ -137,26 +137,8 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
         }
         right={
           <div className="flex items-center gap-2 print:hidden">
-            <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-              {PERIODOS.map((op) => (
-                <button
-                  key={op.days}
-                  onClick={() => setDias(op.days)}
-                  className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
-                    dias === op.days ? "bg-ink text-void" : "text-muted hover:text-ink"
-                  }`}
-                >
-                  {op.label}
-                </button>
-              ))}
-            </div>
-            <button
-              onClick={() => window.print()}
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-              aria-label="Exportar PDF"
-            >
-              <Printer size={15} />
-            </button>
+            <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
+            <PrintButton />
           </div>
         }
       />

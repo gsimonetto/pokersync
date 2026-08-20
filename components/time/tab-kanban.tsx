@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, Circle, Clock, ListChecks, MessageCircleWarning, MessageSquare, Plus, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, ChevronLeft, ChevronRight, Circle, Clock, ListChecks, MessageCircleWarning, MessageSquare, Plus, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Campo } from "@/components/time/campo";
 import {
@@ -204,9 +204,11 @@ export function TabKanban({
       </div>
 
       <div className="flex gap-4 overflow-x-auto pb-2">
-        {fases.map((fase) => {
+        {fases.map((fase, faseIdx) => {
           const lista = (cardsPorFase.get(fase.id) ?? []).sort((a, b) => a.movedAt.localeCompare(b.movedAt));
           const recebendoDrop = faseArrastando === fase.id;
+          const faseAnterior = fases[faseIdx - 1];
+          const faseSeguinte = fases[faseIdx + 1];
           return (
             <div
               key={fase.id}
@@ -246,8 +248,10 @@ export function TabKanban({
                     const labels = labelsPorCard.get(card.cardId) ?? [];
                     const chk = checklistPorCard.get(card.cardId);
                     return (
-                      <button
+                      <div
                         key={card.cardId}
+                        role="button"
+                        tabIndex={0}
                         draggable
                         onDragStart={(e) => {
                           e.dataTransfer.setData("text/player-id", card.playerId);
@@ -255,6 +259,9 @@ export function TabKanban({
                           e.dataTransfer.effectAllowed = "move";
                         }}
                         onClick={() => setCardAberto(card)}
+                        onKeyDown={(e) => {
+                          if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCardAberto(card); }
+                        }}
                         className="block w-full cursor-grab rounded-xl border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/30 active:cursor-grabbing"
                       >
                         {labels.length > 0 && (
@@ -303,7 +310,39 @@ export function TabKanban({
                             {chk.done}/{chk.total}
                           </p>
                         )}
-                      </button>
+
+                        {/* Mover de fase por toque — drag-and-drop e' so' mouse
+                            (HTML5 drag nao funciona em touch), essas setas
+                            sao o caminho equivalente pra celular/tablet. */}
+                        {(faseAnterior || faseSeguinte) && (
+                          <div className="mt-2 flex items-center justify-between border-t border-hairline pt-2">
+                            <button
+                              type="button"
+                              disabled={!faseAnterior}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (faseAnterior) moverParaFase(card.playerId, faseAnterior.id);
+                              }}
+                              aria-label={faseAnterior ? `Mover pra ${faseAnterior.name}` : undefined}
+                              className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-ink disabled:pointer-events-none disabled:opacity-0"
+                            >
+                              <ChevronLeft size={14} />
+                            </button>
+                            <button
+                              type="button"
+                              disabled={!faseSeguinte}
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                if (faseSeguinte) moverParaFase(card.playerId, faseSeguinte.id);
+                              }}
+                              aria-label={faseSeguinte ? `Mover pra ${faseSeguinte.name}` : undefined}
+                              className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-ink disabled:pointer-events-none disabled:opacity-0"
+                            >
+                              <ChevronRight size={14} />
+                            </button>
+                          </div>
+                        )}
+                      </div>
                     );
                   })
                 )}

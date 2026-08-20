@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArrowLeft } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
@@ -32,56 +32,66 @@ export function AppHeader({
   right?: ReactNode;
 }) {
   const [compacto, setCompacto] = useState(false);
-  const sentinelRef = useRef<HTMLDivElement>(null);
 
+  // Threshold com histerese (some so' depois de 56px, volta so' abaixo de
+  // 16px) em vez de reagir a 1px de scroll — evita o header "piscar"
+  // entre os dois estados quando o usuario rola devagar perto do topo.
   useEffect(() => {
-    const el = sentinelRef.current;
-    if (!el) return;
-    const obs = new IntersectionObserver(([entry]) => setCompacto(!entry.isIntersecting), { threshold: 0 });
-    obs.observe(el);
-    return () => obs.disconnect();
+    let ticking = false;
+    function avaliar() {
+      ticking = false;
+      setCompacto((atual) => {
+        if (!atual && window.scrollY > 56) return true;
+        if (atual && window.scrollY < 16) return false;
+        return atual;
+      });
+    }
+    function onScroll() {
+      if (ticking) return;
+      ticking = true;
+      requestAnimationFrame(avaliar);
+    }
+    window.addEventListener("scroll", onScroll, { passive: true });
+    return () => window.removeEventListener("scroll", onScroll);
   }, []);
 
   return (
-    <>
-      <div ref={sentinelRef} aria-hidden="true" />
-      <header
-        className={`sticky top-0 z-30 mb-6 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding] duration-150 print:static print:border-none print:bg-transparent ${
-          compacto ? "border-hairline py-2.5" : "border-transparent py-4"
-        }`}
-      >
-        {backHref ? (
-          <Link
-            href={backHref}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-            aria-label="Voltar"
-          >
-            <ArrowLeft size={18} />
-          </Link>
-        ) : onBack ? (
-          <button
-            onClick={onBack}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-            aria-label="Voltar"
-          >
-            <ArrowLeft size={18} />
-          </button>
-        ) : null}
+    <header
+      className={`sticky top-0 z-30 mb-6 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding,border-color] duration-300 ease-out print:static print:border-none print:bg-transparent ${
+        compacto ? "border-hairline py-2.5" : "border-transparent py-4"
+      }`}
+    >
+      {backHref ? (
+        <Link
+          href={backHref}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+          aria-label="Voltar"
+        >
+          <ArrowLeft size={18} />
+        </Link>
+      ) : onBack ? (
+        <button
+          onClick={onBack}
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+          aria-label="Voltar"
+        >
+          <ArrowLeft size={18} />
+        </button>
+      ) : null}
 
-        {!compacto && iconNode}
-        {!compacto && !iconNode && Icon && <Icon size={20} style={iconColor ? { color: iconColor } : undefined} />}
+      {!compacto && iconNode}
+      {!compacto && !iconNode && Icon && <Icon size={20} style={iconColor ? { color: iconColor } : undefined} />}
 
-        <div className="min-w-0 flex-1">
-          <h1 className={`m-0 truncate font-semibold tracking-tight transition-all ${compacto ? "text-base" : "text-xl"}`}>
-            {title}
-          </h1>
-          {subtitle && !compacto && (
-            <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted">{subtitle}</div>
-          )}
-        </div>
+      <div className="min-w-0 flex-1">
+        <h1 className={`m-0 truncate font-semibold tracking-tight transition-all duration-300 ease-out ${compacto ? "text-base" : "text-xl"}`}>
+          {title}
+        </h1>
+        {subtitle && !compacto && (
+          <div className="mt-0.5 flex flex-wrap items-center gap-2 text-sm text-muted">{subtitle}</div>
+        )}
+      </div>
 
-        {right}
-      </header>
-    </>
+      {right}
+    </header>
   );
 }

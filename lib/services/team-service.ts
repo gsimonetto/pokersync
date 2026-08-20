@@ -147,6 +147,34 @@ export function planoPermiteCriarTime(plan: string): boolean {
   return plan === "team" || plan === "master";
 }
 
+// ============================================================
+// Cache curta (15s) pra fetchMyTeam/fetchTeamDashboard — Painel e Funil
+// sao paginas separadas hoje e cada uma carrega o time do zero ao
+// navegar entre elas. Sem isso, ir e voltar Painel<->Funil refaz as
+// mesmas duas RPCs toda vez. TTL curto de proposito: e' so' pra
+// suavizar a ida-e-volta imediata, nao pra esconder mudanca real (o
+// usuario que mexeu em algo e trocou de aba ja espera ver atualizado
+// em ~15s, nao precisa de invalidacao manual pra esse caso de uso).
+// ============================================================
+const CACHE_TTL_MS = 15_000;
+let myTeamCache: { data: MyTeam | null; ts: number } | null = null;
+const dashboardCache = new Map<number, { data: TeamDashboardRow[]; ts: number }>();
+
+export async function fetchMyTeamCached(): Promise<MyTeam | null> {
+  if (myTeamCache && Date.now() - myTeamCache.ts < CACHE_TTL_MS) return myTeamCache.data;
+  const data = await fetchMyTeam();
+  myTeamCache = { data, ts: Date.now() };
+  return data;
+}
+
+export async function fetchTeamDashboardCached(days = 30): Promise<TeamDashboardRow[]> {
+  const cached = dashboardCache.get(days);
+  if (cached && Date.now() - cached.ts < CACHE_TTL_MS) return cached.data;
+  const data = await fetchTeamDashboard(days);
+  dashboardCache.set(days, { data, ts: Date.now() });
+  return data;
+}
+
 export async function fetchMyTeam(): Promise<MyTeam | null> {
   const supabase = createClient();
   const meId = await getUserId();

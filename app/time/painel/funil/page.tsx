@@ -6,8 +6,8 @@ import { Kanban } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import { TabKanban } from "@/components/time/tab-kanban";
 import {
-  fetchMyTeam,
-  fetchTeamDashboard,
+  fetchMyTeamCached,
+  fetchTeamDashboardCached,
   traduzErroTime,
   type MyTeam,
   type TeamDashboardRow,
@@ -28,13 +28,13 @@ export default function FunilPage() {
     setLoading(true);
     setErro(null);
     try {
-      const t = await fetchMyTeam();
+      const t = await fetchMyTeamCached();
       if (!t) {
         router.replace("/time");
         return;
       }
       setTime(t);
-      setLinhas(await fetchTeamDashboard(365));
+      setLinhas(await fetchTeamDashboardCached(365));
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {

@@ -3,8 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Users, Printer, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
+import { Users, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import {
   fetchFinancialSeries,
   fetchMyTeam,
@@ -168,21 +169,8 @@ function PainelConteudo() {
           subtitle={time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
           right={
             <div className="flex items-center gap-2 print:hidden">
-              <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-                {PERIODOS.map((p) => (
-                  <button key={p.days} onClick={() => setDias(p.days)}
-                    className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
-                      dias === p.days ? "bg-ink text-void" : "text-muted hover:text-ink"
-                    }`}>
-                    {p.label}
-                  </button>
-                ))}
-              </div>
-              <button onClick={() => window.print()}
-                className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-                aria-label="Exportar PDF">
-                <Printer size={15} />
-              </button>
+              <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
+              <PrintButton />
             </div>
           }
         />
