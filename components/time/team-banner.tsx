@@ -5,7 +5,10 @@ import { ArrowLeft, ImagePlus, Users } from "lucide-react";
 // tamanho — sem isso a imagem escala pra cobrir a caixa e corta de
 // jeito imprevisivel dependendo da tela.
 export const BANNER_DIMENSOES = "1600 × 400px";
-export const BANNER_PROPORCAO_CLASS = "aspect-[4/1]";
+// max-h trava a altura em telas largas — sem isso a proporcao 4:1 sozinha
+// deixava o banner gigante em desktop, empurrando as estatisticas do time
+// pra fora da tela sem rolar.
+export const BANNER_PROPORCAO_CLASS = "aspect-[4/1] max-h-[220px]";
 
 // Banner do time, customizavel pelo proprio time. Sem banner: cai num
 // degrade na cor do time; se quem esta' vendo pode editar, o degrade

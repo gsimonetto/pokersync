@@ -6,10 +6,12 @@ import Link from "next/link";
 import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
+import { AssistenteCoach } from "@/components/time/assistente-coach";
 import {
   assignCoach,
   assignTeamDrill,
   diasSemAtividade,
+  fetchTeamLeakPlayers,
   fetchTeamThread,
   markThreadRead,
   removeMember,
@@ -19,6 +21,7 @@ import {
   type TeamDashboardRow,
   type TeamLabel,
   type TeamLeak,
+  type TeamLeakPlayer,
   type TeamMessage,
 } from "@/lib/services/team-service";
 import { BRL } from "@/lib/format";
@@ -47,6 +50,7 @@ const OPCOES_ORDEM: { key: Ordem; label: string }[] = [
 ];
 
 export function TabJogadores({
+  teamId,
   jogadores,
   labels,
   isAdmin,
@@ -58,6 +62,7 @@ export function TabJogadores({
   onChange,
   onErro,
 }: {
+  teamId: string;
   jogadores: TeamDashboardRow[];
   labels: TeamLabel[];
   isAdmin: boolean;
@@ -106,6 +111,7 @@ export function TabJogadores({
 
   return (
     <div className="space-y-4">
+      <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} />
       <LeaksSection leaks={leaks} dias={dias} onAtribuido={onAtribuido} />
 
       <section className="rounded-xl border border-hairline bg-surface p-5">
@@ -629,6 +635,7 @@ function LeaksSection({ leaks, dias, onAtribuido }: { leaks: TeamLeak[]; dias: n
   const [aberto, setAberto] = useState(false);
   const [atribuindo, setAtribuindo] = useState<string | null>(null);
   const [feedback, setFeedback] = useState<Record<string, string>>({});
+  const [leakVendo, setLeakVendo] = useState<TeamLeak | null>(null);
 
   if (leaks.length === 0) return null;
 
@@ -683,9 +690,12 @@ function LeaksSection({ leaks, dias, onAtribuido }: { leaks: TeamLeak[]; dias: n
                   {msg && <p className="mt-0.5 text-[11px] text-training">{msg}</p>}
                 </div>
 
-                <span className="shrink-0 text-xs text-muted tnum">
+                <button
+                  onClick={() => setLeakVendo(l)}
+                  className="shrink-0 text-xs text-muted tnum underline decoration-dotted underline-offset-2 hover:text-ink"
+                >
                   {l.total}× · {l.jogadores} jogador(es)
-                </span>
+                </button>
 
                 {l.treinavel && (
                   <button
@@ -703,6 +713,72 @@ function LeaksSection({ leaks, dias, onAtribuido }: { leaks: TeamLeak[]; dias: n
           })}
         </ul>
       )}
+
+      {leakVendo && (
+        <ModalLeakJogadores leak={leakVendo} dias={dias} onFechar={() => setLeakVendo(null)} />
+      )}
     </section>
+  );
+}
+
+// ------------------------------------------------------------
+// So mostra quais jogadores tem determinado leak quando o coach pede
+// (botao na linha) — a lista completa nao cabe na linha resumida, e
+// nem toda vez que se olha os leaks se precisa saber os nomes.
+// ------------------------------------------------------------
+function ModalLeakJogadores({ leak, dias, onFechar }: { leak: TeamLeak; dias: number; onFechar: () => void }) {
+  const [jogadores, setJogadores] = useState<TeamLeakPlayer[] | null>(null);
+  const [erro, setErro] = useState<string | null>(null);
+
+  useEffect(() => {
+    let ativo = true;
+    fetchTeamLeakPlayers(leak.reasonCode, leak.street, dias)
+      .then((r) => ativo && setJogadores(r))
+      .catch((e) => ativo && setErro(traduzErroTime(e)));
+    return () => {
+      ativo = false;
+    };
+  }, [leak, dias]);
+
+  return (
+    <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
+      <div className="max-h-[80vh] w-full max-w-sm overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="flex items-center justify-between">
+          <div className="min-w-0">
+            <p className="truncate text-sm font-semibold">{leak.label}</p>
+            <p className="text-xs text-muted">{leak.street} · {leak.total}× nos últimos {dias}d</p>
+          </div>
+          <button onClick={onFechar} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
+            <X size={16} />
+          </button>
+        </div>
+
+        <div className="mt-4">
+          {erro ? (
+            <p className="text-sm text-negative">{erro}</p>
+          ) : jogadores === null ? (
+            <p className="text-sm text-muted">Carregando…</p>
+          ) : jogadores.length === 0 ? (
+            <p className="text-sm text-muted">Nenhum jogador encontrado.</p>
+          ) : (
+            <ul className="space-y-1">
+              {jogadores.map((j) => (
+                <li key={j.userId}>
+                  <Link
+                    href={`/time/jogador/${j.userId}`}
+                    onClick={onFechar}
+                    className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-elevated"
+                  >
+                    <Avatar id={j.avatarId} url={j.avatarUrl} size={28} />
+                    <span className="min-w-0 flex-1 truncate text-sm">{j.nome}</span>
+                    <ChevronRight size={14} className="shrink-0 text-muted" />
+                  </Link>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+      </div>
+    </div>
   );
 }

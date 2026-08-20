@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TabKanban } from "@/components/time/tab-kanban";
+import { ModalNovoEvento } from "@/components/time/tab-calendario";
 import {
   fetchMyTeamCached,
   fetchTeamDashboardCached,
@@ -21,6 +22,7 @@ export default function FunilPage() {
   const [erro, setErro] = useState<string | null>(null);
   const [time, setTime] = useState<MyTeam | null>(null);
   const [linhas, setLinhas] = useState<TeamDashboardRow[]>([]);
+  const [agendarPlayerId, setAgendarPlayerId] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
@@ -69,7 +71,22 @@ export default function FunilPage() {
           isAdmin={time.role === "admin"}
           backHref="/time/painel"
           onErro={setErro}
-          onAgendarConversa={(playerId) => router.push(`/time/painel?tab=calendario&prefill=${playerId}`)}
+          onAgendarConversa={setAgendarPlayerId}
+        />
+      )}
+
+      {/* Agenda sem sair do funil — navegar pra /time/painel perdia todo o
+          estado do board (filtros, card aberto, scroll). */}
+      {agendarPlayerId && time && (
+        <ModalNovoEvento
+          teamId={time.team.id}
+          jogadores={jogadores}
+          meuUserId={time.members.find((m) => m.isMe)?.userId ?? ""}
+          meuPapel={time.role}
+          prefillPlayerId={agendarPlayerId}
+          onFechar={() => setAgendarPlayerId(null)}
+          onCriado={() => setAgendarPlayerId(null)}
+          onErro={setErro}
         />
       )}
     </main>
