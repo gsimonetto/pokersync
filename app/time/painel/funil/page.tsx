@@ -46,6 +46,10 @@ export default function FunilPage() {
   }, [carregar]);
 
   const jogadores = useMemo(() => linhas.filter((l) => l.role === "player"), [linhas]);
+  const coaches = useMemo(
+    () => (time?.members ?? []).filter((m) => m.isCoach).map((m) => ({ userId: m.userId, nome: m.name })),
+    [time]
+  );
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
@@ -64,6 +68,8 @@ export default function FunilPage() {
         <TabKanban
           teamId={time.team.id}
           jogadores={jogadores}
+          coaches={coaches}
+          isAdmin={time.role === "admin"}
           onErro={setErro}
           onAgendarConversa={(playerId) => router.push(`/time/painel?tab=calendario&prefill=${playerId}`)}
         />

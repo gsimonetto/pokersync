@@ -181,49 +181,52 @@ function PainelConteudo() {
   return (
     <>
       <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink print:max-w-full print:p-0">
-        <AppHeader
-          backHref="/modulos"
-          title={info?.name ?? "Painel do time"}
-          subtitle={time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
-          right={<PrintButton />}
-        />
-
-        {info && (
-          <div className="mb-6">
-            {coaches.length > 0 && (
-              <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 print:hidden">
-                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                  Coach{coaches.length > 1 ? "es" : ""}
-                </span>
-                {coaches.map((c) => (
-                  <Chip key={c.userId} color={info.accent} size="sm">{c.nome}</Chip>
-                ))}
-              </div>
-            )}
-            <TeamBanner
-              name={info.name}
-              description={info.description}
-              accent={info.accent}
-              logoUrl={info.logoUrl}
-              bannerUrl={info.bannerUrl}
-              editable={podeEditarTime}
-              uploading={enviandoBanner}
-              onUploadClick={() => bannerRef.current?.click()}
-            />
-            {podeEditarTime && (
-              <input
-                ref={bannerRef}
-                type="file"
-                accept="image/png,image/jpeg,image/webp"
-                className="hidden"
-                onChange={(e) => {
-                  const f = e.target.files?.[0];
-                  if (f) enviarBanner(f);
-                  e.target.value = "";
-                }}
+        {/* Banner so' na Visao Geral (primeira tela) — nas outras abas ele
+            so' empurrava conteudo pra baixo sem servir de navegacao real.
+            Ali o banner substitui o header: leva o voltar embutido no
+            canto, sem repetir nome/subtitulo que ele mesmo ja mostra. */}
+        {aba === "visao" ? (
+          info && (
+            <div className="mb-6">
+              {coaches.length > 0 && (
+                <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 print:hidden">
+                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                    Coach{coaches.length > 1 ? "es" : ""}
+                  </span>
+                  {coaches.map((c) => (
+                    <Chip key={c.userId} color={info.accent} size="sm">{c.nome}</Chip>
+                  ))}
+                </div>
+              )}
+              <TeamBanner
+                name={info.name}
+                description={info.description}
+                accent={info.accent}
+                logoUrl={info.logoUrl}
+                bannerUrl={info.bannerUrl}
+                editable={podeEditarTime}
+                uploading={enviandoBanner}
+                onUploadClick={() => bannerRef.current?.click()}
+                backHref="/modulos"
+                right={<PrintButton />}
               />
-            )}
-          </div>
+              {podeEditarTime && (
+                <input
+                  ref={bannerRef}
+                  type="file"
+                  accept="image/png,image/jpeg,image/webp"
+                  className="hidden"
+                  onChange={(e) => {
+                    const f = e.target.files?.[0];
+                    if (f) enviarBanner(f);
+                    e.target.value = "";
+                  }}
+                />
+              )}
+            </div>
+          )
+        ) : (
+          <AppHeader backHref="/modulos" right={<PrintButton />} />
         )}
 
         <nav className="mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline print:hidden">

@@ -143,6 +143,96 @@ export async function createPhase(teamId: string, name: string, color: string, s
   if (error) throw error;
 }
 
+export async function updatePhase(
+  phaseId: string,
+  patch: {
+    name?: string;
+    color?: string;
+    defaultDrillsTarget?: number;
+    defaultReviewsTarget?: number;
+  }
+) {
+  const supabase = createClient();
+  const row: Record<string, unknown> = {};
+  if (patch.name !== undefined) row.name = patch.name.trim();
+  if (patch.color !== undefined) row.color = patch.color;
+  if (patch.defaultDrillsTarget !== undefined) row.default_drills_target = patch.defaultDrillsTarget;
+  if (patch.defaultReviewsTarget !== undefined) row.default_reviews_target = patch.defaultReviewsTarget;
+  const { error } = await supabase.from("team_funnel_phases").update(row).eq("id", phaseId);
+  if (error) throw error;
+}
+
+// Troca a ordem de duas fases vizinhas (subir/descer na lista de
+// configuracoes) — mais simples que drag-and-drop pra reordenar so' 3-6
+// fases, e evita duplicar a logica de drag que o board ja tem.
+export async function swapPhaseOrder(a: FunnelPhase, b: FunnelPhase) {
+  const supabase = createClient();
+  const { error: e1 } = await supabase.from("team_funnel_phases").update({ sort_order: b.sortOrder }).eq("id", a.id);
+  if (e1) throw e1;
+  const { error: e2 } = await supabase.from("team_funnel_phases").update({ sort_order: a.sortOrder }).eq("id", b.id);
+  if (e2) throw e2;
+}
+
+// Bloqueia (FK) se ainda houver card nessa fase — erro traduzido cobre
+// esse caso especifico em vez do generico.
+export async function deletePhase(phaseId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_funnel_phases").delete().eq("id", phaseId);
+  if (error) throw error;
+}
+
+// ============================================================
+// Arquivar card (sair do funil ativo, sem perder o historico)
+// ============================================================
+
+export type ArchiveReason = "concluido" | "removido";
+
+export const ARCHIVE_REASON_LABEL: Record<ArchiveReason, string> = {
+  concluido: "Acompanhamento completo",
+  removido: "Removido do time",
+};
+
+export interface ArchivedCard {
+  cardId: string;
+  playerId: string;
+  nome: string;
+  avatarId: number;
+  avatarUrl: string | null;
+  phaseName: string;
+  phaseColor: string;
+  archivedAt: string;
+  archivedReason: ArchiveReason;
+  notes: string | null;
+}
+
+export async function archiveCard(playerId: string, reason: ArchiveReason) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("team_player_cards")
+    .update({ archived_at: new Date().toISOString(), archived_reason: reason })
+    .eq("player_id", playerId);
+  if (error) throw error;
+}
+
+export async function fetchArchivedCards(): Promise<ArchivedCard[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_archived_cards");
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    cardId: r.card_id,
+    playerId: r.player_id,
+    nome: r.nome,
+    avatarId: r.avatar_id ?? 1,
+    avatarUrl: r.avatar_url ?? null,
+    phaseName: r.phase_name,
+    phaseColor: r.phase_color,
+    archivedAt: r.archived_at,
+    archivedReason: r.archived_reason as ArchiveReason,
+    notes: r.notes,
+  }));
+}
+
 // "Pronto pra subir" considera só drills e reviews — a meta de stat fica
 // como referência visual no card (subir ou descer o número é uma leitura
 // do coach, não algo que dá pra automatizar sem contexto da situação).
@@ -331,6 +421,9 @@ export function traduzErroFunil(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("SEM_PERMISSAO")) return "Você não tem permissão para essa ação.";
   if (msg.includes("SEM_TIME")) return "Você precisa estar em um time ativo.";
+  if (msg.includes("foreign key constraint") && msg.includes("phase_id")) {
+    return "Essa fase ainda tem jogador dentro — mova todos pra outra fase antes de excluir.";
+  }
   return "Não foi possível completar a ação. Tente novamente.";
 }
 
