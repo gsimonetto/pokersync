@@ -8,8 +8,11 @@ import { PokerTable, type TableHand, type SeatState } from "@/components/drill/p
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
 import {
+  ALL_POSITIONS,
   getRfiJamSpot,
   listRfiJamSpots,
+  matchupKey,
+  parseMatchup,
   type RfiJamListItem,
   type RfiJamPhaseRaw,
   type RfiJamSpot,
@@ -81,33 +84,6 @@ const VERDICT_LABEL: Record<Verdict, string> = {
   ERRO_GRAVE: "Erro Grave",
   UNKNOWN: "Sem dados do solver",
 };
-
-// Ordem pedida explicitamente: UTG ... até BB. Token usado nos spot_ids
-// gerados pelo motor (ex "btn_vs_bb") segue lib/poker/... já usada em
-// app/treino/page.tsx pro lado pós-flop (VILLAIN_TOKEN_TO_POS).
-const ALL_POSITIONS = ["UTG", "UTG+1", "MP", "HJ", "CO", "BTN", "SB", "BB"];
-const POS_TO_TOKEN: Record<string, string> = {
-  UTG: "utg",
-  "UTG+1": "utg1",
-  MP: "mp",
-  HJ: "hj",
-  CO: "co",
-  BTN: "btn",
-  SB: "sb",
-  BB: "bb",
-};
-const TOKEN_TO_POS: Record<string, string> = Object.fromEntries(
-  Object.entries(POS_TO_TOKEN).map(([label, token]) => [token, label])
-);
-
-function matchupKey(hero: string, villain: string): string {
-  return `${POS_TO_TOKEN[hero]}_vs_${POS_TO_TOKEN[villain]}`;
-}
-
-function parseMatchup(matchup: string): { hero: string | null; villain: string | null } {
-  const [heroToken, villainToken] = matchup.split("_vs_");
-  return { hero: TOKEN_TO_POS[heroToken] ?? null, villain: TOKEN_TO_POS[villainToken] ?? null };
-}
 
 const STACK_OPTIONS = [10, 15, 20, 25, 30, 40, 50, 60];
 
