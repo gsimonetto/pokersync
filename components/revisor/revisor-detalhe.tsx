@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight } from "lucide-react";
+import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight, Link2, Wallet } from "lucide-react";
+import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import {
   getReview,
@@ -21,6 +22,9 @@ import {
   updateReviewTags,
   fetchTeamCoaches,
   shareReviewWithCoach,
+  fetchRecentBankrollSessions,
+  fetchBankrollSessionById,
+  linkReviewToSession,
   type ReviewDetail,
   type ReviewAnswer,
   type StreetEval,
@@ -29,6 +33,7 @@ import {
   type ManualTicket,
   type Tag,
   type TeamCoach,
+  type BankrollSessionOption,
 } from "@/lib/services/hand-review-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { RevisorHandTable } from "./revisor-hand-table";
@@ -272,6 +277,14 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [shareMenuOpen, setShareMenuOpen] = useState(false);
   const [shareStatus, setShareStatus] = useState<"idle" | "sending" | "sent">("idle");
 
+  // Vinculo com sessao de banca -- antes era write-only na criacao da
+  // mao, sem jeito de corrigir/desvincular depois nem de ver aqui qual
+  // sessao ja estava vinculada.
+  const [linkedSession, setLinkedSession] = useState<BankrollSessionOption | null>(null);
+  const [recentSessions, setRecentSessions] = useState<BankrollSessionOption[]>([]);
+  const [sessionEditorOpen, setSessionEditorOpen] = useState(false);
+  const [savingSession, setSavingSession] = useState(false);
+
   useEffect(() => {
     (async () => {
       const supabase = createClient();
@@ -354,6 +367,14 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         });
         setTicketSaved(true);
       }
+
+      if (r.session_id) {
+        fetchBankrollSessionById(r.session_id)
+          .then(setLinkedSession)
+          .catch(() => {});
+      } else {
+        setLinkedSession(null);
+      }
     } catch {
       setError("Erro ao carregar a mão.");
     } finally {
@@ -391,6 +412,27 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       await toggleReviewTag(tag.id);
     } catch {
       setError("Não foi possível criar o marcador.");
+    }
+  }
+
+  useEffect(() => {
+    if (!sessionEditorOpen || recentSessions.length > 0) return;
+    fetchRecentBankrollSessions(5)
+      .then(setRecentSessions)
+      .catch(() => {});
+  }, [sessionEditorOpen, recentSessions.length]);
+
+  async function handleLinkSession(sessionId: string | null) {
+    setSavingSession(true);
+    try {
+      await linkReviewToSession(reviewId, sessionId);
+      const next = sessionId ? recentSessions.find((s) => s.id === sessionId) ?? (await fetchBankrollSessionById(sessionId)) : null;
+      setLinkedSession(next);
+      setSessionEditorOpen(false);
+    } catch {
+      setError("Não foi possível atualizar o vínculo com a sessão.");
+    } finally {
+      setSavingSession(false);
     }
   }
 
@@ -433,6 +475,9 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         drill_suggestion: drill.trim() || null,
       };
       if (nextStatus) patch.status = nextStatus;
+      // concluded_at nunca era gravado (campo buscado em 3 queries, sempre
+      // nulo) -- sem isso, nao tem como medir "tempo ate revisar a mao".
+      if (nextStatus === "concluida") patch.concluded_at = new Date().toISOString();
       const updated = await updateReviewProgress(reviewId, patch);
       setReview((prev) => (prev ? { ...prev, ...updated } : prev));
 
@@ -746,6 +791,62 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   <Plus size={11} /> Criar
                 </button>
               </div>
+            </div>
+          )}
+
+          {/* Vinculo com sessao de banca -- editavel a qualquer momento
+              agora (antes so' dava pra escolher na criacao da mao, sem
+              jeito de corrigir depois). */}
+          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
+            {linkedSession ? (
+              <Link
+                href="/banca"
+                className="flex items-center gap-1 rounded border border-training/30 bg-training/[0.12] px-1.5 py-0.5 text-training transition-colors hover:border-training/60"
+              >
+                <Wallet size={10} />
+                {[linkedSession.format, linkedSession.stake, linkedSession.date].filter(Boolean).join(" · ")}
+              </Link>
+            ) : (
+              <span className="text-muted">Sem sessão de banca vinculada</span>
+            )}
+            <button
+              onClick={() => setSessionEditorOpen((v) => !v)}
+              className="flex items-center gap-1 rounded border border-dashed border-hairline px-1.5 py-0.5 text-muted transition-colors hover:border-training/50 hover:text-training"
+            >
+              <Link2 size={10} /> {linkedSession ? "Trocar" : "Vincular"}
+            </button>
+          </div>
+
+          {sessionEditorOpen && (
+            <div className="mt-2 rounded-lg border border-hairline bg-void p-2.5">
+              <div className="flex flex-wrap gap-1.5">
+                {recentSessions.length === 0 && <p className="text-[11px] text-muted">Nenhuma sessão recente encontrada.</p>}
+                {recentSessions.map((s) => {
+                  const active = linkedSession?.id === s.id;
+                  return (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => handleLinkSession(active ? null : s.id)}
+                      disabled={savingSession}
+                      className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                        active ? "border-training bg-training text-void" : "border-hairline bg-transparent text-ink"
+                      }`}
+                    >
+                      {[s.format, s.stake, s.date].filter(Boolean).join(" · ")}
+                    </button>
+                  );
+                })}
+              </div>
+              {linkedSession && (
+                <button
+                  onClick={() => handleLinkSession(null)}
+                  disabled={savingSession}
+                  className="mt-2 text-[11px] text-negative disabled:opacity-50"
+                >
+                  Desvincular
+                </button>
+              )}
             </div>
           )}
         </div>

@@ -540,10 +540,37 @@ export async function fetchRecentBankrollSessions(limit = 5): Promise<BankrollSe
   return data ?? [];
 }
 
+// Sessao ja vinculada pode nao estar entre as ultimas N (o vinculo e'
+// antigo, ou o jogador ja registrou varias sessoes desde entao) — sem
+// isso a tela de detalhe nao tinha como mostrar qual sessao a mao ja
+// esta vinculada, so' as sugestoes recentes pra escolher uma nova.
+export async function fetchBankrollSessionById(id: string): Promise<BankrollSessionOption | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("bankroll_sessions").select("id, date, format, stake").eq("id", id).maybeSingle();
+  if (error) throw error;
+  return data;
+}
+
 export async function linkReviewToSession(reviewId: string, sessionId: string | null) {
   const supabase = createClient();
   const { error } = await supabase.from("hand_reviews").update({ session_id: sessionId }).eq("id", reviewId);
   if (error) throw error;
+}
+
+// Quantas maos ja foram revisadas por sessao de banca -- fecha o ciclo
+// no sentido banca->revisor (antes so' existia revisor->banca, o
+// vinculo nunca aparecia de volta na tela de banca).
+export async function fetchReviewCountsBySessionIds(sessionIds: string[]): Promise<Record<string, number>> {
+  if (sessionIds.length === 0) return {};
+  const supabase = createClient();
+  const { data, error } = await supabase.from("hand_reviews").select("session_id").in("session_id", sessionIds);
+  if (error) throw error;
+  const counts: Record<string, number> = {};
+  for (const row of data ?? []) {
+    const sid = (row as { session_id: string | null }).session_id;
+    if (sid) counts[sid] = (counts[sid] || 0) + 1;
+  }
+  return counts;
 }
 
 // ============================================================
