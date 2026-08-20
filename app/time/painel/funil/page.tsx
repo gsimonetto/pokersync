@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { AppHeader } from "@/components/app-header";
 import { TabKanban } from "@/components/time/tab-kanban";
 import {
   fetchMyTeamCached,
@@ -53,11 +52,9 @@ export default function FunilPage() {
 
   return (
     <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
-      {/* Sem titulo/subtitulo aqui de proposito — a barra de abas do
-          Painel ja' identifica "Funil"; repetir o nome + descricao so'
-          empurra os cards pra baixo sem agregar informacao nova. */}
-      <AppHeader backHref="/time/painel" />
-
+      {/* Sem AppHeader aqui de proposito — a barra de abas do Painel ja'
+          identifica "Funil", e o header sozinho virava uma faixa vazia
+          no topo. O voltar mora na propria barra de filtros do board. */}
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
       )}
@@ -70,6 +67,7 @@ export default function FunilPage() {
           jogadores={jogadores}
           coaches={coaches}
           isAdmin={time.role === "admin"}
+          backHref="/time/painel"
           onErro={setErro}
           onAgendarConversa={(playerId) => router.push(`/time/painel?tab=calendario&prefill=${playerId}`)}
         />
