@@ -125,13 +125,26 @@ export function AderenciaRange() {
       const { data } = await supabase.auth.getUser();
       const uid = data.user?.id;
       if (!uid) throw new Error("NO_SESSION");
-      const title = [hand.format, hand.stakes, hand.heroPosition, `desvio de ${ranges.find((r) => r.id === rangeId)?.name}`]
-        .filter(Boolean)
-        .join(" · ");
+      const rangeName = ranges.find((r) => r.id === rangeId)?.name;
+      const title = [hand.format, hand.stakes, hand.heroPosition, `desvio de ${rangeName}`].filter(Boolean).join(" · ");
+      // Veredito objetivo ja' foi calculado aqui (contra o range+posicao
+      // que o jogador escolheu explicitamente) -- viaja junto pra revisao
+      // em vez de pedir pro Revisor adivinhar contra qual range comparar
+      // (nao ha vinculo salvo entre range e posicao, seria chute).
       await createReview(uid, {
         title,
         handHistory: hand.rawText,
-        parsedData: { kind: "parsed", ...hand },
+        parsedData: {
+          kind: "parsed",
+          ...hand,
+          objectiveVerdict: {
+            verdict: row.verdict,
+            heroAction: row.heroAction,
+            decision: row.decision,
+            rangeName: rangeName || null,
+            position,
+          },
+        },
         source: "import",
       });
       setSentHandIds((prev) => new Set(prev).add(row.handId!));
