@@ -3,8 +3,9 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Users, Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
+import { Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { Chip } from "@/components/chip";
 import { ACCENT } from "@/lib/modules-data";
 import { TeamBanner } from "@/components/time/team-banner";
 import { fetchDrillFacets } from "@/lib/services/drill-service";
@@ -77,14 +78,8 @@ export default function TimePage() {
   }, [carregar]);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <AppHeader
-        backHref="/modulos"
-        icon={Users}
-        iconColor={data?.team.accent ?? ACCENT.blue}
-        title={data ? data.team.name : "Meu Time"}
-        subtitle="Times, papéis e convites"
-      />
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
+      <AppHeader backHref="/modulos" title={data ? data.team.name : "Meu Time"} subtitle="Times, papéis e convites" />
 
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
@@ -129,9 +124,20 @@ function AguardandoAprovacao({ membership }: { membership: MyMembership }) {
 function VisaoJogador({ data }: { data: MyTeam }) {
   const eu = data.members.find((m) => m.isMe);
   const meuCoach = data.members.find((m) => m.userId === eu?.coachId);
+  const coaches = data.members.filter((m) => m.isCoach);
 
   return (
     <div className="max-w-2xl space-y-5">
+      {coaches.length > 0 && (
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
+          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+            Coach{coaches.length > 1 ? "es" : ""}
+          </span>
+          {coaches.map((c) => (
+            <Chip key={c.userId} color={data.team.accent} size="sm">{c.name}</Chip>
+          ))}
+        </div>
+      )}
       <TeamBanner
         name={data.team.name}
         accent={data.team.accent}

@@ -1,15 +1,24 @@
-import { Users } from "lucide-react";
+import { ImagePlus, Users } from "lucide-react";
 
-// Banner do time — mesma altura/raio do WelcomeHero dos Modulos
-// (components/welcome-hero.tsx), so' que aqui a imagem de fundo e'
-// customizavel pelo proprio time. Sem banner, cai num degrade na cor
-// do time (nunca fica "vazio").
+// Proporcao fixa (4:1) pra quem for montar a arte saber exatamente o
+// tamanho — sem isso a imagem escala pra cobrir a caixa e corta de
+// jeito imprevisivel dependendo da tela.
+export const BANNER_DIMENSOES = "1600 × 400px";
+export const BANNER_PROPORCAO_CLASS = "aspect-[4/1]";
+
+// Banner do time, customizavel pelo proprio time. Sem banner: cai num
+// degrade na cor do time; se quem esta' vendo pode editar, o degrade
+// vira um placeholder explicito ("Adicionar banner") em vez de deixar
+// a caixa parecendo so' decorativa.
 export function TeamBanner({
   name,
   description,
   accent,
   logoUrl,
   bannerUrl,
+  editable,
+  uploading,
+  onUploadClick,
   right,
 }: {
   name: string;
@@ -17,11 +26,19 @@ export function TeamBanner({
   accent: string;
   logoUrl?: string | null;
   bannerUrl?: string | null;
+  /** Quem esta' vendo pode trocar o banner (admin/coach). */
+  editable?: boolean;
+  uploading?: boolean;
+  onUploadClick?: () => void;
   right?: React.ReactNode;
 }) {
+  const semBannerEditavel = editable && !bannerUrl;
+
   return (
     <section
-      className="relative overflow-hidden rounded-2xl border border-hairline bg-surface p-6 sm:p-8"
+      className={`relative overflow-hidden rounded-2xl border bg-surface ${
+        semBannerEditavel ? "border-dashed border-hairline" : "border-hairline"
+      } ${BANNER_PROPORCAO_CLASS}`}
       style={
         bannerUrl
           ? { backgroundImage: `url(${bannerUrl})`, backgroundSize: "cover", backgroundPosition: "center" }
@@ -34,7 +51,7 @@ export function TeamBanner({
         <>
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -right-16 -top-24 size-80 rounded-full blur-3xl"
+            className="glow-breathe pointer-events-none absolute -right-16 -top-24 size-80 rounded-full blur-3xl"
             style={{ backgroundColor: `${accent}22` }}
           />
           <div
@@ -44,33 +61,60 @@ export function TeamBanner({
         </>
       )}
 
-      <div className="relative flex flex-wrap items-end justify-between gap-4">
-        <div className="flex items-center gap-4">
-          <div
-            className="grid h-14 w-14 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/20 sm:h-16 sm:w-16"
-            style={{ backgroundColor: `${accent}30` }}
-          >
-            {logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={logoUrl} alt={name} className="h-full w-full object-cover" />
-            ) : (
-              <Users size={26} style={{ color: accent }} />
-            )}
+      <div className="relative flex h-full flex-col justify-end p-4 sm:p-6">
+        <div className="flex flex-wrap items-end justify-between gap-4">
+          <div className="flex items-center gap-3 sm:gap-4">
+            <div
+              className="grid h-11 w-11 shrink-0 place-items-center overflow-hidden rounded-2xl border border-white/20 sm:h-16 sm:w-16"
+              style={{ backgroundColor: `${accent}30` }}
+            >
+              {logoUrl ? (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img src={logoUrl} alt={name} className="h-full w-full object-cover" />
+              ) : (
+                <Users size={22} style={{ color: accent }} />
+              )}
+            </div>
+            <div className="min-w-0">
+              <h1 className={`truncate text-xl font-bold tracking-tight sm:text-3xl ${bannerUrl ? "text-white drop-shadow" : "text-ink"}`}>
+                {name}
+              </h1>
+              {description && (
+                <p className={`mt-1 hidden max-w-xl truncate text-[13px] leading-relaxed sm:block ${bannerUrl ? "text-white/85" : "text-muted"}`}>
+                  {description}
+                </p>
+              )}
+            </div>
           </div>
-          <div className="min-w-0">
-            <h1 className={`text-2xl font-bold tracking-tight sm:text-3xl ${bannerUrl ? "text-white drop-shadow" : "text-ink"}`}>
-              {name}
-            </h1>
-            {description && (
-              <p className={`mt-1 max-w-xl truncate text-[13px] leading-relaxed ${bannerUrl ? "text-white/85" : "text-muted"}`}>
-                {description}
-              </p>
-            )}
-          </div>
-        </div>
 
-        {right}
+          {right}
+        </div>
       </div>
+
+      {semBannerEditavel && (
+        <button
+          type="button"
+          onClick={onUploadClick}
+          disabled={uploading}
+          className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-muted transition-colors hover:text-ink disabled:opacity-60"
+        >
+          <ImagePlus size={22} />
+          <span className="text-[13px] font-semibold">{uploading ? "Enviando…" : "Adicionar banner do time"}</span>
+          <span className="text-[11px] text-muted/80">Recomendado: {BANNER_DIMENSOES} (proporção 4:1)</span>
+        </button>
+      )}
+
+      {editable && bannerUrl && (
+        <button
+          type="button"
+          onClick={onUploadClick}
+          disabled={uploading}
+          className="absolute right-3 top-3 flex items-center gap-1.5 rounded-lg border border-white/25 bg-void/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-void/80 disabled:opacity-60 print:hidden"
+        >
+          <ImagePlus size={13} />
+          {uploading ? "Enviando…" : "Trocar banner"}
+        </button>
+      )}
     </section>
   );
 }

@@ -17,7 +17,7 @@ import {
 
 // Historico completo. O sino mostra so o que esta por ler; aqui fica
 // tudo, lido ou nao, com filtro por categoria.
-// Espacamento de borda seguindo Banca/Revisor: max-w-6xl px-6 py-10.
+// Espacamento de borda seguindo Banca/Revisor: max-w-[1600px] px-6 py-10.
 
 const KIND_ICON = {
   info: { Icon: Info, color: "#60a5fa" },
@@ -85,7 +85,7 @@ export default function NotificacoesPage() {
   const totalNaoLidas = naoLidas.sistema + naoLidas.tarefas + naoLidas.team;
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader
         backHref="/modulos"
         icon={Bell}

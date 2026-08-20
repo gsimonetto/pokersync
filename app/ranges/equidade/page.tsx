@@ -12,7 +12,7 @@ function EquidadePageInner() {
   const rangeId = searchParams.get("rangeId");
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader backHref="/modulos" icon={Percent} iconColor="var(--color-review)" title="Equidade"
         right={<RangesTabs active="equidade" />} />
 

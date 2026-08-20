@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { AppHeader } from "@/components/app-header";
+import { Chip } from "@/components/chip";
 import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { MetasCard } from "@/components/time/metas-card";
@@ -47,7 +48,7 @@ import {
 // Ficha individual do jogador. Quem pode abrir: admin do time, o coach
 // responsavel, ou o proprio jogador — a checagem esta nas RPCs, esta
 // tela so mostra o erro que voltar.
-// Espacamento de borda seguindo Banca/Revisor: max-w-6xl px-6 py-10.
+// Espacamento de borda seguindo Banca/Revisor: max-w-[1600px] px-6 py-10.
 
 const PERIODOS = [
   { label: "7 dias", days: 7 },
@@ -115,7 +116,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
 
   return (
     <>
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink print:max-w-full print:p-0">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink print:max-w-full print:p-0">
       <AppHeader
         backHref="/time/painel?tab=jogadores"
         iconNode={p ? <Avatar id={p.avatarId} url={p.avatarUrl} size={38} /> : undefined}
@@ -319,15 +320,9 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
               <ul className="mt-3 space-y-2">
                 {alertas.map((a) => (
                   <li key={a.id} className="flex flex-wrap items-center gap-2 text-[13px]">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        a.kind === "lembrete_estudo"
-                          ? "border-hairline text-muted"
-                          : "border-evolution/50 text-evolution"
-                      }`}
-                    >
+                    <Chip color={a.kind === "lembrete_estudo" ? "#8b8b8b" : "#F59E0B"} size="sm">
                       {ALERTA_LABEL[a.kind]}
-                    </span>
+                    </Chip>
                     <span className="min-w-0 flex-1 text-ink/85">{a.detail}</span>
                     <span className="text-xs text-muted">
                       {new Date(a.createdAt).toLocaleDateString("pt-BR")}

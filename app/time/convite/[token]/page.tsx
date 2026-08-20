@@ -72,7 +72,7 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
   const accent = info?.teamAccent || "#5AA6E0";
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <div className="mx-auto max-w-md rounded-xl border border-hairline bg-surface p-6">
         {loading ? (
           <p className="text-sm text-muted">Carregando convite…</p>

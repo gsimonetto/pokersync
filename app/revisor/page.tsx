@@ -71,7 +71,7 @@ function RevisorPageInner() {
   }
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader
         backHref={screen === "fila" || screen === "aderencia" ? "/modulos" : undefined}
         onBack={screen === "fila" || screen === "aderencia" ? undefined : (screen === "detalhe" ? backFromDetalhe : goFila)}
@@ -117,7 +117,7 @@ export default function RevisorPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+        <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
           <p className="text-sm text-muted">Carregando…</p>
         </main>
       }

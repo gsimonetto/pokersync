@@ -9,7 +9,7 @@ export default function TreeEditPage({ params }: { params: Promise<{ id: string 
   const { id } = use(params);
 
   return (
-    <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader backHref="/ranges/arvores" icon={GitBranch} iconColor="var(--color-review)"
         title={id === "nova" ? "Nova Árvore" : "Editar Árvore"} />
 

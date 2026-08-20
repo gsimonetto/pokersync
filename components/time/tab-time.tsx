@@ -1,8 +1,9 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Check, ImagePlus, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Camera, Check, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Chip } from "@/components/chip";
 import { TeamBanner } from "@/components/time/team-banner";
 import { ACCENT } from "@/lib/modules-data";
 import {
@@ -91,30 +92,28 @@ export function TabTime({
 
   return (
     <div className="space-y-5">
-      <div className="relative">
-        <TeamBanner name={info.name} accent={info.accent} logoUrl={info.logoUrl} bannerUrl={info.bannerUrl} />
+      <div>
+        <TeamBanner
+          name={info.name}
+          accent={info.accent}
+          logoUrl={info.logoUrl}
+          bannerUrl={info.bannerUrl}
+          editable={podeEditar}
+          uploading={enviandoBanner}
+          onUploadClick={() => bannerRef.current?.click()}
+        />
         {podeEditar && (
-          <>
-            <button
-              onClick={() => bannerRef.current?.click()}
-              disabled={enviandoBanner}
-              className="absolute right-4 top-4 flex items-center gap-1.5 rounded-lg border border-white/25 bg-void/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-void/80 print:hidden"
-            >
-              <ImagePlus size={13} />
-              {enviandoBanner ? "Enviando…" : info.bannerUrl ? "Trocar banner" : "Adicionar banner"}
-            </button>
-            <input
-              ref={bannerRef}
-              type="file"
-              accept="image/png,image/jpeg,image/webp"
-              className="hidden"
-              onChange={(e) => {
-                const f = e.target.files?.[0];
-                if (f) enviarBanner(f);
-                e.target.value = "";
-              }}
-            />
-          </>
+          <input
+            ref={bannerRef}
+            type="file"
+            accept="image/png,image/jpeg,image/webp"
+            className="hidden"
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) enviarBanner(f);
+              e.target.value = "";
+            }}
+          />
         )}
       </div>
 
@@ -307,9 +306,7 @@ function EtiquetasCard({
       <div className="mt-4 flex flex-wrap gap-2">
         {labels.length === 0 && <p className="text-sm text-muted">Nenhuma etiqueta criada.</p>}
         {labels.map((l) => (
-          <span key={l.id}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold"
-            style={{ backgroundColor: `${l.color}22`, color: l.color }}>
+          <Chip key={l.id} color={l.color}>
             {l.name}
             {podeEditar && (
               <button
@@ -318,12 +315,12 @@ function EtiquetasCard({
                   try { await deleteLabel(l.id); onChange(); } catch (e) { onErro(traduzErroTime(e)); }
                 }}
                 aria-label={`Excluir etiqueta ${l.name}`}
-                className="opacity-60 transition-opacity hover:opacity-100"
+                className="opacity-70 transition-opacity hover:opacity-100"
               >
-                <Trash2 size={12} />
+                <Trash2 size={11} />
               </button>
             )}
-          </span>
+          </Chip>
         ))}
       </div>
 

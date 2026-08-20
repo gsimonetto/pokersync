@@ -9,11 +9,9 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 // precisar passar pela biblioteca e clicar em "Novo range" antes. A
 // biblioteca continua acessivel pelo botao "Meus ranges" dentro do
 // proprio construtor (RangeListModal), sem sair da tela.
-// Largura maior que o padrao (max-w-6xl) e' proposital aqui: a matriz
-// 13x13 do range precisa de espaco horizontal real.
 export default function RangesPage() {
   return (
-    <main className="mx-auto max-w-[1440px] px-4 py-3 text-ink">
+    <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink">
       <AppHeader backHref="/modulos" icon={Layers} iconColor="var(--color-review)" title="Construtor de Ranges"
         right={<RangesTabs active="ranges" />} />
 

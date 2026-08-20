@@ -1,11 +1,13 @@
 "use client";
 
-import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
+import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Users, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
+import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
-import { PeriodSelector, PrintButton } from "@/components/period-selector";
+import { Chip } from "@/components/chip";
+import { PrintButton } from "@/components/period-selector";
+import { TeamBanner } from "@/components/time/team-banner";
 import {
   fetchFinancialSeries,
   fetchMyTeam,
@@ -19,6 +21,7 @@ import {
   fetchTeamStaff,
   fetchInvites,
   traduzErroTime,
+  uploadTeamBanner,
   type FinancialDay,
   type MyTeam,
   type PendingMember,
@@ -62,7 +65,7 @@ const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
 
 export default function PainelPage() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-6xl px-6 py-10 text-sm text-muted">Carregando…</main>}>
+    <Suspense fallback={<main className="mx-auto max-w-[1600px] px-6 py-10 text-sm text-muted">Carregando…</main>}>
       <PainelConteudo />
     </Suspense>
   );
@@ -78,6 +81,8 @@ function PainelConteudo() {
   const [loading, setLoading] = useState(true);
   const [pronto, setPronto] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
+  const [enviandoBanner, setEnviandoBanner] = useState(false);
+  const bannerRef = useRef<HTMLInputElement>(null);
 
   const [time, setTime] = useState<MyTeam | null>(null);
   const [info, setInfo] = useState<TeamInfo | null>(null);
@@ -151,29 +156,75 @@ function PainelConteudo() {
     window.history.replaceState(null, "", url);
   }
 
+  async function enviarBanner(file: File) {
+    if (!info) return;
+    if (file.size > 4 * 1024 * 1024) return setErro("Imagem muito grande (máximo 4 MB).");
+    setEnviandoBanner(true);
+    try {
+      await uploadTeamBanner(info.id, file);
+      await carregar();
+    } catch (e) {
+      setErro(traduzErroTime(e));
+    } finally {
+      setEnviandoBanner(false);
+    }
+  }
+
   const jogadores = useMemo(() => linhas.filter((l) => l.role === "player"), [linhas]);
   const coaches = useMemo(
     () => staff.filter((s) => s.isCoach).map((s) => ({ userId: s.userId, nome: s.nome })),
     [staff]
   );
   const isAdmin = time?.role === "admin";
+  const podeEditarTime = time?.role !== "player";
 
   return (
     <>
-      <main className="mx-auto max-w-6xl px-6 py-10 text-ink print:max-w-full print:p-0">
+      <main className="mx-auto max-w-[1600px] px-6 py-10 text-ink print:max-w-full print:p-0">
         <AppHeader
           backHref="/modulos"
-          icon={Users}
-          iconColor={info?.accent ?? "#5AA6E0"}
           title={info?.name ?? "Painel do time"}
           subtitle={time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
-          right={
-            <div className="flex items-center gap-2 print:hidden">
-              <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
-              <PrintButton />
-            </div>
-          }
+          right={<PrintButton />}
         />
+
+        {info && (
+          <div className="mb-6">
+            {coaches.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 print:hidden">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Coach{coaches.length > 1 ? "es" : ""}
+                </span>
+                {coaches.map((c) => (
+                  <Chip key={c.userId} color={info.accent} size="sm">{c.nome}</Chip>
+                ))}
+              </div>
+            )}
+            <TeamBanner
+              name={info.name}
+              description={info.description}
+              accent={info.accent}
+              logoUrl={info.logoUrl}
+              bannerUrl={info.bannerUrl}
+              editable={podeEditarTime}
+              uploading={enviandoBanner}
+              onUploadClick={() => bannerRef.current?.click()}
+            />
+            {podeEditarTime && (
+              <input
+                ref={bannerRef}
+                type="file"
+                accept="image/png,image/jpeg,image/webp"
+                className="hidden"
+                onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  if (f) enviarBanner(f);
+                  e.target.value = "";
+                }}
+              />
+            )}
+          </div>
+        )}
 
         <nav className="mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline print:hidden">
           {ABAS.map((a) => {
@@ -212,12 +263,13 @@ function PainelConteudo() {
         ) : (
           <>
             {aba === "visao" && (
-              <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} leaks={leaks} comparacao={comparacao} pronto={pronto} dias={dias} onAtribuido={carregar}
+              <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
                 onAbrirFunil={() => router.push("/time/painel/funil")} />
             )}
             {aba === "jogadores" && (
               <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
                 podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
+                leaks={leaks} dias={dias} onAtribuido={carregar}
                 onChange={carregar} onErro={setErro} />
             )}
             {aba === "convites" && time && (
