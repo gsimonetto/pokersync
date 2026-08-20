@@ -33,6 +33,20 @@ function accentFor(category?: string | null) {
   return (category && CATEGORY_ACCENT[category]) || ACCENT;
 }
 
+// Pra onde o card de missao leva quando clicado -- fecha o ciclo "vi a
+// missao no Hub -> fui cumprir ela" em vez de so mostrar progresso sem
+// caminho. "habit" nao tem modulo proprio (ver CATEGORY_ACCENT acima),
+// entao fica sem link mesmo -- nao inventa destino que nao existe.
+const CATEGORY_HREF: Record<string, string> = {
+  drill: "/treino",
+  bankroll: "/banca",
+  review: "/revisor",
+};
+
+function hrefFor(category?: string | null) {
+  return (category && CATEGORY_HREF[category]) || null;
+}
+
 // Icones das missoes (pedido explicito: "nao pode ter icones que nao
 // existem, adicionar aos que nao existem") — mapeado 1:1 contra os
 // valores REAIS que existem hoje na tabela `missions.icon` (conferido
@@ -514,6 +528,34 @@ function MiniStat({ icon: Icon, label, value }: { icon: LucideIcon; label: strin
   );
 }
 
+// Card vira link de verdade quando a categoria tem modulo proprio (ver
+// CATEGORY_HREF) -- senao fica um <div> normal, sem fingir um destino
+// que nao existe (caso "habit").
+function MissionCardShell({
+  href,
+  className,
+  style,
+  children,
+}: {
+  href: string | null;
+  className: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  if (href) {
+    return (
+      <Link href={href} className={className} style={style}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <div className={className} style={style}>
+      {children}
+    </div>
+  );
+}
+
 function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) {
   const m = preview ? item : item.missions;
   // Fallback pra Circle so deveria acontecer com icone realmente
@@ -524,6 +566,7 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   const prog = preview ? 0 : item.progress;
   const completed = !preview && item.status === "completed";
   const pct = Math.min(100, (prog / goal) * 100);
+  const href = preview ? null : hrefFor(m?.category);
 
   // Cor da missao = cor do modulo de origem. Concluida sobrepoe com verde,
   // porque "feito" e uma informacao mais importante do que a origem.
@@ -531,10 +574,11 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   const iconColor = accent;
 
   return (
-    <div
-      className={`hub-mission-card group rounded-xl border p-4 ${
+    <MissionCardShell
+      href={href}
+      className={`hub-mission-card group block rounded-xl border p-4 ${
         completed ? "border-positive/35 bg-positive/[0.06]" : "border-hairline bg-surface"
-      } ${preview ? "opacity-85" : ""}`}
+      } ${preview ? "opacity-85" : ""} ${href ? "cursor-pointer" : ""}`}
       style={{ borderColor: completed ? undefined : `${accent}30` }}
     >
       <div className="flex items-start gap-3">
@@ -582,7 +626,7 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
           </div>
         </div>
       </div>
-    </div>
+    </MissionCardShell>
   );
 }
 
