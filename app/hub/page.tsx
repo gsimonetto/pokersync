@@ -1,20 +1,19 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft, Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
-  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Users, Bell,
+  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Users, Gift, Crown,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboardPeriod, fetchMyLeaderboardRank, xpForNextLevel, levelColor, MAX_LEVEL,
-  type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, MAX_LEVEL,
+  type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank, type Season,
 } from "@/lib/services/xp-service";
 import { fetchMyMembership, type MyMembership } from "@/lib/services/team-service";
-import { fetchNotifications, markAsRead, type Notification } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
 
 const ACCENT = "#E0B24C";
@@ -91,30 +90,29 @@ export default function HubPage() {
   const [err, setErr] = useState("");
   const [tab, setTab] = useState<MissionTab>("daily");
 
-  // Ranking global -- agora secao fixa da tela (nao mais drawer escondido
-  // atras do trofeu: pedido explicito, "hoje e' so uma tela ao lado").
-  // O botao de trofeu vira atalho de scroll, igual ao padrao ja usado no
-  // painel de leaks da Gestao de Banca (leaksRef).
-  const rankingRef = useRef<HTMLElement | null>(null);
+  // Hub agora tem 2 vistas de verdade (pedido explicito: ranking "em
+  // outra aba dentro do hub que mostrasse so isso"), nao missoes+ranking
+  // empilhados na mesma tela infinita.
+  const [view, setView] = useState<"missoes" | "ranking">("missoes");
+
   const [rankingPeriod, setRankingPeriod] = useState<LeaderboardPeriod>("week");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [myRank, setMyRank] = useState<MyRank | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+  const [season, setSeason] = useState<Season | null>(null);
 
-  // Time e notificacoes recentes -- o Hub deveria ser o centro que
-  // conecta os modulos, nao so uma lista de numeros. Nao bloqueiam o
-  // carregamento principal nem quebram a tela se falharem (usuario sem
-  // time e' o caso normal, nao um erro).
+  // Time -- acesso rapido ao modulo, sem bloquear o carregamento
+  // principal nem quebrar a tela se o usuario nao tiver time (caso normal).
   const [membership, setMembership] = useState<MyMembership | null>(null);
-  const [recentNotifs, setRecentNotifs] = useState<Notification[]>([]);
 
   useEffect(() => {
     fetchMyMembership().then(setMembership).catch(() => {});
-    fetchNotifications(5).then(setRecentNotifs).catch(() => {});
+    fetchActiveSeason().then(setSeason).catch(() => {});
   }, []);
 
   useEffect(() => {
+    if (view !== "ranking") return;
     let alive = true;
     setLeaderboardLoading(true);
     Promise.all([
@@ -129,7 +127,7 @@ export default function HubPage() {
     return () => {
       alive = false;
     };
-  }, [rankingPeriod]);
+  }, [rankingPeriod, view]);
 
   useEffect(() => {
     let alive = true;
@@ -249,29 +247,53 @@ export default function HubPage() {
         }
       `}</style>
 
-      <div className="flex items-center justify-between gap-3">
+      <div className="flex flex-wrap items-center justify-between gap-3">
         <div className="flex items-center gap-3">
           <Link href="/modulos" className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink">
             <ArrowLeft size={18} />
           </Link>
           <div>
             <h1 className="text-2xl font-semibold tracking-tight">Hub de Evolução</h1>
-            <p className="mt-0.5 text-sm text-muted">Ganhe XP, mantenha a ofensiva e suba de nível.</p>
+            <div className="mt-0.5 flex flex-wrap items-center gap-2">
+              <p className="text-sm text-muted">
+                {view === "missoes" ? "Ganhe XP, mantenha a ofensiva e suba de nível." : "Ranking de todos os membros PokerSync."}
+              </p>
+              {membership && (
+                <Link
+                  href="/time"
+                  className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                >
+                  <Users size={10} /> {membership.teamName}
+                </Link>
+              )}
+            </div>
           </div>
         </div>
 
-        {/* Ranking de todos os membros PokerSync -- secao fixa la embaixo,
-            isso aqui so' rola ate' ela. */}
-        <button
-          onClick={() => rankingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-          title="Ranking PokerSync"
-          className="hub-trophy-btn grid h-10 w-10 place-items-center rounded-xl border"
-          style={{ borderColor: `${ACCENT}55`, background: `${ACCENT}15`, color: ACCENT }}
-        >
-          <Trophy size={18} />
-        </button>
+        {/* Missoes/Ranking viram vistas de verdade (pedido explicito) --
+            antes o ranking era secao fixa la embaixo, agora e' aba propria. */}
+        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+          <button
+            onClick={() => setView("missoes")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
+              view === "missoes" ? "bg-ink text-void" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Target size={13} /> Missões
+          </button>
+          <button
+            onClick={() => setView("ranking")}
+            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
+              view === "ranking" ? "bg-ink text-void" : "text-muted hover:text-ink"
+            }`}
+          >
+            <Trophy size={13} /> Ranking
+          </button>
+        </div>
       </div>
 
+      {view === "missoes" && (
+      <>
       <div className="hub-level-card relative mt-6 overflow-hidden rounded-xl border border-hairline bg-surface p-6">
         <div
           className="pointer-events-none absolute inset-0"
@@ -355,63 +377,6 @@ export default function HubPage() {
         </div>
       </div>
 
-      {/* Hub como centro de verdade, nao so lista de numeros: acesso
-          rapido ao time (se tiver um) e as ultimas notificacoes, que
-          antes so viviam escondidas no sininho do menu. */}
-      <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-3">
-        <section className="rounded-xl border border-hairline bg-surface p-4 lg:col-span-2">
-          <div className="flex items-center justify-between">
-            <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
-              <Bell size={13} /> Notificações recentes
-            </h2>
-            <Link href="/notificacoes" className="text-[11px] font-semibold text-muted transition-colors hover:text-ink">
-              Ver todas
-            </Link>
-          </div>
-          {recentNotifs.length === 0 ? (
-            <p className="mt-3 text-xs text-muted">Nenhuma notificação ainda.</p>
-          ) : (
-            <div className="mt-2.5 flex flex-col gap-1">
-              {recentNotifs.map((n) => (
-                <Link
-                  key={n.id}
-                  href={n.action_url || "/notificacoes"}
-                  onClick={() => {
-                    if (!n.read) markAsRead(n.id).catch(() => {});
-                  }}
-                  className={`flex items-start gap-2 rounded-lg px-2.5 py-2 text-[12.5px] transition-colors hover:bg-elevated ${
-                    !n.read ? "bg-white/[0.03]" : ""
-                  }`}
-                >
-                  {!n.read && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: ACCENT }} />}
-                  <span className={`min-w-0 flex-1 truncate ${n.read ? "text-muted" : "text-ink"}`}>
-                    <span className="font-semibold">{n.title}</span>
-                    {n.body ? ` — ${n.body}` : ""}
-                  </span>
-                </Link>
-              ))}
-            </div>
-          )}
-        </section>
-
-        <Link
-          href="/time"
-          className="flex flex-col justify-center rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-review/40 hover:bg-elevated"
-        >
-          <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
-            <Users size={13} /> Seu time
-          </h2>
-          {membership ? (
-            <>
-              <p className="mt-1.5 truncate text-sm font-semibold text-ink">{membership.teamName}</p>
-              <p className="text-[11px] text-muted capitalize">{membership.role}</p>
-            </>
-          ) : (
-            <p className="mt-1.5 text-xs text-muted">Você ainda não faz parte de um time.</p>
-          )}
-        </Link>
-      </div>
-
       {showingCatalog && (
         <p className="mt-5 rounded-lg border border-evolution/25 bg-evolution/10 px-4 py-3 text-xs" style={{ color: ACCENT }}>
           As missões abaixo são um preview do catálogo. Em breve você receberá missões diárias personalizadas ao seu nível.
@@ -457,16 +422,20 @@ export default function HubPage() {
           </div>
         )}
       </div>
+      </>
+      )}
 
-      <RankingSection
-        forwardedRef={rankingRef}
-        entries={leaderboard}
-        loading={leaderboardLoading}
-        meId={meId}
-        period={rankingPeriod}
-        onPeriodChange={setRankingPeriod}
-        myRank={myRank}
-      />
+      {view === "ranking" && (
+        <RankingSection
+          entries={leaderboard}
+          loading={leaderboardLoading}
+          meId={meId}
+          period={rankingPeriod}
+          onPeriodChange={setRankingPeriod}
+          myRank={myRank}
+          season={season}
+        />
+      )}
     </main>
   );
 }
@@ -630,88 +599,174 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   );
 }
 
-const RANKING_PERIODS: { value: LeaderboardPeriod; label: string }[] = [
+const BASE_RANKING_PERIODS: { value: LeaderboardPeriod; label: string }[] = [
   { value: "week", label: "Semana" },
   { value: "month", label: "Mês" },
   { value: "all", label: "Geral" },
 ];
 
-// Ranking global -- secao fixa do Hub (nao mais escondida atras de um
-// botao). Ganhou filtro por periodo (antes so xp_total vitalicio, o que
-// travava sempre nos mesmos nomes de quem entrou primeiro) e a posicao
-// do proprio jogador mesmo quando ele nao esta no top exibido.
+function fmtDate(d: string) {
+  return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+// Ranking global -- vista propria do Hub (pedido explicito: "em outra
+// aba dentro do hub que mostrasse so isso, com podium"). Periodo Semana/
+// Mes/Geral + Temporada (3 em 3 meses, com premio configuravel via
+// leaderboard_seasons) -- Temporada so aparece na troca quando existe
+// uma configurada, pra nao virar aba morta.
 function RankingSection({
-  forwardedRef,
   entries,
   loading,
   meId,
   period,
   onPeriodChange,
   myRank,
+  season,
 }: {
-  forwardedRef: React.RefObject<HTMLElement | null>;
   entries: LeaderboardEntry[] | null;
   loading: boolean;
   meId: string | null;
   period: LeaderboardPeriod;
   onPeriodChange: (p: LeaderboardPeriod) => void;
   myRank: MyRank | null;
+  season: Season | null;
 }) {
   const meInList = entries?.some((e) => e.userId === meId) ?? false;
+  const periods = season
+    ? [...BASE_RANKING_PERIODS.slice(0, 2), { value: "season" as const, label: "Temporada" }, ...BASE_RANKING_PERIODS.slice(2)]
+    : BASE_RANKING_PERIODS;
+  const podium = entries?.slice(0, 3) ?? [];
+  const rest = entries?.slice(3) ?? [];
 
   return (
-    <section ref={forwardedRef} className="mt-6 scroll-mt-6 rounded-xl border border-hairline bg-surface p-5">
-      <div className="flex flex-wrap items-center justify-between gap-2">
-        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
-          <Trophy size={16} /> Ranking PokerSync
-        </h2>
-        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-          {RANKING_PERIODS.map((p) => (
-            <button
-              key={p.value}
-              onClick={() => onPeriodChange(p.value)}
-              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
-                period === p.value ? "bg-ink text-void" : "text-muted hover:text-ink"
-              }`}
-            >
-              {p.label}
-            </button>
-          ))}
+    <div className="mt-6">
+      {season && (
+        <div
+          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border p-4"
+          style={{ borderColor: `${ACCENT}40`, background: `${ACCENT}0D` }}
+        >
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg" style={{ background: `${ACCENT}22`, color: ACCENT }}>
+            <Gift size={18} />
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-sm font-bold text-ink">{season.rewardTitle || "Temporada em andamento"}</p>
+            {season.rewardDescription && <p className="mt-0.5 text-xs text-muted">{season.rewardDescription}</p>}
+          </div>
+          <div className="text-right text-xs text-muted">
+            <p>{fmtDate(season.startsAt)} — {fmtDate(season.endsAt)}</p>
+            <p className="font-semibold" style={{ color: ACCENT }}>
+              {season.daysRemaining === 0 ? "Termina hoje" : `${season.daysRemaining} dias restantes`}
+            </p>
+          </div>
+        </div>
+      )}
+
+      <div className="rounded-xl border border-hairline bg-surface p-5">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
+            <Trophy size={16} /> Ranking PokerSync
+          </h2>
+          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+            {periods.map((p) => (
+              <button
+                key={p.value}
+                onClick={() => onPeriodChange(p.value)}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
+                  period === p.value ? "bg-ink text-void" : "text-muted hover:text-ink"
+                }`}
+              >
+                {p.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        <div className="mt-4">
+          {loading ? (
+            <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
+          ) : !entries || entries.length === 0 ? (
+            <p className="p-6 text-center text-sm text-muted">
+              {period === "season" && !season
+                ? "Nenhuma temporada ativa no momento."
+                : period === "all"
+                  ? "Ninguém no ranking ainda."
+                  : "Ninguém ganhou XP nesse período ainda."}
+            </p>
+          ) : (
+            <>
+              {podium.length === 3 && <Podium entries={podium} meId={meId} />}
+              <div className="flex flex-col gap-1.5">
+                {(podium.length === 3 ? rest : entries).map((e) => (
+                  <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} />
+                ))}
+                {myRank && !meInList && (
+                  <>
+                    <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
+                      <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
+                    </div>
+                    <div className="flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
+                      <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
+                      <p className="min-w-0 flex-1 text-sm font-semibold">
+                        Sua posição <span className="text-[10px] text-review">(você)</span>
+                      </p>
+                      <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+                        {myRank.xp.toLocaleString("pt-BR")} XP
+                      </span>
+                    </div>
+                  </>
+                )}
+              </div>
+            </>
+          )}
         </div>
       </div>
+    </div>
+  );
+}
 
-      <div className="mt-4">
-        {loading ? (
-          <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
-        ) : !entries || entries.length === 0 ? (
-          <p className="p-6 text-center text-sm text-muted">
-            {period === "all" ? "Ninguém no ranking ainda." : "Ninguém ganhou XP nesse período ainda."}
-          </p>
-        ) : (
-          <div className="flex flex-col gap-1.5">
-            {entries.map((e) => (
-              <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} />
-            ))}
-            {myRank && !meInList && (
-              <>
-                <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
-                  <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
-                </div>
-                <div className="flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
-                  <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
-                  <p className="min-w-0 flex-1 text-sm font-semibold">
-                    Sua posição <span className="text-[10px] text-review">(você)</span>
-                  </p>
-                  <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
-                    {myRank.xp.toLocaleString("pt-BR")} XP
-                  </span>
-                </div>
-              </>
-            )}
+const PODIUM_META = [
+  { rank: 2, order: "order-1", height: "h-20", medal: "#C0C6CC" },
+  { rank: 1, order: "order-2", height: "h-28", medal: "#F5D48C" },
+  { rank: 3, order: "order-3", height: "h-14", medal: "#CD7F32" },
+] as const;
+
+// Pódio dos top 3 -- 1o lugar no centro e mais alto, estilo classico.
+function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string | null }) {
+  const byRank = (r: number) => entries.find((e) => e.rank === r);
+  return (
+    <div className="mb-5 flex items-end justify-center gap-3">
+      {PODIUM_META.map((meta) => {
+        const e = byRank(meta.rank);
+        if (!e) return null;
+        const isMe = e.userId === meId;
+        return (
+          <div key={meta.rank} className={`flex w-28 flex-col items-center ${meta.order}`}>
+            <Crown
+              size={meta.rank === 1 ? 20 : 14}
+              style={{ color: meta.medal, opacity: meta.rank === 1 ? 1 : 0.7 }}
+              fill={meta.rank === 1 ? meta.medal : "none"}
+            />
+            <p className="mt-1 w-full truncate text-center text-xs font-bold text-ink">
+              {e.name} {isMe && <span className="text-[9px] text-review">(você)</span>}
+            </p>
+            <p className="text-[10px]" style={{ color: levelColor(e.level) }}>
+              Nível {e.level}
+            </p>
+            <p className="mt-0.5 text-[11px] font-bold" style={{ color: ACCENT }}>
+              {e.xpTotal.toLocaleString("pt-BR")} XP
+            </p>
+            <div
+              className={`mt-2 flex w-full items-start justify-center rounded-t-lg pt-1.5 ${meta.height}`}
+              style={{ background: `${meta.medal}1A`, border: `1px solid ${meta.medal}55` }}
+            >
+              <span className="text-lg font-extrabold" style={{ color: meta.medal }}>
+                {meta.rank}
+              </span>
+            </div>
           </div>
-        )}
-      </div>
-    </section>
+        );
+      })}
+    </div>
   );
 }
 
