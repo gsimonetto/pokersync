@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense } from "react";
-import Link from "next/link";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Percent } from "lucide-react";
+import { Percent } from "lucide-react";
+import { AppHeader } from "@/components/app-header";
 import { EquityCalculator } from "@/components/ranges/equity-calculator";
 import { RangesTabs } from "@/components/ranges/ranges-tabs";
 
@@ -13,18 +13,8 @@ function EquidadePageInner() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <header className="mb-4 flex items-center gap-3">
-        <Link
-          href="/modulos"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"
-          aria-label="Voltar"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-        <Percent size={20} className="text-review" />
-        <h1 className="m-0 text-xl font-semibold">Equidade</h1>
-        <RangesTabs active="equidade" />
-      </header>
+      <AppHeader backHref="/modulos" icon={Percent} iconColor="var(--color-review)" title="Equidade"
+        right={<RangesTabs active="equidade" />} />
 
       <EquityCalculator initialRangeId={rangeId} />
     </main>

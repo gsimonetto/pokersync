@@ -150,6 +150,183 @@ export function progressoPronto(card: PlayerCard): boolean {
   return card.drillsDone >= card.drillsTarget && card.reviewsDone >= card.reviewsTarget;
 }
 
+// ============================================================
+// Checklist do card (Trello-like) — itens marcaveis alem das metas
+// automaticas de drills/reviews.
+// ============================================================
+
+export interface ChecklistItem {
+  id: string;
+  cardId: string;
+  text: string;
+  done: boolean;
+  sortOrder: number;
+  createdAt: string;
+}
+
+export async function fetchChecklist(cardId: string): Promise<ChecklistItem[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("team_card_checklist_items")
+    .select("id, card_id, text, done, sort_order, created_at")
+    .eq("card_id", cardId)
+    .order("sort_order", { ascending: true });
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    id: r.id,
+    cardId: r.card_id,
+    text: r.text,
+    done: r.done,
+    sortOrder: r.sort_order,
+    createdAt: r.created_at,
+  }));
+}
+
+export async function addChecklistItem(cardId: string, text: string, sortOrder: number) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("team_card_checklist_items")
+    .insert({ card_id: cardId, text: text.trim(), sort_order: sortOrder });
+  if (error) throw error;
+}
+
+export async function toggleChecklistItem(itemId: string, done: boolean) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_card_checklist_items").update({ done }).eq("id", itemId);
+  if (error) throw error;
+}
+
+// Progresso (feitos/total) por card, pra mostrar na face do card sem
+// carregar a lista inteira de itens.
+export async function fetchChecklistProgressForCards(cardIds: string[]): Promise<Map<string, { done: number; total: number }>> {
+  const supabase = createClient();
+  const m = new Map<string, { done: number; total: number }>();
+  if (cardIds.length === 0) return m;
+  const { data, error } = await supabase
+    .from("team_card_checklist_items")
+    .select("card_id, done")
+    .in("card_id", cardIds);
+  if (error) throw error;
+  for (const r of data ?? []) {
+    const cur = m.get(r.card_id) ?? { done: 0, total: 0 };
+    cur.total += 1;
+    if (r.done) cur.done += 1;
+    m.set(r.card_id, cur);
+  }
+  return m;
+}
+
+export async function deleteChecklistItem(itemId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_card_checklist_items").delete().eq("id", itemId);
+  if (error) throw error;
+}
+
+// ============================================================
+// Etiquetas no card — reusa team_labels (mesma tabela das etiquetas
+// de jogador), so' a ligacao N:N com o card e' nova.
+// ============================================================
+
+export interface CardLabel {
+  id: string;
+  name: string;
+  color: string;
+}
+
+export async function fetchCardLabels(cardId: string): Promise<CardLabel[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("team_card_label_links")
+    .select("team_labels(id, name, color)")
+    .eq("card_id", cardId);
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[])
+    .map((r) => r.team_labels)
+    .filter(Boolean)
+    .map((l) => ({ id: l.id, name: l.name, color: l.color }));
+}
+
+export async function fetchCardLabelsForCards(cardIds: string[]): Promise<Map<string, CardLabel[]>> {
+  const supabase = createClient();
+  const m = new Map<string, CardLabel[]>();
+  if (cardIds.length === 0) return m;
+  const { data, error } = await supabase
+    .from("team_card_label_links")
+    .select("card_id, team_labels(id, name, color)")
+    .in("card_id", cardIds);
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  for (const r of (data ?? []) as any[]) {
+    if (!r.team_labels) continue;
+    const arr = m.get(r.card_id) ?? [];
+    arr.push({ id: r.team_labels.id, name: r.team_labels.name, color: r.team_labels.color });
+    m.set(r.card_id, arr);
+  }
+  return m;
+}
+
+export async function setCardLabel(cardId: string, labelId: string, ativo: boolean) {
+  const supabase = createClient();
+  if (ativo) {
+    const { error } = await supabase.from("team_card_label_links").insert({ card_id: cardId, label_id: labelId });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase
+      .from("team_card_label_links")
+      .delete()
+      .eq("card_id", cardId)
+      .eq("label_id", labelId);
+    if (error) throw error;
+  }
+}
+
+// ============================================================
+// Comentarios/atividade do card
+// ============================================================
+
+export interface CardComment {
+  id: string;
+  cardId: string;
+  authorId: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export async function fetchCardComments(cardId: string): Promise<CardComment[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("team_card_comments")
+    .select("id, card_id, author_id, body, created_at")
+    .eq("card_id", cardId)
+    .order("created_at", { ascending: true });
+  if (error) throw error;
+  const rows = data ?? [];
+  const ids = [...new Set(rows.map((r) => r.author_id))];
+  const { data: profileRows } = await supabase
+    .from("profiles")
+    .select("id, nome, apelido")
+    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  return rows.map((r) => {
+    const p = (profileRows ?? []).find((row) => row.id === r.author_id);
+    return {
+      id: r.id,
+      cardId: r.card_id,
+      authorId: r.author_id,
+      authorName: p?.apelido || p?.nome || "Alguém do time",
+      body: r.body,
+      createdAt: r.created_at,
+    };
+  });
+}
+
+export async function addCardComment(cardId: string, body: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_card_comments").insert({ card_id: cardId, body: body.trim() });
+  if (error) throw error;
+}
+
 export function traduzErroFunil(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("SEM_PERMISSAO")) return "Você não tem permissão para essa ação.";

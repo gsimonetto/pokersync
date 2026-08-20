@@ -2,8 +2,8 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
+import { AppHeader } from "@/components/app-header";
 import {
-  ArrowLeft,
   LineChart,
   Lock,
   ShieldAlert,
@@ -154,38 +154,33 @@ export default function PerformancePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <header className="mb-6 flex items-center gap-3">
-        <Link
-          href="/modulos"
-          aria-label="Voltar"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-        <LineChart size={20} className="text-evolution" />
-        <div>
-          <h1 className="m-0 text-xl font-semibold tracking-tight">Player Evolution</h1>
-          <p className="mt-0.5 text-sm text-muted">Banca, jogo e estudo em um só lugar</p>
-        </div>
-        {data?.score_geral !== null && data?.score_geral !== undefined && (
-          <div className="ml-auto flex items-center gap-2">
-            <span className="hidden text-xs font-medium text-muted sm:inline">{nivelDoScore(Number(data.score_geral))}</span>
-            <div
-              className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 text-center"
-              style={{
-                borderColor:
-                  Number(data.score_geral) >= 70 ? "#2FB89A" : Number(data.score_geral) >= 45 ? "#E0B24C" : "#e0555a",
-              }}
-              title="Score Geral de Evolução"
-            >
-              <div>
-                <p className="text-base font-bold leading-none tabular-nums">{Math.round(Number(data.score_geral))}</p>
-                <p className="mt-0.5 text-[8px] uppercase tracking-wide text-muted">/100</p>
+      <AppHeader
+        backHref="/modulos"
+        icon={LineChart}
+        iconColor="var(--color-evolution)"
+        title="Player Evolution"
+        subtitle="Banca, jogo e estudo em um só lugar"
+        right={
+          data?.score_geral !== null && data?.score_geral !== undefined ? (
+            <div className="flex items-center gap-2">
+              <span className="hidden text-xs font-medium text-muted sm:inline">{nivelDoScore(Number(data.score_geral))}</span>
+              <div
+                className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 text-center"
+                style={{
+                  borderColor:
+                    Number(data.score_geral) >= 70 ? "#2FB89A" : Number(data.score_geral) >= 45 ? "#E0B24C" : "#e0555a",
+                }}
+                title="Score Geral de Evolução"
+              >
+                <div>
+                  <p className="text-base font-bold leading-none tabular-nums">{Math.round(Number(data.score_geral))}</p>
+                  <p className="mt-0.5 text-[8px] uppercase tracking-wide text-muted">/100</p>
+                </div>
               </div>
             </div>
-          </div>
-        )}
-      </header>
+          ) : undefined
+        }
+      />
 
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>

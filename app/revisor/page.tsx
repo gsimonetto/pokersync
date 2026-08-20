@@ -2,8 +2,8 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import Link from "next/link";
-import { ArrowLeft, BookOpen } from "lucide-react";
+import { BookOpen } from "lucide-react";
+import { AppHeader } from "@/components/app-header";
 import { RevisorFila } from "@/components/revisor/revisor-fila";
 import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
@@ -72,44 +72,31 @@ function RevisorPageInner() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <header className="mb-4 flex items-center gap-3">
-        {screen === "fila" || screen === "aderencia" ? (
-          <Link
-            href="/modulos"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"
-            aria-label="Voltar"
-          >
-            <ArrowLeft size={18} />
-          </Link>
-        ) : (
-          <button
-            onClick={screen === "detalhe" ? backFromDetalhe : goFila}
-            className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"
-            aria-label="Voltar"
-          >
-            <ArrowLeft size={18} />
-          </button>
-        )}
-        <BookOpen size={20} className="text-review" />
-        <h1 className="m-0 text-xl font-semibold">Revisão de Mãos</h1>
-
-        {(screen === "fila" || screen === "aderencia") && (
-          <div className="ml-auto flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            <button
-              onClick={goFila}
-              className={`rounded-md px-3 py-1 text-xs font-medium ${screen === "fila" ? "bg-ink text-void" : "text-muted"}`}
-            >
-              Fila
-            </button>
-            <button
-              onClick={() => setScreen("aderencia")}
-              className={`rounded-md px-3 py-1 text-xs font-medium ${screen === "aderencia" ? "bg-ink text-void" : "text-muted"}`}
-            >
-              Aderência a Range
-            </button>
-          </div>
-        )}
-      </header>
+      <AppHeader
+        backHref={screen === "fila" || screen === "aderencia" ? "/modulos" : undefined}
+        onBack={screen === "fila" || screen === "aderencia" ? undefined : (screen === "detalhe" ? backFromDetalhe : goFila)}
+        icon={BookOpen}
+        iconColor="var(--color-review)"
+        title="Revisão de Mãos"
+        right={
+          (screen === "fila" || screen === "aderencia") && (
+            <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+              <button
+                onClick={goFila}
+                className={`rounded-md px-3 py-1 text-xs font-medium ${screen === "fila" ? "bg-ink text-void" : "text-muted"}`}
+              >
+                Fila
+              </button>
+              <button
+                onClick={() => setScreen("aderencia")}
+                className={`rounded-md px-3 py-1 text-xs font-medium ${screen === "aderencia" ? "bg-ink text-void" : "text-muted"}`}
+              >
+                Aderência a Range
+              </button>
+            </div>
+          )
+        }
+      />
 
       {screen === "fila" && <RevisorFila onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />}
       {screen === "aderencia" && <AderenciaRange />}

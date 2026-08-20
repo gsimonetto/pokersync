@@ -1,14 +1,16 @@
 "use client";
 
 import { useRef, useState } from "react";
-import { Camera, Check, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
+import { Camera, Check, ImagePlus, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { TeamBanner } from "@/components/time/team-banner";
 import { ACCENT } from "@/lib/modules-data";
 import {
   createLabel,
   deleteLabel,
   traduzErroTime,
   updateTeamInfo,
+  uploadTeamBanner,
   uploadTeamLogo,
   type TeamInfo,
   type TeamLabel,
@@ -43,7 +45,9 @@ export function TabTime({
   const [cor, setCor] = useState(info.accent);
   const [salvando, setSalvando] = useState(false);
   const [enviandoLogo, setEnviandoLogo] = useState(false);
+  const [enviandoBanner, setEnviandoBanner] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  const bannerRef = useRef<HTMLInputElement>(null);
 
   async function salvar() {
     if (!nome.trim()) return onErro("O time precisa de um nome.");
@@ -72,8 +76,48 @@ export function TabTime({
     }
   }
 
+  async function enviarBanner(file: File) {
+    if (file.size > 4 * 1024 * 1024) return onErro("Imagem muito grande (máximo 4 MB).");
+    setEnviandoBanner(true);
+    try {
+      await uploadTeamBanner(info.id, file);
+      onChange();
+    } catch (e) {
+      onErro(traduzErroTime(e));
+    } finally {
+      setEnviandoBanner(false);
+    }
+  }
+
   return (
     <div className="space-y-5">
+      <div className="relative">
+        <TeamBanner name={info.name} accent={info.accent} logoUrl={info.logoUrl} bannerUrl={info.bannerUrl} />
+        {podeEditar && (
+          <>
+            <button
+              onClick={() => bannerRef.current?.click()}
+              disabled={enviandoBanner}
+              className="absolute right-4 top-4 flex items-center gap-1.5 rounded-lg border border-white/25 bg-void/60 px-3 py-1.5 text-[12px] font-medium text-white backdrop-blur-sm transition-colors hover:bg-void/80 print:hidden"
+            >
+              <ImagePlus size={13} />
+              {enviandoBanner ? "Enviando…" : info.bannerUrl ? "Trocar banner" : "Adicionar banner"}
+            </button>
+            <input
+              ref={bannerRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) enviarBanner(f);
+                e.target.value = "";
+              }}
+            />
+          </>
+        )}
+      </div>
+
       <section className="rounded-xl border border-hairline bg-surface p-5">
         <div className="flex flex-wrap items-start gap-5">
           <div className="relative shrink-0">

@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
-import { Flame, ChevronRight, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
+import { Flame, ChevronRight, ChevronDown, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import {
   assignCoach,
@@ -65,6 +65,15 @@ export function TabJogadores({
   const [ordem, setOrdem] = useState<Ordem>("nome");
   const [acaoAberta, setAcaoAberta] = useState<TeamDashboardRow | null>(null);
   const [conversaCom, setConversaCom] = useState<TeamDashboardRow | null>(null);
+  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+
+  function alternarExpandido(userId: string) {
+    setExpandidos((prev) => {
+      const next = new Set(prev);
+      next.has(userId) ? next.delete(userId) : next.add(userId);
+      return next;
+    });
+  }
 
   const lista = useMemo(() => {
     const filtrada = jogadores.filter((j) => {
@@ -135,19 +144,24 @@ export function TabJogadores({
             const d = diasSemAtividade(j.lastActivityAt);
             const inativo = d === null || d >= INATIVO_DIAS;
             const pct = j.treinos > 0 ? Math.round((j.acertosGto / j.treinos) * 100) : null;
+            const aberto = expandidos.has(j.userId);
             return (
-              <li key={j.userId} className="flex flex-col gap-2 py-3 sm:flex-row sm:flex-wrap sm:items-center sm:gap-3">
-                <div className="flex items-center gap-3">
-                  {ordem !== "nome" && (
-                    <span className={`w-5 shrink-0 text-center text-[13px] font-bold tnum ${
-                      idx === 0 ? "text-evolution" : "text-muted"
-                    }`}>
-                      {idx + 1}
-                    </span>
-                  )}
+              <li key={j.userId} className="py-2.5">
+                {/* Grid com colunas fixas compartilhadas por todas as linhas —
+                    resolve o desalinhamento do layout anterior (flex por
+                    linha fazia cada linha calcular suas proprias larguras).
+                    So' "Resultado" fica visivel de cara; o resto (treinos,
+                    GTO, revisadas, jogos) entra no detalhe expansivel. */}
+                <div className="grid grid-cols-[16px_auto_1fr_84px_36px_36px_36px] items-center gap-2.5 sm:grid-cols-[20px_auto_1fr_96px_36px_36px_36px] sm:gap-3">
+                  <span className={`text-center text-[13px] font-bold tnum ${
+                    ordem !== "nome" ? (idx === 0 ? "text-evolution" : "text-muted") : "invisible"
+                  }`}>
+                    {ordem !== "nome" ? idx + 1 : "·"}
+                  </span>
+
                   <Avatar id={j.avatarId} url={j.avatarUrl} size={38} />
 
-                  <div className="min-w-0 flex-1 sm:flex-[2]">
+                  <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <Link href={`/time/jogador/${j.userId}`} className="truncate text-sm font-medium hover:underline">
                         {j.nome}
@@ -170,7 +184,7 @@ export function TabJogadores({
                         </span>
                       ) : null}
                     </div>
-                    <p className="mt-0.5 text-xs text-muted">
+                    <p className="mt-0.5 truncate text-xs text-muted">
                       Entrou em {new Date(j.joinedAt).toLocaleDateString("pt-BR")}
                       {" · "}
                       <span className={inativo ? "text-negative" : undefined}>
@@ -179,34 +193,34 @@ export function TabJogadores({
                     </p>
                   </div>
 
-                  {podeConversar && (
+                  <div className="text-right">
+                    <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">Resultado</p>
+                    <p className={`text-[13px] font-medium tnum ${
+                      j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-ink/90"
+                    }`}>
+                      {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
+                    </p>
+                  </div>
+
+                  {podeConversar ? (
                     <button
-                      onClick={() => setAcaoAberta(j)}
-                      className="ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden sm:hidden"
-                      aria-label={`Ações para ${j.nome}`}
+                      onClick={() => setConversaCom(j)}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+                      aria-label={`Conversar com ${j.nome}`}
                     >
-                      <MoreVertical size={15} />
+                      <MessageCircle size={15} />
                     </button>
-                  )}
-                </div>
+                  ) : <span />}
 
-                {/* Metricas: grid compacto no mobile (sem scroll horizontal),
-                    volta a ser uma fileira de colunas a partir do sm. */}
-                <div className="grid grid-cols-3 gap-x-2 gap-y-2 pl-[50px] sm:contents sm:pl-0">
-                  <Metrica label="Treinos" valor={String(j.treinos)} />
-                  <Metrica label="GTO" valor={pct === null ? "—" : `${pct}%`} />
-                  <Metrica label="Revisadas" valor={String(j.maosRevisadas)} />
-                  <Metrica label="Jogos" valor={String(j.jogosNoTime)} />
-                  <Metrica
-                    label="Resultado"
-                    valor={j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
-                    tom={j.lucroNoTime > 0 ? "positivo" : j.lucroNoTime < 0 ? "negativo" : undefined}
-                    largo
-                  />
-                </div>
+                  <button
+                    onClick={() => alternarExpandido(j.userId)}
+                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+                    aria-label={aberto ? `Recolher informações de ${j.nome}` : `Ver informações de ${j.nome}`}
+                  >
+                    <ChevronDown size={15} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
+                  </button>
 
-                <div className="hidden shrink-0 items-center gap-2 sm:flex">
-                  {podeConversar && (
+                  {isAdmin ? (
                     <button
                       onClick={() => setAcaoAberta(j)}
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
@@ -214,14 +228,21 @@ export function TabJogadores({
                     >
                       <MoreVertical size={15} />
                     </button>
-                  )}
-
-                  <Link href={`/time/jogador/${j.userId}`}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-                    aria-label={`Abrir ficha de ${j.nome}`}>
-                    <ChevronRight size={15} />
-                  </Link>
+                  ) : <span />}
                 </div>
+
+                {aberto && (
+                  <div className="mt-2.5 ml-[26px] flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-hairline bg-elevated px-3.5 py-3 sm:ml-[64px]">
+                    <Metrica label="Treinos" valor={String(j.treinos)} />
+                    <Metrica label="GTO" valor={pct === null ? "—" : `${pct}%`} />
+                    <Metrica label="Revisadas" valor={String(j.maosRevisadas)} />
+                    <Metrica label="Jogos" valor={String(j.jogosNoTime)} />
+                    <Link href={`/time/jogador/${j.userId}`}
+                      className="ml-auto flex items-center gap-1 text-[12px] font-medium text-ink hover:underline">
+                      Ver ficha completa <ChevronRight size={13} />
+                    </Link>
+                  </div>
+                )}
               </li>
             );
           })}

@@ -77,7 +77,7 @@ export default async function ModulosPage() {
   });
   return (
     <div className="min-h-screen bg-void">
-      <main className="mx-auto max-w-6xl px-4 py-6 sm:px-6 sm:py-8">
+      <main className="mx-auto max-w-6xl px-6 py-10">
         <div className="space-y-6">
           <WelcomeHero name={displayName} plan={plan} team={team} />
           <StatCards

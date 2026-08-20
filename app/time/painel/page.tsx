@@ -3,7 +3,9 @@
 import { Suspense, useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Users, Printer, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban } from "lucide-react";
+import { Users, LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
+import { AppHeader } from "@/components/app-header";
+import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import {
   fetchFinancialSeries,
   fetchMyTeam,
@@ -35,12 +37,12 @@ import { TabJogadores } from "@/components/time/tab-jogadores";
 import { TabConvites } from "@/components/time/tab-convites";
 import { TabTime } from "@/components/time/tab-time";
 import { TabCalendario } from "@/components/time/tab-calendario";
-import { TabKanban } from "@/components/time/tab-kanban";
 import { TeamPrintStyles } from "@/components/time/print-styles";
 
-// Painel do time: um so lugar, quatro abas. A aba fica na URL (?tab=)
-// para que notificacao e link externo abram direto no ponto certo.
-// Espacamento de borda seguindo Banca/Revisor: max-w-6xl px-6 py-10.
+// Painel do time: um so lugar, cinco abas (Funil tem pagina propria em
+// /time/painel/funil — precisa de mais espaco vertical que uma aba
+// permite). A aba fica na URL (?tab=) para que notificacao e link
+// externo abram direto no ponto certo.
 
 const PERIODOS = [
   { label: "7d", days: 7 },
@@ -48,14 +50,13 @@ const PERIODOS = [
   { label: "90d", days: 90 },
 ];
 
-type Aba = "visao" | "jogadores" | "convites" | "calendario" | "kanban" | "time";
+type Aba = "visao" | "jogadores" | "convites" | "calendario" | "time";
 
 const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "visao", label: "Visão geral", icon: LayoutDashboard },
   { key: "jogadores", label: "Jogadores", icon: UserRound },
   { key: "convites", label: "Convites", icon: Mail },
   { key: "calendario", label: "Calendário", icon: CalendarDays },
-  { key: "kanban", label: "Funil", icon: Kanban },
   { key: "time", label: "Time", icon: Settings2 },
 ];
 
@@ -139,6 +140,11 @@ function PainelConteudo() {
     carregar();
   }, [carregar]);
 
+  useEffect(() => {
+    const prefill = params.get("prefill");
+    if (prefill) setPrefillEventoPlayerId(prefill);
+  }, [params]);
+
   function trocarAba(nova: Aba) {
     setAba(nova);
     const url = nova === "visao" ? "/time/painel" : `/time/painel?tab=${nova}`;
@@ -155,48 +161,19 @@ function PainelConteudo() {
   return (
     <>
       <main className="mx-auto max-w-6xl px-6 py-10 text-ink print:max-w-full print:p-0">
-        <div className="mb-5 flex items-center justify-between print:hidden">
-          <Link href="/modulos"
-            className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-            aria-label="Voltar">
-            <ArrowLeft size={18} />
-          </Link>
-
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            {PERIODOS.map((p) => (
-              <button key={p.days} onClick={() => setDias(p.days)}
-                className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
-                  dias === p.days ? "bg-ink text-void" : "text-muted hover:text-ink"
-                }`}>
-                {p.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        <header className="mb-8 flex flex-col items-center gap-2 text-center print:mb-4">
-          <div className="grid h-10 w-10 shrink-0 place-items-center overflow-hidden rounded-xl border border-hairline shadow-sm"
-            style={{ backgroundColor: `${info?.accent ?? "#5AA6E0"}18` }}>
-            {info?.logoUrl ? (
-              // eslint-disable-next-line @next/next/no-img-element
-              <img src={info.logoUrl} alt={info.name} className="h-full w-full object-cover" />
-            ) : (
-              <Users size={18} style={{ color: info?.accent ?? "#5AA6E0" }} />
-            )}
-          </div>
-
-          <h1 className="m-0 text-xl font-bold tracking-tight">{info?.name ?? "Painel do time"}</h1>
-          <p className="text-sm text-muted">
-            {time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
-            <span className="hidden print:inline"> · gerado em {new Date().toLocaleDateString("pt-BR")}</span>
-          </p>
-
-          <button onClick={() => window.print()}
-            className="mt-2 flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 print:hidden">
-            <Printer size={15} />
-            PDF
-          </button>
-        </header>
+        <AppHeader
+          backHref="/modulos"
+          icon={Users}
+          iconColor={info?.accent ?? "#5AA6E0"}
+          title={info?.name ?? "Painel do time"}
+          subtitle={time?.role === "coach" ? "Seus jogadores acompanhados" : "Visão geral da organização"}
+          right={
+            <div className="flex items-center gap-2 print:hidden">
+              <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
+              <PrintButton />
+            </div>
+          }
+        />
 
         <nav className="mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline print:hidden">
           {ABAS.map((a) => {
@@ -215,6 +192,13 @@ function PainelConteudo() {
               </button>
             );
           })}
+
+          <Link href="/time/painel/funil"
+            className="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 py-2.5 text-[13px] font-medium text-muted transition-colors hover:text-ink">
+            <Kanban size={15} />
+            Funil
+            <ArrowUpRight size={12} className="text-muted/70" />
+          </Link>
         </nav>
 
         {erro && (
@@ -229,7 +213,7 @@ function PainelConteudo() {
           <>
             {aba === "visao" && (
               <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} leaks={leaks} comparacao={comparacao} pronto={pronto} dias={dias} onAtribuido={carregar}
-                onAbrirFunil={() => trocarAba("kanban")} />
+                onAbrirFunil={() => router.push("/time/painel/funil")} />
             )}
             {aba === "jogadores" && (
               <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
@@ -247,13 +231,6 @@ function PainelConteudo() {
                 prefillPlayerId={prefillEventoPlayerId}
                 onPrefillConsumido={() => setPrefillEventoPlayerId(null)}
                 onChange={carregar} onErro={setErro} />
-            )}
-            {aba === "kanban" && time && (
-              <TabKanban teamId={time.team.id} jogadores={jogadores} onErro={setErro}
-                onAgendarConversa={(playerId) => {
-                  setPrefillEventoPlayerId(playerId);
-                  trocarAba("calendario");
-                }} />
             )}
             {aba === "time" && info && (
               <TabTime info={info} staff={staff} labels={labels} podeEditar={time?.role !== "player"}
