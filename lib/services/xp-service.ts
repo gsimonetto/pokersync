@@ -153,6 +153,8 @@ export async function awardXP({
 }
 
 // --- Ranking global (todos os membros PokerSync) --------------------------
+export type LeaderboardPeriod = "week" | "month" | "all";
+
 export interface LeaderboardEntry {
   userId: string;
   name: string;
@@ -175,4 +177,40 @@ export async function fetchLeaderboard(limit = 100): Promise<LeaderboardEntry[]>
     streakDays: r.streak_days,
     rank: Number(r.rank),
   }));
+}
+
+// Ranking por periodo (semana/mes/geral) — "geral" e' xp_total vitalicio
+// (mesma coisa que fetchLeaderboard), semana/mes somam xp_events da
+// janela. xpTotal aqui carrega o xp DO PERIODO quando period != "all",
+// nao o xp vitalicio — nome do campo mantido por simplicidade de uso na UI.
+export async function fetchLeaderboardPeriod(period: LeaderboardPeriod, limit = 50): Promise<LeaderboardEntry[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_leaderboard_period", { p_period: period, p_limit: limit });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data ?? []).map((r: any) => ({
+    userId: r.user_id,
+    name: r.name,
+    level: r.level,
+    xpTotal: r.xp_period,
+    streakDays: r.streak_days,
+    rank: Number(r.rank),
+  }));
+}
+
+export interface MyRank {
+  rank: number;
+  xp: number;
+  totalPlayers: number;
+}
+
+// Posicao do proprio usuario, mesmo fora do top exibido -- sem isso quem
+// nao esta no top 50 nunca sabe onde esta no ranking.
+export async function fetchMyLeaderboardRank(period: LeaderboardPeriod): Promise<MyRank | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("get_my_leaderboard_rank", { p_period: period });
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) return null;
+  return { rank: Number(r.rank), xp: Number(r.xp), totalPlayers: Number(r.total_players) };
 }

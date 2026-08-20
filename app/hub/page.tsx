@@ -1,17 +1,20 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft, Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
-  Clock, Spade, BookOpen, HelpCircle, Scale, X, Medal,
+  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Users, Bell,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboard, xpForNextLevel, levelColor, MAX_LEVEL, type Progress, type LeaderboardEntry,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, xpForNextLevel, levelColor, MAX_LEVEL,
+  type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank,
 } from "@/lib/services/xp-service";
+import { fetchMyMembership, type MyMembership } from "@/lib/services/team-service";
+import { fetchNotifications, markAsRead, type Notification } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
 
 const ACCENT = "#E0B24C";
@@ -28,6 +31,20 @@ const CATEGORY_ACCENT: Record<string, string> = {
 
 function accentFor(category?: string | null) {
   return (category && CATEGORY_ACCENT[category]) || ACCENT;
+}
+
+// Pra onde o card de missao leva quando clicado -- fecha o ciclo "vi a
+// missao no Hub -> fui cumprir ela" em vez de so mostrar progresso sem
+// caminho. "habit" nao tem modulo proprio (ver CATEGORY_ACCENT acima),
+// entao fica sem link mesmo -- nao inventa destino que nao existe.
+const CATEGORY_HREF: Record<string, string> = {
+  drill: "/treino",
+  bankroll: "/banca",
+  review: "/revisor",
+};
+
+function hrefFor(category?: string | null) {
+  return (category && CATEGORY_HREF[category]) || null;
 }
 
 // Icones das missoes (pedido explicito: "nao pode ter icones que nao
@@ -74,13 +91,45 @@ export default function HubPage() {
   const [err, setErr] = useState("");
   const [tab, setTab] = useState<MissionTab>("daily");
 
-  // Ranking global (filtro lateral de Trofeu) — carregado so quando o
-  // painel abre pela primeira vez, nao no load inicial da tela (evita
-  // custo de RPC extra pra quem nunca abre o ranking).
-  const [leaderboardOpen, setLeaderboardOpen] = useState(false);
+  // Ranking global -- agora secao fixa da tela (nao mais drawer escondido
+  // atras do trofeu: pedido explicito, "hoje e' so uma tela ao lado").
+  // O botao de trofeu vira atalho de scroll, igual ao padrao ja usado no
+  // painel de leaks da Gestao de Banca (leaksRef).
+  const rankingRef = useRef<HTMLElement | null>(null);
+  const [rankingPeriod, setRankingPeriod] = useState<LeaderboardPeriod>("week");
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
+  const [myRank, setMyRank] = useState<MyRank | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+
+  // Time e notificacoes recentes -- o Hub deveria ser o centro que
+  // conecta os modulos, nao so uma lista de numeros. Nao bloqueiam o
+  // carregamento principal nem quebram a tela se falharem (usuario sem
+  // time e' o caso normal, nao um erro).
+  const [membership, setMembership] = useState<MyMembership | null>(null);
+  const [recentNotifs, setRecentNotifs] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    fetchMyMembership().then(setMembership).catch(() => {});
+    fetchNotifications(5).then(setRecentNotifs).catch(() => {});
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    setLeaderboardLoading(true);
+    Promise.all([
+      fetchLeaderboardPeriod(rankingPeriod, 50).catch(() => []),
+      fetchMyLeaderboardRank(rankingPeriod).catch(() => null),
+    ]).then(([lb, mine]) => {
+      if (!alive) return;
+      setLeaderboard(lb);
+      setMyRank(mine);
+      setLeaderboardLoading(false);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [rankingPeriod]);
 
   useEffect(() => {
     let alive = true;
@@ -107,19 +156,6 @@ export default function HubPage() {
       alive = false;
     };
   }, []);
-
-  async function openLeaderboard() {
-    setLeaderboardOpen(true);
-    if (leaderboard) return;
-    setLeaderboardLoading(true);
-    try {
-      setLeaderboard(await fetchLeaderboard(100));
-    } catch {
-      setLeaderboard([]);
-    } finally {
-      setLeaderboardLoading(false);
-    }
-  }
 
   if (loading) return <main className="p-10 text-center text-sm text-muted">Carregando Hub...</main>;
   if (err || !progress) return <main className="p-10 text-center text-sm text-negative">{err}</main>;
@@ -173,10 +209,6 @@ export default function HubPage() {
           from { opacity: 0; transform: translateY(6px); }
           to   { opacity: 1; transform: translateY(0); }
         }
-        @keyframes hubDrawerIn {
-          from { opacity: 0; transform: translateX(24px); }
-          to   { opacity: 1; transform: translateX(0); }
-        }
         .hub-flame-icon { animation: hubFlameFlicker var(--flame-speed, 2.4s) ease-in-out infinite; }
         .hub-flame-glow { animation: hubFlameGlow var(--flame-speed, 2.4s) ease-in-out infinite; }
         .hub-ember { animation: hubEmberRise var(--ember-speed, 1.6s) ease-in infinite; }
@@ -228,10 +260,10 @@ export default function HubPage() {
           </div>
         </div>
 
-        {/* Filtro lateral de Trofeu (pedido explicito): ranking de todos
-            os membros PokerSync, abre em drawer pela direita. */}
+        {/* Ranking de todos os membros PokerSync -- secao fixa la embaixo,
+            isso aqui so' rola ate' ela. */}
         <button
-          onClick={openLeaderboard}
+          onClick={() => rankingRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
           title="Ranking PokerSync"
           className="hub-trophy-btn grid h-10 w-10 place-items-center rounded-xl border"
           style={{ borderColor: `${ACCENT}55`, background: `${ACCENT}15`, color: ACCENT }}
@@ -273,9 +305,21 @@ export default function HubPage() {
             {/* Nome de patente em ingles (Micro Stakes I etc) removido
                 (pedido explicito) — so o numero do nivel, sem rotulo por
                 baixo. Cor do nivel muda a cada 10 (pedido explicito). */}
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
-              Nível {level}
-              {isMaxLevel && <span className="ml-1.5" style={{ color: badgeColor }}>· MÁXIMO</span>}
+            <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
+              <span>
+                Nível {level}
+                <span className="text-muted/70">/{MAX_LEVEL}</span>
+              </span>
+              {isMaxLevel && <span style={{ color: badgeColor }}>· MÁXIMO</span>}
+              {progress.prestige_count > 0 && (
+                <span
+                  className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px]"
+                  style={{ color: "#F5D48C", background: "#F5D48C22" }}
+                  title={`Prestígio ${progress.prestige_count}x — já chegou no nível máximo e recomeçou`}
+                >
+                  <Star size={10} fill="#F5D48C" /> {progress.prestige_count}
+                </span>
+              )}
             </p>
             <div className="mt-3">
               <div className="relative h-2 overflow-hidden rounded-full border border-hairline bg-white/5">
@@ -309,6 +353,63 @@ export default function HubPage() {
           <MiniStat icon={Target} label="Combo GTO" value={String(progress.combo_gto)} />
           <MiniStat icon={Trophy} label="Recorde streak" value={String(progress.streak_best)} />
         </div>
+      </div>
+
+      {/* Hub como centro de verdade, nao so lista de numeros: acesso
+          rapido ao time (se tiver um) e as ultimas notificacoes, que
+          antes so viviam escondidas no sininho do menu. */}
+      <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-3">
+        <section className="rounded-xl border border-hairline bg-surface p-4 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
+              <Bell size={13} /> Notificações recentes
+            </h2>
+            <Link href="/notificacoes" className="text-[11px] font-semibold text-muted transition-colors hover:text-ink">
+              Ver todas
+            </Link>
+          </div>
+          {recentNotifs.length === 0 ? (
+            <p className="mt-3 text-xs text-muted">Nenhuma notificação ainda.</p>
+          ) : (
+            <div className="mt-2.5 flex flex-col gap-1">
+              {recentNotifs.map((n) => (
+                <Link
+                  key={n.id}
+                  href={n.action_url || "/notificacoes"}
+                  onClick={() => {
+                    if (!n.read) markAsRead(n.id).catch(() => {});
+                  }}
+                  className={`flex items-start gap-2 rounded-lg px-2.5 py-2 text-[12.5px] transition-colors hover:bg-elevated ${
+                    !n.read ? "bg-white/[0.03]" : ""
+                  }`}
+                >
+                  {!n.read && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: ACCENT }} />}
+                  <span className={`min-w-0 flex-1 truncate ${n.read ? "text-muted" : "text-ink"}`}>
+                    <span className="font-semibold">{n.title}</span>
+                    {n.body ? ` — ${n.body}` : ""}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <Link
+          href="/time"
+          className="flex flex-col justify-center rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-review/40 hover:bg-elevated"
+        >
+          <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
+            <Users size={13} /> Seu time
+          </h2>
+          {membership ? (
+            <>
+              <p className="mt-1.5 truncate text-sm font-semibold text-ink">{membership.teamName}</p>
+              <p className="text-[11px] text-muted capitalize">{membership.role}</p>
+            </>
+          ) : (
+            <p className="mt-1.5 text-xs text-muted">Você ainda não faz parte de um time.</p>
+          )}
+        </Link>
       </div>
 
       {showingCatalog && (
@@ -357,14 +458,15 @@ export default function HubPage() {
         )}
       </div>
 
-      {leaderboardOpen && (
-        <LeaderboardDrawer
-          onClose={() => setLeaderboardOpen(false)}
-          entries={leaderboard}
-          loading={leaderboardLoading}
-          meId={meId}
-        />
-      )}
+      <RankingSection
+        forwardedRef={rankingRef}
+        entries={leaderboard}
+        loading={leaderboardLoading}
+        meId={meId}
+        period={rankingPeriod}
+        onPeriodChange={setRankingPeriod}
+        myRank={myRank}
+      />
     </main>
   );
 }
@@ -426,6 +528,34 @@ function MiniStat({ icon: Icon, label, value }: { icon: LucideIcon; label: strin
   );
 }
 
+// Card vira link de verdade quando a categoria tem modulo proprio (ver
+// CATEGORY_HREF) -- senao fica um <div> normal, sem fingir um destino
+// que nao existe (caso "habit").
+function MissionCardShell({
+  href,
+  className,
+  style,
+  children,
+}: {
+  href: string | null;
+  className: string;
+  style?: React.CSSProperties;
+  children: React.ReactNode;
+}) {
+  if (href) {
+    return (
+      <Link href={href} className={className} style={style}>
+        {children}
+      </Link>
+    );
+  }
+  return (
+    <div className={className} style={style}>
+      {children}
+    </div>
+  );
+}
+
 function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) {
   const m = preview ? item : item.missions;
   // Fallback pra Circle so deveria acontecer com icone realmente
@@ -436,6 +566,7 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   const prog = preview ? 0 : item.progress;
   const completed = !preview && item.status === "completed";
   const pct = Math.min(100, (prog / goal) * 100);
+  const href = preview ? null : hrefFor(m?.category);
 
   // Cor da missao = cor do modulo de origem. Concluida sobrepoe com verde,
   // porque "feito" e uma informacao mais importante do que a origem.
@@ -443,10 +574,11 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   const iconColor = accent;
 
   return (
-    <div
-      className={`hub-mission-card group rounded-xl border p-4 ${
+    <MissionCardShell
+      href={href}
+      className={`hub-mission-card group block rounded-xl border p-4 ${
         completed ? "border-positive/35 bg-positive/[0.06]" : "border-hairline bg-surface"
-      } ${preview ? "opacity-85" : ""}`}
+      } ${preview ? "opacity-85" : ""} ${href ? "cursor-pointer" : ""}`}
       style={{ borderColor: completed ? undefined : `${accent}30` }}
     >
       <div className="flex items-start gap-3">
@@ -494,90 +626,118 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
           </div>
         </div>
       </div>
-    </div>
+    </MissionCardShell>
   );
 }
 
-// Ranking global (pedido explicito: "criar rankeamento de todos os
-// membros pokersync em um filtro lateral de Trofeu dentro do hub") —
-// drawer deslizando da direita, ordenado por XP total. Usa a RPC
-// get_leaderboard (security definer) pois user_progress e' privada por
-// RLS — a RPC expoe so o necessario pro ranking (nome, nivel, xp,
-// streak), nada sensivel.
-function LeaderboardDrawer({
-  onClose,
+const RANKING_PERIODS: { value: LeaderboardPeriod; label: string }[] = [
+  { value: "week", label: "Semana" },
+  { value: "month", label: "Mês" },
+  { value: "all", label: "Geral" },
+];
+
+// Ranking global -- secao fixa do Hub (nao mais escondida atras de um
+// botao). Ganhou filtro por periodo (antes so xp_total vitalicio, o que
+// travava sempre nos mesmos nomes de quem entrou primeiro) e a posicao
+// do proprio jogador mesmo quando ele nao esta no top exibido.
+function RankingSection({
+  forwardedRef,
   entries,
   loading,
   meId,
+  period,
+  onPeriodChange,
+  myRank,
 }: {
-  onClose: () => void;
+  forwardedRef: React.RefObject<HTMLElement | null>;
   entries: LeaderboardEntry[] | null;
   loading: boolean;
   meId: string | null;
+  period: LeaderboardPeriod;
+  onPeriodChange: (p: LeaderboardPeriod) => void;
+  myRank: MyRank | null;
 }) {
-  useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [onClose]);
+  const meInList = entries?.some((e) => e.userId === meId) ?? false;
 
   return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-void/70 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div
-        className="relative flex h-full w-full max-w-sm flex-col border-l border-hairline bg-surface p-5"
-        style={{ animation: "hubDrawerIn .22s ease-out both" }}
-      >
-        <div className="flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
-            <Trophy size={16} /> Ranking PokerSync
-          </h2>
-          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="mt-4 flex-1 overflow-y-auto">
-          {loading ? (
-            <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
-          ) : !entries || entries.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">Ninguém no ranking ainda.</p>
-          ) : (
-            <div className="flex flex-col gap-1.5">
-              {entries.map((e) => {
-                const isMe = e.userId === meId;
-                const medalColor = e.rank === 1 ? "#F5D48C" : e.rank === 2 ? "#C0C6CC" : e.rank === 3 ? "#CD7F32" : null;
-                return (
-                  <div
-                    key={e.userId}
-                    className={`hub-lb-row flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
-                      isMe ? "border-review/50 bg-review/[0.08]" : "border-hairline bg-void/40 hover:bg-elevated"
-                    }`}
-                    style={{ animationDelay: `${Math.min(e.rank, 20) * 0.02}s` }}
-                  >
-                    <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
-                      {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
-                    </span>
-                    <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
-                        {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
-                      </p>
-                      <p className="text-[11px] text-muted">
-                        <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span> · {e.streakDays} dias de streak
-                      </p>
-                    </div>
-                    <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
-                      {e.xpTotal.toLocaleString("pt-BR")} XP
-                    </span>
-                  </div>
-                );
-              })}
-            </div>
-          )}
+    <section ref={forwardedRef} className="mt-6 scroll-mt-6 rounded-xl border border-hairline bg-surface p-5">
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
+          <Trophy size={16} /> Ranking PokerSync
+        </h2>
+        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+          {RANKING_PERIODS.map((p) => (
+            <button
+              key={p.value}
+              onClick={() => onPeriodChange(p.value)}
+              className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
+                period === p.value ? "bg-ink text-void" : "text-muted hover:text-ink"
+              }`}
+            >
+              {p.label}
+            </button>
+          ))}
         </div>
       </div>
+
+      <div className="mt-4">
+        {loading ? (
+          <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
+        ) : !entries || entries.length === 0 ? (
+          <p className="p-6 text-center text-sm text-muted">
+            {period === "all" ? "Ninguém no ranking ainda." : "Ninguém ganhou XP nesse período ainda."}
+          </p>
+        ) : (
+          <div className="flex flex-col gap-1.5">
+            {entries.map((e) => (
+              <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} />
+            ))}
+            {myRank && !meInList && (
+              <>
+                <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
+                  <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
+                </div>
+                <div className="flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
+                  <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
+                  <p className="min-w-0 flex-1 text-sm font-semibold">
+                    Sua posição <span className="text-[10px] text-review">(você)</span>
+                  </p>
+                  <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+                    {myRank.xp.toLocaleString("pt-BR")} XP
+                  </span>
+                </div>
+              </>
+            )}
+          </div>
+        )}
+      </div>
+    </section>
+  );
+}
+
+function RankingRow({ entry: e, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+  const medalColor = e.rank === 1 ? "#F5D48C" : e.rank === 2 ? "#C0C6CC" : e.rank === 3 ? "#CD7F32" : null;
+  return (
+    <div
+      className={`hub-lb-row flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+        isMe ? "border-review/50 bg-review/[0.08]" : "border-hairline bg-void/40 hover:bg-elevated"
+      }`}
+      style={{ animationDelay: `${Math.min(e.rank, 20) * 0.02}s` }}
+    >
+      <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
+        {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="truncate text-sm font-semibold">
+          {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
+        </p>
+        <p className="text-[11px] text-muted">
+          <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span> · {e.streakDays} dias de streak
+        </p>
+      </div>
+      <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+        {e.xpTotal.toLocaleString("pt-BR")} XP
+      </span>
     </div>
   );
 }
