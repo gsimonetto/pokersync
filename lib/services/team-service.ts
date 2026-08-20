@@ -474,6 +474,26 @@ export async function fetchTeamLeaks(days = 30, limit = 8): Promise<TeamLeak[]> 
   }));
 }
 
+export interface TeamLeakPlayer {
+  userId: string;
+  nome: string;
+  avatarId: number;
+  avatarUrl: string | null;
+}
+
+export async function fetchTeamLeakPlayers(reasonCode: string, street: string, days = 30): Promise<TeamLeakPlayer[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_leak_players", { p_reason_code: reasonCode, p_street: street, p_days: days });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    userId: r.user_id,
+    nome: r.nome,
+    avatarId: r.avatar_id ?? 1,
+    avatarUrl: r.avatar_url ?? null,
+  }));
+}
+
 export async function assignTeamDrill(
   reasonCode: string,
   street: string,

@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArchiveRestore, ArrowLeft, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock, GripVertical, ListChecks, MessageCircleWarning, MessageSquare, Plus, Settings2, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, GripVertical, ListChecks, MessageSquare, Plus, Settings2, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
@@ -42,10 +42,7 @@ import {
   type StatMetric,
 } from "@/lib/services/team-funnel-service";
 import {
-  fetchTeamAlerts,
   fetchTeamLabels,
-  ALERTA_LABEL,
-  type TeamAlert,
   type TeamDashboardRow,
   type TeamLabel,
 } from "@/lib/services/team-service";
@@ -77,7 +74,6 @@ export function TabKanban({
 }) {
   const [fases, setFases] = useState<FunnelPhase[]>([]);
   const [cards, setCards] = useState<PlayerCard[]>([]);
-  const [alertas, setAlertas] = useState<TeamAlert[]>([]);
   const [labelsDoTime, setLabelsDoTime] = useState<TeamLabel[]>([]);
   const [labelsPorCard, setLabelsPorCard] = useState<Map<string, CardLabel[]>>(new Map());
   const [checklistPorCard, setChecklistPorCard] = useState<Map<string, { done: number; total: number }>>(new Map());
@@ -101,15 +97,13 @@ export function TabKanban({
   const carregar = async () => {
     setLoading(true);
     try {
-      const [f, c, al, tl] = await Promise.all([
+      const [f, c, tl] = await Promise.all([
         fetchFunnelPhases(teamId),
         fetchPlayerCards(),
-        fetchTeamAlerts(14).catch(() => []),
         fetchTeamLabels(teamId).catch(() => []),
       ]);
       setFases(f);
       setCards(c);
-      setAlertas(al);
       setLabelsDoTime(tl);
       const cardIds = c.map((card) => card.cardId);
       const [lbl, chk] = await Promise.all([
@@ -195,25 +189,6 @@ export function TabKanban({
     return m;
   }, [fases, cardsFiltrados]);
 
-  const prontos = useMemo(() => cards.filter(progressoPronto), [cards]);
-  const estagnados = useMemo(() => {
-    const limite = Date.now() - 14 * 24 * 60 * 60 * 1000;
-    return cards.filter((c) => !progressoPronto(c) && new Date(c.movedAt).getTime() < limite && c.drillsDone === 0 && c.reviewsDone === 0);
-  }, [cards]);
-  const comFaltas = useMemo(() => cards.filter((c) => c.eventosAusente >= 2), [cards]);
-
-  async function moverProximaFase(card: PlayerCard) {
-    const idx = fases.findIndex((f) => f.id === card.phaseId);
-    const proxima = fases[idx + 1];
-    if (!proxima) return;
-    try {
-      await movePlayerCard(card.playerId, proxima.id);
-      await carregar();
-    } catch (e) {
-      onErro(traduzErroFunil(e));
-    }
-  }
-
   async function criarFasesPadrao() {
     setCriandoFases(true);
     try {
@@ -247,17 +222,6 @@ export function TabKanban({
 
   return (
     <div className="space-y-4">
-      <AssistenteResumo
-        prontos={prontos}
-        estagnados={estagnados}
-        comFaltas={comFaltas}
-        alertas={alertas}
-        porNome={porNome}
-        fases={fases}
-        onMoverProximaFase={moverProximaFase}
-        onAbrirCard={setCardAberto}
-      />
-
       <div className="flex flex-wrap items-center gap-2">
         {backHref && (
           <Link
@@ -419,15 +383,13 @@ export function TabKanban({
                         onKeyDown={(e) => {
                           if (e.key === "Enter" || e.key === " ") { e.preventDefault(); setCardAberto(card); }
                         }}
-                        className="block w-full cursor-grab rounded-xl border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/30 active:cursor-grabbing"
+                        className="flex h-[228px] w-full cursor-grab flex-col overflow-hidden rounded-xl border border-hairline bg-surface p-3 text-left transition-colors hover:border-ink/30 active:cursor-grabbing"
                       >
-                        {labels.length > 0 && (
-                          <div className="mb-1.5 flex flex-wrap gap-1">
-                            {labels.map((l) => (
-                              <Chip key={l.id} color={l.color} size="sm">{l.name}</Chip>
-                            ))}
-                          </div>
-                        )}
+                        <div className="mb-1.5 flex max-h-[20px] flex-wrap gap-1 overflow-hidden">
+                          {labels.map((l) => (
+                            <Chip key={l.id} color={l.color} size="sm">{l.name}</Chip>
+                          ))}
+                        </div>
 
                         <div className="flex items-center gap-2">
                           <Avatar id={j?.avatarId ?? 1} url={j?.avatarUrl} size={26} />
@@ -440,33 +402,35 @@ export function TabKanban({
                           <BarraProgresso label="Reviews" done={card.reviewsDone} target={card.reviewsTarget} />
                         </div>
 
-                        {card.statMetric && (
-                          <p className="mt-1.5 text-[11px] text-muted">
-                            {STAT_METRIC_LABEL[card.statMetric]}: {card.statValue ?? "—"}%
-                            {card.statTarget != null && ` (meta ${card.statTarget}%)`}
-                          </p>
-                        )}
+                        <div className="mt-1.5 flex-1 space-y-1 overflow-hidden">
+                          {card.statMetric && (
+                            <p className="text-[11px] text-muted">
+                              {STAT_METRIC_LABEL[card.statMetric]}: {card.statValue ?? "—"}%
+                              {card.statTarget != null && ` (meta ${card.statTarget}%)`}
+                            </p>
+                          )}
 
-                        {card.eventosTotal > 0 && (
-                          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted">
-                            <CalendarCheck size={11} />
-                            {card.eventosPresente}/{card.eventosTotal} presenças
-                            {card.eventosAusente >= 2 && <AlertTriangle size={11} className="text-negative" />}
-                          </p>
-                        )}
+                          {card.eventosTotal > 0 && (
+                            <p className="flex items-center gap-1 text-[11px] text-muted">
+                              <CalendarCheck size={11} />
+                              {card.eventosPresente}/{card.eventosTotal} presenças
+                              {card.eventosAusente >= 2 && <AlertTriangle size={11} className="text-negative" />}
+                            </p>
+                          )}
 
-                        {chk && chk.total > 0 && (
-                          <p className="mt-1 flex items-center gap-1 text-[11px] text-muted">
-                            <ListChecks size={11} />
-                            {chk.done}/{chk.total}
-                          </p>
-                        )}
+                          {chk && chk.total > 0 && (
+                            <p className="flex items-center gap-1 text-[11px] text-muted">
+                              <ListChecks size={11} />
+                              {chk.done}/{chk.total}
+                            </p>
+                          )}
+                        </div>
 
                         {/* Mover de fase por toque — drag-and-drop e' so' mouse
                             (HTML5 drag nao funciona em touch), essas setas
                             sao o caminho equivalente pra celular/tablet. */}
                         {(faseAnterior || faseSeguinte) && (
-                          <div className="mt-2 flex items-center justify-between border-t border-hairline pt-2">
+                          <div className="mt-2 flex shrink-0 items-center justify-between border-t border-hairline pt-2">
                             <button
                               type="button"
                               disabled={!faseAnterior}
@@ -546,232 +510,6 @@ export function TabKanban({
         />
       )}
     </div>
-  );
-}
-
-const ALERTA_ICON: Record<string, typeof AlertTriangle> = {
-  faltas_consecutivas: CalendarCheck,
-  rsvp_sem_resposta: MessageCircleWarning,
-  inatividade: Clock,
-  queda_frequencia: AlertTriangle,
-  sem_revisao: AlertTriangle,
-  mao_sem_resposta: MessageCircleWarning,
-  lembrete_estudo: Clock,
-};
-
-// Memoria de "ja vi isso" do Assistente — guardada no navegador (nao no
-// banco: e' so' preferencia de leitura, nao precisa sincronizar entre
-// dispositivos). Cada item some assim que o coach clica nele (via
-// dismiss()) ou sozinho depois de 24h do primeiro aparecimento, o que
-// vier primeiro — libera espaco pros proximos itens da fila em vez de
-// empilhar aviso velho pra sempre.
-const ASSISTENTE_MEMORIA_KEY = "ps_funil_assistente_memoria";
-const ASSISTENTE_EXPIRA_MS = 24 * 60 * 60 * 1000;
-
-function useAssistenteMemoria() {
-  const [memoria, setMemoria] = useState<Record<string, { primeiraVezEm: number; dispensadoEm?: number }>>({});
-
-  useEffect(() => {
-    try {
-      setMemoria(JSON.parse(localStorage.getItem(ASSISTENTE_MEMORIA_KEY) ?? "{}"));
-    } catch {
-      setMemoria({});
-    }
-  }, []);
-
-  function persistir(next: typeof memoria) {
-    setMemoria(next);
-    try {
-      localStorage.setItem(ASSISTENTE_MEMORIA_KEY, JSON.stringify(next));
-    } catch {
-      // localStorage indisponivel (modo privado etc.) — degrada pra "sempre visivel", sem quebrar a tela.
-    }
-  }
-
-  // Registra o primeiro aparecimento das chaves que ainda nao tem
-  // memoria — chamado com a lista completa (antes do filtro) toda vez
-  // que os dados recarregam.
-  function registrarVistas(chaves: string[]) {
-    let mudou = false;
-    const next = { ...memoria };
-    for (const k of chaves) {
-      if (!next[k]) {
-        next[k] = { primeiraVezEm: Date.now() };
-        mudou = true;
-      }
-    }
-    if (mudou) persistir(next);
-  }
-
-  function dispensar(chave: string) {
-    persistir({ ...memoria, [chave]: { primeiraVezEm: memoria[chave]?.primeiraVezEm ?? Date.now(), dispensadoEm: Date.now() } });
-  }
-
-  function visivel(chave: string): boolean {
-    const m = memoria[chave];
-    if (!m) return true;
-    if (m.dispensadoEm) return false;
-    return Date.now() - m.primeiraVezEm < ASSISTENTE_EXPIRA_MS;
-  }
-
-  return { registrarVistas, dispensar, visivel };
-}
-
-// Resumo do coach: o que precisa de decisao agora. So aparece o que
-// existe (secoes vazias somem) — nada de placeholder vazio ocupando
-// espaco em tela pequena.
-function AssistenteResumo({
-  prontos,
-  estagnados,
-  comFaltas,
-  alertas,
-  porNome,
-  fases,
-  onMoverProximaFase,
-  onAbrirCard,
-}: {
-  prontos: PlayerCard[];
-  estagnados: PlayerCard[];
-  comFaltas: PlayerCard[];
-  alertas: TeamAlert[];
-  porNome: Map<string, TeamDashboardRow>;
-  fases: FunnelPhase[];
-  onMoverProximaFase: (card: PlayerCard) => void;
-  onAbrirCard: (card: PlayerCard) => void;
-}) {
-  const [aberto, setAberto] = useState(false);
-  const { registrarVistas, dispensar, visivel } = useAssistenteMemoria();
-
-  useEffect(() => {
-    registrarVistas([
-      ...prontos.map((c) => `pronto:${c.cardId}`),
-      ...comFaltas.map((c) => `falta:${c.cardId}`),
-      ...estagnados.map((c) => `estagnado:${c.cardId}`),
-      ...alertas.map((a) => `alerta:${a.id}`),
-    ]);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [prontos, comFaltas, estagnados, alertas]);
-
-  const prontosVisiveis = prontos.filter((c) => visivel(`pronto:${c.cardId}`));
-  const comFaltasVisiveis = comFaltas.filter((c) => visivel(`falta:${c.cardId}`));
-  const estagnadosVisiveis = estagnados.filter((c) => visivel(`estagnado:${c.cardId}`));
-  const alertasVisiveis = alertas.filter((a) => visivel(`alerta:${a.id}`)).slice(0, 6);
-
-  const total = prontosVisiveis.length + estagnadosVisiveis.length + comFaltasVisiveis.length + alertasVisiveis.length;
-  if (total === 0) return null;
-
-  return (
-    <section className="rounded-xl border border-hairline bg-surface p-5">
-      <button
-        onClick={() => setAberto((v) => !v)}
-        className="flex w-full items-center gap-2 text-left text-[15px] font-semibold"
-      >
-        <Sparkles size={16} />
-        Assistente do coach
-        <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{total}</span>
-        <ChevronDown size={16} className={`ml-auto text-muted transition-transform ${aberto ? "rotate-180" : ""}`} />
-      </button>
-
-      {aberto && (
-      <div className="mt-3 grid gap-3 sm:grid-cols-2">
-        {prontosVisiveis.length > 0 && (
-          <div className="rounded-lg border border-positive/30 bg-positive/5 p-3">
-            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-positive">
-              <CheckCircle2 size={13} /> Prontos pra subir de fase
-            </p>
-            <ul className="mt-2 space-y-1.5">
-              {prontosVisiveis.map((c) => {
-                const j = porNome.get(c.playerId);
-                const idx = fases.findIndex((f) => f.id === c.phaseId);
-                const proxima = fases[idx + 1];
-                return (
-                  <li key={c.cardId} className="flex items-center justify-between gap-2 text-[13px]">
-                    <button onClick={() => { dispensar(`pronto:${c.cardId}`); onAbrirCard(c); }} className="min-w-0 truncate text-left hover:underline">{j?.nome ?? "Jogador"}</button>
-                    {proxima && (
-                      <button onClick={() => { dispensar(`pronto:${c.cardId}`); onMoverProximaFase(c); }}
-                        className="flex shrink-0 items-center gap-1 rounded-full border border-positive/40 px-2 py-0.5 text-[11px] text-positive transition-colors hover:bg-positive/10">
-                        {proxima.name} <ArrowRight size={11} />
-                      </button>
-                    )}
-                    <button onClick={() => dispensar(`pronto:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
-                      <X size={12} />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        {comFaltasVisiveis.length > 0 && (
-          <div className="rounded-lg border border-negative/30 bg-negative/5 p-3">
-            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-negative">
-              <AlertTriangle size={13} /> Faltando às reuniões
-            </p>
-            <ul className="mt-2 space-y-1.5">
-              {comFaltasVisiveis.map((c) => {
-                const j = porNome.get(c.playerId);
-                return (
-                  <li key={c.cardId} className="flex items-center justify-between gap-2">
-                    <button onClick={() => { dispensar(`falta:${c.cardId}`); onAbrirCard(c); }} className="min-w-0 truncate text-left text-[13px] hover:underline">
-                      {j?.nome ?? "Jogador"} <span className="text-muted">· {c.eventosAusente} faltas</span>
-                    </button>
-                    <button onClick={() => dispensar(`falta:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
-                      <X size={12} />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        {estagnadosVisiveis.length > 0 && (
-          <div className="rounded-lg border border-evolution/30 bg-evolution/5 p-3">
-            <p className="flex items-center gap-1.5 text-[12px] font-semibold text-evolution">
-              <Clock size={13} /> Sem progresso há 14+ dias na fase
-            </p>
-            <ul className="mt-2 space-y-1.5">
-              {estagnadosVisiveis.map((c) => {
-                const j = porNome.get(c.playerId);
-                return (
-                  <li key={c.cardId} className="flex items-center justify-between gap-2">
-                    <button onClick={() => { dispensar(`estagnado:${c.cardId}`); onAbrirCard(c); }} className="min-w-0 truncate text-left text-[13px] hover:underline">{j?.nome ?? "Jogador"}</button>
-                    <button onClick={() => dispensar(`estagnado:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
-                      <X size={12} />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-
-        {alertasVisiveis.length > 0 && (
-          <div className="rounded-lg border border-hairline bg-elevated p-3">
-            <p className="text-[12px] font-semibold text-muted">Últimos alertas do sistema</p>
-            <ul className="mt-2 space-y-1.5">
-              {alertasVisiveis.map((a) => {
-                const j = porNome.get(a.playerId);
-                const Icon = ALERTA_ICON[a.kind] ?? AlertTriangle;
-                return (
-                  <li key={a.id} className="flex items-start justify-between gap-1.5">
-                    <span className="flex min-w-0 items-start gap-1.5 text-[12px] text-muted">
-                      <Icon size={12} className="mt-0.5 shrink-0" />
-                      <span><strong className="text-ink/80">{j?.nome ?? "Jogador"}</strong> · {ALERTA_LABEL[a.kind]}</span>
-                    </span>
-                    <button onClick={() => dispensar(`alerta:${a.id}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
-                      <X size={12} />
-                    </button>
-                  </li>
-                );
-              })}
-            </ul>
-          </div>
-        )}
-      </div>
-      )}
-    </section>
   );
 }
 

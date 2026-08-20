@@ -319,7 +319,7 @@ function CalendarioMensal({
         ))}
       </div>
 
-      <div className="mt-1 grid grid-cols-7 gap-1">
+      <div className="mt-1 grid grid-cols-7 gap-1.5">
         {celulas.map((d, i) => {
           if (!d) return <div key={i} />;
           const key = d.toDateString();
@@ -330,18 +330,26 @@ function CalendarioMensal({
             <button
               key={i}
               onClick={() => onSelecionarDia(selecionado ? null : key)}
-              className={`flex aspect-square flex-col items-center justify-center gap-0.5 rounded-lg text-[12px] transition-colors ${
+              className={`relative flex h-11 items-center justify-center rounded-lg border text-[12px] transition-colors sm:h-14 ${
                 selecionado
-                  ? "bg-ink text-void"
+                  ? "border-ink bg-ink text-void"
                   : hoje
-                  ? "border border-ink/40 text-ink"
+                  ? "border-ink/50 text-ink"
                   : n > 0
-                  ? "text-ink hover:bg-elevated"
-                  : "text-muted/70 hover:bg-elevated"
+                  ? "border-hairline text-ink hover:border-ink/40 hover:bg-elevated"
+                  : "border-hairline/40 text-muted hover:border-hairline hover:bg-elevated"
               }`}
             >
               <span className="tnum">{d.getDate()}</span>
-              {n > 0 && <span className={`h-1 w-1 rounded-full ${selecionado ? "bg-void" : "bg-training"}`} />}
+              {n > 0 && (
+                <span
+                  className={`absolute -top-1.5 -right-1.5 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[9px] font-bold ${
+                    selecionado ? "bg-void text-ink" : "bg-training text-void"
+                  }`}
+                >
+                  {n}
+                </span>
+              )}
             </button>
           );
         })}
@@ -350,7 +358,7 @@ function CalendarioMensal({
   );
 }
 
-function ModalNovoEvento({
+export function ModalNovoEvento({
   teamId,
   jogadores,
   meuUserId,

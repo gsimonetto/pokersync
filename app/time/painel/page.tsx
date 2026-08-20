@@ -269,8 +269,8 @@ function PainelConteudo() {
               <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
                 onAbrirFunil={() => router.push("/time/painel/funil")} />
             )}
-            {aba === "jogadores" && (
-              <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
+            {aba === "jogadores" && time && (
+              <TabJogadores teamId={time.team.id} jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
                 podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
                 leaks={leaks} dias={dias} onAtribuido={carregar}
                 onChange={carregar} onErro={setErro} />
