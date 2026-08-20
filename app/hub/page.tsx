@@ -6,13 +6,15 @@ import type { LucideIcon } from "lucide-react";
 import {
   ArrowLeft, Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
-  Clock, Spade, BookOpen, HelpCircle, Scale, Medal,
+  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Users, Bell,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
   fetchLeaderboardPeriod, fetchMyLeaderboardRank, xpForNextLevel, levelColor, MAX_LEVEL,
   type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank,
 } from "@/lib/services/xp-service";
+import { fetchMyMembership, type MyMembership } from "@/lib/services/team-service";
+import { fetchNotifications, markAsRead, type Notification } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
 
 const ACCENT = "#E0B24C";
@@ -85,6 +87,18 @@ export default function HubPage() {
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [myRank, setMyRank] = useState<MyRank | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
+
+  // Time e notificacoes recentes -- o Hub deveria ser o centro que
+  // conecta os modulos, nao so uma lista de numeros. Nao bloqueiam o
+  // carregamento principal nem quebram a tela se falharem (usuario sem
+  // time e' o caso normal, nao um erro).
+  const [membership, setMembership] = useState<MyMembership | null>(null);
+  const [recentNotifs, setRecentNotifs] = useState<Notification[]>([]);
+
+  useEffect(() => {
+    fetchMyMembership().then(setMembership).catch(() => {});
+    fetchNotifications(5).then(setRecentNotifs).catch(() => {});
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -277,9 +291,21 @@ export default function HubPage() {
             {/* Nome de patente em ingles (Micro Stakes I etc) removido
                 (pedido explicito) — so o numero do nivel, sem rotulo por
                 baixo. Cor do nivel muda a cada 10 (pedido explicito). */}
-            <p className="text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
-              Nível {level}
-              {isMaxLevel && <span className="ml-1.5" style={{ color: badgeColor }}>· MÁXIMO</span>}
+            <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
+              <span>
+                Nível {level}
+                <span className="text-muted/70">/{MAX_LEVEL}</span>
+              </span>
+              {isMaxLevel && <span style={{ color: badgeColor }}>· MÁXIMO</span>}
+              {progress.prestige_count > 0 && (
+                <span
+                  className="flex items-center gap-0.5 rounded-full px-1.5 py-0.5 text-[10px]"
+                  style={{ color: "#F5D48C", background: "#F5D48C22" }}
+                  title={`Prestígio ${progress.prestige_count}x — já chegou no nível máximo e recomeçou`}
+                >
+                  <Star size={10} fill="#F5D48C" /> {progress.prestige_count}
+                </span>
+              )}
             </p>
             <div className="mt-3">
               <div className="relative h-2 overflow-hidden rounded-full border border-hairline bg-white/5">
@@ -313,6 +339,63 @@ export default function HubPage() {
           <MiniStat icon={Target} label="Combo GTO" value={String(progress.combo_gto)} />
           <MiniStat icon={Trophy} label="Recorde streak" value={String(progress.streak_best)} />
         </div>
+      </div>
+
+      {/* Hub como centro de verdade, nao so lista de numeros: acesso
+          rapido ao time (se tiver um) e as ultimas notificacoes, que
+          antes so viviam escondidas no sininho do menu. */}
+      <div className="mt-5 grid grid-cols-1 gap-3.5 lg:grid-cols-3">
+        <section className="rounded-xl border border-hairline bg-surface p-4 lg:col-span-2">
+          <div className="flex items-center justify-between">
+            <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
+              <Bell size={13} /> Notificações recentes
+            </h2>
+            <Link href="/notificacoes" className="text-[11px] font-semibold text-muted transition-colors hover:text-ink">
+              Ver todas
+            </Link>
+          </div>
+          {recentNotifs.length === 0 ? (
+            <p className="mt-3 text-xs text-muted">Nenhuma notificação ainda.</p>
+          ) : (
+            <div className="mt-2.5 flex flex-col gap-1">
+              {recentNotifs.map((n) => (
+                <Link
+                  key={n.id}
+                  href={n.action_url || "/notificacoes"}
+                  onClick={() => {
+                    if (!n.read) markAsRead(n.id).catch(() => {});
+                  }}
+                  className={`flex items-start gap-2 rounded-lg px-2.5 py-2 text-[12.5px] transition-colors hover:bg-elevated ${
+                    !n.read ? "bg-white/[0.03]" : ""
+                  }`}
+                >
+                  {!n.read && <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full" style={{ background: ACCENT }} />}
+                  <span className={`min-w-0 flex-1 truncate ${n.read ? "text-muted" : "text-ink"}`}>
+                    <span className="font-semibold">{n.title}</span>
+                    {n.body ? ` — ${n.body}` : ""}
+                  </span>
+                </Link>
+              ))}
+            </div>
+          )}
+        </section>
+
+        <Link
+          href="/time"
+          className="flex flex-col justify-center rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-review/40 hover:bg-elevated"
+        >
+          <h2 className="flex items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.12em] text-muted">
+            <Users size={13} /> Seu time
+          </h2>
+          {membership ? (
+            <>
+              <p className="mt-1.5 truncate text-sm font-semibold text-ink">{membership.teamName}</p>
+              <p className="text-[11px] text-muted capitalize">{membership.role}</p>
+            </>
+          ) : (
+            <p className="mt-1.5 text-xs text-muted">Você ainda não faz parte de um time.</p>
+          )}
+        </Link>
       </div>
 
       {showingCatalog && (
