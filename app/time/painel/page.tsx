@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { Chip } from "@/components/chip";
 import { PrintButton } from "@/components/period-selector";
 import { TeamBanner } from "@/components/time/team-banner";
 import {
@@ -189,6 +190,16 @@ function PainelConteudo() {
 
         {info && (
           <div className="mb-6">
+            {coaches.length > 0 && (
+              <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 print:hidden">
+                <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
+                  Coach{coaches.length > 1 ? "es" : ""}
+                </span>
+                {coaches.map((c) => (
+                  <Chip key={c.userId} color={info.accent} size="sm">{c.nome}</Chip>
+                ))}
+              </div>
+            )}
             <TeamBanner
               name={info.name}
               description={info.description}

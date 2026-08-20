@@ -5,6 +5,7 @@ import { createClient } from "@/lib/supabase/client";
 import Link from "next/link";
 import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Chip } from "@/components/chip";
 import {
   assignCoach,
   assignTeamDrill,
@@ -139,13 +140,13 @@ export function TabJogadores({
 
       {labels.length > 0 && (
         <div className="mt-3 flex flex-wrap gap-1.5 print:hidden">
-          <Chip ativo={filtroLabel === "todas"} onClick={() => setFiltroLabel("todas")}>Todas</Chip>
+          <FiltroChip ativo={filtroLabel === "todas"} onClick={() => setFiltroLabel("todas")}>Todas</FiltroChip>
           {labels.map((l) => (
-            <Chip key={l.id} ativo={filtroLabel === l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
+            <FiltroChip key={l.id} ativo={filtroLabel === l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
               {l.name}
-            </Chip>
+            </FiltroChip>
           ))}
-          <Chip ativo={filtroLabel === "sem"} onClick={() => setFiltroLabel("sem")}>Sem etiqueta</Chip>
+          <FiltroChip ativo={filtroLabel === "sem"} onClick={() => setFiltroLabel("sem")}>Sem etiqueta</FiltroChip>
         </div>
       )}
 
@@ -182,13 +183,8 @@ export function TabJogadores({
                       <span className="shrink-0 rounded-md bg-elevated px-1.5 py-px text-[10px] font-bold tracking-wide text-muted">
                         NÍVEL {j.level ?? 1}
                       </span>
-                      {j.labelName && (
-                        <span
-                          className="shrink-0 rounded-full px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                          style={{ backgroundColor: `${j.labelColor}22`, color: j.labelColor ?? undefined, border: `1px solid ${j.labelColor}55` }}
-                        >
-                          {j.labelName}
-                        </span>
+                      {j.labelName && j.labelColor && (
+                        <Chip color={j.labelColor} size="sm">{j.labelName}</Chip>
                       )}
                       {j.streakDays ? (
                         <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-evolution">
@@ -602,7 +598,7 @@ function Metrica({ label, valor, tom, largo }: { label: string; valor: string; t
   );
 }
 
-function Chip({ children, ativo, cor, onClick }: { children: React.ReactNode; ativo: boolean; cor?: string; onClick: () => void }) {
+function FiltroChip({ children, ativo, cor, onClick }: { children: React.ReactNode; ativo: boolean; cor?: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
@@ -622,11 +618,11 @@ function Chip({ children, ativo, cor, onClick }: { children: React.ReactNode; at
 // pra quem precisa de treino). Recolhivel e fechado por padrao, igual
 // o Assistente do Kanban, pra nao competir com a lista logo abaixo.
 // ------------------------------------------------------------
-function severidade(indice: number, total: number): { label: string; cor: string; bg: string } {
+function severidade(indice: number, total: number): { label: string; cor: string } {
   const pct = total <= 1 ? 0 : indice / (total - 1);
-  if (pct <= 0.33) return { label: "Alta", cor: "#F26D6D", bg: "rgba(242,109,109,0.14)" };
-  if (pct <= 0.66) return { label: "Média", cor: "#F2B84C", bg: "rgba(242,184,76,0.14)" };
-  return { label: "Baixa", cor: "#8b8b8b", bg: "rgba(139,139,139,0.14)" };
+  if (pct <= 0.33) return { label: "Alta", cor: "#F26D6D" };
+  if (pct <= 0.66) return { label: "Média", cor: "#F2B84C" };
+  return { label: "Baixa", cor: "#8b8b8b" };
 }
 
 function LeaksSection({ leaks, dias, onAtribuido }: { leaks: TeamLeak[]; dias: number; onAtribuido: () => void }) {
@@ -674,12 +670,7 @@ function LeaksSection({ leaks, dias, onAtribuido }: { leaks: TeamLeak[]; dias: n
             const sev = severidade(i, leaks.length);
             return (
               <li key={chave} className="flex items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-                <span
-                  className="shrink-0 rounded-md px-2 py-1 text-center text-[10px] font-bold uppercase tracking-wider"
-                  style={{ color: sev.cor, backgroundColor: sev.bg }}
-                >
-                  {sev.label}
-                </span>
+                <Chip color={sev.cor} size="sm" className="shrink-0">{sev.label}</Chip>
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-1.5">

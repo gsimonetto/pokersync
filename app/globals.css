@@ -67,6 +67,20 @@ body {
   font-variant-numeric: tabular-nums;
 }
 
+/* "Respiracao" leve no brilho decorativo do banner do time — deixa a
+   tela de entrada menos estatica sem virar distracao (ciclo longo,
+   variacao pequena de opacidade). */
+@keyframes glow-breathe {
+  0%, 100% { opacity: 0.55; transform: scale(1); }
+  50% { opacity: 0.85; transform: scale(1.06); }
+}
+.glow-breathe {
+  animation: glow-breathe 5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .glow-breathe { animation: none; }
+}
+
 /* Utilitarios de acento: a cor vem da custom property --acc definida
    inline no elemento. Espelha exatamente o design de referencia (v0). */
 .acc-card {

@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { AppHeader } from "@/components/app-header";
+import { Chip } from "@/components/chip";
 import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { MetasCard } from "@/components/time/metas-card";
@@ -319,15 +320,9 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
               <ul className="mt-3 space-y-2">
                 {alertas.map((a) => (
                   <li key={a.id} className="flex flex-wrap items-center gap-2 text-[13px]">
-                    <span
-                      className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
-                        a.kind === "lembrete_estudo"
-                          ? "border-hairline text-muted"
-                          : "border-evolution/50 text-evolution"
-                      }`}
-                    >
+                    <Chip color={a.kind === "lembrete_estudo" ? "#8b8b8b" : "#F59E0B"} size="sm">
                       {ALERTA_LABEL[a.kind]}
-                    </span>
+                    </Chip>
                     <span className="min-w-0 flex-1 text-ink/85">{a.detail}</span>
                     <span className="text-xs text-muted">
                       {new Date(a.createdAt).toLocaleDateString("pt-BR")}

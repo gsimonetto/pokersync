@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AlertTriangle, ArrowRight, CalendarCheck, CalendarPlus, CheckCircle2, ChevronDown, ChevronLeft, ChevronRight, Circle, Clock, ListChecks, MessageCircleWarning, MessageSquare, Plus, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
 import {
   addCardComment,
@@ -267,13 +268,7 @@ export function TabKanban({
                         {labels.length > 0 && (
                           <div className="mb-1.5 flex flex-wrap gap-1">
                             {labels.map((l) => (
-                              <span
-                                key={l.id}
-                                className="rounded-full px-1.5 py-px text-[9.5px] font-bold uppercase tracking-wide"
-                                style={{ backgroundColor: `${l.color}22`, color: l.color, border: `1px solid ${l.color}55` }}
-                              >
-                                {l.name}
-                              </span>
+                              <Chip key={l.id} color={l.color} size="sm">{l.name}</Chip>
                             ))}
                           </div>
                         )}

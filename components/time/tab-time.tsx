@@ -3,6 +3,7 @@
 import { useRef, useState } from "react";
 import { Camera, Check, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Chip } from "@/components/chip";
 import { TeamBanner } from "@/components/time/team-banner";
 import { ACCENT } from "@/lib/modules-data";
 import {
@@ -305,9 +306,7 @@ function EtiquetasCard({
       <div className="mt-4 flex flex-wrap gap-2">
         {labels.length === 0 && <p className="text-sm text-muted">Nenhuma etiqueta criada.</p>}
         {labels.map((l) => (
-          <span key={l.id}
-            className="flex items-center gap-1.5 rounded-full px-3 py-1 text-[12px] font-semibold"
-            style={{ backgroundColor: `${l.color}22`, color: l.color }}>
+          <Chip key={l.id} color={l.color}>
             {l.name}
             {podeEditar && (
               <button
@@ -316,12 +315,12 @@ function EtiquetasCard({
                   try { await deleteLabel(l.id); onChange(); } catch (e) { onErro(traduzErroTime(e)); }
                 }}
                 aria-label={`Excluir etiqueta ${l.name}`}
-                className="opacity-60 transition-opacity hover:opacity-100"
+                className="opacity-70 transition-opacity hover:opacity-100"
               >
-                <Trash2 size={12} />
+                <Trash2 size={11} />
               </button>
             )}
-          </span>
+          </Chip>
         ))}
       </div>
 

@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
+import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
 import {
   cancelEventSeries,
@@ -132,12 +133,7 @@ export function TabCalendario({
 
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-center gap-2">
-                    <span
-                      className="rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider"
-                      style={{ backgroundColor: `${TIPO_COR[ev.eventType]}22`, color: TIPO_COR[ev.eventType] }}
-                    >
-                      {TIPO_LABEL[ev.eventType]}
-                    </span>
+                    <Chip color={TIPO_COR[ev.eventType]} size="sm">{TIPO_LABEL[ev.eventType]}</Chip>
                     {ev.recurrenceGroupId && (
                       <span className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
                         <Repeat size={10} /> semanal

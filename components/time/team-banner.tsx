@@ -51,7 +51,7 @@ export function TeamBanner({
         <>
           <div
             aria-hidden="true"
-            className="pointer-events-none absolute -right-16 -top-24 size-80 rounded-full blur-3xl"
+            className="glow-breathe pointer-events-none absolute -right-16 -top-24 size-80 rounded-full blur-3xl"
             style={{ backgroundColor: `${accent}22` }}
           />
           <div

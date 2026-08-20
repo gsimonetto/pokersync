@@ -1,4 +1,6 @@
-function Chip({ size, className }: { size: number; className?: string }) {
+import { Chip } from "@/components/chip";
+
+function AnelDecorativo({ size, className }: { size: number; className?: string }) {
   return (
     <span
       className={`absolute rounded-full border border-dashed border-white/15 ${className ?? ""}`}
@@ -42,10 +44,10 @@ export function WelcomeHero({
       />
 
       <div className="pointer-events-none absolute inset-y-0 right-0 hidden w-1/2 sm:block" aria-hidden="true">
-        <Chip size={190} className="right-6 top-1/2 -translate-y-1/2 opacity-70" />
-        <Chip size={130} className="right-40 top-6 opacity-60" />
-        <Chip size={96} className="-bottom-6 right-24 opacity-50" />
-        <Chip size={64} className="right-2 top-8 opacity-40" />
+        <AnelDecorativo size={190} className="right-6 top-1/2 -translate-y-1/2 opacity-70" />
+        <AnelDecorativo size={130} className="right-40 top-6 opacity-60" />
+        <AnelDecorativo size={96} className="-bottom-6 right-24 opacity-50" />
+        <AnelDecorativo size={64} className="right-2 top-8 opacity-40" />
       </div>
 
       <div className="relative">
@@ -59,34 +61,11 @@ export function WelcomeHero({
           {name}
         </h1>
 
-        {/* Plano e time: chips empilhados abaixo do apelido, mesmo tratamento visual
-            (borda + brilho na cor), com hover para dar feedback de interacao. */}
+        {/* Plano e time: chips empilhados abaixo do apelido — padrao Chip
+            do PokerSync (components/chip.tsx), nascido aqui. */}
         <div className="mt-2.5 flex flex-col items-start gap-1.5">
-          <span
-            className="inline-flex cursor-default items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition duration-200 hover:scale-[1.04] hover:brightness-125"
-            style={{
-              color: planStyle.color,
-              borderColor: `${planStyle.color}55`,
-              background: `${planStyle.color}1A`,
-              boxShadow: `0 0 10px ${planStyle.color}80, 0 0 2px ${planStyle.color}`,
-            }}
-          >
-            {planStyle.label}
-          </span>
-
-          {team && (
-            <span
-              className="inline-flex cursor-default items-center rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide transition duration-200 hover:scale-[1.04] hover:brightness-125"
-              style={{
-                color: team.accent,
-                borderColor: `${team.accent}55`,
-                background: `${team.accent}1A`,
-                boxShadow: `0 0 10px ${team.accent}80, 0 0 2px ${team.accent}`,
-              }}
-            >
-              {team.name}
-            </span>
-          )}
+          <Chip color={planStyle.color}>{planStyle.label}</Chip>
+          {team && <Chip color={team.accent}>{team.name}</Chip>}
         </div>
       </div>
     </section>
