@@ -8,6 +8,7 @@ import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange,
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
+import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
 import {
   fetchSessions,
   fetchSettings,
@@ -249,6 +250,18 @@ export default function BankrollPage() {
     );
   }, [platformSessions, historySearch]);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
+
+  // Quantas maos foram revisadas por sessao -- antes o vinculo so existia
+  // no sentido revisor->banca (session_id gravado na mao), a banca nunca
+  // mostrava nada de volta. So busca pras sessoes realmente visiveis na
+  // lista (nao a banca toda).
+  const [reviewCounts, setReviewCounts] = useState<Record<string, number>>({});
+  const visibleSessionIds = (historyOpen ? historyFiltered : recent).map((s) => s.id).join(",");
+  useEffect(() => {
+    const ids = visibleSessionIds ? visibleSessionIds.split(",") : [];
+    if (ids.length === 0) return;
+    fetchReviewCountsBySessionIds(ids).then(setReviewCounts).catch(() => {});
+  }, [visibleSessionIds]);
 
   const featuredTip = useFeaturedCoachTip(tips);
 
@@ -1259,11 +1272,23 @@ export default function BankrollPage() {
                   className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-all duration-200 first:border-t-0 hover:translate-x-1 hover:bg-elevated"
                   >
                     <div className="min-w-0 flex-1">
-                      <p className="truncate text-sm font-semibold">
-                        {s.format} · {s.date}
-                        {s.stake ? ` · ${s.stake}` : ""}
-                        {s.mood ? ` · ${s.mood}` : ""}
-                        {s.ownPct != null && s.ownPct < 100 ? ` · ${s.ownPct}% sua` : ""}
+                      <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                        <span className="truncate">
+                          {s.format} · {s.date}
+                          {s.stake ? ` · ${s.stake}` : ""}
+                          {s.mood ? ` · ${s.mood}` : ""}
+                          {s.ownPct != null && s.ownPct < 100 ? ` · ${s.ownPct}% sua` : ""}
+                        </span>
+                        {reviewCounts[s.id] > 0 && (
+                          <Link
+                            href="/revisor"
+                            onClick={(e) => e.stopPropagation()}
+                            title={`${reviewCounts[s.id]} mão(s) revisada(s) desta sessão`}
+                            className="flex shrink-0 items-center gap-0.5 rounded border border-review/30 bg-review/[0.12] px-1 py-0.5 text-[10px] font-semibold text-review"
+                          >
+                            <BookOpen size={9} /> {reviewCounts[s.id]}
+                          </Link>
+                        )}
                       </p>
                       <p className="truncate text-xs text-muted">
                         {s.venue || "—"}

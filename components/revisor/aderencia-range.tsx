@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { parseSession, HandParseError } from "@/lib/poker/hand-parser";
+import { parseSession, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { listRanges, getRange, type RangeListItem } from "@/lib/services/range-service";
-import { analyzeSessionAdherence, type AdherenceResult } from "@/lib/poker/range-adherence";
+import { analyzeSessionAdherence, type AdherenceResult, type AdherenceRow } from "@/lib/poker/range-adherence";
 import { verdictColor } from "@/lib/poker/gto-verdict";
 import {
   logAdherenceRun,
@@ -11,6 +11,9 @@ import {
   type AdherenceRunPoint,
 } from "@/lib/services/range-adherence-history-service";
 import { AdherenceHistoryChart } from "@/components/revisor/adherence-history-chart";
+import { createReview } from "@/lib/services/hand-review-service";
+import { createClient } from "@/lib/supabase/client";
+import { Send, Check } from "lucide-react";
 
 const POSITIONS = ["UTG", "UTG+1", "MP", "HJ", "CO", "BTN", "SB", "BB"];
 
@@ -28,6 +31,14 @@ export function AderenciaRange() {
 
   const [history, setHistory] = useState<AdherenceRunPoint[]>([]);
   const [historyLoading, setHistoryLoading] = useState(false);
+
+  // Maos marcadas aqui viravam beco sem saida -- so' um link generico
+  // pro treino, nunca entravam na fila de verdade do Revisor (hand_reviews)
+  // nem no sistema de leaks/drills. Guarda as maos parseadas pra poder
+  // criar uma revisao de verdade a partir de uma linha marcada.
+  const [parsedHands, setParsedHands] = useState<ParsedHand[]>([]);
+  const [sentHandIds, setSentHandIds] = useState<Set<string>>(new Set());
+  const [sendingHandId, setSendingHandId] = useState<string | null>(null);
 
   useEffect(() => {
     listRanges()
@@ -73,6 +84,8 @@ export function AderenciaRange() {
       const range = await getRange(rangeId);
       const analysis = analyzeSessionAdherence(hands, range.hands, position);
       setResult(analysis);
+      setParsedHands(hands);
+      setSentHandIds(new Set());
 
       if (analysis.comparable > 0) {
         const accuracyPct = Math.round(((analysis.comparable - analysis.flagged) / analysis.comparable) * 100);
@@ -101,6 +114,33 @@ export function AderenciaRange() {
   }
 
   const visibleRows = result ? (onlyFlagged ? result.rows.filter((r) => r.flagged) : result.rows) : [];
+
+  async function handleSendToReview(row: AdherenceRow) {
+    if (!row.handId) return;
+    const hand = parsedHands.find((h) => h.handId === row.handId);
+    if (!hand) return;
+    setSendingHandId(row.handId);
+    try {
+      const supabase = createClient();
+      const { data } = await supabase.auth.getUser();
+      const uid = data.user?.id;
+      if (!uid) throw new Error("NO_SESSION");
+      const title = [hand.format, hand.stakes, hand.heroPosition, `desvio de ${ranges.find((r) => r.id === rangeId)?.name}`]
+        .filter(Boolean)
+        .join(" · ");
+      await createReview(uid, {
+        title,
+        handHistory: hand.rawText,
+        parsedData: { kind: "parsed", ...hand },
+        source: "import",
+      });
+      setSentHandIds((prev) => new Set(prev).add(row.handId!));
+    } catch {
+      setError("Não foi possível enviar essa mão pra revisão.");
+    } finally {
+      setSendingHandId(null);
+    }
+  }
 
   return (
     <div>
@@ -205,21 +245,40 @@ export function AderenciaRange() {
                       <th className="px-3 py-2 text-left">Ação do hero</th>
                       <th className="px-3 py-2 text-left">Range (F/C/R)</th>
                       <th className="px-3 py-2 text-left">Veredito</th>
+                      <th className="px-3 py-2 text-left">Revisão</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {visibleRows.map((row, i) => (
-                      <tr key={`${row.handId}-${i}`} className="border-b border-hairline last:border-0">
-                        <td className="px-3 py-2 font-medium">{row.label}</td>
-                        <td className="px-3 py-2 text-muted">{ACTION_LABEL[row.heroAction]}</td>
-                        <td className="px-3 py-2 text-muted">
-                          {row.decision.fold}/{row.decision.call}/{row.decision.raise}
-                        </td>
-                        <td className="px-3 py-2 font-medium" style={{ color: verdictColor(row.verdict) }}>
-                          {row.verdict.replace("_", " ")}
-                        </td>
-                      </tr>
-                    ))}
+                    {visibleRows.map((row, i) => {
+                      const sent = row.handId != null && sentHandIds.has(row.handId);
+                      const canSend = row.flagged && row.handId != null && parsedHands.some((h) => h.handId === row.handId);
+                      return (
+                        <tr key={`${row.handId}-${i}`} className="border-b border-hairline last:border-0">
+                          <td className="px-3 py-2 font-medium">{row.label}</td>
+                          <td className="px-3 py-2 text-muted">{ACTION_LABEL[row.heroAction]}</td>
+                          <td className="px-3 py-2 text-muted">
+                            {row.decision.fold}/{row.decision.call}/{row.decision.raise}
+                          </td>
+                          <td className="px-3 py-2 font-medium" style={{ color: verdictColor(row.verdict) }}>
+                            {row.verdict.replace("_", " ")}
+                          </td>
+                          <td className="px-3 py-2">
+                            {canSend && (
+                              <button
+                                onClick={() => handleSendToReview(row)}
+                                disabled={sent || sendingHandId === row.handId}
+                                className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-60 ${
+                                  sent ? "border-positive/40 text-positive" : "border-hairline text-ink hover:border-review/50"
+                                }`}
+                              >
+                                {sent ? <Check size={11} /> : <Send size={11} />}
+                                {sent ? "Na fila" : "Enviar pra revisão"}
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>
