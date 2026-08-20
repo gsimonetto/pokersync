@@ -2,9 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, GitBranch } from "lucide-react";
-import { listRanges, type RangeListItem } from "@/lib/services/range-service";
+import { Layers, GitBranch, Search } from "lucide-react";
+import { listRanges, type RangeHands, type RangeListItem } from "@/lib/services/range-service";
 import { listTrees, type TreeListItem } from "@/lib/services/strategy-tree-service";
+import { RangeGridPreview } from "@/components/ranges/range-grid-preview";
 
 // Temas sugeridos como atalho — aparecem mesmo com 0 itens, pra sinalizar
 // que sao categorias validas do produto (o usuario so precisa comecar a
@@ -21,7 +22,7 @@ const SUGGESTED_THEMES = [
 ];
 
 type LibraryItem =
-  | { kind: "range"; id: string; name: string; description: string | null; tags: string[] }
+  | { kind: "range"; id: string; name: string; description: string | null; tags: string[]; hands: RangeHands }
   | { kind: "tree"; id: string; name: string; description: string | null; tags: string[] };
 
 export function Biblioteca() {
@@ -31,6 +32,7 @@ export function Biblioteca() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [busca, setBusca] = useState("");
 
   useEffect(() => {
     Promise.all([listRanges(), listTrees()])
@@ -44,7 +46,7 @@ export function Biblioteca() {
 
   const items: LibraryItem[] = useMemo(
     () => [
-      ...ranges.map((r) => ({ kind: "range" as const, id: r.id, name: r.name, description: r.description, tags: r.tags })),
+      ...ranges.map((r) => ({ kind: "range" as const, id: r.id, name: r.name, description: r.description, tags: r.tags, hands: r.hands })),
       ...trees.map((t) => ({ kind: "tree" as const, id: t.id, name: t.name, description: t.description, tags: t.tags })),
     ],
     [ranges, trees]
@@ -61,7 +63,14 @@ export function Biblioteca() {
     return Array.from(counts.entries()).sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
   }, [items]);
 
-  const filtered = activeTag ? items.filter((i) => i.tags.includes(activeTag)) : items;
+  const filtered = useMemo(() => {
+    const termo = busca.trim().toLowerCase();
+    return items.filter((i) => {
+      if (activeTag && !i.tags.includes(activeTag)) return false;
+      if (termo && !i.name.toLowerCase().includes(termo)) return false;
+      return true;
+    });
+  }, [items, activeTag, busca]);
 
   function openItem(item: LibraryItem) {
     router.push(item.kind === "range" ? `/ranges/${item.id}` : `/ranges/arvores/${item.id}`);
@@ -72,6 +81,16 @@ export function Biblioteca() {
   return (
     <div>
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
+
+      <div className="relative mb-4 max-w-sm">
+        <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+        <input
+          value={busca}
+          onChange={(e) => setBusca(e.target.value)}
+          placeholder="Buscar por nome…"
+          className="w-full rounded-lg border border-hairline bg-elevated py-2 pl-8 pr-3 text-sm text-ink outline-none placeholder:text-muted/50"
+        />
+      </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
         <button
@@ -98,7 +117,9 @@ export function Biblioteca() {
       {filtered.length === 0 && (
         <div className="rounded-xl border border-hairline bg-surface p-10 text-center">
           <p className="text-sm text-muted">
-            {activeTag
+            {busca.trim()
+              ? `Nada bate com "${busca}".`
+              : activeTag
               ? `Nenhum range ou árvore com a tag "${activeTag}" ainda.`
               : "Sua biblioteca está vazia. Crie um range ou uma árvore pra começar."}
           </p>
@@ -122,8 +143,20 @@ export function Biblioteca() {
                 {item.kind === "range" ? "Range" : "Árvore"}
               </span>
             </div>
-            <h3 className="mb-1 truncate text-sm font-semibold">{item.name}</h3>
-            {item.description && <p className="mb-2 line-clamp-2 text-xs text-muted">{item.description}</p>}
+            {item.kind === "range" ? (
+              <div className="mb-1 flex gap-3">
+                <RangeGridPreview hands={item.hands} className="w-14 shrink-0" />
+                <div className="min-w-0">
+                  <h3 className="mb-1 truncate text-sm font-semibold">{item.name}</h3>
+                  {item.description && <p className="line-clamp-2 text-xs text-muted">{item.description}</p>}
+                </div>
+              </div>
+            ) : (
+              <>
+                <h3 className="mb-1 truncate text-sm font-semibold">{item.name}</h3>
+                {item.description && <p className="mb-2 line-clamp-2 text-xs text-muted">{item.description}</p>}
+              </>
+            )}
             {item.tags.length > 0 && (
               <div className="mt-2 flex flex-wrap gap-1">
                 {item.tags.map((t) => (

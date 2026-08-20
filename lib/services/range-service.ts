@@ -15,6 +15,9 @@ export interface RangeListItem {
   team_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Pra desenhar a miniatura da grade nos cards da biblioteca — o
+      select ja trazia "hands" do banco mas descartava antes de expor. */
+  hands: RangeHands;
 }
 
 export interface RangeDetail extends RangeListItem {
@@ -62,6 +65,7 @@ export async function listRanges(): Promise<RangeListItem[]> {
     team_id: r.team_id ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
+    hands: (r.hands as RangeHands) ?? {},
   }));
 }
 
@@ -285,6 +289,7 @@ export async function listTeamSharedRanges(teamId: string): Promise<TeamSharedRa
       team_id: r.team_id,
       created_at: r.created_at,
       updated_at: r.updated_at,
+      hands: (r.hands as RangeHands) ?? {},
       ownerName: profile?.apelido || profile?.nome || "Jogador",
       isMine: user?.id === r.user_id,
     };

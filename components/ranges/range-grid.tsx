@@ -1,9 +1,10 @@
 "use client";
 
-import { useCallback, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { Redo2, Undo2 } from "lucide-react";
 import { HAND_STRENGTH_RANKING } from "@/lib/poker/hand-strength-ranking";
 
-const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
+export const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 
 // Uma mao pode ser dividida entre as 3 acoes (estrategia mista, igual ao
 // que o solver ja retorna no Modo Treino). Mao ausente do mapa = fold
@@ -76,7 +77,7 @@ export function getDecision(hands: RangeHands, label: string): HandDecision {
   return hands[label] ?? EMPTY_DECISION;
 }
 
-function getHandLabel(rowIdx: number, colIdx: number): string {
+export function getHandLabel(rowIdx: number, colIdx: number): string {
   const rHigh = RANKS[rowIdx];
   const rLow = RANKS[colIdx];
   if (rowIdx === colIdx) return `${rHigh}${rLow}`;
@@ -111,7 +112,7 @@ function smartGroupCells(rowIdx: number, colIdx: number): [number, number][] {
 // Gradiente empilhado de baixo pra cima: fold (cinza) -> call (azul) ->
 // raise (verde). Fold com peso 100 fica praticamente invisivel de
 // proposito — so o que tem acao chama atencao visual.
-function cellBackground(d: HandDecision): string {
+export function cellBackground(d: HandDecision): string {
   const foldC = "#c4c7c8", callC = "#3b82f6";
   const raiseC = RAISE_TYPE_COLOR[d.raiseType ?? "raise"];
   const foldEnd = d.fold;
@@ -191,6 +192,28 @@ export function RangeGrid({
   // "apagar" (volta pro fold 100%) em vez de pintar.
   const dragMode = useRef<"paint" | "erase">("paint");
 
+  // Desfazer/refazer: cada gesto completo (uma arrastada inteira, ou um
+  // solte do slider de %) vira UM passo — nao um passo por celula — pra
+  // Ctrl+Z desfazer a pintura inteira de uma vez, do jeito que se espera
+  // de uma ferramenta de desenho.
+  const [past, setPast] = useState<RangeHands[]>([]);
+  const [future, setFuture] = useState<RangeHands[]>([]);
+
+  function undo() {
+    if (readOnly || past.length === 0) return;
+    const previous = past[past.length - 1];
+    setPast((p) => p.slice(0, -1));
+    setFuture((f) => [value, ...f]);
+    onChange(previous);
+  }
+  function redo() {
+    if (readOnly || future.length === 0) return;
+    const next = future[0];
+    setFuture((f) => f.slice(1));
+    setPast((p) => [...p, value]);
+    onChange(next);
+  }
+
   const applyGroup = useCallback(
     (rowIdx: number, colIdx: number) => {
       if (readOnly) return;
@@ -212,6 +235,8 @@ export function RangeGrid({
     const label = getHandLabel(rowIdx, colIdx);
     const current = getDecision(value, label);
     dragMode.current = matchesTool(current, tool) ? "erase" : "paint";
+    setPast((p) => [...p, value]);
+    setFuture([]);
     applyGroup(rowIdx, colIdx);
   };
   const continuePaint = (rowIdx: number, colIdx: number) => {
@@ -225,8 +250,41 @@ export function RangeGrid({
   function applyPercent(p: number) {
     setPercent(p);
     if (readOnly) return;
+    setPast((prev) => [...prev, value]);
+    setFuture([]);
     onChange(buildPercentSelection(p, tool));
   }
+
+  // Atalhos de teclado: 1-5 troca a ferramenta (mesma ordem dos botoes),
+  // Ctrl/Cmd+Z desfaz, Ctrl/Cmd+Shift+Z ou Ctrl+Y refaz. So ativa numa
+  // grade editavel (nunca em grades readOnly, ex: lado a lado no
+  // comparador) e ignora quando o foco esta' num campo de texto (nome,
+  // tag, descricao) pra nao roubar digitacao normal.
+  useEffect(() => {
+    if (readOnly) return;
+    function onKeyDown(e: KeyboardEvent) {
+      const target = e.target as HTMLElement | null;
+      if (target?.matches("input, textarea, select")) return;
+
+      const mod = e.metaKey || e.ctrlKey;
+      if (mod && e.key.toLowerCase() === "z") {
+        e.preventDefault();
+        if (e.shiftKey) redo();
+        else undo();
+        return;
+      }
+      if (mod && e.key.toLowerCase() === "y") {
+        e.preventDefault();
+        redo();
+        return;
+      }
+      const idx = Number(e.key) - 1;
+      if (idx >= 0 && idx < TOOL_ORDER.length) setTool(TOOL_ORDER[idx]);
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [readOnly, past, future, value]);
 
   const summary = useMemo(() => {
     let combos = { fold: 0, call: 0, raise: 0 };
@@ -255,27 +313,51 @@ export function RangeGrid({
       <div className="mx-auto" style={{ maxWidth: maxWidthPx }}>
         {!readOnly && (
           <div className="mb-3 space-y-2">
-            <div className="flex flex-wrap items-center gap-1.5 rounded-full border border-hairline bg-elevated p-1">
-              {TOOL_ORDER.map((t) => {
-                const active = tool === t;
-                return (
-                  <button
-                    key={t}
-                    type="button"
-                    onClick={() => setTool(t)}
-                    className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all ${
-                      active ? "shadow-sm" : "text-muted hover:text-ink"
-                    }`}
-                    style={active ? { backgroundColor: `${TOOL_META[t].color}26`, color: TOOL_META[t].color } : undefined}
-                  >
-                    <span
-                      className="h-2 w-2 rounded-full transition-transform"
-                      style={{ backgroundColor: TOOL_META[t].color, transform: active ? "scale(1.15)" : "scale(1)" }}
-                    />
-                    {TOOL_META[t].label}
-                  </button>
-                );
-              })}
+            <div className="flex flex-wrap items-center gap-1.5">
+              <div className="flex flex-1 flex-wrap items-center gap-1.5 rounded-full border border-hairline bg-elevated p-1">
+                {TOOL_ORDER.map((t) => {
+                  const active = tool === t;
+                  return (
+                    <button
+                      key={t}
+                      type="button"
+                      onClick={() => setTool(t)}
+                      title={`${TOOL_META[t].label} (tecla ${TOOL_ORDER.indexOf(t) + 1})`}
+                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all ${
+                        active ? "shadow-sm" : "text-muted hover:text-ink"
+                      }`}
+                      style={active ? { backgroundColor: `${TOOL_META[t].color}26`, color: TOOL_META[t].color } : undefined}
+                    >
+                      <span
+                        className="h-2 w-2 rounded-full transition-transform"
+                        style={{ backgroundColor: TOOL_META[t].color, transform: active ? "scale(1.15)" : "scale(1)" }}
+                      />
+                      {TOOL_META[t].label}
+                    </button>
+                  );
+                })}
+              </div>
+
+              <div className="flex shrink-0 gap-1">
+                <button
+                  type="button"
+                  onClick={undo}
+                  disabled={past.length === 0}
+                  title="Desfazer (Ctrl+Z)"
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:text-ink disabled:opacity-30"
+                >
+                  <Undo2 size={14} />
+                </button>
+                <button
+                  type="button"
+                  onClick={redo}
+                  disabled={future.length === 0}
+                  title="Refazer (Ctrl+Shift+Z)"
+                  className="grid h-8 w-8 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:text-ink disabled:opacity-30"
+                >
+                  <Redo2 size={14} />
+                </button>
+              </div>
             </div>
 
             <div className="flex items-center gap-2 rounded-full border border-hairline bg-elevated px-3 py-1.5">
@@ -320,6 +402,13 @@ export function RangeGrid({
                   {label}
                   {hasOverride && <span className="absolute right-0.5 top-0.5 h-1 w-1 rounded-full bg-evolution" />}
                   {onOpenComboEditor && !readOnly && (
+                    // Hit-box de 2x2px era praticamente impossivel de
+                    // acertar (e invisivel, sem nenhuma pista de que
+                    // dava pra clicar ali) — agora fica sempre visivel
+                    // (bem sutil) e cresce/escurece no hover, com area
+                    // de clique maior. Fica so' no canto (nao cobre a
+                    // celula toda) pra nao atrapalhar o clique/arrasto
+                    // de pintar quando a celula esta' fechada.
                     <button
                       type="button"
                       onPointerDown={(e) => e.stopPropagation()}
@@ -327,7 +416,7 @@ export function RangeGrid({
                         e.stopPropagation();
                         onOpenComboEditor(label);
                       }}
-                      className="absolute bottom-0 left-0 h-2 w-2 rounded-tr bg-black/0 text-[5px] leading-none text-transparent hover:bg-black/50 hover:text-ink"
+                      className="absolute bottom-0 right-0 flex h-3 w-3 items-end justify-end rounded-tl-[3px] bg-black/0 pb-px pr-px text-[7px] leading-none text-black/25 transition-colors hover:bg-black/60 hover:text-white"
                       title="Editar combos individuais desta mão"
                     >
                       ⋯
