@@ -69,7 +69,7 @@ export function BoardAnalyzer({
                 Selecionar board
               </span>
             ) : (
-              parsed.cards.map((c) => <Card key={cardToString(c)} card={cardToString(c)} size="mini" hideCornerSuitGlyph />)
+              parsed.cards.map((c) => <Card key={cardToString(c)} card={cardToString(c)} size="mini" />)
             )}
           </button>
 

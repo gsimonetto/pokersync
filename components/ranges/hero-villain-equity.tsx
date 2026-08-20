@@ -109,7 +109,7 @@ export function HeroVillainEquity({
                   Selecionar (ou preflop)
                 </span>
               ) : (
-                boardParsed.cards.map((c) => <Card key={cardToString(c)} card={cardToString(c)} size="mini" hideCornerSuitGlyph />)
+                boardParsed.cards.map((c) => <Card key={cardToString(c)} card={cardToString(c)} size="mini" />)
               )}
             </button>
           </div>

@@ -193,8 +193,8 @@ export function EquityCalculator({ initialRangeId }: { initialRangeId?: string |
               >
                 {p.handInput.length === 4 ? (
                   <>
-                    <Card card={p.handInput.slice(0, 2)} size="mini" hideCornerSuitGlyph />
-                    <Card card={p.handInput.slice(2, 4)} size="mini" hideCornerSuitGlyph />
+                    <Card card={p.handInput.slice(0, 2)} size="mini" />
+                    <Card card={p.handInput.slice(2, 4)} size="mini" />
                   </>
                 ) : (
                   <span className="flex items-center gap-1.5 text-xs text-muted">
@@ -247,7 +247,7 @@ export function EquityCalculator({ initialRangeId }: { initialRangeId?: string |
               Selecionar board (ou deixe vazio pra preflop)
             </span>
           ) : (
-            (boardInput.match(/.{1,2}/g) ?? []).map((c) => <Card key={c} card={c} size="mini" hideCornerSuitGlyph />)
+            (boardInput.match(/.{1,2}/g) ?? []).map((c) => <Card key={c} card={c} size="mini" />)
           )}
         </button>
       </div>

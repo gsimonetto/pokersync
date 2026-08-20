@@ -56,7 +56,7 @@ export function CardPickerModal({
               {minCards > 0 ? `Selecione ${minCards === maxCards ? minCards : `${minCards} a ${maxCards}`} carta(s)…` : "Nenhuma carta selecionada"}
             </span>
           ) : (
-            selected.map((c) => <Card key={c} card={c} size="mini" hideCornerSuitGlyph />)
+            selected.map((c) => <Card key={c} card={c} size="mini" />)
           )}
         </div>
 
@@ -78,7 +78,7 @@ export function CardPickerModal({
                       isSelected ? "-translate-y-1 ring-2 ring-ink" : "hover:-translate-y-0.5"
                     } ${isExcluded ? "cursor-not-allowed opacity-20" : "cursor-pointer"}`}
                   >
-                    <Card card={card} size="mini" hideCornerSuitGlyph />
+                    <Card card={card} size="mini" />
                     {order && (
                       <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-ink text-[9px] font-bold text-void">
                         {order}
