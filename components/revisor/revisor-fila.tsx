@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash, HelpCircle, XCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
+import { getThumbUrl, deleteReview, fetchReviewSummary, type ReviewListItem, type ReviewSummary } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { LeaksCard } from "./leaks-card";
 
@@ -40,6 +40,16 @@ export function RevisorFila({
   const router = useRouter();
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("sessoes");
+
+  // Resumo consolidado (RPC ja existia pronta, nunca era chamada) --
+  // Revisor era so uma lista de maos sem nenhum numero de topo, diferente
+  // do resto do produto (Banca sempre teve Resultado/ROI/ITM).
+  const [summary, setSummary] = useState<ReviewSummary | null>(null);
+  useEffect(() => {
+    fetchReviewSummary(30)
+      .then(setSummary)
+      .catch(() => {});
+  }, []);
 
   // ---- Sessões ----
   const [sessionsList, setSessionsList] = useState<HandSessionWithCount[]>([]);
@@ -193,6 +203,28 @@ export function RevisorFila({
 
   return (
     <div>
+      {summary && summary.totalReviews > 0 && (
+        <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+          <SummaryStat icon={Hash} label="Mãos (30d)" value={String(summary.totalReviews)} accent="#5AA6E0" />
+          <SummaryStat icon={CheckCircle2} label="Concluídas" value={String(summary.totalConcluded)} accent="#10b981" />
+          <SummaryStat icon={CheckCircle2} label="Acertei" value={String(summary.totalCorrect)} accent="#10b981" />
+          <SummaryStat icon={XCircle} label="Errei" value={String(summary.totalErrors)} accent="#ef4444" />
+          <SummaryStat icon={HelpCircle} label="Dúvida" value={String(summary.totalDoubts)} accent="#f59e0b" />
+        </div>
+      )}
+      {summary && (summary.worstStreet || summary.worstCategory) && (
+        <p className="mb-4 text-xs text-muted">
+          Pior rua nos últimos 30 dias:{" "}
+          <span className="font-semibold text-ink">{summary.worstStreet ? summary.worstStreet.toUpperCase() : "—"}</span>
+          {summary.worstCategory && (
+            <>
+              {" "}
+              · categoria de erro mais comum: <span className="font-semibold text-ink">{summary.worstCategory}</span>
+            </>
+          )}
+        </p>
+      )}
+
       <div className="mb-3 flex items-center justify-between">
         <div className="flex gap-1.5">
           <button
@@ -549,4 +581,26 @@ export function RevisorFila({
 function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+function SummaryStat({
+  icon: Icon,
+  label,
+  value,
+  accent,
+}: {
+  icon: typeof Clock;
+  label: string;
+  value: string;
+  accent: string;
+}) {
+  return (
+    <div className="rounded-lg border border-hairline bg-surface p-2.5">
+      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
+        <Icon size={11} style={{ color: accent }} />
+        {label}
+      </p>
+      <p className="mt-1 text-lg font-bold text-ink">{value}</p>
+    </div>
+  );
 }
