@@ -251,7 +251,7 @@ export default function HubPage() {
       <AppHeader
         subtitle={
           <>
-            {view === "missoes" ? "Ganhe XP, mantenha a ofensiva e suba de nível." : "Ranking de todos os membros PokerSync."}
+            {view === "missoes" ? "Missões e progresso de nível." : "Ranking de todos os membros PokerSync."}
             {membership && (
               <Link
                 href="/time"
