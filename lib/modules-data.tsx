@@ -1,4 +1,4 @@
-import { Target, TrendingUp, BookOpen, LineChart, Layers, Users } from "lucide-react";
+import { Target, TrendingUp, BookOpen, LineChart, Layers, Users, Trophy } from "lucide-react";
 import type { ModuleDef } from "@/components/module-card";
 
 export const ACCENT = {
@@ -7,6 +7,8 @@ export const ACCENT = {
   purple: "#A855F7",
   amber: "#E0B24C",
   pink: "#E0559E",
+  cyan: "#22D3EE",
+  indigo: "#6366F1",
 };
 
 // Espelha o array `modules` de src/components/Dashboard.jsx (projeto Vite).
@@ -39,11 +41,22 @@ export const modules: ModuleDef[] = [
     href: "/revisor",
   },
   {
+    key: "hub",
+    icon: Trophy,
+    title: "Hub de Evolução",
+    subtitle: "XP, missões e ranking",
+    accent: ACCENT.amber,
+    available: true,
+    href: "/hub",
+  },
+  {
     key: "time",
     icon: Users,
     title: "Meu Time",
     subtitle: "Membros, papeis e convites",
-    accent: ACCENT.green,
+    // Antes usava o mesmo verde do Modo Treino -- cor deixava de
+    // diferenciar os dois modulos numa varredura rapida do grid.
+    accent: ACCENT.indigo,
     available: true,
     href: "/time",
   },
@@ -52,7 +65,9 @@ export const modules: ModuleDef[] = [
     icon: LineChart,
     title: "Player Evolution",
     subtitle: "ROI, ABI e tendencias de performance",
-    accent: ACCENT.amber,
+    // Amber liberado pro Hub (que ja usa essa cor como identidade
+    // propria em app/hub/page.tsx) -- Performance passa pro cyan.
+    accent: ACCENT.cyan,
     available: true,
     href: "/performance",
   },
