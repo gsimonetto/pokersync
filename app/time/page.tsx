@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Users, Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
+import { Users, Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
+import { AppHeader } from "@/components/app-header";
 import { ACCENT } from "@/lib/modules-data";
 import { TeamBanner } from "@/components/time/team-banner";
 import { fetchDrillFacets } from "@/lib/services/drill-service";
@@ -77,18 +78,13 @@ export default function TimePage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <header className="mb-6 flex items-center gap-3">
-        <Link href="/modulos"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-          aria-label="Voltar">
-          <ArrowLeft size={18} />
-        </Link>
-        <Users size={20} style={{ color: data?.team.accent ?? ACCENT.blue }} />
-        <div>
-          <h1 className="m-0 text-xl font-semibold tracking-tight">{data ? data.team.name : "Meu Time"}</h1>
-          <p className="mt-0.5 text-sm text-muted">Times, papéis e convites</p>
-        </div>
-      </header>
+      <AppHeader
+        backHref="/modulos"
+        icon={Users}
+        iconColor={data?.team.accent ?? ACCENT.blue}
+        title={data ? data.team.name : "Meu Time"}
+        subtitle="Times, papéis e convites"
+      />
 
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>

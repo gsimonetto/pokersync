@@ -3,8 +3,9 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import { AppHeader } from "@/components/app-header";
 import {
-  ArrowLeft, Trophy, Flame, Zap, Target, TrendingUp,
+  Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
   Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Users, Gift, Crown,
 } from "lucide-react";
@@ -182,7 +183,7 @@ export default function HubPage() {
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
 
   return (
-    <main className="mx-auto max-w-7xl px-4 py-10">
+    <main className="mx-auto max-w-6xl px-6 py-10">
       {/* Animacoes escopadas neste arquivo: nao depende do globals.css do restante do projeto. */}
       <style>{`
         @keyframes hubFlameFlicker {
@@ -247,50 +248,45 @@ export default function HubPage() {
         }
       `}</style>
 
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex items-center gap-3">
-          <Link href="/modulos" className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink">
-            <ArrowLeft size={18} />
-          </Link>
-          <div>
-            <h1 className="text-2xl font-semibold tracking-tight">Hub de Evolução</h1>
-            <div className="mt-0.5 flex flex-wrap items-center gap-2">
-              <p className="text-sm text-muted">
-                {view === "missoes" ? "Ganhe XP, mantenha a ofensiva e suba de nível." : "Ranking de todos os membros PokerSync."}
-              </p>
-              {membership && (
-                <Link
-                  href="/time"
-                  className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-                >
-                  <Users size={10} /> {membership.teamName}
-                </Link>
-              )}
-            </div>
+      <AppHeader
+        backHref="/modulos"
+        title="Hub de Evolução"
+        subtitle={
+          <>
+            {view === "missoes" ? "Ganhe XP, mantenha a ofensiva e suba de nível." : "Ranking de todos os membros PokerSync."}
+            {membership && (
+              <Link
+                href="/time"
+                className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+              >
+                <Users size={10} /> {membership.teamName}
+              </Link>
+            )}
+          </>
+        }
+        right={
+          /* Missoes/Ranking viram vistas de verdade (pedido explicito) --
+              antes o ranking era secao fixa la embaixo, agora e' aba propria. */
+          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+            <button
+              onClick={() => setView("missoes")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
+                view === "missoes" ? "bg-ink text-void" : "text-muted hover:text-ink"
+              }`}
+            >
+              <Target size={13} /> Missões
+            </button>
+            <button
+              onClick={() => setView("ranking")}
+              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
+                view === "ranking" ? "bg-ink text-void" : "text-muted hover:text-ink"
+              }`}
+            >
+              <Trophy size={13} /> Ranking
+            </button>
           </div>
-        </div>
-
-        {/* Missoes/Ranking viram vistas de verdade (pedido explicito) --
-            antes o ranking era secao fixa la embaixo, agora e' aba propria. */}
-        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-          <button
-            onClick={() => setView("missoes")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
-              view === "missoes" ? "bg-ink text-void" : "text-muted hover:text-ink"
-            }`}
-          >
-            <Target size={13} /> Missões
-          </button>
-          <button
-            onClick={() => setView("ranking")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
-              view === "ranking" ? "bg-ink text-void" : "text-muted hover:text-ink"
-            }`}
-          >
-            <Trophy size={13} /> Ranking
-          </button>
-        </div>
-      </div>
+        }
+      />
 
       {view === "missoes" && (
       <>

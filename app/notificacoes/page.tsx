@@ -1,9 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
-import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowLeft, Bell, CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle } from "lucide-react";
+import { Bell, CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle } from "lucide-react";
+import { AppHeader } from "@/components/app-header";
 import {
   CATEGORIA_LABEL,
   deleteNotification,
@@ -86,31 +86,24 @@ export default function NotificacoesPage() {
 
   return (
     <main className="mx-auto max-w-6xl px-6 py-10 text-ink">
-      <header className="mb-6 flex flex-wrap items-center gap-3">
-        <Link
-          href="/modulos"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-          aria-label="Voltar"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-        <Bell size={20} className="text-evolution" />
-        <div className="flex-1">
-          <h1 className="m-0 text-xl font-semibold tracking-tight">Notificações</h1>
-          <p className="mt-0.5 text-sm text-muted">
-            {totalNaoLidas > 0 ? `${totalNaoLidas} por ler` : "Tudo lido"}
-          </p>
-        </div>
-        {totalNaoLidas > 0 && (
-          <button
-            onClick={lerTudo}
-            className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
-          >
-            <CheckCheck size={15} />
-            Ler tudo
-          </button>
-        )}
-      </header>
+      <AppHeader
+        backHref="/modulos"
+        icon={Bell}
+        iconColor="var(--color-evolution)"
+        title="Notificações"
+        subtitle={totalNaoLidas > 0 ? `${totalNaoLidas} por ler` : "Tudo lido"}
+        right={
+          totalNaoLidas > 0 && (
+            <button
+              onClick={lerTudo}
+              className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
+            >
+              <CheckCheck size={15} />
+              Ler tudo
+            </button>
+          )
+        }
+      />
 
       <div className="mb-4 flex flex-wrap gap-1 rounded-lg border border-hairline bg-elevated p-1">
         {FILTROS.map((f) => {

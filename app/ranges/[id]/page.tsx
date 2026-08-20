@@ -1,8 +1,8 @@
 "use client";
 
 import { use } from "react";
-import Link from "next/link";
-import { ArrowLeft, Layers } from "lucide-react";
+import { Layers } from "lucide-react";
+import { AppHeader } from "@/components/app-header";
 import { RangeEditor } from "@/components/ranges/range-editor";
 
 export default function RangeEditPage({ params }: { params: Promise<{ id: string }> }) {
@@ -10,17 +10,8 @@ export default function RangeEditPage({ params }: { params: Promise<{ id: string
 
   return (
     <main className="mx-auto max-w-[1440px] px-4 py-3 text-ink">
-      <header className="mb-2 flex items-center gap-3">
-        <Link
-          href="/ranges"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted"
-          aria-label="Voltar"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-        <Layers size={20} className="text-review" />
-        <h1 className="m-0 text-xl font-semibold">{id === "novo" ? "Novo Range" : "Editar Range"}</h1>
-      </header>
+      <AppHeader backHref="/ranges" icon={Layers} iconColor="var(--color-review)"
+        title={id === "novo" ? "Novo Range" : "Editar Range"} />
 
       <RangeEditor id={id} />
     </main>
