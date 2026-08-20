@@ -352,9 +352,20 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
   // depende da escala de ICM/premiação daquele torneio especifico, sem
   // significado isolado), a DIFERENÇA em % de uma opção pra outra é
   // comparável entre spots, independente da escala.
+  //
+  // Fix (2026-08): denominador era a MEDIA das duas EVs -- quando a
+  // opção errada tem EV bem menor que a certa (justamente o caso de
+  // "Erro Grave", o mais importante de comunicar direito), a média
+  // encolhe e a % estoura bem acima de 100 (visto em teste real: 290%,
+  // 298%). Isso não lê como "você perdeu quase 3x o valor" pra ninguém
+  // -- lê como número quebrado, bem na hora que o feedback mais importa.
+  // Denominador agora é a MAIOR das duas EVs (o valor da melhor opção
+  // disponível) -- como as duas são fatias de equity ICM (sempre ≥0), a
+  // diferença nunca passa da maior das duas, então a % fica sempre ≤100
+  // e lê como "você abriu mão de X% do valor que a melhor opção tinha".
   const gapRelativePct = round && currentPhase
     ? (() => {
-        const denom = (currentPhase.ev_fold + round.ev) / 2;
+        const denom = Math.max(currentPhase.ev_fold, round.ev);
         return denom > 0 ? (round.gap / denom) * 100 : 0;
       })()
     : null;
