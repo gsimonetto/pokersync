@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Flame, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
+import { Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, bbHourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
@@ -104,7 +104,6 @@ export default function BankrollPage() {
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [goalsModalOpen, setGoalsModalOpen] = useState(false);
   const [brmModalOpen, setBrmModalOpen] = useState(false);
-  const leaksRef = useRef<HTMLElement | null>(null);
   const [calcFormat, setCalcFormat] = useState<BrmFormat>("Cash");
   const [calcBuyIn, setCalcBuyIn] = useState("");
 
@@ -177,6 +176,17 @@ export default function BankrollPage() {
   // tela inteira parecia ter quebrado (tudo em branco: sem grafico, sem
   // stats, sem historico).
   const platformNames = useMemo(() => platforms.map((p) => p.platform), [platforms]);
+  // Sem isso, trocar de moeda (ou apagar a ultima sessao de uma
+  // plataforma) deixava platformFilter apontando pra um valor que nao
+  // existe mais em platformNames -- o <select> controlado nao acha
+  // nenhuma <option> com esse value e renderiza em branco, sem nenhuma
+  // opcao selecionada visivel (mesmo bug que currencyFilter ja tinha e
+  // corrigiu acima).
+  useEffect(() => {
+    if (platformFilter !== "todas" && !platformNames.includes(platformFilter)) {
+      setPlatformFilter("todas");
+    }
+  }, [platformNames, platformFilter]);
   const isPlatformFiltered = platformFilter !== "todas";
   const platformSessions = useMemo(
     () =>
@@ -482,72 +492,60 @@ export default function BankrollPage() {
         <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
-        <div className="flex items-center gap-2.5">
-          {isMultiCurrency && (
-            <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <div className="flex flex-wrap items-center justify-between gap-3">
+          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
+          <div className="flex items-center gap-2.5">
+            {isMultiCurrency && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
+                <select
+                  value={currencyFilter}
+                  onChange={(e) => setCurrencyFilter(e.target.value)}
+                  title="Moeda — os stats abaixo nunca somam moedas diferentes"
+                  className="bg-transparent text-[11px] font-bold uppercase tracking-[0.06em] text-training outline-none"
+                >
+                  {currencies.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
+              <Landmark size={13} className="text-muted" />
               <select
-                value={currencyFilter}
-                onChange={(e) => setCurrencyFilter(e.target.value)}
-                title="Moeda — os stats abaixo nunca somam moedas diferentes"
-                className="bg-transparent text-[11px] font-bold uppercase tracking-[0.06em] text-training outline-none"
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                className="bg-transparent text-[11px] font-semibold uppercase tracking-[0.06em] text-ink outline-none"
               >
-                {currencies.map((c) => (
-                  <option key={c} value={c}>
-                    {c}
+                <option value="todas">Todas as plataformas</option>
+                {platformNames.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
                   </option>
                 ))}
               </select>
             </div>
-          )}
-          <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
-            <Landmark size={13} className="text-muted" />
-            <select
-              value={platformFilter}
-              onChange={(e) => setPlatformFilter(e.target.value)}
-              className="bg-transparent text-[11px] font-semibold uppercase tracking-[0.06em] text-ink outline-none"
+            <button
+              onClick={() => setSessionModalOpen(true)}
+              aria-label="Registrar sessao"
+              title="Registrar sessao"
+              className="group flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform duration-200 hover:scale-110 active:scale-90"
             >
-              <option value="todas">Todas as plataformas</option>
-              {platformNames.map((p) => (
-                <option key={p} value={p}>
-                  {p}
-                </option>
-              ))}
-            </select>
+              <Plus size={18} strokeWidth={2.5} className="transition-transform duration-200 group-hover:rotate-90" />
+            </button>
+            <button
+              onClick={() => setTxModalOpen(true)}
+              aria-label="Deposito / saque"
+              title="Deposito / saque"
+              className="group flex h-9 w-9 items-center justify-center rounded-xl border border-hairline bg-elevated text-ink shadow-lg shadow-black/20 transition-transform duration-200 hover:scale-110 hover:border-ink/40 active:scale-90"
+            >
+              <Wallet size={17} className="transition-transform duration-200 group-hover:-rotate-12" />
+            </button>
           </div>
-          <button
-            onClick={() => setSessionModalOpen(true)}
-            aria-label="Registrar sessao"
-            title="Registrar sessao"
-            className="group flex h-11 w-11 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform duration-200 hover:scale-110 active:scale-90"
-          >
-            <Plus size={20} strokeWidth={2.5} className="transition-transform duration-200 group-hover:rotate-90" />
-          </button>
-          <button
-            onClick={() => setTxModalOpen(true)}
-            aria-label="Deposito / saque"
-            title="Deposito / saque"
-            className="group flex h-11 w-11 items-center justify-center rounded-xl border border-hairline bg-elevated text-ink shadow-lg shadow-black/20 transition-transform duration-200 hover:scale-110 hover:border-ink/40 active:scale-90"
-          >
-            <Wallet size={19} className="transition-transform duration-200 group-hover:-rotate-12" />
-          </button>
-
-          <div className="mx-1 h-7 w-px bg-hairline" />
-
-          <button
-            onClick={() => leaksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
-            aria-label="Ir pro painel de leaks"
-            title="Ir pro painel de leaks"
-            className="group flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-all duration-200 hover:scale-110 hover:border-evolution/50 hover:text-evolution hover:shadow-[0_0_12px_rgba(245,158,11,.35)] active:scale-90"
-          >
-            <Flame size={16} className="transition-transform duration-200 group-hover:scale-110" />
-          </button>
         </div>
-      </div>
-
-      <section className="mt-4 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
-        <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+        <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
           {/* Banca atual + Resultado mesclados num card so' — eram duas
               informacoes sobrepostas (saldo atual e o quanto rendeu),
               antes cada uma com seu proprio card grande. */}
@@ -599,30 +597,120 @@ export default function BankrollPage() {
         <p className="mt-5 border-t border-hairline pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
           Atividade &amp; risco
         </p>
-        <div className="mt-2.5 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
-          <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
-          <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
-          <StatCard label="Buy-in médio" value={fmt(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
-          <StatCard
-            label="Drawdown atual"
-            value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
-            tone={currentDrawdown >= 15 ? "negative" : undefined}
-            icon={<History size={11} />}
-            accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
-          />
-          {agg.totalRake > 0 && (
-            <StatCard label="Rake pago" value={fmt(agg.totalRake)} icon={<Landmark size={11} />} accent="#e0555a" />
-          )}
-          {agg.totalRakeback > 0 && (
-            <StatCard label="Rakeback" value={fmt(agg.totalRakeback)} icon={<Landmark size={11} />} accent="#22c55e" />
-          )}
-          {nw.withdrawn > 0 && (
-            <StatCard label="Sacado" value={fmt(nw.withdrawn)} icon={<Wallet size={11} />} accent="#e0555a" />
-          )}
-          {nw.caixinha > 0 && (
-            <StatCard label="Guardado (caixinha)" value={fmt(nw.caixinha)} icon={<PiggyBank size={11} />} accent="#ec4899" />
-          )}
+        <div className="mt-2.5 flex flex-col gap-4 lg:flex-row lg:items-start">
+          <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+            <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
+            <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
+            <StatCard label="Buy-in médio" value={fmt(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
+            <StatCard
+              label="Drawdown atual"
+              value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+              tone={currentDrawdown >= 15 ? "negative" : undefined}
+              icon={<History size={11} />}
+              accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
+            />
+            {agg.totalRake > 0 && (
+              <StatCard label="Rake pago" value={fmt(agg.totalRake)} icon={<Landmark size={11} />} accent="#e0555a" />
+            )}
+            {agg.totalRakeback > 0 && (
+              <StatCard label="Rakeback" value={fmt(agg.totalRakeback)} icon={<Landmark size={11} />} accent="#22c55e" />
+            )}
+            {nw.withdrawn > 0 && (
+              <StatCard label="Sacado" value={fmt(nw.withdrawn)} icon={<Wallet size={11} />} accent="#e0555a" />
+            )}
+            {nw.caixinha > 0 && (
+              <StatCard label="Guardado (caixinha)" value={fmt(nw.caixinha)} icon={<PiggyBank size={11} />} accent="#ec4899" />
+            )}
+          </div>
+          <div className="shrink-0 rounded-lg border border-hairline bg-elevated p-3 lg:w-[300px]">
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Consistência de volume</p>
+            <VolumeHeatmap activity={activity} currency={currencyFilter} />
+          </div>
         </div>
+      </section>
+
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Painel de leaks</h2>
+          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+            {[
+              { value: "format" as const, label: "Formato" },
+              { value: "weekday" as const, label: "Dia" },
+              { value: "time" as const, label: "Horario" },
+            ].map((d) => (
+              <button
+                key={d.value}
+                onClick={() => setLeakDimension(d.value)}
+                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
+                  leakDimension === d.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
+                }`}
+              >
+                {d.label}
+              </button>
+            ))}
+          </div>
+        </div>
+
+        {leakStats.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
+        ) : (
+          <div className="mt-4 flex flex-col gap-1.5">
+            {leakStats.map((g: GroupStat) => {
+              const maxAbs = Math.max(...leakStats.map((x) => Math.abs(x.net)), 1);
+              const halfWidth = Math.max(2, (Math.abs(g.net) / maxAbs) * 50);
+              const negative = g.net < 0;
+              const lowSample = g.n < 5;
+              return (
+                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
+                  <div className="min-w-0">
+                    <p className="truncate text-sm font-semibold">{g.key}</p>
+                    <p className="text-[10.5px] text-muted">
+                      {g.n} {g.n === 1 ? "sessao" : "sessoes"} · ROI {fmtPct(g.roi)}
+                      {lowSample && <span className="ml-1 text-evolution">· amostra pequena</span>}
+                    </p>
+                  </div>
+                  <div className="relative h-2 w-full rounded-full bg-void/40">
+                    <div className="absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-hairline" />
+                    {negative ? (
+                      <div
+                        className="absolute right-1/2 top-0 h-full rounded-l-full bg-negative transition-[width] duration-500 ease-out"
+                        style={{ width: `${halfWidth}%`, opacity: lowSample ? 0.55 : 1 }}
+                      />
+                    ) : (
+                      <div
+                        className="absolute left-1/2 top-0 h-full rounded-r-full bg-positive transition-[width] duration-500 ease-out"
+                        style={{ width: `${halfWidth}%`, opacity: lowSample ? 0.55 : 1 }}
+                      />
+                    )}
+                  </div>
+                  <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
+                    {fmtSigned(g.net)}
+                  </span>
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {tiltStats && tiltStats.tiltN > 0 && (
+          <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
+            <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Sessoes com tilt vs demais</p>
+            <div className="mt-2 grid grid-cols-2 gap-3">
+              <div>
+                <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
+                <p className={`text-sm font-bold ${tiltStats.tiltNet >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSigned(tiltStats.tiltNet)} · ROI {fmtPct(tiltStats.tiltRoi)}
+                </p>
+              </div>
+              <div>
+                <p className="text-[11px] text-muted">Demais ({tiltStats.otherN})</p>
+                <p className={`text-sm font-bold ${tiltStats.otherNet >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSigned(tiltStats.otherNet)} · ROI {fmtPct(tiltStats.otherRoi)}
+                </p>
+              </div>
+            </div>
+          </div>
+        )}
       </section>
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
@@ -1374,97 +1462,6 @@ export default function BankrollPage() {
         )}
       </section>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Consistência de volume</h2>
-        <VolumeHeatmap activity={activity} currency={currencyFilter} />
-      </section>
-
-      <section ref={leaksRef} className="mt-6 scroll-mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div className="flex items-center gap-1.5">
-            <Flame size={13} className="text-evolution" />
-            <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Painel de leaks</h2>
-          </div>
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            {[
-              { value: "format" as const, label: "Formato" },
-              { value: "weekday" as const, label: "Dia" },
-              { value: "time" as const, label: "Horario" },
-            ].map((d) => (
-              <button
-                key={d.value}
-                onClick={() => setLeakDimension(d.value)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
-                  leakDimension === d.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {leakStats.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
-        ) : (
-          <div className="mt-4 flex flex-col gap-1.5">
-            {leakStats.map((g: GroupStat) => {
-              const maxAbs = Math.max(...leakStats.map((x) => Math.abs(x.net)), 1);
-              const halfWidth = Math.max(2, (Math.abs(g.net) / maxAbs) * 50);
-              const negative = g.net < 0;
-              const lowSample = g.n < 5;
-              return (
-                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
-                  <div className="min-w-0">
-                    <p className="truncate text-sm font-semibold">{g.key}</p>
-                    <p className="text-[10.5px] text-muted">
-                      {g.n} {g.n === 1 ? "sessao" : "sessoes"} · ROI {fmtPct(g.roi)}
-                      {lowSample && <span className="ml-1 text-evolution">· amostra pequena</span>}
-                    </p>
-                  </div>
-                  <div className="relative h-2 w-full rounded-full bg-void/40">
-                    <div className="absolute left-1/2 top-1/2 h-3 w-px -translate-x-1/2 -translate-y-1/2 bg-hairline" />
-                    {negative ? (
-                      <div
-                        className="absolute right-1/2 top-0 h-full rounded-l-full bg-negative transition-[width] duration-500 ease-out"
-                        style={{ width: `${halfWidth}%`, opacity: lowSample ? 0.55 : 1 }}
-                      />
-                    ) : (
-                      <div
-                        className="absolute left-1/2 top-0 h-full rounded-r-full bg-positive transition-[width] duration-500 ease-out"
-                        style={{ width: `${halfWidth}%`, opacity: lowSample ? 0.55 : 1 }}
-                      />
-                    )}
-                  </div>
-                  <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
-                    {fmtSigned(g.net)}
-                  </span>
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-        {tiltStats && tiltStats.tiltN > 0 && (
-          <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Sessoes com tilt vs demais</p>
-            <div className="mt-2 grid grid-cols-2 gap-3">
-              <div>
-                <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
-                <p className={`text-sm font-bold ${tiltStats.tiltNet >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtSigned(tiltStats.tiltNet)} · ROI {fmtPct(tiltStats.tiltRoi)}
-                </p>
-              </div>
-              <div>
-                <p className="text-[11px] text-muted">Demais ({tiltStats.otherN})</p>
-                <p className={`text-sm font-bold ${tiltStats.otherNet >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtSigned(tiltStats.otherNet)} · ROI {fmtPct(tiltStats.otherRoi)}
-                </p>
-              </div>
-            </div>
-          </div>
-        )}
-      </section>
 
     </main>
   );

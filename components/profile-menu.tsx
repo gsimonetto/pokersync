@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock3 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AVATARS } from "./avatar";
+import { ModalPortal } from "./modal-portal";
 import {
   updateAvatarIcon,
   uploadAvatarPhoto,
@@ -113,6 +114,7 @@ export function ProfileMenu({
   }
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-16" onClick={onClose}>
       <div
         className="w-full max-w-sm overflow-hidden rounded-2xl border border-hairline bg-surface/[0.98] shadow-2xl shadow-black/60 backdrop-blur-xl"
@@ -288,5 +290,6 @@ export function ProfileMenu({
         )}
       </div>
     </div>
+    </ModalPortal>
   );
 }

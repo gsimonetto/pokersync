@@ -69,8 +69,11 @@ export function TabVisaoGeral({
 
   return (
     <div className="space-y-5">
-      <div className="flex justify-end print:hidden">
-        <PeriodSelector value={dias} onChange={onDiasChange} options={periodos} />
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho do time</p>
+        <div className="print:hidden">
+          <PeriodSelector value={dias} onChange={onDiasChange} options={periodos} />
+        </div>
       </div>
 
       <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 print:grid-cols-3">

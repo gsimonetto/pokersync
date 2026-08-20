@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle, ChevronRight, X } from "lucide-react";
+import { ModalPortal } from "./modal-portal";
 import {
   fetchNotifications,
   markAsRead,
@@ -88,6 +89,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
   }
 
   return (
+    <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-16" onClick={onClose}>
       <div
         className="w-full max-w-sm overflow-hidden rounded-2xl border border-hairline bg-surface/[0.98] shadow-2xl shadow-black/60 backdrop-blur-xl"
@@ -152,5 +154,6 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
         </Link>
       </div>
     </div>
+    </ModalPortal>
   );
 }

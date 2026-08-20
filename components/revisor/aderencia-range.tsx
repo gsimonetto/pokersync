@@ -156,7 +156,7 @@ export function AderenciaRange() {
   }
 
   return (
-    <div>
+    <section className="rounded-xl border border-hairline bg-surface p-5">
       <p className="mb-4 text-sm text-muted">
         Compara a ação real do hero em spots de <strong>RFI</strong> (primeiro a poder abrir, sem raise antes)
         contra um range salvo. Facing 3-bet, defesa de blind e squeeze ficam de fora por enquanto — comparariam
@@ -299,6 +299,6 @@ export function AderenciaRange() {
           )}
         </div>
       )}
-    </div>
+    </section>
   );
 }
