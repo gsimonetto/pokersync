@@ -339,8 +339,88 @@ function randomFlop(): Card[] {
   return picked;
 }
 
+// --- Filtro de textura (estilo Flopzilla): em vez de digitar um board
+// exato, o coach escolhe o TIPO de flop ("monotone", "pareado", "alto")
+// e a analise roda so' sobre boards daquela textura — util pra estudar
+// "como esse range se comporta em boards secos altos" sem ficar
+// testando board por board a mao.
+export type SuitTexture = "any" | "rainbow" | "twotone" | "monotone";
+export type PairedTexture = "any" | "unpaired" | "paired";
+export type ConnectivityTexture = "any" | "connected" | "disconnected";
+export type HighCardTexture = "any" | "high" | "medium" | "low";
+
+export interface BoardTextureFilter {
+  suits: SuitTexture;
+  paired: PairedTexture;
+  connectivity: ConnectivityTexture;
+  highCard: HighCardTexture;
+}
+
+export const DEFAULT_TEXTURE_FILTER: BoardTextureFilter = {
+  suits: "any",
+  paired: "any",
+  connectivity: "any",
+  highCard: "any",
+};
+
+export const SUIT_TEXTURE_LABEL: Record<SuitTexture, string> = {
+  any: "Qualquer",
+  rainbow: "Rainbow (3 naipes)",
+  twotone: "Two-tone (2 naipes)",
+  monotone: "Monotone (1 naipe)",
+};
+export const PAIRED_TEXTURE_LABEL: Record<PairedTexture, string> = {
+  any: "Qualquer",
+  unpaired: "Sem par",
+  paired: "Pareado",
+};
+export const CONNECTIVITY_TEXTURE_LABEL: Record<ConnectivityTexture, string> = {
+  any: "Qualquer",
+  connected: "Conectado",
+  disconnected: "Desconectado",
+};
+export const HIGH_CARD_TEXTURE_LABEL: Record<HighCardTexture, string> = {
+  any: "Qualquer",
+  high: "Alto (A/K/Q)",
+  medium: "Médio (J/T)",
+  low: "Baixo (9 ou menor)",
+};
+
+// Classifica o board nos 4 eixos acima. Conectividade usa o vao entre a
+// carta mais alta e mais baixa (<=4 cobre a maioria dos flops com
+// projeto de sequencia real); carta mais alta olha so' o topo do board.
+function boardTexture(board: Card[]): { suits: SuitTexture; paired: PairedTexture; connectivity: ConnectivityTexture; highCard: HighCardTexture } {
+  const suitCounts = new Map<Suit, number>();
+  for (const c of board) suitCounts.set(c.suit, (suitCounts.get(c.suit) ?? 0) + 1);
+  const maxSuitCount = Math.max(...suitCounts.values());
+  const suits: SuitTexture = maxSuitCount >= 3 ? "monotone" : maxSuitCount === 2 ? "twotone" : "rainbow";
+
+  const rankCounts = new Map<number, number>();
+  for (const c of board) rankCounts.set(c.rank, (rankCounts.get(c.rank) ?? 0) + 1);
+  const paired: PairedTexture = Array.from(rankCounts.values()).some((n) => n >= 2) ? "paired" : "unpaired";
+
+  const ranks = board.map((c) => c.rank);
+  const gap = Math.max(...ranks) - Math.min(...ranks);
+  const connectivity: ConnectivityTexture = gap <= 4 ? "connected" : "disconnected";
+
+  const topRank = Math.max(...ranks);
+  const highCard: HighCardTexture = topRank >= 12 ? "high" : topRank >= 10 ? "medium" : "low";
+
+  return { suits, paired, connectivity, highCard };
+}
+
+function boardMatchesFilter(board: Card[], filter: BoardTextureFilter): boolean {
+  const t = boardTexture(board);
+  if (filter.suits !== "any" && filter.suits !== t.suits) return false;
+  if (filter.paired !== "any" && filter.paired !== t.paired) return false;
+  if (filter.connectivity !== "any" && filter.connectivity !== t.connectivity) return false;
+  if (filter.highCard !== "any" && filter.highCard !== t.highCard) return false;
+  return true;
+}
+
 export interface MultiBoardAnalysis {
   boardsSampled: number;
+  boardsRequested: number;
   totalCombos: number;
   byCategory: Record<Category, number>;
 }
@@ -362,21 +442,34 @@ export function chooseAdaptiveSampleSize(hands: RangeHands, comboOverrides: Rang
   return Math.max(ADAPTIVE_MIN_BOARDS, Math.min(ADAPTIVE_MAX_BOARDS, raw));
 }
 
+// Teto de tentativas de geracao (baratas: so' sorteia + classifica
+// textura, sem avaliar o range) pra filtros muito restritos ou
+// impossiveis (ex: "Monotone" + "Pareado" nao existe — pra ter as 2
+// cartas do mesmo rank E do mesmo naipe elas seriam a mesma carta).
+// Sem esse teto, um filtro impossivel travaria o loop pra sempre.
+const MAX_TEXTURE_ATTEMPTS = 50_000;
+
 export function analyzeRangeAcrossRandomBoards(
   hands: RangeHands,
   sampleSize: number,
-  comboOverrides: RangeHands = {}
+  comboOverrides: RangeHands = {},
+  textureFilter: BoardTextureFilter = DEFAULT_TEXTURE_FILTER
 ): MultiBoardAnalysis {
   const byCategory = {} as Record<Category, number>;
   CATEGORY_ORDER.forEach((cat) => (byCategory[cat] = 0));
   let totalCombos = 0;
+  let boardsSampled = 0;
+  let attempts = 0;
 
-  for (let i = 0; i < sampleSize; i++) {
+  while (boardsSampled < sampleSize && attempts < MAX_TEXTURE_ATTEMPTS) {
+    attempts += 1;
     const board = randomFlop();
+    if (!boardMatchesFilter(board, textureFilter)) continue;
+    boardsSampled += 1;
     const result = analyzeRangeVsBoard(hands, board, comboOverrides);
     totalCombos += result.totalCombos;
     for (const cat of CATEGORY_ORDER) byCategory[cat] += result.byCategory[cat];
   }
 
-  return { boardsSampled: sampleSize, totalCombos, byCategory };
+  return { boardsSampled, boardsRequested: sampleSize, totalCombos, byCategory };
 }

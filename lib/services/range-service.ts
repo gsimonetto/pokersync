@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import type { RangeHands } from "@/components/ranges/range-grid";
+import type { RangeHands, RaiseType } from "@/components/ranges/range-grid";
 
 // RangeHands agora vive em range-grid.tsx (fold/call/raise por mao, somando
 // 100) — reexportado aqui pra quem so importa do service nao precisar
@@ -15,6 +15,9 @@ export interface RangeListItem {
   team_id: string | null;
   created_at: string;
   updated_at: string;
+  /** Pra desenhar a miniatura da grade nos cards da biblioteca — o
+      select ja trazia "hands" do banco mas descartava antes de expor. */
+  hands: RangeHands;
 }
 
 export interface RangeDetail extends RangeListItem {
@@ -62,6 +65,7 @@ export async function listRanges(): Promise<RangeListItem[]> {
     team_id: r.team_id ?? null,
     created_at: r.created_at,
     updated_at: r.updated_at,
+    hands: (r.hands as RangeHands) ?? {},
   }));
 }
 
@@ -285,6 +289,7 @@ export async function listTeamSharedRanges(teamId: string): Promise<TeamSharedRa
       team_id: r.team_id,
       created_at: r.created_at,
       updated_at: r.updated_at,
+      hands: (r.hands as RangeHands) ?? {},
       ownerName: profile?.apelido || profile?.nome || "Jogador",
       isMine: user?.id === r.user_id,
     };
@@ -318,10 +323,12 @@ function parseHandsMap(raw: unknown): RangeHands {
     const fold = typeof v.fold === "number" ? v.fold : 0;
     const call = typeof v.call === "number" ? v.call : 0;
     const raise = typeof v.raise === "number" ? v.raise : 0;
+    const raiseType = v.raiseType === "raise" || v.raiseType === "threebet" || v.raiseType === "allin" ? (v.raiseType as RaiseType) : undefined;
     result[label] = {
       fold: Math.max(0, Math.min(100, fold)),
       call: Math.max(0, Math.min(100, call)),
       raise: Math.max(0, Math.min(100, raise)),
+      ...(raiseType ? { raiseType } : {}),
     };
   }
   return result;

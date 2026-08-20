@@ -5,6 +5,8 @@ import { useRouter } from "next/navigation";
 import { GitCompare, Save, Trash2, Download, Check, Users, X, History, FolderOpen, ChevronDown, ChevronUp, Percent } from "lucide-react";
 import { RangeGrid, getDecision, type RangeHands } from "@/components/ranges/range-grid";
 import { BoardAnalyzer } from "@/components/ranges/board-analyzer";
+import { MultiBoardAnalyzer } from "@/components/ranges/multi-board-analyzer";
+import { MotorLibraryPanel } from "@/components/ranges/motor-library-panel";
 import { RangeVersionHistory } from "@/components/ranges/range-version-history";
 import { ComboEditorModal } from "@/components/ranges/combo-editor-modal";
 import { RangeListModal } from "@/components/ranges/range-list-modal";
@@ -252,9 +254,11 @@ export function RangeEditor({ id }: { id: string }) {
         />
       )}
 
-      {/* Grade + analise lado a lado — a analise so preenche quando tem
-          board digitado/rodado, mas fica sempre visivel na lateral pra
-          nao precisar rolar a pagina pra baixo pra ver ela. */}
+      {/* Grade + coluna lateral lado a lado — a lateral fica sempre
+          visivel (sticky) pra nao precisar rolar a pagina pra baixo pra
+          ver analise/biblioteca. Em telas largas a lateral vira 2
+          colunas (analise + biblioteca do motor) pra usar o espaco que
+          sobrava vazio ao lado da grade. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div className="lg:shrink-0">
           <RangeGrid
@@ -265,15 +269,20 @@ export function RangeEditor({ id }: { id: string }) {
           />
         </div>
 
-        <div className="w-full flex-1 space-y-2 lg:sticky lg:top-4 lg:max-w-[460px]">
-          <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
-          <a
-            href={rangeId ? `/ranges/equidade?rangeId=${rangeId}` : "/ranges/equidade"}
-            className="flex items-center justify-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-2.5 text-xs text-muted hover:text-ink"
-          >
-            <Percent size={14} />
-            {rangeId ? "Calcular equidade desse range" : "Calcular equidade (salve o range primeiro)"}
-          </a>
+        <div className="grid w-full flex-1 gap-4 lg:sticky lg:top-4 lg:grid-cols-2 lg:items-start xl:grid-cols-[460px_1fr]">
+          <div className="space-y-2">
+            <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
+            <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
+            <a
+              href={rangeId ? `/ranges/equidade?rangeId=${rangeId}` : "/ranges/equidade"}
+              className="flex items-center justify-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-2.5 text-xs text-muted hover:text-ink"
+            >
+              <Percent size={14} />
+              {rangeId ? "Calcular equidade desse range" : "Calcular equidade (salve o range primeiro)"}
+            </a>
+          </div>
+
+          <MotorLibraryPanel onLoad={setHands} />
         </div>
       </div>
 

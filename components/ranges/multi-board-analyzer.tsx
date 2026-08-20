@@ -8,6 +8,12 @@ import {
   chooseAdaptiveSampleSize,
   CATEGORY_ORDER,
   CATEGORY_LABEL,
+  CONNECTIVITY_TEXTURE_LABEL,
+  DEFAULT_TEXTURE_FILTER,
+  HIGH_CARD_TEXTURE_LABEL,
+  PAIRED_TEXTURE_LABEL,
+  SUIT_TEXTURE_LABEL,
+  type BoardTextureFilter,
   type Category,
   type MultiBoardAnalysis,
 } from "@/lib/poker/range-board-analyzer";
@@ -21,6 +27,8 @@ function categoryColor(cat: Category): string {
   return "#c4c7c8";
 }
 
+const SELECT_CLASS = "rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-xs text-ink outline-none";
+
 export function MultiBoardAnalyzer({
   hands,
   comboOverrides = {},
@@ -33,16 +41,18 @@ export function MultiBoardAnalyzer({
   const [open, setOpen] = useState(startOpen);
   const [running, setRunning] = useState(false);
   const [result, setResult] = useState<MultiBoardAnalysis | null>(null);
+  const [filter, setFilter] = useState<BoardTextureFilter>(DEFAULT_TEXTURE_FILTER);
 
   // Sem escolha manual de tamanho de amostra — calcula sozinho o maior
   // numero de boards que da pra rodar sem travar, baseado em quantos
-  // combos o range tem ativos agora.
+  // combos o range tem ativos agora. O filtro de textura pode reduzir
+  // quantos boards de fato sao encontrados (boardsSampled < pedido).
   function handleRun() {
     setRunning(true);
     setResult(null);
     setTimeout(() => {
       const sampleSize = chooseAdaptiveSampleSize(hands, comboOverrides);
-      setResult(analyzeRangeAcrossRandomBoards(hands, sampleSize, comboOverrides));
+      setResult(analyzeRangeAcrossRandomBoards(hands, sampleSize, comboOverrides, filter));
       setRunning(false);
     }, 30);
   }
@@ -59,6 +69,47 @@ export function MultiBoardAnalyzer({
 
       {open && (
         <div className="border-t border-hairline p-3">
+          <p className="mb-2 text-[11px] text-muted">Filtrar por textura do flop (estilo Flopzilla) — deixe "Qualquer" pra amostrar todo tipo de board.</p>
+
+          <div className="mb-3 grid grid-cols-2 gap-1.5">
+            <select
+              value={filter.suits}
+              onChange={(e) => setFilter((f) => ({ ...f, suits: e.target.value as BoardTextureFilter["suits"] }))}
+              className={SELECT_CLASS}
+            >
+              {Object.entries(SUIT_TEXTURE_LABEL).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+            <select
+              value={filter.paired}
+              onChange={(e) => setFilter((f) => ({ ...f, paired: e.target.value as BoardTextureFilter["paired"] }))}
+              className={SELECT_CLASS}
+            >
+              {Object.entries(PAIRED_TEXTURE_LABEL).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+            <select
+              value={filter.connectivity}
+              onChange={(e) => setFilter((f) => ({ ...f, connectivity: e.target.value as BoardTextureFilter["connectivity"] }))}
+              className={SELECT_CLASS}
+            >
+              {Object.entries(CONNECTIVITY_TEXTURE_LABEL).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+            <select
+              value={filter.highCard}
+              onChange={(e) => setFilter((f) => ({ ...f, highCard: e.target.value as BoardTextureFilter["highCard"] }))}
+              className={SELECT_CLASS}
+            >
+              {Object.entries(HIGH_CARD_TEXTURE_LABEL).map(([k, label]) => (
+                <option key={k} value={k}>{label}</option>
+              ))}
+            </select>
+          </div>
+
           <button
             onClick={handleRun}
             disabled={running}
@@ -68,11 +119,16 @@ export function MultiBoardAnalyzer({
             {running ? "Calculando…" : "Rodar análise"}
           </button>
 
-          {result && (
+          {result && result.boardsSampled === 0 && (
+            <p className="text-xs text-negative">Nenhum board encontrado com essa combinação de filtros — talvez ela seja impossível (ex: monotone + pareado não existe).</p>
+          )}
+
+          {result && result.boardsSampled > 0 && (
             <div>
               <p className="mb-2 text-[11px] text-muted">
-                {result.totalCombos.toLocaleString("pt-BR")} combos em {result.boardsSampled} boards — amostra
-                ajustada automaticamente pro tamanho do range.
+                {result.totalCombos.toLocaleString("pt-BR")} combos em {result.boardsSampled} boards
+                {result.boardsSampled < result.boardsRequested && ` (só ${result.boardsSampled} de ${result.boardsRequested} pedidos foram encontrados com esse filtro)`}
+                {" "}— amostra ajustada automaticamente pro tamanho do range.
               </p>
               <div className="space-y-1">
                 {CATEGORY_ORDER.filter((cat) => result.byCategory[cat] > 0).map((cat) => {

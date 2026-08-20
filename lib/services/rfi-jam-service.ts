@@ -29,18 +29,55 @@ export interface RfiJamListItem {
   stackBb: number;
 }
 
+// Posicoes e conversao pro token usado no spot_id gerado pelo motor
+// (ex "btn_vs_bb") — vive aqui (nao em cada tela que consome spot RFI/
+// Jam) pra Treino e Construtor de Ranges nao duplicarem o mesmo mapa.
+export const ALL_POSITIONS = ["UTG", "UTG+1", "MP", "HJ", "CO", "BTN", "SB", "BB"];
+export const POS_TO_TOKEN: Record<string, string> = {
+  UTG: "utg",
+  "UTG+1": "utg1",
+  MP: "mp",
+  HJ: "hj",
+  CO: "co",
+  BTN: "btn",
+  SB: "sb",
+  BB: "bb",
+};
+export const TOKEN_TO_POS: Record<string, string> = Object.fromEntries(
+  Object.entries(POS_TO_TOKEN).map(([label, token]) => [token, label])
+);
+
+export function matchupKey(hero: string, villain: string): string {
+  return `${POS_TO_TOKEN[hero]}_vs_${POS_TO_TOKEN[villain]}`;
+}
+
+export function parseMatchup(matchup: string): { hero: string | null; villain: string | null } {
+  const [heroToken, villainToken] = matchup.split("_vs_");
+  return { hero: TOKEN_TO_POS[heroToken] ?? null, villain: TOKEN_TO_POS[villainToken] ?? null };
+}
+
 // action='open'/'jam' pinta na cor de "raise" do grid (verde), porque
 // tecnicamente são all-in — não existe uma 4a cor pronta no componente
 // e criar uma agora só pra isso não vale o esforço nesse estágio de
 // teste. action='call' pinta na cor de "call" (azul), que já existe.
+// action='jam' e' um all-in de verdade -- marca o raiseType pra a
+// grade do construtor colorir igual ao botao "All-in" (nao o verde
+// generico de "Raise"), consistente com o que o solver de fato resolveu.
+const ACTION_RAISE_TYPE: Record<RfiJamPhaseRaw["action"], "raise" | "allin" | undefined> = {
+  open: "raise",
+  jam: "allin",
+  call: undefined,
+};
+
 function phaseToRangeHands(phase: RfiJamPhaseRaw): RangeHands {
   const out: RangeHands = {};
+  const raiseType = ACTION_RAISE_TYPE[phase.action];
   for (const [label, [freq]] of Object.entries(phase.hands)) {
     const pct = Math.round(freq * 100);
     out[label] =
       phase.action === "call"
         ? { fold: 100 - pct, call: pct, raise: 0 }
-        : { fold: 100 - pct, call: 0, raise: pct };
+        : { fold: 100 - pct, call: 0, raise: pct, raiseType };
   }
   return out;
 }
