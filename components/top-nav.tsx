@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CircleHelp, House, ListChecks } from "lucide-react";
+import { Bell, CircleHelp, House, Trophy } from "lucide-react";
 import { Logo } from "./logo";
 import { Avatar } from "./avatar";
 import { ProfileMenu } from "./profile-menu";
@@ -14,9 +14,12 @@ import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
 
+// Icone do atalho "Tarefas" bate com o icone do card "Hub de Evolução"
+// (lib/modules-data.tsx) -- os dois levam pro mesmo /hub, entao usar
+// icones diferentes pra mesma tela so' confundia no reconhecimento.
 const TABS = [
   { label: "Início", href: "/modulos", icon: House },
-  { label: "Tarefas", href: "/hub", icon: ListChecks },
+  { label: "Tarefas", href: "/hub", icon: Trophy },
 ] as const;
 
 type OpenMenu = "profile" | "notifications" | "help" | null;
@@ -76,7 +79,9 @@ export function TopNav() {
           "recuados" enquanto o corpo da pagina esticava quase ate a borda,
           dando a impressao de margem desalinhada/colada. */}
       <div className="mx-auto flex h-16 sm:h-18 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
-        <Logo className="h-8 w-auto sm:h-10" />
+        <Link href="/modulos" aria-label="Ir para Módulos" className="shrink-0">
+          <Logo className="h-8 w-auto sm:h-10" />
+        </Link>
 
         <div className="flex items-center gap-1.5">
           {TABS.map((tab) => {

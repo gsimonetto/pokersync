@@ -81,7 +81,7 @@ export default function TimePage() {
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       {/* Quando o time carregou, o banner (dentro de VisaoJogador) vira o
           header — leva o voltar embutido, sem repetir nome/subtitulo. */}
-      {!data && <AppHeader backHref="/modulos" title="Meu Time" subtitle="Times, papéis e convites" />}
+      {!data && <AppHeader backHref="/modulos" />}
 
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>

@@ -889,6 +889,10 @@ export async function uploadTeamBanner(teamId: string, file: File): Promise<stri
   return data.publicUrl;
 }
 
+export async function removeTeamBanner(): Promise<void> {
+  await updateTeamInfo({ bannerUrl: null });
+}
+
 export async function fetchTeamLabels(teamId: string): Promise<TeamLabel[]> {
   const supabase = createClient();
   const { data, error } = await supabase

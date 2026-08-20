@@ -65,12 +65,17 @@ function TreinoShell() {
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
 
+  // py-10 (2.5rem = 40px) do container padrao entra embaixo tambem —
+  // sem descontar isso aqui o card calculava altura ate' a base da
+  // viewport e o padding inferior nunca aparecia (ficava cortado).
+  const BOTTOM_PADDING_PX = 40;
+
   useEffect(() => {
     function measure() {
       const el = pageRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top + window.scrollY;
-      setAvailableHeight(Math.max(320, window.innerHeight - top));
+      setAvailableHeight(Math.max(320, window.innerHeight - top - BOTTOM_PADDING_PX));
     }
     measure();
     window.addEventListener("resize", measure);
@@ -78,6 +83,10 @@ function TreinoShell() {
   }, []);
 
   return (
+    // Margem padrao do app (max-w-[1280px] px-6 py-10) — antes essa tela
+    // era full-bleed de proposito, mas o padrao virou consistencia entre
+    // todo modulo, entao entra aqui tambem.
+    <main className="mx-auto max-w-[1280px] px-6 py-10">
     <div
       ref={pageRef}
       className="ps-treino-page"
@@ -90,10 +99,6 @@ function TreinoShell() {
         overflow: "hidden",
       }}
     >
-      {/* Moldura única (antes: padding aqui NESTA página + padding de
-          novo no card = 28px de margem morta empilhada). Só o card
-          enquadra agora -- pedido explícito: nada de margem "sobrando"
-          sem função, telinha de alta densidade. */}
       <div
         className="ps-treino-card"
         style={{
@@ -171,6 +176,7 @@ function TreinoShell() {
         </div>
       </div>
     </div>
+    </main>
   );
 }
 

@@ -9,6 +9,35 @@ import { createClient } from "@/lib/supabase/client";
 export type EventType = "aula" | "reuniao" | "outro";
 export type ParticipantStatus = "pendente" | "confirmado" | "recusado";
 
+export interface TeamBirthday {
+  userId: string;
+  nome: string;
+  avatarId: number;
+  avatarUrl: string | null;
+  dataNascimento: string;
+}
+
+// Perfil e' de leitura publica pra todo usuario logado (mesma policy que
+// ja libera nome/avatar) — so' filtra pelos ids do time aqui, sem precisar
+// de RPC nova. So' devolve quem de fato preencheu a data.
+export async function fetchTeamBirthdays(memberIds: string[]): Promise<TeamBirthday[]> {
+  if (memberIds.length === 0) return [];
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("profiles")
+    .select("id, nome, apelido, avatar_id, avatar_url, data_nascimento")
+    .in("id", memberIds)
+    .not("data_nascimento", "is", null);
+  if (error) throw error;
+  return (data ?? []).map((r) => ({
+    userId: r.id,
+    nome: r.apelido?.trim() || r.nome?.trim() || "Jogador",
+    avatarId: r.avatar_id ?? 1,
+    avatarUrl: r.avatar_url ?? null,
+    dataNascimento: r.data_nascimento as string,
+  }));
+}
+
 export interface TeamEventParticipant {
   playerId: string;
   status: ParticipantStatus;

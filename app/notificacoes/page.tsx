@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Bell, CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle } from "lucide-react";
+import { CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
 import {
   CATEGORIA_LABEL,
@@ -88,9 +88,6 @@ export default function NotificacoesPage() {
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader
         backHref="/modulos"
-        icon={Bell}
-        iconColor="var(--color-evolution)"
-        title="Notificações"
         subtitle={totalNaoLidas > 0 ? `${totalNaoLidas} por ler` : "Tudo lido"}
         right={
           totalNaoLidas > 0 && (

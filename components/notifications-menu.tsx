@@ -1,9 +1,9 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle, ChevronRight } from "lucide-react";
+import { CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle, ChevronRight, X } from "lucide-react";
 import {
   fetchNotifications,
   markAsRead,
@@ -31,7 +31,6 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
-  const ref = useRef<HTMLDivElement>(null);
 
   const unread = items.length;
 
@@ -53,14 +52,6 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
     const t = setInterval(load, 60000);
     return () => clearInterval(t);
   }, []);
-
-  useEffect(() => {
-    function handle(e: MouseEvent) {
-      if (ref.current && !ref.current.contains(e.target as Node)) onClose();
-    }
-    document.addEventListener("mousedown", handle);
-    return () => document.removeEventListener("mousedown", handle);
-  }, [onClose]);
 
   async function handleItemClick(n: Notification) {
     if (!n.read) {
@@ -97,20 +88,26 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div
-      ref={ref}
-      className="absolute right-0 top-[46px] z-50 w-[340px] overflow-hidden rounded-2xl border border-hairline bg-surface/[0.98] shadow-2xl shadow-black/60 backdrop-blur-xl"
-    >
-      <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
-        <span className="text-sm font-bold text-ink">Notificações</span>
-        {unread > 0 && (
-          <button onClick={handleMarkAll} title="Marcar tudo como lido" className="flex items-center gap-1 text-xs text-muted hover:text-ink">
-            <CheckCheck size={14} /> Ler tudo
-          </button>
-        )}
-      </div>
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-16" onClick={onClose}>
+      <div
+        className="w-full max-w-sm overflow-hidden rounded-2xl border border-hairline bg-surface/[0.98] shadow-2xl shadow-black/60 backdrop-blur-xl"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+          <span className="text-sm font-bold text-ink">Notificações</span>
+          <div className="flex items-center gap-3">
+            {unread > 0 && (
+              <button onClick={handleMarkAll} title="Marcar tudo como lido" className="flex items-center gap-1 text-xs text-muted hover:text-ink">
+                <CheckCheck size={14} /> Ler tudo
+              </button>
+            )}
+            <button onClick={onClose} className="grid size-6 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
+              <X size={15} />
+            </button>
+          </div>
+        </div>
 
-      <div className="max-h-[400px] overflow-y-auto">
+        <div className="max-h-[400px] overflow-y-auto">
         {loading && items.length === 0 ? (
           <p className="p-5 text-center text-[13px] text-muted">Carregando…</p>
         ) : items.length === 0 ? (
@@ -143,16 +140,17 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
             );
           })
         )}
-      </div>
+        </div>
 
-      <Link
-        href="/notificacoes"
-        onClick={onClose}
-        className="flex items-center justify-center gap-1 border-t border-hairline px-4 py-2.5 text-[12px] font-semibold text-muted transition-colors hover:bg-elevated hover:text-ink"
-      >
-        Ver todas
-        <ChevronRight size={13} />
-      </Link>
+        <Link
+          href="/notificacoes"
+          onClick={onClose}
+          className="flex items-center justify-center gap-1 border-t border-hairline px-4 py-2.5 text-[12px] font-semibold text-muted transition-colors hover:bg-elevated hover:text-ink"
+        >
+          Ver todas
+          <ChevronRight size={13} />
+        </Link>
+      </div>
     </div>
   );
 }

@@ -22,6 +22,7 @@ import {
   fetchInvites,
   traduzErroTime,
   uploadTeamBanner,
+  removeTeamBanner,
   type FinancialDay,
   type MyTeam,
   type PendingMember,
@@ -170,6 +171,19 @@ function PainelConteudo() {
     }
   }
 
+  async function removerBanner() {
+    if (!confirm("Remover o banner do time? Volta pro degradê padrão.")) return;
+    setEnviandoBanner(true);
+    try {
+      await removeTeamBanner();
+      await carregar();
+    } catch (e) {
+      setErro(traduzErroTime(e));
+    } finally {
+      setEnviandoBanner(false);
+    }
+  }
+
   const jogadores = useMemo(() => linhas.filter((l) => l.role === "player"), [linhas]);
   const coaches = useMemo(
     () => staff.filter((s) => s.isCoach).map((s) => ({ userId: s.userId, nome: s.nome })),
@@ -207,6 +221,7 @@ function PainelConteudo() {
                 editable={podeEditarTime}
                 uploading={enviandoBanner}
                 onUploadClick={() => bannerRef.current?.click()}
+                onRemoveClick={removerBanner}
                 backHref="/modulos"
                 right={<PrintButton />}
               />

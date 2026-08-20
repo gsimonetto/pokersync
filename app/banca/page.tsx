@@ -54,7 +54,6 @@ export default function BankrollPage() {
   const [leakDimension, setLeakDimension] = useState<"format" | "weekday" | "time">("format");
   const [bankroll, setBankroll] = useState(0);
   const [range, setRange] = useState<RangeOption>("all");
-  const [view, setView] = useState<"jogo" | "patrimonio">("jogo");
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [platformFilter, setPlatformFilter] = useState<string>("todas");
@@ -173,11 +172,12 @@ export default function BankrollPage() {
   );
 
   const platforms = useMemo(() => platformBalances(currencySessions, currencyTransactions), [currencySessions, currencyTransactions]);
-  const platformNames = useMemo(() => {
-    const known = new Set<string>(PLATFORMS as readonly string[]);
-    for (const p of platforms) known.add(p.platform);
-    return Array.from(known);
-  }, [platforms]);
+  // So' plataformas com sessao/transacao de verdade -- antes juntava com
+  // o catalogo inteiro (PLATFORMS), entao o filtro oferecia opcoes sem
+  // nenhum dado; escolher uma delas filtrava pra uma lista vazia e a
+  // tela inteira parecia ter quebrado (tudo em branco: sem grafico, sem
+  // stats, sem historico).
+  const platformNames = useMemo(() => platforms.map((p) => p.platform), [platforms]);
   const isPlatformFiltered = platformFilter !== "todas";
   const platformSessions = useMemo(
     () =>
@@ -204,9 +204,7 @@ export default function BankrollPage() {
   );
   const currentBankroll = isPlatformFiltered
     ? platforms.find((p) => p.platform === platformFilter)?.balance ?? 0
-    : view === "jogo"
-      ? nw.playingBankroll
-      : nw.netWorth;
+    : nw.playingBankroll;
   const series = useMemo(
     () => evolutionSeries(platformSessions, isPlatformFiltered ? 0 : base),
     [platformSessions, isPlatformFiltered, base]
@@ -229,7 +227,6 @@ export default function BankrollPage() {
   const ruin = useMemo(() => riskOfRuin(sessions, nw.playingBankroll), [sessions, nw.playingBankroll]);
   const comparison = useMemo(() => compareMonths(platformSessions), [platformSessions]);
   const currentDrawdown = useMemo(() => drawdownBuyIns(platformSessions, agg.avgBuyIn), [platformSessions, agg.avgBuyIn]);
-  const profitDelta = comparison.current.profit - comparison.previous.profit;
   const roiDelta = comparison.current.roi - comparison.previous.roi;
   const calcBuyInsCovered = Number(calcBuyIn) > 0 ? nw.playingBankroll / Number(calcBuyIn) : null;
   const calcStatus: BrmStatus | null =
@@ -482,32 +479,13 @@ export default function BankrollPage() {
 
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-10">
-      <AppHeader backHref="/modulos" title="Gestão de Banca" subtitle="Controle de risco, ROI e coach de bankroll." />
+      <AppHeader backHref="/modulos" />
 
       {err && (
         <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
 
-      <div className="mt-6 flex flex-wrap items-center justify-between gap-3">
-        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-          <button
-            onClick={() => setView("jogo")}
-            className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
-              view === "jogo" ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
-            }`}
-          >
-            Banca de jogo
-          </button>
-          <button
-            onClick={() => setView("patrimonio")}
-            className={`rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
-              view === "patrimonio" ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
-            }`}
-          >
-            Patrimonio total
-          </button>
-        </div>
-
+      <div className="mt-6 flex flex-wrap items-center justify-end gap-3">
         <div className="flex items-center gap-2.5">
           {isMultiCurrency && (
             <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
@@ -560,22 +538,6 @@ export default function BankrollPage() {
           <div className="mx-1 h-7 w-px bg-hairline" />
 
           <button
-            onClick={() => setGoalsModalOpen(true)}
-            aria-label="Nova meta"
-            title="Nova meta"
-            className="group flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-all duration-200 hover:scale-110 hover:border-review/50 hover:text-review hover:shadow-[0_0_12px_rgba(168,85,247,.35)] active:scale-90"
-          >
-            <Target size={16} className="transition-transform duration-200 group-hover:rotate-45" />
-          </button>
-          <button
-            onClick={() => setBrmModalOpen(true)}
-            aria-label="BRM — moveup / movedown"
-            title="BRM — moveup / movedown"
-            className="group flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-muted transition-all duration-200 hover:scale-110 hover:border-training/50 hover:text-training hover:shadow-[0_0_12px_rgba(59,130,246,.35)] active:scale-90"
-          >
-            <Gauge size={16} className="transition-transform duration-200 group-hover:-rotate-12" />
-          </button>
-          <button
             onClick={() => leaksRef.current?.scrollIntoView({ behavior: "smooth", block: "start" })}
             aria-label="Ir pro painel de leaks"
             title="Ir pro painel de leaks"
@@ -586,28 +548,19 @@ export default function BankrollPage() {
         </div>
       </div>
 
-      <div className="mt-4">
-        <HeroStat
-          label={view === "jogo" ? "Banca atual" : "Patrimônio total"}
-          value={fmt(currentBankroll)}
-          negative={currentBankroll < 0}
-          delta={
-            comparison.previous.n > 0
-              ? { text: `${fmtSigned(profitDelta)} vs mês passado`, positive: profitDelta >= 0 }
-              : undefined
-          }
-        />
-      </div>
-
       <section className="mt-4 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
         <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
         <div className="mt-2.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
+          {/* Banca atual + Resultado mesclados num card so' — eram duas
+              informacoes sobrepostas (saldo atual e o quanto rendeu),
+              antes cada uma com seu proprio card grande. */}
           <StatCard
             size="lg"
-            label="Resultado"
-            value={fmtSigned(agg.profit)}
-            tone={agg.profit >= 0 ? "positive" : "negative"}
-            accent={agg.profit >= 0 ? "#22c55e" : "#e0555a"}
+            label="Banca atual"
+            value={fmt(currentBankroll)}
+            tone={currentBankroll < 0 ? "negative" : undefined}
+            accent={currentBankroll < 0 ? "#e0555a" : "#22c55e"}
+            delta={{ text: `${fmtSigned(agg.profit)} de resultado`, positive: agg.profit >= 0 }}
           />
           <StatCard
             size="lg"
@@ -809,12 +762,18 @@ export default function BankrollPage() {
           )}
 
           <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
-            <div className="flex items-center gap-1.5">
+            <button
+              onClick={() => setGoalsModalOpen(true)}
+              className="flex w-full items-center gap-1.5 text-left"
+              title="Clique pra criar ou ajustar metas"
+            >
               <Target size={12} className="text-review" />
               <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Metas</h2>
-            </div>
+            </button>
             {goalsProgress.length === 0 ? (
-              <p className="mt-2 text-[11px] text-muted">Nenhuma meta ativa. Use o icone de alvo pra criar.</p>
+              <button onClick={() => setGoalsModalOpen(true)} className="mt-2 block text-left text-[11px] text-muted hover:text-ink">
+                Nenhuma meta ativa. Clique aqui pra criar.
+              </button>
             ) : (
               <div className="mt-2 flex flex-col gap-2">
                 {goalsProgress.map(({ goal, current, pct }) => (
@@ -857,7 +816,11 @@ export default function BankrollPage() {
             )}
           </section>
 
-          <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+          <button
+            onClick={() => setBrmModalOpen(true)}
+            className="w-full rounded-xl border border-hairline bg-surface p-3.5 text-left transition-colors hover:border-training/40"
+            title="Clique pra ajustar os limites de BRM"
+          >
             <div className="flex items-center gap-1.5">
               <Gauge size={12} className="text-training" />
               <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">BRM</h2>
@@ -883,7 +846,7 @@ export default function BankrollPage() {
             ) : (
               <p className="mt-2 text-[11px] text-muted">Registre sessoes pra ver sua leitura de BRM.</p>
             )}
-          </section>
+          </button>
         </div>
       </div>
 
@@ -1510,35 +1473,6 @@ export default function BankrollPage() {
   );
 }
 
-function HeroStat({
-  label,
-  value,
-  negative,
-  delta,
-}: {
-  label: string;
-  value: string;
-  negative?: boolean;
-  delta?: { text: string; positive: boolean };
-}) {
-  const accent = negative ? "#e0555a" : "#22c55e";
-  return (
-    <div
-      style={{ "--acc": accent } as React.CSSProperties}
-      className="acc-card relative overflow-hidden rounded-xl border border-ink/15 bg-surface p-6"
-    >
-      <div aria-hidden="true" className="acc-glow pointer-events-none absolute -right-10 -top-10 size-40 rounded-full blur-3xl" />
-      <p className="relative text-[11px] font-bold uppercase tracking-[0.14em] text-muted">{label}</p>
-      <p className={`relative mt-2 text-4xl font-bold tabular-nums ${negative ? "text-negative" : "text-ink"}`}>{value}</p>
-      {delta && (
-        <p className={`relative mt-2 text-[12px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
-          {delta.positive ? "▲" : "▼"} {delta.text}
-        </p>
-      )}
-    </div>
-  );
-}
-
 function StatCard({
   label,
   value,
@@ -1817,7 +1751,13 @@ function EvolutionChart({
   }
 
   return (
-    <svg viewBox={`0 0 ${w} ${h}`} className="h-56 w-full overflow-visible">
+    // aspect-ratio no lugar de h-56 fixo -- antes a caixa renderizada
+    // (w-full x altura fixa) quase nunca batia com a proporcao intrinseca
+    // do viewBox (640x220), entao o SVG "letterboxava" com faixas pretas
+    // nas laterais (preserveAspectRatio default = meet). Travando a
+    // proporcao da propria caixa igual ao viewBox, a faixa preta some sem
+    // esticar/distorcer os rotulos de texto (que "none" faria).
+    <svg viewBox={`0 0 ${w} ${h}`} style={{ aspectRatio: `${w} / ${h}` }} className="w-full overflow-visible">
       <defs>
         <linearGradient id={gradId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={color} stopOpacity="0.28" />

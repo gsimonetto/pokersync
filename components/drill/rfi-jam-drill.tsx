@@ -213,7 +213,13 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
   const [phaseKey, setPhaseKey] = useState<(typeof PHASES)[number]["key"]>("sbOpen");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  const [filtersOpen, setFiltersOpen] = useState(false);
+  // Desktop comeca com os filtros abertos (igual sempre foi); mobile
+  // comeca fechado (gaveta, evita cobrir a mesa de cara). matchMedia so'
+  // roda uma vez no mount, no client.
+  const [filtersOpen, setFiltersOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 769px)").matches;
+  });
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<"fold" | "action" | null>(null);
@@ -439,8 +445,9 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
       <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minHeight: 34 }}>
         <button
           className="ps-tr-filters-toggle"
-          onClick={() => setFiltersOpen(true)}
-          style={{ alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0 }}
+          onClick={() => setFiltersOpen((v) => !v)}
+          title={filtersOpen ? "Esconder filtros" : "Mostrar filtros"}
+          style={{ alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: filtersOpen ? "rgba(255,255,255,0.10)" : "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0 }}
         >
           <SlidersHorizontal size={15} strokeWidth={1.5} />
         </button>
@@ -458,11 +465,15 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
         {tabs}
       </div>
 
-      <div className="ps-tr-body" style={{ display: "grid", gridTemplateColumns: "240px minmax(0, 1fr)", gap: 12, minHeight: 0 }}>
-        <div className={`ps-tr-filters${filtersOpen ? " ps-tr-filters--open" : ""}`} style={{ position: "relative", minHeight: 0 }}>
+      <div className="ps-tr-body" style={{ display: "grid", gridTemplateColumns: filtersOpen ? "240px minmax(0, 1fr)" : "0px minmax(0, 1fr)", gap: filtersOpen ? 12 : 0, minHeight: 0, transition: "grid-template-columns 180ms ease, gap 180ms ease" }}>
+        <div
+          className={`ps-tr-filters${filtersOpen ? " ps-tr-filters--open" : ""}`}
+          style={{ position: "relative", minHeight: 0, overflow: filtersOpen ? "visible" : "hidden" }}
+        >
           {filtersOpen && (
             <button
               onClick={() => setFiltersOpen(false)}
+              title="Esconder filtros"
               style={{ position: "absolute", top: 10, right: 10, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)" }}
             >
               <X size={15} />
@@ -552,7 +563,11 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
         </div>
 
         {filtersOpen && (
-          <div onClick={() => setFiltersOpen(false)} style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 39 }} />
+          <div
+            className="ps-tr-filters-backdrop"
+            onClick={() => setFiltersOpen(false)}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 39 }}
+          />
         )}
 
         <div className="ps-tr-table-col" style={{ display: "flex", flexDirection: "column", minHeight: 0 }}>

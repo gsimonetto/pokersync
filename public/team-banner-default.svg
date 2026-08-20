@@ -1,0 +1,18 @@
+<svg width="1600" height="400" viewBox="0 0 1600 400" xmlns="http://www.w3.org/2000/svg">
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1600" y2="400" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#0c0c0f"/>
+      <stop offset="1" stop-color="#151519"/>
+    </linearGradient>
+    <pattern id="suits" width="120" height="120" patternUnits="userSpaceOnUse" patternTransform="rotate(-12)">
+      <g fill="#ffffff" fill-opacity="0.035">
+        <path d="M20 8c-8 0-14 6-14 13 0 8 8 12 14 20 6-8 14-12 14-20 0-7-6-13-14-13z"/>
+        <path d="M80 10l7 13 14 2-10 10 2 14-13-7-13 7 2-14-10-10 14-2z"/>
+      </g>
+    </pattern>
+  </defs>
+  <rect width="1600" height="400" fill="url(#bg)"/>
+  <rect width="1600" height="400" fill="url(#suits)"/>
+  <circle cx="1420" cy="80" r="220" fill="#ffffff" fill-opacity="0.03"/>
+  <circle cx="1520" cy="260" r="140" fill="#ffffff" fill-opacity="0.025"/>
+</svg>

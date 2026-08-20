@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { ArrowLeft } from "lucide-react";
 import type { ComponentType, ReactNode } from "react";
 
@@ -26,7 +26,7 @@ export function AppHeader({
   subtitle,
   right,
 }: {
-  /** Volta pra uma rota fixa (Link). Use `onBack` quando a volta depende de estado (ex: telas empilhadas dentro da mesma pagina). */
+  /** Fallback so' usado quando nao ha historico de navegacao (ex: link direto/notificacao) — o clique normal volta pra tela anterior de verdade (router.back), nao pra uma rota fixa, ja que "ir pro inicio" e' o icone Home do TopNav. */
   backHref?: string;
   onBack?: () => void;
   icon?: ComponentType<{ size?: number; style?: React.CSSProperties }>;
@@ -38,7 +38,17 @@ export function AppHeader({
   subtitle?: ReactNode;
   right?: ReactNode;
 }) {
+  const router = useRouter();
   const [compacto, setCompacto] = useState(false);
+
+  function handleBack() {
+    if (onBack) return onBack();
+    if (typeof window !== "undefined" && window.history.length > 1) {
+      router.back();
+    } else if (backHref) {
+      router.push(backHref);
+    }
+  }
 
   // Threshold com histerese (some so' depois de 56px, volta so' abaixo de
   // 16px) em vez de reagir a 1px de scroll — evita o header "piscar"
@@ -68,23 +78,15 @@ export function AppHeader({
         compacto ? "border-hairline py-2.5" : "border-transparent py-4"
       }`}
     >
-      {backHref ? (
-        <Link
-          href={backHref}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-          aria-label="Voltar"
-        >
-          <ArrowLeft size={18} />
-        </Link>
-      ) : onBack ? (
+      {(backHref || onBack) && (
         <button
-          onClick={onBack}
+          onClick={handleBack}
           className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
           aria-label="Voltar"
         >
           <ArrowLeft size={18} />
         </button>
-      ) : null}
+      )}
 
       {!compacto && iconNode}
       {!compacto && !iconNode && Icon && <Icon size={20} style={iconColor ? { color: iconColor } : undefined} />}
