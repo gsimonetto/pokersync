@@ -7,7 +7,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 export default function ArvoresPage() {
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <AppHeader backHref="/modulos" right={<RangesTabs active="arvores" />} />
+      <AppHeader right={<RangesTabs active="arvores" />} />
 
       <TreeList />
     </main>

@@ -156,7 +156,7 @@ export function AdminDrillsPanel() {
         </div>
         <button
           onClick={openNew}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-review px-3 py-2 text-[13px] font-semibold text-void"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-[13px] font-semibold text-void"
         >
           <Plus size={14} /> Novo
         </button>
@@ -324,7 +324,7 @@ export function AdminDrillsPanel() {
             <button
               onClick={save}
               disabled={saving}
-              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-review px-3 py-2 text-[13px] font-semibold text-void disabled:opacity-50"
+              className="mt-3 flex w-full items-center justify-center gap-1.5 rounded-lg bg-ink px-3 py-2 text-[13px] font-semibold text-void disabled:opacity-50"
             >
               {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />} Salvar
             </button>

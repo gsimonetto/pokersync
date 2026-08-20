@@ -12,7 +12,7 @@ function EquidadePageInner() {
 
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <AppHeader backHref="/modulos" right={<RangesTabs active="equidade" />} />
+      <AppHeader right={<RangesTabs active="equidade" />} />
 
       <EquityCalculator initialRangeId={rangeId} />
     </main>

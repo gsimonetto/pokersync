@@ -281,7 +281,7 @@ export function AderenciaRange() {
                                 onClick={() => handleSendToReview(row)}
                                 disabled={sent || sendingHandId === row.handId}
                                 className={`flex items-center gap-1 rounded-md border px-2 py-1 text-[11px] font-medium transition-colors disabled:opacity-60 ${
-                                  sent ? "border-positive/40 text-positive" : "border-hairline text-ink hover:border-review/50"
+                                  sent ? "border-positive/40 text-positive" : "border-hairline text-ink hover:border-ink/40"
                                 }`}
                               >
                                 {sent ? <Check size={11} /> : <Send size={11} />}

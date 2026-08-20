@@ -579,12 +579,20 @@ export function PokerTable({
         </div>
       )}
 
+      {/* aspectRatio fixo -- antes a mesa era so' "flex:1; width:100%",
+          esticando pra qualquer proporcao que a caixa disponivel tivesse
+          (bug reportado: "mesa esticada"). Com proporcao travada e auto
+          margins, ela sempre desenha uma oval de mesa de verdade, do
+          maior tamanho que couber sem estourar largura nem altura. */}
       <div
         style={{
           position: "relative",
-          flex: 1,
-          minHeight: 0,
+          flex: "0 1 auto",
           width: "100%",
+          maxWidth: "100%",
+          maxHeight: "100%",
+          aspectRatio: "8 / 5",
+          margin: "auto",
           overflow: "hidden",
           borderRadius: "50%",
         }}

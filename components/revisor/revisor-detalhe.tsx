@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight, Link2, Wallet, Gauge } from "lucide-react";
+import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight, Link2, Wallet, Gauge, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
@@ -26,6 +26,7 @@ import {
   fetchRecentBankrollSessions,
   fetchBankrollSessionById,
   linkReviewToSession,
+  setSpotSaved,
   type ReviewDetail,
   type ReviewAnswer,
   type StreetEval,
@@ -117,7 +118,7 @@ function GuidedQuestionChip({
       >
         <span
           className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full text-[8.5px] font-bold ${
-            answered ? "bg-review text-void" : "border border-hairline text-muted"
+            answered ? "bg-ink text-void" : "border border-hairline text-muted"
           }`}
         >
           {answered ? "✓" : index + 1}
@@ -131,7 +132,7 @@ function GuidedQuestionChip({
           rows={2}
           autoFocus
           placeholder="Sua análise…"
-          className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
+          className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
         />
       )}
     </div>
@@ -216,7 +217,7 @@ function GuidedQuestionsModal({
                     onChange={(e) => onChange(idx, e.target.value)}
                     rows={2}
                     placeholder="Sua análise…"
-                    className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
+                    className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
                   />
                 </div>
               );
@@ -295,6 +296,25 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [recentSessions, setRecentSessions] = useState<BankrollSessionOption[]>([]);
   const [sessionEditorOpen, setSessionEditorOpen] = useState(false);
   const [savingSession, setSavingSession] = useState(false);
+
+  // "Salvar spot" -- mãos que valeram a pena guardar pra rever depois,
+  // com biblioteca própria (ver RevisorSpotsSalvos) separada da fila
+  // normal. Otimista: atualiza a tela na hora, desfaz se a chamada falhar.
+  const [savingSpot, setSavingSpot] = useState(false);
+  async function toggleSaved() {
+    if (!review || savingSpot) return;
+    const next = !review.saved;
+    setReview({ ...review, saved: next });
+    setSavingSpot(true);
+    try {
+      await setSpotSaved(review.id, next);
+    } catch {
+      setReview((r) => (r ? { ...r, saved: !next } : r));
+      setError("Erro ao salvar o spot.");
+    } finally {
+      setSavingSpot(false);
+    }
+  }
 
   useEffect(() => {
     (async () => {
@@ -724,7 +744,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           onChange={(e) => setLearning(e.target.value)}
           rows={2}
           placeholder="Ex.: Subestimei blockers do vilão no river em spot 3B pot OOP."
-          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
+          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
         />
       </section>
 
@@ -738,7 +758,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           onChange={(e) => setDrill(e.target.value)}
           rows={2}
           placeholder="Ex.: BB defense vs BTN open — 20–30bb."
-          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-review"
+          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
         />
       </section>
 
@@ -760,7 +780,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         <button
           onClick={() => persist("concluida")}
           disabled={saving || !canConclude}
-          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-review px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
+          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
         >
           {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
           Concluir revisão
@@ -785,7 +805,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                 agora tambem disponivel aqui na revisao. */}
             <button
               onClick={() => setTagEditorOpen((v) => !v)}
-              className="flex items-center gap-1 rounded border border-dashed border-hairline px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:border-review/50 hover:text-review"
+              className="flex items-center gap-1 rounded border border-dashed border-hairline px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:border-ink/40 hover:text-review"
             >
               <TagIcon size={10} /> {review.tags.length === 0 ? "Marcar" : "Editar"}
             </button>
@@ -803,7 +823,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                       onClick={() => toggleReviewTag(t.id)}
                       disabled={savingTags}
                       className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-50 ${
-                        active ? "border-review bg-review text-void" : "border-hairline bg-transparent text-ink"
+                        active ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
                       }`}
                     >
                       {t.label}
@@ -817,11 +837,11 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   onChange={(e) => setNewTagLabel(e.target.value)}
                   onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
                   placeholder="Criar marcador"
-                  className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-ink outline-none focus:border-review"
+                  className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-ink outline-none focus:border-ink/40"
                 />
                 <button
                   onClick={handleCreateTag}
-                  className="flex shrink-0 items-center gap-1 rounded-md bg-review px-2 py-1 text-[11px] font-semibold text-void"
+                  className="flex shrink-0 items-center gap-1 rounded-md bg-ink px-2 py-1 text-[11px] font-semibold text-void"
                 >
                   <Plus size={11} /> Criar
                 </button>
@@ -887,12 +907,25 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </div>
 
         <div className="flex shrink-0 items-center gap-1.5">
+          {/* Salvar spot -- maos que valeram a pena guardar pra rever
+              depois, com biblioteca propria (aba "Salvos"). */}
+          <button
+            onClick={toggleSaved}
+            disabled={savingSpot}
+            title={review.saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
+            className={`grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg border transition-colors disabled:opacity-50 ${
+              review.saved ? "border-ink bg-ink text-void" : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
+            }`}
+          >
+            <Bookmark size={15} fill={review.saved ? "currentColor" : "none"} />
+          </button>
+
           {/* Perguntas guiadas — lugar estrategico (cabecalho, sempre
               visivel, nao precisa rolar) — abre modal em vez de ocupar
               espaco fixo na coluna. */}
           <button
             onClick={() => setGuidedModalOpen(true)}
-            className="relative flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-review/40"
+            className="relative flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40"
           >
             <HelpCircle size={14} className="text-review" />
             Perguntas

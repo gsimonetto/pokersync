@@ -11,7 +11,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 export default function RangesPage() {
   return (
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <AppHeader backHref="/modulos" right={<RangesTabs active="ranges" />} />
+      <AppHeader right={<RangesTabs active="ranges" />} />
 
       <RangeEditor id="novo" />
     </main>

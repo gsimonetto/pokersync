@@ -60,6 +60,9 @@ export interface ReviewListItem {
   concluded_at: string | null;
   tags: Tag[];
   thumb: string | null;
+  // Spot marcado pra revisar depois -- independente do status (concluida
+  // ou nao), fica visivel na Biblioteca sem precisar reabrir a fila toda.
+  saved: boolean;
 }
 
 export interface ReviewDetail extends ReviewListItem {
@@ -209,14 +212,14 @@ export async function createReview(
 
 export async function listReviews(
   userId: string,
-  { status }: { status?: string } = {}
+  { status, saved }: { status?: string; saved?: boolean } = {}
 ): Promise<ReviewListItem[]> {
   const supabase = createClient();
   let q = supabase
     .from("hand_reviews")
     .select(
       `
-      id, title, free_text, status, created_at, updated_at, concluded_at,
+      id, title, free_text, status, created_at, updated_at, concluded_at, saved,
       hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
       hand_review_images ( id, storage_path, position )
     `
@@ -225,6 +228,7 @@ export async function listReviews(
     .order("created_at", { ascending: false });
 
   if (status) q = q.eq("status", status);
+  if (saved != null) q = q.eq("saved", saved);
   const { data, error } = await q;
   if (error) throw error;
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -255,7 +259,7 @@ export async function getReview(reviewId: string): Promise<ReviewDetail> {
     .from("hand_reviews")
     .select(
       `
-      id, user_id, title, free_text, hand_history, status,
+      id, user_id, title, free_text, hand_history, status, saved,
       learning_note, drill_suggestion, created_at, updated_at, concluded_at,
       parsed_data, source, session_id,
       hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
@@ -333,6 +337,14 @@ export async function updateReviewProgress(reviewId: string, patch: Record<strin
   const { data, error } = await supabase.from("hand_reviews").update(patch).eq("id", reviewId).select().single();
   if (error) throw error;
   return data;
+}
+
+// "Salvar spot" -- mãos que valeram a pena guardar pra rever depois,
+// independente de já estar concluída ou não. Fica separado de status
+// (rascunho/concluída) porque são eixos diferentes: uma mão pode estar
+// concluída e ainda assim não valer a pena guardar, ou vice-versa.
+export async function setSpotSaved(reviewId: string, saved: boolean) {
+  await updateReviewProgress(reviewId, { saved });
 }
 
 // ============================================================

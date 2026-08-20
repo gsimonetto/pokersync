@@ -230,7 +230,7 @@ export function RevisorFila({
           <button
             onClick={() => setTab("sessoes")}
             className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-              tab === "sessoes" ? "border-review bg-review text-void" : "border-hairline bg-transparent text-ink"
+              tab === "sessoes" ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
             }`}
           >
             Torneios e sessões
@@ -238,7 +238,7 @@ export function RevisorFila({
           <button
             onClick={() => setTab("avulsas")}
             className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-              tab === "avulsas" ? "border-review bg-review text-void" : "border-hairline bg-transparent text-ink"
+              tab === "avulsas" ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
             }`}
           >
             Mãos avulsas
@@ -246,7 +246,7 @@ export function RevisorFila({
         </div>
         <button
           onClick={onNova}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-review px-3.5 py-2 text-[13px] font-semibold text-void"
+          className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
         >
           <Plus size={16} />
           Nova mão
@@ -270,7 +270,7 @@ export function RevisorFila({
               onClick={() => toggleSessionChip("pko")}
               className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
                 sessionChipFilters.has("pko")
-                  ? "border-review bg-review/15 text-review"
+                  ? "border-ink bg-ink text-void"
                   : "border-hairline bg-transparent text-muted"
               }`}
             >
@@ -280,7 +280,7 @@ export function RevisorFila({
               onClick={() => toggleSessionChip("mystery")}
               className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
                 sessionChipFilters.has("mystery")
-                  ? "border-review bg-review/15 text-review"
+                  ? "border-ink bg-ink text-void"
                   : "border-hairline bg-transparent text-muted"
               }`}
             >
@@ -294,7 +294,7 @@ export function RevisorFila({
               }}
               title="Buscar torneios/sessões"
               className={`ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-colors ${
-                sessionSearchOpen ? "border-review bg-review/15 text-review" : "border-hairline text-muted"
+                sessionSearchOpen ? "border-ink bg-ink text-void" : "border-hairline text-muted"
               }`}
             >
               <Search size={13} />
@@ -342,7 +342,7 @@ export function RevisorFila({
               </p>
               <button
                 onClick={onNova}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-review px-3.5 py-2 text-[13px] font-semibold text-void"
+                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
               >
                 <Plus size={16} />
                 Importar primeira mão
@@ -360,7 +360,7 @@ export function RevisorFila({
                   <li
                     key={s.id}
                     onClick={() => onOpenSession(s.id)}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-review/40"
+                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/40"
                   >
                     <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-void">
                       {/* Icone generico de torneio virou "Flag" (pedido
@@ -406,7 +406,7 @@ export function RevisorFila({
                       {!s.champion && s.final_place == null && s.reached_ft && (
                         <span
                           title="Chegou na mesa final"
-                          className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-review px-1 shadow-[0_0_8px_rgba(168,85,247,.55)]"
+                          className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 shadow-[0_0_8px_rgba(255,255,255,.35)]"
                         >
                           <span className="text-[8.5px] font-bold text-void">FT</span>
                         </span>
@@ -450,7 +450,7 @@ export function RevisorFila({
                   key={f.id}
                   onClick={() => setFilter(f.id)}
                   className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    active ? "border-review bg-review text-void" : "border-hairline bg-transparent text-ink"
+                    active ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
                   }`}
                 >
                   {f.label}
@@ -477,7 +477,7 @@ export function RevisorFila({
               <p className="mt-3 text-muted">Nenhuma mão avulsa aqui ainda.</p>
               <button
                 onClick={onNova}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-review px-3.5 py-2 text-[13px] font-semibold text-void"
+                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
               >
                 <Plus size={16} />
                 Registrar primeira mão
@@ -492,7 +492,7 @@ export function RevisorFila({
                   <li
                     key={r.id}
                     onClick={() => onOpen(r.id)}
-                    className="flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-colors hover:border-review/40"
+                    className="flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-colors hover:border-ink/40"
                   >
                     <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">
                       {thumbs[r.id] ? (

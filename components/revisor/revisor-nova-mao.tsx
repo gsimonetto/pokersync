@@ -434,7 +434,7 @@ export function RevisorNovaMao({
 
       {/* ================= MODAL: RESOLUCAO DE SESSAO ================= */}
       {sessionFlow.kind === "attach_or_new" && (
-        <div className="mb-3.5 rounded-xl border border-review/40 bg-surface p-4">
+        <div className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
           <div className="mb-1 flex items-center gap-2">
             <Trophy size={16} className="text-review" />
             <label className="text-sm font-semibold text-ink">Torneio já existe</label>
@@ -446,7 +446,7 @@ export function RevisorNovaMao({
           <div className="flex gap-2.5">
             <button
               onClick={handleAttachToExisting}
-              className="flex-1 rounded-lg bg-review px-3.5 py-2 text-[13px] font-semibold text-void"
+              className="flex-1 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
             >
               Anexar a {sessionFlow.existing.label}
             </button>
@@ -461,7 +461,7 @@ export function RevisorNovaMao({
       )}
 
       {sessionFlow.kind === "new_tournament_form" && (
-        <div className="mb-3.5 rounded-xl border border-review/40 bg-surface p-4">
+        <div className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
           <div className="mb-1 flex items-center gap-2">
             <Trophy size={16} className="text-review" />
             <label className="text-sm font-semibold text-ink">{sessionFlow.label}</label>
@@ -478,7 +478,7 @@ export function RevisorNovaMao({
                 key={f.value}
                 onClick={() => setFormatChoice(f.value)}
                 className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                  formatChoice === f.value ? "border-review bg-review text-void" : "border-hairline bg-void text-ink"
+                  formatChoice === f.value ? "border-ink bg-ink text-void" : "border-hairline bg-void text-ink"
                 }`}
               >
                 {f.label}
@@ -500,7 +500,7 @@ export function RevisorNovaMao({
                 value={bountyInput}
                 onChange={(e) => setBountyInput(e.target.value)}
                 placeholder="Ex.: 12.50"
-                className="w-full rounded-lg border border-hairline bg-void px-3 py-2.5 text-sm text-ink outline-none focus:border-review"
+                className="w-full rounded-lg border border-hairline bg-void px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
               />
             </div>
           )}
@@ -509,7 +509,7 @@ export function RevisorNovaMao({
 
           <button
             onClick={handleCreateTournamentSession}
-            className="w-full rounded-lg bg-review px-3.5 py-2.5 text-[13px] font-semibold text-void"
+            className="w-full rounded-lg bg-ink px-3.5 py-2.5 text-[13px] font-semibold text-void"
           >
             Criar torneio e salvar mão
           </button>
@@ -525,7 +525,7 @@ export function RevisorNovaMao({
 
       {/* ================= BLOCO PRIMARIO: IMPORT ================= */}
       {sessionFlow.kind === "idle" && (
-        <section className="mb-3.5 rounded-xl border border-review/40 bg-surface p-4">
+        <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
           <div className="mb-1 flex items-center gap-2">
             <Upload size={16} className="text-review" />
             <label className="text-sm font-semibold text-ink">Importar hand history</label>
@@ -548,7 +548,7 @@ export function RevisorNovaMao({
                   onChange={(e) => setImportText(e.target.value)}
                   placeholder="PokerStars Hand #123456789: Tournament #..."
                   rows={7}
-                  className="w-full resize-y rounded-lg border border-hairline bg-void p-3 font-mono text-xs text-ink outline-none focus:border-review"
+                  className="w-full resize-y rounded-lg border border-hairline bg-void p-3 font-mono text-xs text-ink outline-none focus:border-ink/40"
                 />
               </div>
               <div className="mt-2 flex items-center justify-between">
@@ -565,7 +565,7 @@ export function RevisorNovaMao({
                 <button
                   onClick={handleImport}
                   disabled={!importText.trim() || importing}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-review px-3.5 py-2 text-[13px] font-semibold text-void disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void disabled:opacity-50"
                 >
                   {importing ? <Loader2 size={14} className="animate-spin" /> : <Upload size={14} />}
                   Importar
@@ -587,12 +587,12 @@ export function RevisorNovaMao({
                       key={idx}
                       onClick={() => toggleHandSelection(idx)}
                       className={`flex cursor-pointer items-center gap-2.5 rounded-lg border p-2.5 text-xs transition-colors ${
-                        checked ? "border-review bg-review/10" : "border-hairline bg-void"
+                        checked ? "border-ink bg-ink/10" : "border-hairline bg-void"
                       }`}
                     >
                       <span
                         className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${
-                          checked ? "border-review bg-review" : "border-hairline"
+                          checked ? "border-ink bg-ink" : "border-hairline"
                         }`}
                       >
                         {checked && <Check size={11} className="text-void" />}
@@ -613,7 +613,7 @@ export function RevisorNovaMao({
                 <button
                   onClick={confirmImport}
                   disabled={selectedHands.length === 0 || importing}
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-review px-3.5 py-2 text-[13px] font-semibold text-void disabled:opacity-50"
+                  className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void disabled:opacity-50"
                 >
                   {importing ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                   Importar {selectedHands.length} selecionada{selectedHands.length === 1 ? "" : "s"}
@@ -642,7 +642,7 @@ export function RevisorNovaMao({
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Ex.: 3B pot vs BTN — river tough"
-                className="mb-3.5 w-full rounded-lg border border-hairline bg-void px-3 py-2.5 text-sm text-ink outline-none focus:border-review"
+                className="mb-3.5 w-full rounded-lg border border-hairline bg-void px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
               />
 
               <label className="mb-2 block text-[13px] text-muted">Descrição livre</label>
@@ -651,7 +651,7 @@ export function RevisorNovaMao({
                 onChange={(e) => setFreeText(e.target.value)}
                 placeholder="Descreva o contexto, sizings, reads, dúvidas..."
                 rows={4}
-                className="mb-3.5 w-full resize-y rounded-lg border border-hairline bg-void p-3 text-sm text-ink outline-none focus:border-review"
+                className="mb-3.5 w-full resize-y rounded-lg border border-hairline bg-void p-3 text-sm text-ink outline-none focus:border-ink/40"
               />
 
               <div className="mb-3.5">
@@ -719,7 +719,7 @@ export function RevisorNovaMao({
                         type="button"
                         onClick={() => toggleTag(t.id)}
                         className={`rounded-full border px-2.5 py-1.5 text-xs transition-colors ${
-                          active ? "border-review bg-review text-void" : "border-hairline bg-transparent text-ink"
+                          active ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
                         }`}
                       >
                         {t.label}
@@ -733,7 +733,7 @@ export function RevisorNovaMao({
                     value={newTagLabel}
                     onChange={(e) => setNewTagLabel(e.target.value)}
                     placeholder="Criar nova etiqueta"
-                    className="flex-1 rounded-lg border border-hairline bg-void px-3 py-2.5 text-sm text-ink outline-none focus:border-review"
+                    className="flex-1 rounded-lg border border-hairline bg-void px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
                     onKeyDown={(e) => {
                       if (e.key === "Enter") {
                         e.preventDefault();
@@ -781,7 +781,7 @@ export function RevisorNovaMao({
                         key={s.id}
                         onClick={() => setSelectedSessionId(active ? null : s.id)}
                         className={`rounded-full border px-2.5 py-1.5 text-xs transition-colors ${
-                          active ? "border-review bg-review text-void" : "border-hairline bg-void text-ink"
+                          active ? "border-ink bg-ink text-void" : "border-hairline bg-void text-ink"
                         }`}
                       >
                         {[s.format, s.stake, s.date].filter(Boolean).join(" · ")}
@@ -816,7 +816,7 @@ export function RevisorNovaMao({
             type="button"
             onClick={() => saveManual(true)}
             disabled={!canSaveManual || saving}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-review px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Play size={16} />}
             Salvar e começar revisão

@@ -399,19 +399,21 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
   // Quem senta como "herói" na mesa varia por situação: sbOpen/sbCallJam
   // testam a decisão de quem abre (heroPos), bbJam testa a decisão de
   // quem defende (villainPos) -- a mesa reflete isso trocando quem
-  // recebe as cartas viradas, mesmo a posição ancorada embaixo
-  // continuando sendo a do filtro "Posição Herói" (simplificação
-  // deliberada da v1: não gira a mesa por fase, só troca quem age).
+  // recebe as cartas viradas. O anel gira em torno de quem esta' de
+  // fato agindo (activeHeroSeat), nao mais sempre em torno do filtro
+  // "Posição Herói" -- sem isso, na fase bbJam quem decide (o defensor)
+  // podia cair fora do slot de baixo, quebrando a convencao de "hero
+  // sempre embaixo" que o resto do produto (Replay) já segue.
   const activeHeroSeat = phaseKey === "bbJam" ? villainPos : heroPos;
   const activeVillainSeat = phaseKey === "bbJam" ? heroPos : villainPos;
 
   const { seatLayout, layoutError } = useMemo(() => {
     try {
-      return { seatLayout: computeStylizedSeatLayout(heroPos), layoutError: null as Error | null };
+      return { seatLayout: computeStylizedSeatLayout(activeHeroSeat), layoutError: null as Error | null };
     } catch (e) {
       return { seatLayout: null, layoutError: e instanceof Error ? e : new Error("Posição inválida.") };
     }
-  }, [heroPos]);
+  }, [activeHeroSeat]);
 
   const tableHand: TableHand | null = useMemo(() => {
     if (!spot || !round) return null;
