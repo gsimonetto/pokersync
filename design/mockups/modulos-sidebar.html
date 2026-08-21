@@ -329,126 +329,114 @@
   /* Icons */
   .icon { width: 18px; height: 18px; display: inline-block; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 
-  /* ============ GRID DE MÓDULOS ============ */
-  /* Preenche o espaço abaixo do perfil com a função real desta tela --
-     lançador rápido dos módulos -- em vez de deixar area nobre vazia. */
-  .modules-section {
+  /* ============ FREQUÊNCIAS PRÉ-FLOP ============ */
+  /* Reusa o mesmo componente-régua (faixa de referência + marcador) que
+     ja existe hoje em app/performance/page.tsx (função Frequencia) --
+     estatística real do Player Evolution, sem duplicar navegação. */
+  .freq-panel {
     flex: 1;
     min-height: 0;
-    display: flex;
-    flex-direction: column;
-  }
-  .modules-head {
-    display: flex;
-    align-items: center;
-    justify-content: space-between;
-    margin-bottom: 10px;
-    flex-shrink: 0;
-  }
-  .modules-head h3 {
-    margin: 0;
-    font-size: 13px;
-    font-weight: 500;
-    color: var(--muted);
-  }
-  .modules-head span { font-size: 12px; color: rgba(196, 199, 200, 0.6); }
-
-  .modules-grid {
-    flex: 1;
-    min-height: 0;
-    display: grid;
-    grid-template-columns: repeat(4, 1fr);
-    grid-template-rows: repeat(2, 1fr);
-    gap: 12px;
-  }
-  .module-card {
-    --acc: #2fb89a;
-    position: relative;
-    height: 100%;
     border-radius: 12px;
     border: 1px solid var(--hairline);
     background: var(--surface);
-    padding: 16px;
-    text-decoration: none;
+    padding: 20px;
     display: flex;
     flex-direction: column;
-    overflow: hidden;
-    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
   }
-  .module-card:hover,
-  .module-card.is-active {
-    border-color: var(--acc);
-    box-shadow: 0 12px 34px -10px var(--acc);
-    transform: translateY(-2px);
+  .freq-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-shrink: 0;
   }
-  .module-glow {
-    position: absolute;
-    left: -32px;
-    top: -32px;
-    width: 112px;
-    height: 112px;
-    border-radius: 999px;
-    background: var(--acc);
-    filter: blur(28px);
-    opacity: 0;
-    transition: opacity 0.3s ease;
-    pointer-events: none;
-  }
-  .module-card:hover .module-glow,
-  .module-card.is-active .module-glow { opacity: 0.22; }
-
-  .module-top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
-  .module-icon-box {
-    width: 36px;
-    height: 36px;
-    border-radius: 8px;
-    background: var(--elevated);
-    border: 1px solid var(--hairline);
-    display: grid;
-    place-items: center;
-    color: var(--muted);
-    transition: color 0.2s ease, border-color 0.2s ease;
-  }
-  .module-card:hover .module-icon-box,
-  .module-card.is-active .module-icon-box { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 40%, transparent); }
-
-  .module-arrow {
-    color: var(--acc);
-    opacity: 0;
-    transform: translateX(-4px);
-    transition: opacity 0.2s ease, transform 0.2s ease;
-  }
-  .module-card:hover .module-arrow,
-  .module-card.is-active .module-arrow { opacity: 1; transform: translateX(0); }
-
-  .module-badge {
-    border-radius: 999px;
-    border: 1px solid var(--hairline);
-    padding: 2px 8px;
+  .freq-head-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
     font-size: 10px;
     font-weight: 700;
     text-transform: uppercase;
-    letter-spacing: 0.04em;
+    letter-spacing: 0.14em;
     color: var(--muted);
   }
-
-  .module-card h4 {
-    position: relative;
-    margin: 12px 0 0;
-    font-size: 14px;
-    font-weight: 600;
-    color: var(--ink);
-    transition: color 0.2s ease;
-  }
-  .module-card:hover h4,
-  .module-card.is-active h4 { color: var(--acc); }
-  .module-card p {
-    position: relative;
-    margin: 4px 0 0;
+  .freq-head a {
+    display: flex;
+    align-items: center;
+    gap: 4px;
     font-size: 12px;
-    line-height: 1.4;
     color: var(--muted);
+    text-decoration: none;
   }
+  .freq-head a:hover { color: var(--ink); }
+
+  .freq-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(3, 1fr);
+    gap: 14px;
+  }
+  .freq-card {
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    background: var(--elevated);
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .freq-card .label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.12em;
+    color: rgba(196, 199, 200, 0.8);
+  }
+  .freq-card .value {
+    margin-top: 4px;
+    font-size: 26px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .freq-track {
+    position: relative;
+    margin-top: 18px;
+    height: 4px;
+    width: 100%;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .freq-band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .freq-marker {
+    position: absolute;
+    top: 50%;
+    width: 3px;
+    height: 14px;
+    transform: translate(-50%, -50%);
+    border-radius: 999px;
+    background: var(--training);
+    box-shadow: 0 0 8px rgba(59, 130, 246, 0.6);
+  }
+  .freq-card .foot {
+    margin-top: 10px;
+    font-size: 11px;
+    color: rgba(196, 199, 200, 0.7);
+  }
+  .freq-sample {
+    margin-top: 12px;
+    font-size: 11px;
+    color: rgba(196, 199, 200, 0.7);
+    flex-shrink: 0;
+  }
+  .freq-sample strong { color: rgba(255, 255, 255, 0.85); }
 </style>
 </head>
 <body>
@@ -647,6 +635,61 @@
             </div>
           </div>
         </div>
+      </section>
+
+      <!-- Frequências pré-flop: mesmo componente-régua do Player Evolution
+           hoje (app/performance/page.tsx, função Frequencia) -- faixa de
+           referência + marcador, não estatística inventada nem card
+           genérico. VPIP/ROI/ITM já aparecem na coluna 3 do perfil, então
+           aqui entra só o que falta: PFR e a leitura visual das 3. -->
+      <section class="freq-panel">
+        <div class="freq-head">
+          <div class="freq-head-title">
+            <svg class="icon" style="width:14px;height:14px;color:#3b82f6"><use href="#i-target"/></svg>
+            Frequências pré-flop
+          </div>
+          <a href="#">
+            Ver Player Evolution
+            <svg class="icon" style="width:12px;height:12px"><use href="#i-arrow-right"/></svg>
+          </a>
+        </div>
+
+        <div class="freq-grid">
+          <!-- VPIP: valor 24,5 / escala 60 -> 40.8%; ref 18-28 -->
+          <div class="freq-card">
+            <p class="label">VPIP</p>
+            <p class="value tnum">24,5%</p>
+            <div class="freq-track">
+              <div class="freq-band" style="left:30%; width:16.7%;"></div>
+              <div class="freq-marker" style="left:40.8%;"></div>
+            </div>
+            <p class="foot">dentro da referência (18–28%)</p>
+          </div>
+
+          <!-- PFR: valor 17,8 / escala 60 -> 29.7%; ref 14-22 -->
+          <div class="freq-card">
+            <p class="label">PFR</p>
+            <p class="value tnum">17,8%</p>
+            <div class="freq-track">
+              <div class="freq-band" style="left:23.3%; width:13.3%;"></div>
+              <div class="freq-marker" style="left:29.7%;"></div>
+            </div>
+            <p class="foot">dentro da referência (14–22%)</p>
+          </div>
+
+          <!-- 3-Bet: valor 8,2 / escala 20 -> 41%; ref 5-10 -->
+          <div class="freq-card">
+            <p class="label">3-Bet</p>
+            <p class="value tnum">8,2%</p>
+            <div class="freq-track">
+              <div class="freq-band" style="left:25%; width:25%;"></div>
+              <div class="freq-marker" style="left:41%;"></div>
+            </div>
+            <p class="foot">dentro da referência (5–10%)</p>
+          </div>
+        </div>
+
+        <p class="freq-sample">Calculado sobre <strong>4.812</strong> mãos com hand history estruturada.</p>
       </section>
 
     </main>
