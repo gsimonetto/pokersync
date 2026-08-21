@@ -7,6 +7,7 @@ import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, fetchReviewSummary, type ReviewListItem, type ReviewSummary } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { LeaksCard } from "./leaks-card";
+import { useConfirm } from "@/components/confirm-dialog";
 
 const FILTERS = [
   { id: "todas", label: "Todas", status: null as string | null },
@@ -38,6 +39,7 @@ export function RevisorFila({
   onOpenSession: (sessionId: string) => void;
 }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("sessoes");
 
@@ -151,7 +153,7 @@ export function RevisorFila({
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir esta mão? Ação não pode ser desfeita.")) return;
+    if (!(await confirm({ title: "Excluir mão", message: "Essa ação não pode ser desfeita.", confirmLabel: "Excluir" }))) return;
     try {
       await deleteReview(id);
       setItems((prev) => prev.filter((r) => r.id !== id));

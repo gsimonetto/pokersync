@@ -16,6 +16,7 @@ import {
   Upload,
 } from "lucide-react";
 import { ImportHandModal } from "@/components/ranges/import-hand-modal";
+import { useConfirm } from "@/components/confirm-dialog";
 import { TagPicker } from "@/components/shared/tag-picker";
 import {
   addChildNode,
@@ -162,6 +163,7 @@ function NodeEditor({
 
 export function TreeEditor({ id }: { id: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const isNew = id === "nova";
 
   const [loading, setLoading] = useState(!isNew);
@@ -263,7 +265,7 @@ export function TreeEditor({ id }: { id: string }) {
 
   async function handleDelete() {
     if (!treeId) return;
-    if (!confirm("Excluir esta árvore? Essa ação não pode ser desfeita.")) return;
+    if (!(await confirm({ title: "Excluir árvore", message: "Essa ação não pode ser desfeita.", confirmLabel: "Excluir" }))) return;
     try {
       await deleteTree(treeId);
       router.push("/ranges/arvores");

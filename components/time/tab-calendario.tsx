@@ -18,6 +18,7 @@ import {
   type TeamEvent,
 } from "@/lib/services/team-calendar-service";
 import type { TeamDashboardRow, TeamRole } from "@/lib/services/team-service";
+import { useConfirm } from "@/components/confirm-dialog";
 
 // Lista simples dos proximos eventos (sem grade de mes/semana).
 // Criacao restrita a admin/coach — RLS ja bloqueia no banco, aqui so
@@ -191,6 +192,7 @@ function ModalCalendarioCompleto({
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
+  const confirm = useConfirm();
   const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
   const [mostrarAniversarios, setMostrarAniversarios] = useState(false);
   const [aniversarios, setAniversarios] = useState<TeamBirthday[] | null>(null);
@@ -232,7 +234,7 @@ function ModalCalendarioCompleto({
     const msg = ehSerie
       ? `Cancelar TODA a série de "${ev.title}" (esta e as próximas)? Quem confirmou presença será avisado.`
       : `Cancelar o evento "${ev.title}"? Quem confirmou presença será avisado.`;
-    if (!confirm(msg)) return;
+    if (!(await confirm({ title: ehSerie ? "Cancelar série" : "Cancelar evento", message: msg, confirmLabel: "Cancelar evento", cancelLabel: "Voltar" }))) return;
     try {
       if (ehSerie) await cancelEventSeries(ev.recurrenceGroupId as string);
       else await cancelTeamEvent(ev.id);

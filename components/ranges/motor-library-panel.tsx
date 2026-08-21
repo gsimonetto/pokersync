@@ -13,6 +13,7 @@ import {
   type RfiJamListItem,
   type RfiJamSpot,
 } from "@/lib/services/rfi-jam-service";
+import { useConfirm } from "@/components/confirm-dialog";
 
 const FASES = [
   { key: "sbOpen", label: "Abrir (RFI)" },
@@ -27,6 +28,7 @@ type FaseKey = (typeof FASES)[number]["key"];
 // zero. So aparece quando ha spot no banco (senao seria uma secao
 // vazia sem utilidade).
 export function MotorLibraryPanel({ onLoad }: { onLoad: (hands: RangeHands) => void }) {
+  const confirm = useConfirm();
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   const [heroPos, setHeroPos] = useState("SB");
   const [villainPos, setVillainPos] = useState("BB");
@@ -98,9 +100,15 @@ export function MotorLibraryPanel({ onLoad }: { onLoad: (hands: RangeHands) => v
     return Object.values(handsDaFase).filter((d) => d.call > 0 || d.raise > 0).length;
   }, [handsDaFase]);
 
-  function carregar() {
+  async function carregar() {
     if (!handsDaFase) return;
-    if (!confirm("Isso substitui o range atual na grade por este da biblioteca. Continuar?")) return;
+    const ok = await confirm({
+      tone: "default",
+      title: "Carregar range da biblioteca",
+      message: "Isso substitui o range atual na grade por este da biblioteca.",
+      confirmLabel: "Carregar",
+    });
+    if (!ok) return;
     onLoad(handsDaFase);
   }
 

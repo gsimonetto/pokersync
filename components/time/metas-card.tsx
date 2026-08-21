@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { useConfirm } from "@/components/confirm-dialog";
 import { Target, Plus, Check, X, Trash2 } from "lucide-react";
 import {
   METRICA_LABEL,
@@ -28,6 +29,7 @@ export function MetasCard({
   podeGerenciar: boolean;
 }) {
   const [metas, setMetas] = useState<PlayerGoal[]>([]);
+  const confirm = useConfirm();
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [criando, setCriando] = useState(false);
@@ -69,7 +71,7 @@ export function MetasCard({
   }
 
   async function remover(goalId: string) {
-    if (!confirm("Remover esta meta?")) return;
+    if (!(await confirm({ title: "Remover meta", message: "A meta sai do painel do jogador.", confirmLabel: "Remover" }))) return;
     try {
       await deactivatePlayerGoal(goalId);
       carregar();

@@ -10,9 +10,11 @@ import {
   parseTreeImport,
   type TreeListItem,
 } from "@/lib/services/strategy-tree-service";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export function TreeList() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [items, setItems] = useState<TreeListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -38,7 +40,7 @@ export function TreeList() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir esta árvore? Essa ação não pode ser desfeita.")) return;
+    if (!(await confirm({ title: "Excluir árvore", message: "Essa ação não pode ser desfeita.", confirmLabel: "Excluir" }))) return;
     setBusyId(id);
     try {
       await deleteTree(id);
@@ -63,9 +65,11 @@ export function TreeList() {
       setImportText("");
       setShowImport(false);
       if (result.unlinkedCount > 0) {
-        alert(
-          `Árvore importada. ${result.unlinkedCount} passo(s) tinham vínculo com um range que não existe na sua conta — o vínculo foi removido, o texto do passo continua igual.`
-        );
+        await confirm({
+          okOnly: true,
+          title: "Árvore importada",
+          message: `${result.unlinkedCount} passo(s) tinham vínculo com um range que não existe na sua conta — o vínculo foi removido, o texto do passo continua igual.`,
+        });
       }
       router.push(`/ranges/arvores/${created.id}`);
     } catch {

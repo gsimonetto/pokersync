@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useConfirm } from "@/components/confirm-dialog";
 import { ArrowLeft, Plus, Save, Trash2, Loader2, X, Target } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchReasons, type Reason } from "@/lib/services/hand-review-service";
@@ -37,6 +38,7 @@ const EMPTY: DrillRow = {
 // e o roteador do Next (useRouter), consistente com o resto do projeto.
 export function AdminDrillsPanel() {
   const router = useRouter();
+  const confirm = useConfirm();
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [items, setItems] = useState<any[]>([]);
   const [reasons, setReasons] = useState<Reason[]>([]);
@@ -134,7 +136,7 @@ export function AdminDrillsPanel() {
   }
 
   async function remove(id: string) {
-    if (!confirm("Excluir esta sugestão?")) return;
+    if (!(await confirm({ title: "Excluir sugestão", message: "Essa sugestão de drill sai do catálogo.", confirmLabel: "Excluir" }))) return;
     const supabase = createClient();
     await supabase.from("hand_review_drill_suggestions").delete().eq("id", id);
     setItems(await loadDrills());

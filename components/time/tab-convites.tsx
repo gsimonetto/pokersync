@@ -4,6 +4,7 @@ import { useState } from "react";
 import { Link2, Copy, Check, Trash2, UserCheck, UserX, Clock } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Campo } from "@/components/time/campo";
+import { useConfirm } from "@/components/confirm-dialog";
 import {
   approveMember,
   createInvite,
@@ -44,6 +45,7 @@ export function TabConvites({
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
+  const confirm = useConfirm();
   const [papel, setPapel] = useState<TeamRole>("player");
   const [horas, setHoras] = useState(168);
   const [usos, setUsos] = useState(1);
@@ -54,7 +56,7 @@ export function TabConvites({
   const ativos = invites.filter(inviteAtivo);
 
   async function decidir(userId: string, aprovar: boolean, nome: string) {
-    if (!aprovar && !confirm(`Recusar o pedido de ${nome}?`)) return;
+    if (!aprovar && !(await confirm({ title: "Recusar pedido", message: `${nome} não vai entrar no time. Ele pode pedir de novo depois.`, confirmLabel: "Recusar" }))) return;
     setProcessando(userId);
     try {
       if (aprovar) await approveMember(userId);
