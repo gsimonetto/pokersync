@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, Users, Link2, Wallet, Gauge, Bookmark, Send } from "lucide-react";
+import { Save, CheckCircle2, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, Users, Link2, Wallet, Gauge, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
@@ -22,7 +22,6 @@ import {
   createUserTag,
   updateReviewTags,
   fetchTeamCoaches,
-  shareReviewWithCoach,
   fetchRecentBankrollSessions,
   fetchBankrollSessionById,
   linkReviewToSession,
@@ -40,6 +39,7 @@ import {
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { CoachThread } from "./coach-thread";
+import { ShareHandModal } from "./share-hand-modal";
 
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
@@ -149,7 +149,10 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   // jogador em team_members) — mesmo formato de replayer no lado do
   // coach, via notificacao com deep-link.
   const [teamCoaches, setTeamCoaches] = useState<TeamCoach[]>([]);
-  const [shareStatus, setShareStatus] = useState<"idle" | "sending" | "sent">("idle");
+  // Modal de compartilhamento (mesma infra que o botao "Compartilhar" do
+  // Hand Replayer ja usa, ver share-hand-modal.tsx) -- reusado aqui pra
+  // nao ter dois jeitos diferentes de mandar mao pro coach na mesma tela.
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // Vinculo com sessao de banca -- antes era write-only na criacao da
   // mao, sem jeito de corrigir/desvincular depois nem de ver aqui qual
@@ -329,18 +332,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       setError("Não foi possível atualizar o vínculo com a sessão.");
     } finally {
       setSavingSession(false);
-    }
-  }
-
-  async function handleShareWithCoach(coach: TeamCoach) {
-    setShareStatus("sending");
-    try {
-      await shareReviewWithCoach(reviewId, coach.userId, review?.title || "Mão sem título");
-      setShareStatus("sent");
-      setTimeout(() => setShareStatus("idle"), 1600);
-    } catch {
-      setShareStatus("idle");
-      setError("Não foi possível compartilhar com o coach.");
     }
   }
 
@@ -688,37 +679,37 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           </div>
         )}
 
-        {/* Enviar ao coach: a conclusao natural do fluxo, so' aparece
-            depois que as 4 streets tem nota -- antes disso compartilhar
-            mandaria uma revisao pela metade. */}
+        {/* Enviar ao coach: sempre disponivel (nao trava por streets sem
+            nota -- decisao revertida, ver historico) -- abre a MESMA modal
+            que o botao "Compartilhar" do Hand Replayer ja usa (perguntas
+            guiadas obrigatorias/opcionais, todas editaveis). Assim so
+            existe UM jeito de compartilhar mao com o coach no produto
+            inteiro, nao dois padroes parecidos disputando espaco. */}
         {teamCoaches.length > 0 && (
           <div className="mt-3 border-t border-hairline pt-3">
-            {allStreetsRated ? (
-              shareStatus === "sent" ? (
-                <p className="text-[12px] text-positive">Mão compartilhada com o coach!</p>
-              ) : (
-                <div className="flex flex-wrap items-center gap-1.5">
-                  <Users size={13} className="text-training" />
-                  <span className="text-[11px] font-semibold text-ink/85">Enviar ao coach:</span>
-                  {teamCoaches.map((c) => (
-                    <button
-                      key={c.userId}
-                      onClick={() => handleShareWithCoach(c)}
-                      disabled={shareStatus === "sending"}
-                      className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5 text-[12px] font-semibold text-training transition-colors hover:bg-training/20 disabled:opacity-50"
-                    >
-                      <Send size={12} />
-                      {c.name}
-                    </button>
-                  ))}
-                </div>
-              )
-            ) : (
-              <p className="text-[11px] text-muted">Avalie as 4 streets pra liberar o envio pro coach.</p>
-            )}
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5 text-[12px] font-semibold text-training transition-colors hover:bg-training/20"
+            >
+              <Users size={13} />
+              Enviar ao coach
+            </button>
           </div>
         )}
       </section>
+
+      <ShareHandModal
+        open={shareModalOpen}
+        reviewId={reviewId}
+        onClose={() => setShareModalOpen(false)}
+        onShared={() => {
+          // As respostas foram salvas pela propria modal (mesmo reviewId) --
+          // recarrega pra essa tela refletir o que acabou de ser enviado
+          // (ex: CoachThread aparecendo com a conversa nova).
+          load();
+        }}
+      />
 
       <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
@@ -922,7 +913,11 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[0.8fr_1.5fr]">
           <div>{secondaryContent}</div>
           <div>
-            <RevisorHandTable parsedHand={parsedHandForTable} />
+            {/* reviewId habilita o botao "Compartilhar" nativo da mesa --
+                antes ficava oculto aqui (so' existia dentro da fila/sessao),
+                entao a unica forma de compartilhar era o bloco abaixo da
+                autoavaliacao. Agora os dois levam pra mesma modal. */}
+            <RevisorHandTable parsedHand={parsedHandForTable} reviewId={reviewId} />
           </div>
         </div>
       ) : (
