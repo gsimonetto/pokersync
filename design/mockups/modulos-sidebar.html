@@ -150,131 +150,103 @@
     <!-- Conteúdo central -->
     <main class="flex-1 min-h-0 px-6 py-5 flex flex-col gap-4 overflow-hidden">
 
-      <!-- Card de perfil: compacto e autocontido -- foto, dados essenciais
-           e troféus numa unica faixa, sem esticar o card pra preencher
-           altura que ele nao precisa. -->
-      <section class="rounded-xl border border-hairline bg-surface px-5 py-4 flex items-center gap-5 shrink-0">
-        <!-- Foto -->
-        <div class="relative size-20 shrink-0 rounded-lg bg-elevated border border-hairline overflow-hidden flex items-center justify-center">
-          <span class="text-2xl font-bold text-white/15 select-none">SN</span>
-          <div class="absolute bottom-1 right-1 bg-black/70 rounded px-1 py-0.5 text-[9px] font-bold text-ink leading-none">BR</div>
-        </div>
-
-        <!-- Nome / time -->
-        <div class="shrink-0 pr-5 border-r border-hairline">
-          <div class="flex items-center gap-2">
-            <h2 class="text-xl font-bold text-ink tracking-tight">simoNetto</h2>
-            <i data-lucide="badge-check" class="icon text-[#E0B24C]" style="width:15px;height:15px;"></i>
-          </div>
-          <p class="text-xs text-muted mt-0.5">Gabriel Toledo · 35 anos</p>
-          <span class="mt-1.5 inline-flex items-center gap-1 rounded-full border border-[#6366F1]/40 bg-[#6366F1]/10 px-2 py-0.5 text-[10px] font-bold text-[#6366F1]">
-            <i data-lucide="shield" style="width:11px;height:11px;"></i> FURIA
-          </span>
-        </div>
-
-        <!-- Fatos essenciais -->
-        <div class="flex-1 grid grid-cols-3 gap-4 px-1">
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/70">Ganhos totais</p>
-            <p class="text-lg font-bold text-[#E0B24C] tnum mt-0.5">R$ 1.515.307</p>
-          </div>
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/70">Ranking histórico</p>
-            <p class="text-lg font-bold text-ink tnum mt-0.5">#2 ('16) · #6 ('17)</p>
-          </div>
-          <div>
-            <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/70">Conquistas</p>
-            <p class="text-[11px] font-semibold text-[#E0B24C] mt-1.5 leading-tight">2x Bracelete WSOP</p>
-          </div>
-        </div>
-
-        <!-- Troféus -->
-        <div class="flex gap-1.5 pl-5 border-l border-hairline shrink-0">
-          <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="medal" class="icon text-[#E0B24C]" style="width:14px;height:14px;"></i></div>
-          <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="medal" class="icon text-[#E0B24C]" style="width:14px;height:14px;"></i></div>
-          <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="trophy" class="icon text-[#2FB89A]" style="width:14px;height:14px;"></i></div>
-          <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="trophy" class="icon text-[#2FB89A]" style="width:14px;height:14px;"></i></div>
-          <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="star" class="icon text-muted" style="width:14px;height:14px;"></i></div>
-        </div>
-      </section>
-
-      <!-- Faixa hero: numeros financeiros, mesmo padrao de
-           app/performance/page.tsx (HeroMetric: divide-x, valor grande,
-           cor segue o sinal). -->
-      <section class="rounded-xl border border-hairline bg-surface grid grid-cols-4 divide-x divide-hairline shrink-0">
-        <div class="px-6 py-4">
-          <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">ROI acumulado</p>
-          <p class="mt-1.5 text-[2rem] font-bold leading-none tracking-tight tnum text-positive">+24,5%</p>
-          <p class="mt-2 text-[11px] text-muted">sobre R$ 61.700 investidos</p>
-        </div>
-        <div class="px-6 py-4">
-          <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">Resultado (30d)</p>
-          <p class="mt-1.5 text-[2rem] font-bold leading-none tracking-tight tnum text-positive">+R$ 14.250</p>
-          <p class="mt-2 text-[11px] text-muted">R$ 78 por hora</p>
-        </div>
-        <div class="px-6 py-4">
-          <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">ITM aproximado</p>
-          <p class="mt-1.5 text-[2rem] font-bold leading-none tracking-tight tnum text-ink">18,2%</p>
-          <p class="mt-2 text-[11px] text-muted">ITM exato chega com o agente desktop</p>
-        </div>
-        <div class="px-6 py-4">
-          <p class="text-[10px] font-bold uppercase tracking-[0.14em] text-[#E0B24C]/80">Premiação total</p>
-          <p class="mt-1.5 text-[2rem] font-bold leading-none tracking-tight tnum text-[#E0B24C]">R$ 1.515.307</p>
-          <p class="mt-2 text-[11px] text-muted">Torneios + HH via agente desktop</p>
-        </div>
-      </section>
-
-      <!-- Frequências pré-flop: mesmo componente-régua do Player Evolution
-           hoje (faixa de referência + marcador), nao um tile generico. -->
-      <section class="flex-1 min-h-0 rounded-xl border border-hairline bg-surface p-5 flex flex-col">
-        <div class="mb-3 flex items-center justify-between shrink-0">
-          <div class="flex items-center gap-1.5">
-            <i data-lucide="target" class="icon" style="width:14px;height:14px;color:#3b82f6"></i>
-            <h3 class="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Frequências pré-flop</h3>
-          </div>
-          <a href="#" class="text-xs text-muted hover:text-ink flex items-center gap-1">
-            Ver Player Evolution <i data-lucide="arrow-right" style="width:12px;height:12px;"></i>
-          </a>
-        </div>
-
-        <div class="flex-1 min-h-0 grid grid-cols-3 gap-3">
-          <!-- Régua: VPIP -->
-          <div class="rounded-lg border border-hairline bg-elevated p-3.5 flex flex-col justify-center">
-            <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">VPIP</p>
-            <p class="mt-1 text-2xl font-bold leading-none tnum text-ink">24,5%</p>
-            <div class="relative mt-4 h-1 w-full rounded-full bg-void/60">
-              <div aria-hidden="true" class="absolute inset-y-0 rounded-full bg-ink/15" style="left:30%; width:16.7%;"></div>
-              <span class="absolute top-1/2 h-3.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-training shadow-[0_0_8px_rgba(90,166,224,.6)]" style="left:40.8%;"></span>
+      <!-- Card de perfil: foto (coluna 1) + dados do jogador (coluna 2,
+           empilhados) + métricas relevantes (coluna 3, do lado, mesma
+           ordem/estilo de linha da coluna 2) -- estrutura 1:1 com a
+           referencia enviada, so trocando a pele visual pra nossos
+           tokens (surface/elevated/hairline, sem foto externa). -->
+      <section class="rounded-xl border border-hairline bg-surface overflow-hidden shrink-0">
+        <div class="flex">
+          <!-- Coluna 1: foto -->
+          <div class="relative w-[240px] h-[240px] shrink-0 bg-elevated flex items-center justify-center overflow-hidden">
+            <span class="text-[80px] font-bold text-white/10 select-none">SN</span>
+            <div class="absolute top-3 left-3 flex flex-col gap-1.5">
+              <div class="bg-black/60 rounded p-1"><i data-lucide="award" class="icon text-[#E0B24C]" style="width:16px;height:16px;"></i></div>
+              <div class="bg-black/60 rounded px-1.5 py-1 text-[10px] font-bold text-ink">BR</div>
             </div>
-            <p class="mt-2.5 text-[11px] text-muted/70">dentro da referência (18–28%)</p>
           </div>
 
-          <!-- Régua: PFR -->
-          <div class="rounded-lg border border-hairline bg-elevated p-3.5 flex flex-col justify-center">
-            <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">PFR</p>
-            <p class="mt-1 text-2xl font-bold leading-none tnum text-ink">17,8%</p>
-            <div class="relative mt-4 h-1 w-full rounded-full bg-void/60">
-              <div aria-hidden="true" class="absolute inset-y-0 rounded-full bg-ink/15" style="left:23.3%; width:13.3%;"></div>
-              <span class="absolute top-1/2 h-3.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-training shadow-[0_0_8px_rgba(90,166,224,.6)]" style="left:29.7%;"></span>
-            </div>
-            <p class="mt-2.5 text-[11px] text-muted/70">dentro da referência (14–22%)</p>
-          </div>
+          <!-- Coluna 2 + 3: dados e métricas -->
+          <div class="flex-1 p-5 flex flex-col justify-between min-w-0">
+            <div>
+              <div class="flex justify-between items-start gap-3">
+                <div class="min-w-0">
+                  <h2 class="text-2xl font-bold text-ink tracking-tight truncate">simoNetto</h2>
+                  <p class="text-muted text-sm mt-0.5">Gabriel Toledo</p>
+                </div>
+                <div class="flex gap-2 shrink-0">
+                  <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center hover:border-white/20 cursor-pointer transition-colors">
+                    <i data-lucide="share-2" class="icon text-muted" style="width:15px;height:15px;"></i>
+                  </div>
+                  <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center hover:border-white/20 cursor-pointer transition-colors">
+                    <i data-lucide="globe" class="icon text-muted" style="width:15px;height:15px;"></i>
+                  </div>
+                </div>
+              </div>
 
-          <!-- Régua: 3-Bet -->
-          <div class="rounded-lg border border-hairline bg-elevated p-3.5 flex flex-col justify-center">
-            <p class="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">3-Bet</p>
-            <p class="mt-1 text-2xl font-bold leading-none tnum text-ink">8,2%</p>
-            <div class="relative mt-4 h-1 w-full rounded-full bg-void/60">
-              <div aria-hidden="true" class="absolute inset-y-0 rounded-full bg-ink/15" style="left:25%; width:25%;"></div>
-              <span class="absolute top-1/2 h-3.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-training shadow-[0_0_8px_rgba(90,166,224,.6)]" style="left:41%;"></span>
+              <div class="mt-4 grid grid-cols-2 gap-x-8 border-t border-hairline pt-4">
+                <!-- Coluna 2: dados do jogador, um embaixo do outro -->
+                <div class="flex flex-col gap-2.5">
+                  <div class="flex justify-between border-b border-hairline/50 pb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Idade</span>
+                    <span class="text-sm text-ink">35 anos</span>
+                  </div>
+                  <div class="flex justify-between border-b border-hairline/50 pb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Time atual</span>
+                    <span class="text-sm text-ink flex items-center gap-1.5">
+                      <i data-lucide="shield" class="icon text-[#6366F1]" style="width:13px;height:13px;"></i>
+                      FURIA
+                    </span>
+                  </div>
+                  <div class="flex justify-between border-b border-hairline/50 pb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
+                    <span class="text-sm text-[#E0B24C] font-semibold tnum">R$ 1.515.307</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ranking</span>
+                    <span class="text-sm text-ink">#2 ('16) · #6 ('17)</span>
+                  </div>
+                </div>
+
+                <!-- Coluna 3: métricas mais relevantes, mesma ordem/estilo de linha -->
+                <div class="flex flex-col gap-2.5">
+                  <div class="flex justify-between border-b border-hairline/50 pb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</span>
+                    <span class="text-sm text-ink tnum">24,5%</span>
+                  </div>
+                  <div class="flex justify-between border-b border-hairline/50 pb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</span>
+                    <span class="text-sm text-ink tnum">8,2%</span>
+                  </div>
+                  <div class="flex justify-between border-b border-hairline/50 pb-2">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">ROI acumulado</span>
+                    <span class="text-sm text-positive font-semibold tnum">+24,5%</span>
+                  </div>
+                  <div class="flex justify-between">
+                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</span>
+                    <span class="text-sm text-ink tnum">18,2%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- Conquistas, largura total -->
+              <div class="mt-3 flex justify-between items-center border-t border-hairline pt-3">
+                <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas</span>
+                <span class="rounded-full border border-[#E0B24C]/40 bg-[#E0B24C]/10 px-2 py-0.5 text-[10px] font-bold text-[#E0B24C]">2x Vencedor de Bracelete WSOP</span>
+              </div>
             </div>
-            <p class="mt-2.5 text-[11px] text-muted/70">dentro da referência (5–10%)</p>
+
+            <!-- Troféus -->
+            <div class="mt-3 flex gap-2">
+              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="medal" class="icon text-[#E0B24C]" style="width:16px;height:16px;"></i></div>
+              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="medal" class="icon text-[#E0B24C]" style="width:16px;height:16px;"></i></div>
+              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="trophy" class="icon text-[#2FB89A]" style="width:16px;height:16px;"></i></div>
+              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="trophy" class="icon text-[#2FB89A]" style="width:16px;height:16px;"></i></div>
+              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="ticket" class="icon text-muted" style="width:16px;height:16px;"></i></div>
+              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="star" class="icon text-muted" style="width:16px;height:16px;"></i></div>
+            </div>
           </div>
         </div>
-
-        <p class="mt-3 text-[11px] text-muted/70 shrink-0">
-          Calculado sobre <strong class="text-ink/85">4.812</strong> mãos com hand history estruturada.
-        </p>
       </section>
 
     </main>
