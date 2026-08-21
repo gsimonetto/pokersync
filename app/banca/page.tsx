@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
+import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, bbHourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
-import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
+import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
 import {
@@ -54,6 +54,10 @@ const HISTORY_RANGES = [...RANGES]
 // Vocabulario do formulario por formato: "reentradas" e' termo de torneio;
 // em cash o jogador recompra/recarrega o stack. Mesmo campo, o nome que ele
 // usa de verdade em cada formato.
+// Mesmo stack curto que a dica de leak do Treino ja aplica -- a acao rapida
+// so' encurta o caminho, nao inventa um alvo diferente.
+const LEAK_SHORT_STACK_BB = 15;
+
 const REENTRY_LABEL: Record<string, string> = {
   MTT: "Reentradas",
   SNG: "Reentradas",
@@ -277,6 +281,14 @@ export default function BankrollPage() {
           : "hold";
   const recent = [...platformSessions].reverse().slice(0, 8);
   const recentTx = [...platformTransactions].reverse().slice(0, 6);
+  // O catalogo (FORMATS) e o que esta gravado nas sessoes nem sempre batem --
+  // ha sessoes com formato "Torneio", que nao esta no seletor. Filtrar so'
+  // pelo catalogo esconderia essas sessoes sem o jogador entender por que.
+  const historyFormats = useMemo(
+    () => Array.from(new Set([...FORMATS, ...platformSessions.map((s) => s.format)])).filter(Boolean),
+    [platformSessions]
+  );
+
   const historyFiltered = useMemo(() => {
     const q = historySearch.trim().toLowerCase();
     let base = platformSessions;
@@ -750,7 +762,7 @@ export default function BankrollPage() {
               const negative = g.net < 0;
               const lowSample = g.n < 5;
               return (
-                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
+                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{g.key}</p>
                     <p className="text-[10.5px] text-muted">
@@ -775,6 +787,36 @@ export default function BankrollPage() {
                   <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
                     {fmtSigned(g.net)}
                   </span>
+                  {/* Acoes rapidas: so' em fatia que esta perdendo -- num grupo
+                      positivo elas seriam ruido. "Treinar" so' aparece onde o
+                      estoque de spots casa com a fatia (motor e' ICM de
+                      torneio), senao levaria a um treino sem relacao com o
+                      leak. "Registrar mao" vale pra qualquer fatia: e' o
+                      primeiro passo de investigar o proprio erro. */}
+                  <div className="flex items-center gap-1">
+                    {negative && leakDimension === "format" && TOURNEY_FORMATS.has(g.key) && (
+                      <Link
+                        href={`/treino?stack=${LEAK_SHORT_STACK_BB}`}
+                        title={`Treinar stack curto (${LEAK_SHORT_STACK_BB}bb) — onde esse leak costuma doer`}
+                        aria-label={`Treinar ${g.key}`}
+                        className="flex items-center gap-1 rounded-lg border border-training/40 px-2 py-1 text-[10.5px] font-semibold text-training transition-colors hover:bg-training/10"
+                      >
+                        <PlayCircle size={13} />
+                        Treinar
+                      </Link>
+                    )}
+                    {negative && (
+                      <Link
+                        href="/revisor?nova=1"
+                        title="Registrar uma mao desse leak pra revisar"
+                        aria-label={`Registrar mao de ${g.key}`}
+                        className="flex items-center gap-1 rounded-lg border border-review/40 px-2 py-1 text-[10.5px] font-semibold text-review transition-colors hover:bg-review/10"
+                      >
+                        <NotebookPen size={13} />
+                        Registrar mao
+                      </Link>
+                    )}
+                  </div>
                 </div>
               );
             })}
@@ -1392,7 +1434,7 @@ export default function BankrollPage() {
                   className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink transition-colors hover:border-ink/30"
                 >
                   <option value="all">Todos os formatos</option>
-                  {FORMATS.map((f) => (
+                  {historyFormats.map((f) => (
                     <option key={f} value={f}>
                       {f}
                     </option>

@@ -2,6 +2,11 @@ import type { Session } from "./types";
 
 export const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
 
+// Formatos de torneio -- os unicos em que os spots do motor (ICM) fazem
+// sentido. "Torneio" esta aqui porque e' o valor que as sessoes reais usam
+// na maior parte da base, alem dos nomes especificos do seletor.
+export const TOURNEY_FORMATS = new Set(["MTT", "SNG", "Spin", "Torneio"]);
+
 const money = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 export function fmtMoney(v: number) {

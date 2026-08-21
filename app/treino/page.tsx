@@ -8,9 +8,8 @@ import { F } from "@/lib/poker/drill-theme";
 import { fetchSuggestionTarget } from "@/lib/services/drill-service";
 import { fetchSessions } from "@/lib/services/bankroll-service";
 import { groupStats } from "@/lib/bankroll/calc";
-import { fmtPct } from "@/lib/bankroll/format";
+import { fmtPct, TOURNEY_FORMATS } from "@/lib/bankroll/format";
 
-const TOURNEY_FORMATS = new Set(["MTT", "SNG", "Spin"]);
 // bb curto tipico de late-stage torneio -- e' o valor que a gente tenta
 // achar entre os spots reais do RFI/Jam quando sugere foco em MTT/SNG/Spin.
 const SHORT_STACK_BB = 15;
@@ -85,6 +84,16 @@ function useSuggestedSpot(): AppliedSuggestion | null {
   return suggestion;
 }
 
+// Stack pedido por quem linkou pra ca (hoje: acao rapida do painel de leaks
+// da Banca). So' aceita numero positivo -- lixo na URL vira "sem
+// preferencia", nao erro de tela.
+function useStackFromUrl(): number | undefined {
+  const raw = useSearchParams().get("stack");
+  if (!raw) return undefined;
+  const n = Number(raw);
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+}
+
 function TreinoShell() {
   // Altura disponível medida, não chutada. O card usava
   // `calc(100vh - 32px)`, ignorando o header global do app que fica
@@ -102,6 +111,7 @@ function TreinoShell() {
   const [topOffset, setTopOffset] = useState(0);
   const leakTip = useBankrollLeakTip();
   const suggestion = useSuggestedSpot();
+  const stackFromUrl = useStackFromUrl();
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
 
@@ -243,7 +253,7 @@ function TreinoShell() {
         <div style={{ flex: 1, minHeight: 0 }}>
           <RfiJamDrill
             initialMatchup={suggestion?.matchup}
-            initialStackBb={suggestion?.stackBb ?? appliedStackBb}
+            initialStackBb={suggestion?.stackBb ?? appliedStackBb ?? stackFromUrl}
           />
         </div>
       </div>
