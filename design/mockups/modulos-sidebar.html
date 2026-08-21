@@ -7,243 +7,520 @@
 <link rel="preconnect" href="https://fonts.googleapis.com" />
 <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
 <link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
-<script src="https://cdn.tailwindcss.com"></script>
-<script>
-  // Tokens 1:1 com app/globals.css (@theme) do produto real — nada de
-  // paleta nova. Esta tela e' uma proposta de layout, nao de identidade.
-  tailwind.config = {
-    theme: {
-      extend: {
-        colors: {
-          void: "#000000",
-          surface: "#111111",
-          elevated: "#1e1e1e",
-          ink: "#ffffff",
-          muted: "#c4c7c8",
-          hairline: "rgba(255,255,255,0.08)",
-          positive: "#22c55e",
-          negative: "#e0555a",
-          training: "#3b82f6",
-          evolution: "#f59e0b",
-          review: "#a855f7",
-        },
-        fontFamily: {
-          sans: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
-        },
-      },
-    },
-  };
-</script>
-<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
 <style>
-  html, body { background: #000; color: #fff; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
-  /* Mockup roda em viewport fixa — sem scroll na tela, como pedido. */
-  html, body { height: 100vh; overflow: hidden; }
-  .icon { width: 18px; height: 18px; stroke-width: 1.75; }
+  /* Tokens 1:1 com app/globals.css (@theme) do produto real — nada de
+     paleta nova. Esta tela e' uma proposta de layout, nao de identidade.
+     Sem Tailwind CDN / lucide CDN: CSS puro e SVG inline, pra renderizar
+     sem depender de rede (inclusive dentro do sandbox de artifacts). */
+  :root {
+    --void: #000000;
+    --surface: #111111;
+    --elevated: #1e1e1e;
+    --ink: #ffffff;
+    --muted: #c4c7c8;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --positive: #22c55e;
+    --negative: #e0555a;
+    --training: #3b82f6;
+    --green: #2fb89a;
+    --blue: #5aa6e0;
+    --purple: #a855f7;
+    --amber: #e0b24c;
+    --indigo: #6366f1;
+    --cyan: #22d3ee;
+    --pink: #e0559e;
+  }
 
-  .acc-card { transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
-  .acc-card:hover, .acc-card.is-active { transform: translateY(-2px); }
-  .acc-glow { background: var(--acc); opacity: 0; transition: opacity .3s ease; }
-  .group:hover .acc-glow, .group.is-active .acc-glow { opacity: .22; }
-  .group:hover .acc-fg, .group.is-active .acc-fg { color: var(--acc); }
-  .group:hover .acc-border, .group.is-active .acc-border { border-color: var(--acc); }
-  .group:hover .acc-card, .group.is-active .acc-card { box-shadow: 0 12px 34px -10px var(--acc); border-color: var(--acc); }
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--void);
+    color: var(--ink);
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
 
-  .nav-item { transition: background-color .15s ease, color .15s ease; }
-  .nav-item.is-active { background: rgba(255,255,255,0.06); }
+  .app { display: flex; height: 100vh; width: 100vw; background: var(--void); }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 264px;
+    flex-shrink: 0;
+    height: 100%;
+    border-right: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px;
+    height: 64px;
+    border-bottom: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .logo-badge {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+  }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+
+  .sidebar-nav {
+    flex: 1;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .nav-label {
+    padding: 0 12px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(196, 199, 200, 0.6);
+  }
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .nav-item:hover { background: rgba(255, 255, 255, 0.04); color: var(--ink); }
+  .nav-item.is-active { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
+  .nav-bar {
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 999px;
+    opacity: 0;
+  }
   .nav-item.is-active .nav-bar { opacity: 1; }
-  .nav-bar { opacity: 0; transition: opacity .15s ease; }
+
+  .sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid var(--hairline);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sidebar-footer .nav-item:hover.is-logout { background: rgba(224, 85, 90, 0.08); color: var(--negative); }
+
+  /* ============ MAIN ============ */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .topbar h1 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.2; }
+  .topbar p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .topbar-actions { display: flex; align-items: center; gap: 6px; }
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .icon-btn:hover { background: #fff; color: var(--void); }
+  .profile-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+    background: var(--elevated);
+    padding: 4px 12px 4px 4px;
+    cursor: pointer;
+  }
+  .avatar-sm {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: rgba(47, 184, 154, 0.15);
+    border: 1px solid rgba(47, 184, 154, 0.4);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--green);
+  }
+  .profile-chip span.level { font-size: 12px; font-weight: 600; }
+
+  .content {
+    flex: 1;
+    min-height: 0;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  /* Card de perfil */
+  .profile-card {
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .profile-card-inner { display: flex; }
+  .profile-photo {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    flex-shrink: 0;
+    background: var(--elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .profile-photo .initials {
+    font-size: 80px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.1);
+    user-select: none;
+  }
+  .photo-badges {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .photo-badges div {
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .photo-badges .flag {
+    padding: 4px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .profile-data {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+  }
+  .profile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .profile-head h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .profile-head p { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+  .profile-head-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .square-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .square-btn:hover { border-color: rgba(255, 255, 255, 0.2); }
+
+  .profile-cols {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 32px;
+    border-top: 1px solid var(--hairline);
+    padding-top: 16px;
+  }
+  .profile-col { display: flex; flex-direction: column; gap: 10px; }
+  .profile-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding-bottom: 8px;
+  }
+  .profile-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .profile-row .label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(196, 199, 200, 0.6);
+  }
+  .profile-row .value { font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+  .profile-row .value.gold { color: var(--amber); font-weight: 600; }
+  .profile-row .value.positive { color: var(--positive); font-weight: 600; }
+
+  .achievements-row {
+    margin-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--hairline);
+    padding-top: 12px;
+  }
+  .badge-gold {
+    border-radius: 999px;
+    border: 1px solid rgba(224, 178, 76, 0.4);
+    background: rgba(224, 178, 76, 0.1);
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--amber);
+  }
+
+  .trophy-row { margin-top: 12px; display: flex; gap: 8px; }
+  .trophy-slot {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    display: grid;
+    place-items: center;
+  }
+
+  /* Icons */
+  .icon { width: 18px; height: 18px; display: inline-block; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
 </style>
 </head>
-<body class="antialiased">
+<body>
 
-<div class="flex h-screen w-screen bg-void">
+<!-- Definicoes de icone (estilo lucide: stroke fino, minimalista) -->
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="i-spade" viewBox="0 0 24 24"><path d="M12 2c-4 4.5-8 8-8 12a5 5 0 0 0 8.5 3.5C12 19 12 20 10 22h4c-2-2-2-3-0.5-4.5A5 5 0 0 0 20 14c0-4-4-7.5-8-12Z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-trending-up" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+    <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a2 2 0 0 0 0 4h3"/><path d="M17 5h3a2 2 0 0 1 0 4h-3"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16.5 8.5a3.2 3.2 0 0 1 0 6.4"/><path d="M17 12.2a5.8 5.8 0 0 1 4.5 7.3"/></symbol>
+    <symbol id="i-line-chart" viewBox="0 0 24 24"><path d="M4 4v15a1 1 0 0 0 1 1h15"/><path d="M6 16l4-5 3.5 3 5-6.5"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2 2 8l10 6 10-6z"/><path d="M2 14l10 6 10-6"/><path d="M2 11l10 6 10-6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.2-1.6l2-1.4-2-3.4-2.3.8a7 7 0 0 0-2.8-1.6L13.2 2h-2.4l-.5 2.8a7 7 0 0 0-2.8 1.6l-2.3-.8-2 3.4 2 1.4A7 7 0 0 0 5 12c0 .5.1 1.1.2 1.6l-2 1.4 2 3.4 2.3-.8a7 7 0 0 0 2.8 1.6l.5 2.8h2.4l.5-2.8a7 7 0 0 0 2.8-1.6l2.3.8 2-3.4-2-1.4c.1-.5.2-1.1.2-1.6Z"/></symbol>
+    <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.1 9a3 3 0 0 1 5.7 1.3c0 2-3 2.6-3 4.2"/><line x1="12" y1="17.5" x2="12" y2="17.6"/></symbol>
+    <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M8.2 13.5 6 22l6-3 6 3-2.2-8.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.2 3.4 8.6 8 11 4.6-2.4 8-5.8 8-11V5Z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><line x1="8.2" y1="10.8" x2="15.8" y2="7.2"/><line x1="8.2" y1="13.2" x2="15.8" y2="16.8"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19"/><path d="M12 2.5c2.6 2.7 4 6 4 9.5s-1.4 6.8-4 9.5c-2.6-2.7-4-6-4-9.5s1.4-6.8 4-9.5Z"/></symbol>
+    <symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="15" r="6"/><path d="M9 10.5 6 3h3l3 5.5L15 3h3l-3 7.5"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a1.5 1.5 0 0 0 0 3V15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.5a1.5 1.5 0 0 0 0-3Z"/><line x1="10" y1="7" x2="10" y2="17" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.5 3 6.2 6.5.9-4.7 4.6 1.1 6.6L12 17.7l-5.9 3.1 1.1-6.6L2.5 9.6l6.5-.9Z"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
 
   <!-- ============ SIDEBAR ============ -->
-  <aside class="hidden md:flex flex-col w-[264px] shrink-0 h-full border-r border-hairline bg-surface">
-
-    <!-- Logo acima do menu -->
-    <div class="flex items-center gap-2.5 px-5 h-16 border-b border-hairline shrink-0">
-      <div class="grid size-8 place-items-center rounded-lg bg-elevated border border-hairline">
-        <i data-lucide="spade" class="icon text-ink" style="width:16px;height:16px;"></i>
-      </div>
-      <span class="text-[15px] font-bold tracking-tight text-ink">PokerSync</span>
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-badge"><svg class="icon" style="width:16px;height:16px;color:#fff"><use href="#i-spade"/></svg></div>
+      <span class="logo-text">POKERSYNC</span>
     </div>
 
-    <!-- Navegação de módulos -->
-    <nav class="flex-1 px-3 py-4 flex flex-col gap-0.5 overflow-hidden">
-      <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>
+    <nav class="sidebar-nav">
+      <p class="nav-label">Módulos</p>
 
-      <a href="#" class="nav-item is-active relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink">
-        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#2FB89A]"></span>
-        <i data-lucide="target" class="icon" style="color:#2FB89A"></i>
+      <a href="#" class="nav-item is-active">
+        <span class="nav-bar" style="background:#2FB89A"></span>
+        <svg class="icon" style="color:#2FB89A"><use href="#i-target"/></svg>
         Modo Treino
       </a>
-      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
-        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#5AA6E0]"></span>
-        <i data-lucide="trending-up" class="icon"></i>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#5AA6E0"></span>
+        <svg class="icon"><use href="#i-trending-up"/></svg>
         Gestão de Banca
       </a>
-      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
-        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#A855F7]"></span>
-        <i data-lucide="book-open" class="icon"></i>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#A855F7"></span>
+        <svg class="icon"><use href="#i-book-open"/></svg>
         Revisão de Mãos
       </a>
-      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
-        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#E0B24C]"></span>
-        <i data-lucide="trophy" class="icon"></i>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#E0B24C"></span>
+        <svg class="icon"><use href="#i-trophy"/></svg>
         Hub de Evolução
       </a>
-      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
-        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#6366F1]"></span>
-        <i data-lucide="users" class="icon"></i>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#6366F1"></span>
+        <svg class="icon"><use href="#i-users"/></svg>
         Meu Time
       </a>
-      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
-        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#22D3EE]"></span>
-        <i data-lucide="line-chart" class="icon"></i>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#22D3EE"></span>
+        <svg class="icon"><use href="#i-line-chart"/></svg>
         Player Evolution
       </a>
-      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
-        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#E0559E]"></span>
-        <i data-lucide="layers" class="icon"></i>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#E0559E"></span>
+        <svg class="icon"><use href="#i-layers"/></svg>
         Construtor de Ranges
       </a>
     </nav>
 
-    <!-- Configuração e Sair, embaixo -->
-    <div class="px-3 py-3 border-t border-hairline shrink-0 flex flex-col gap-0.5">
-      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
-        <i data-lucide="settings" class="icon"></i>
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item">
+        <svg class="icon"><use href="#i-settings"/></svg>
         Configurações
       </a>
-      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-negative hover:bg-negative/[0.08]">
-        <i data-lucide="log-out" class="icon"></i>
+      <a href="#" class="nav-item is-logout">
+        <svg class="icon"><use href="#i-log-out"/></svg>
         Sair
       </a>
     </div>
   </aside>
 
   <!-- ============ MAIN ============ -->
-  <div class="flex-1 flex flex-col h-full min-w-0">
+  <div class="main">
 
-    <!-- Top bar -->
-    <header class="flex items-center justify-between h-16 px-6 border-b border-hairline shrink-0">
+    <header class="topbar">
       <div>
-        <h1 class="text-sm font-semibold text-ink leading-tight">Módulos</h1>
-        <p class="text-xs text-muted">Bem-vindo de volta, simoNetto</p>
+        <h1>Módulos</h1>
+        <p>Bem-vindo de volta, simoNetto</p>
       </div>
-      <div class="flex items-center gap-1.5">
-        <button class="grid size-9 place-items-center rounded-lg text-muted hover:bg-white hover:text-void transition-colors">
-          <i data-lucide="bell" class="icon"></i>
-        </button>
-        <button class="grid size-9 place-items-center rounded-lg text-muted hover:bg-white hover:text-void transition-colors">
-          <i data-lucide="circle-help" class="icon"></i>
-        </button>
-        <div class="flex items-center gap-2 ml-2 rounded-full border border-hairline bg-elevated pl-1 pr-3 py-1 cursor-pointer hover:border-white/20 transition-colors">
-          <div class="size-7 rounded-full bg-[#2FB89A]/15 border border-[#2FB89A]/40 grid place-items-center text-[11px] font-bold text-[#2FB89A]">SN</div>
-          <span class="text-xs font-semibold text-ink">Nv. 12</span>
+      <div class="topbar-actions">
+        <button class="icon-btn"><svg class="icon"><use href="#i-bell"/></svg></button>
+        <button class="icon-btn"><svg class="icon"><use href="#i-help"/></svg></button>
+        <div class="profile-chip">
+          <div class="avatar-sm">SN</div>
+          <span class="level">Nv. 12</span>
         </div>
       </div>
     </header>
 
-    <!-- Conteúdo central -->
-    <main class="flex-1 min-h-0 px-6 py-5 flex flex-col gap-4 overflow-hidden">
+    <main class="content">
 
       <!-- Card de perfil: foto (coluna 1) + dados do jogador (coluna 2,
            empilhados) + métricas relevantes (coluna 3, do lado, mesma
            ordem/estilo de linha da coluna 2) -- estrutura 1:1 com a
            referencia enviada, so trocando a pele visual pra nossos
            tokens (surface/elevated/hairline, sem foto externa). -->
-      <section class="rounded-xl border border-hairline bg-surface overflow-hidden shrink-0">
-        <div class="flex">
-          <!-- Coluna 1: foto -->
-          <div class="relative w-[240px] h-[240px] shrink-0 bg-elevated flex items-center justify-center overflow-hidden">
-            <span class="text-[80px] font-bold text-white/10 select-none">SN</span>
-            <div class="absolute top-3 left-3 flex flex-col gap-1.5">
-              <div class="bg-black/60 rounded p-1"><i data-lucide="award" class="icon text-[#E0B24C]" style="width:16px;height:16px;"></i></div>
-              <div class="bg-black/60 rounded px-1.5 py-1 text-[10px] font-bold text-ink">BR</div>
+      <section class="profile-card">
+        <div class="profile-card-inner">
+          <div class="profile-photo">
+            <span class="initials">SN</span>
+            <div class="photo-badges">
+              <div><svg class="icon" style="width:16px;height:16px;color:#E0B24C"><use href="#i-award"/></svg></div>
+              <div class="flag">BR</div>
             </div>
           </div>
 
-          <!-- Coluna 2 + 3: dados e métricas -->
-          <div class="flex-1 p-5 flex flex-col justify-between min-w-0">
+          <div class="profile-data">
             <div>
-              <div class="flex justify-between items-start gap-3">
-                <div class="min-w-0">
-                  <h2 class="text-2xl font-bold text-ink tracking-tight truncate">simoNetto</h2>
-                  <p class="text-muted text-sm mt-0.5">Gabriel Toledo</p>
+              <div class="profile-head">
+                <div>
+                  <h2>simoNetto</h2>
+                  <p>Gabriel Toledo</p>
                 </div>
-                <div class="flex gap-2 shrink-0">
-                  <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center hover:border-white/20 cursor-pointer transition-colors">
-                    <i data-lucide="share-2" class="icon text-muted" style="width:15px;height:15px;"></i>
-                  </div>
-                  <div class="size-8 rounded-lg bg-elevated border border-hairline grid place-items-center hover:border-white/20 cursor-pointer transition-colors">
-                    <i data-lucide="globe" class="icon text-muted" style="width:15px;height:15px;"></i>
-                  </div>
+                <div class="profile-head-actions">
+                  <div class="square-btn"><svg class="icon" style="width:15px;height:15px"><use href="#i-share"/></svg></div>
+                  <div class="square-btn"><svg class="icon" style="width:15px;height:15px"><use href="#i-globe"/></svg></div>
                 </div>
               </div>
 
-              <div class="mt-4 grid grid-cols-2 gap-x-8 border-t border-hairline pt-4">
+              <div class="profile-cols">
                 <!-- Coluna 2: dados do jogador, um embaixo do outro -->
-                <div class="flex flex-col gap-2.5">
-                  <div class="flex justify-between border-b border-hairline/50 pb-2">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Idade</span>
-                    <span class="text-sm text-ink">35 anos</span>
+                <div class="profile-col">
+                  <div class="profile-row">
+                    <span class="label">Idade</span>
+                    <span class="value">35 anos</span>
                   </div>
-                  <div class="flex justify-between border-b border-hairline/50 pb-2">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Time atual</span>
-                    <span class="text-sm text-ink flex items-center gap-1.5">
-                      <i data-lucide="shield" class="icon text-[#6366F1]" style="width:13px;height:13px;"></i>
-                      FURIA
-                    </span>
+                  <div class="profile-row">
+                    <span class="label">Time atual</span>
+                    <span class="value"><svg class="icon" style="width:13px;height:13px;color:#6366F1"><use href="#i-shield"/></svg> FURIA</span>
                   </div>
-                  <div class="flex justify-between border-b border-hairline/50 pb-2">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
-                    <span class="text-sm text-[#E0B24C] font-semibold tnum">R$ 1.515.307</span>
+                  <div class="profile-row">
+                    <span class="label">Ganhos totais</span>
+                    <span class="value gold tnum">R$ 1.515.307</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ranking</span>
-                    <span class="text-sm text-ink">#2 ('16) · #6 ('17)</span>
+                  <div class="profile-row">
+                    <span class="label">Ranking</span>
+                    <span class="value">#2 ('16) · #6 ('17)</span>
                   </div>
                 </div>
 
                 <!-- Coluna 3: métricas mais relevantes, mesma ordem/estilo de linha -->
-                <div class="flex flex-col gap-2.5">
-                  <div class="flex justify-between border-b border-hairline/50 pb-2">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</span>
-                    <span class="text-sm text-ink tnum">24,5%</span>
+                <div class="profile-col">
+                  <div class="profile-row">
+                    <span class="label">VPIP</span>
+                    <span class="value tnum">24,5%</span>
                   </div>
-                  <div class="flex justify-between border-b border-hairline/50 pb-2">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</span>
-                    <span class="text-sm text-ink tnum">8,2%</span>
+                  <div class="profile-row">
+                    <span class="label">3-Bet</span>
+                    <span class="value tnum">8,2%</span>
                   </div>
-                  <div class="flex justify-between border-b border-hairline/50 pb-2">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">ROI acumulado</span>
-                    <span class="text-sm text-positive font-semibold tnum">+24,5%</span>
+                  <div class="profile-row">
+                    <span class="label">ROI acumulado</span>
+                    <span class="value positive tnum">+24,5%</span>
                   </div>
-                  <div class="flex justify-between">
-                    <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</span>
-                    <span class="text-sm text-ink tnum">18,2%</span>
+                  <div class="profile-row">
+                    <span class="label">ITM aproximado</span>
+                    <span class="value tnum">18,2%</span>
                   </div>
                 </div>
               </div>
 
-              <!-- Conquistas, largura total -->
-              <div class="mt-3 flex justify-between items-center border-t border-hairline pt-3">
-                <span class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas</span>
-                <span class="rounded-full border border-[#E0B24C]/40 bg-[#E0B24C]/10 px-2 py-0.5 text-[10px] font-bold text-[#E0B24C]">2x Vencedor de Bracelete WSOP</span>
+              <div class="achievements-row">
+                <span class="label">Conquistas</span>
+                <span class="badge-gold">2x Vencedor de Bracelete WSOP</span>
               </div>
             </div>
 
-            <!-- Troféus -->
-            <div class="mt-3 flex gap-2">
-              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="medal" class="icon text-[#E0B24C]" style="width:16px;height:16px;"></i></div>
-              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="medal" class="icon text-[#E0B24C]" style="width:16px;height:16px;"></i></div>
-              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="trophy" class="icon text-[#2FB89A]" style="width:16px;height:16px;"></i></div>
-              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="trophy" class="icon text-[#2FB89A]" style="width:16px;height:16px;"></i></div>
-              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="ticket" class="icon text-muted" style="width:16px;height:16px;"></i></div>
-              <div class="size-9 rounded-lg bg-elevated border border-hairline grid place-items-center"><i data-lucide="star" class="icon text-muted" style="width:16px;height:16px;"></i></div>
+            <div class="trophy-row">
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#E0B24C"><use href="#i-medal"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#E0B24C"><use href="#i-medal"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#2FB89A"><use href="#i-trophy"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#2FB89A"><use href="#i-trophy"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#c4c7c8"><use href="#i-ticket"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#c4c7c8"><use href="#i-star"/></svg></div>
             </div>
           </div>
         </div>
@@ -253,6 +530,5 @@
   </div>
 </div>
 
-<script>lucide.createIcons();</script>
 </body>
 </html>
