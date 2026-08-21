@@ -84,15 +84,14 @@ const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
 // mesmo quando o solver só resolveu uma decisão binária (fold vs a
 // ação). Em sbOpen e bbJam a opção errada é uma jogada real de poker
 // que o solver simplesmente não modela (limpar / pagar em vez de
-// jogar); em sbCallJam não existe uma 3a ação de verdade (depois de
-// alguém all-in num pote HU, só cabe fold ou call) -- "Aumentar" fica
-// aqui por decisão explícita (consistência visual > realismo nessa
-// fase específica), sempre classificado como erro grave (frequência
-// 0, o solver nunca recomenda).
-const DISTRACTOR_LABEL: Record<(typeof PHASES)[number]["key"], string> = {
+// jogar). sbCallJam FICA DE FORA de propósito: depois de alguém all-in
+// num pote heads-up só existe fold ou call nas regras do poker -- não
+// tem uma 3a ação real pra fabricar, e forçar uma (ex "Aumentar", que
+// nem é uma jogada legal ali) ensinaria uma opção que não existe. Essa
+// fase continua com só 2 botões.
+const DISTRACTOR_LABEL: Partial<Record<(typeof PHASES)[number]["key"], string>> = {
   sbOpen: "Limpar (call)",
   bbJam: "Pagar (call)",
-  sbCallJam: "Aumentar",
 };
 
 const VERDICT_LABEL: Record<Verdict, string> = {
@@ -239,7 +238,7 @@ function EvDetailsModal({
 }: {
   onClose: () => void;
   actionLabel: string;
-  distractorLabel: string;
+  distractorLabel: string | null;
   chosen: "fold" | "action" | "distractor";
   foldPct: number;
   actionPct: number;
@@ -276,7 +275,7 @@ function EvDetailsModal({
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
                 <FreqBar label="Fold" pct={foldPct} highlighted={chosen === "fold"} />
                 <FreqBar label={actionLabel} pct={actionPct} highlighted={chosen === "action"} />
-                <FreqBar label={distractorLabel} pct={0} highlighted={chosen === "distractor"} />
+                {distractorLabel && <FreqBar label={distractorLabel} pct={0} highlighted={chosen === "distractor"} />}
               </div>
               {isMarginal && (
                 <p style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.5, color: "rgba(255,255,255,0.5)" }}>
@@ -296,7 +295,7 @@ function EvDetailsModal({
                 <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>de diferença entre Fold e {actionLabel.toLowerCase()}</span>
               </div>
               <p style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5, color: "rgba(255,255,255,0.35)" }}>
-                {chosen === "distractor" && (
+                {chosen === "distractor" && distractorLabel && (
                   <>O motor não calcula o valor de {distractorLabel.toLowerCase()} aqui (ele nunca considera essa jogada) — o número acima é só a diferença entre as duas opções reais. </>
                 )}
                 Esse número é o que dá pra comparar entre mãos diferentes. Os valores de equity ICM crus (fold {evFold.toFixed(1)} · {actionLabel.toLowerCase()} {evAction.toFixed(1)}) são específicos desse torneio — servem só pra calcular a % acima, não pra comparar com outra mão.
@@ -508,7 +507,7 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
     // Distrator: não tem EV real calculado (o solver nunca resolve
     // essa jogada), então a frase não tenta comparar valor -- só avisa
     // que essa opção nem entra na conta do GTO aqui.
-    if (chosen === "distractor") return `O GTO nem considera ${DISTRACTOR_LABEL[phaseKey].toLowerCase()} nessa situação.`;
+    if (chosen === "distractor") return `O GTO nem considera ${(DISTRACTOR_LABEL[phaseKey] ?? "essa jogada").toLowerCase()} nessa situação.`;
     if (isMarginal) return "As duas jogadas valem praticamente o mesmo aqui — não tinha erro grave possível.";
     const chosenLabel = chosen === "fold" ? "Fold" : actionLabel;
     const otherLabel = chosen === "fold" ? actionLabel : "Fold";
@@ -543,12 +542,12 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
       if (!chosen) {
         if (e.key.toUpperCase() === "Q") setChosen("fold");
         if (e.key.toUpperCase() === "W") setChosen("action");
-        if (e.key.toUpperCase() === "E") setChosen("distractor");
+        if (e.key.toUpperCase() === "E" && DISTRACTOR_LABEL[phaseKey]) setChosen("distractor");
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [chosen, currentPhase, nextRound]);
+  }, [chosen, currentPhase, nextRound, phaseKey]);
 
   const sessionPct = stats.total > 0 ? Math.round((stats.hits / stats.total) * 100) : 0;
   const emptyMessage = spots.length === 0 ? "Nenhum spot RFI/Jam encontrado no Supabase ainda." : "Sem mãos geradas pra essa combinação de filtros ainda.";
@@ -789,7 +788,7 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
                   <EvDetailsModal
                     onClose={() => setDetailsOpen(false)}
                     actionLabel={actionLabel}
-                    distractorLabel={DISTRACTOR_LABEL[phaseKey]}
+                    distractorLabel={DISTRACTOR_LABEL[phaseKey] ?? null}
                     chosen={chosen}
                     foldPct={Math.round((1 - round.freq) * 100)}
                     actionPct={Math.round(round.freq * 100)}
@@ -828,14 +827,20 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
                           recomenda aqui (frequência 0), pedido explícito
                           pra tirar a decisão binária fold/ação e forçar
                           o jogador a de fato escolher entre 3+ opções
-                          (mais parecido com uma mesa real). */}
-                      <button
-                        onClick={() => setChosen("distractor")}
-                        style={{ fontFamily: F, minWidth: 96, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "13px 18px", fontSize: 14.5, fontWeight: 600, color: "#FFFFFF", cursor: "pointer" }}
-                      >
-                        {DISTRACTOR_LABEL[phaseKey]}
-                        <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>E</span>
-                      </button>
+                          (mais parecido com uma mesa real). Só existe
+                          quando há uma jogada real pra oferecer como
+                          errada -- em "vs All-in" (sbCallJam) não tem
+                          (fold ou call são as únicas ações possíveis
+                          depois de alguém all-in num pote HU). */}
+                      {DISTRACTOR_LABEL[phaseKey] && (
+                        <button
+                          onClick={() => setChosen("distractor")}
+                          style={{ fontFamily: F, minWidth: 96, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "13px 18px", fontSize: 14.5, fontWeight: 600, color: "#FFFFFF", cursor: "pointer" }}
+                        >
+                          {DISTRACTOR_LABEL[phaseKey]}
+                          <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>E</span>
+                        </button>
+                      )}
                     </div>
                   ) : (
                     <>
@@ -843,7 +848,7 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
                           ("Você jogou X — resumo acima"), em vez de só
                           o botão sozinho. */}
                       <div style={{ fontFamily: F, flex: 1, padding: "10px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : chosen === "distractor" ? DISTRACTOR_LABEL[phaseKey] : actionLabel}</span> — resumo acima.
+                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : chosen === "distractor" ? DISTRACTOR_LABEL[phaseKey] ?? "outra" : actionLabel}</span> — resumo acima.
                       </div>
                       <button
                         onClick={() => nextRound(currentPhase)}
