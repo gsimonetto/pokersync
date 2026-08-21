@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, HelpCircle, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, X, Users, ChevronRight, Link2, Wallet, Gauge, Bookmark } from "lucide-react";
+import { Save, CheckCircle2, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, Users, Link2, Wallet, Gauge, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
@@ -22,7 +22,6 @@ import {
   createUserTag,
   updateReviewTags,
   fetchTeamCoaches,
-  shareReviewWithCoach,
   fetchRecentBankrollSessions,
   fetchBankrollSessionById,
   linkReviewToSession,
@@ -40,6 +39,7 @@ import {
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { CoachThread } from "./coach-thread";
+import { ShareHandModal } from "./share-hand-modal";
 
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
@@ -93,142 +93,6 @@ function ShareButton({ review, parsedHand }: { review: ReviewDetail; parsedHand:
   );
 }
 
-function GuidedQuestionChip({
-  index,
-  question,
-  answer,
-  onChange,
-}: {
-  index: number;
-  question: string;
-  answer: string;
-  onChange: (val: string) => void;
-}) {
-  const [open, setOpen] = useState(false);
-  const answered = answer.trim().length > 0;
-
-  return (
-    <div>
-      <button
-        type="button"
-        onClick={() => setOpen((v) => !v)}
-        className={`flex w-full items-center gap-2 rounded-full border px-3 py-1.5 text-left text-[12px] transition-colors ${
-          answered ? "border-review/50 bg-review/10 text-ink" : "border-hairline bg-void text-ink/85"
-        }`}
-      >
-        <span
-          className={`grid h-3.5 w-3.5 shrink-0 place-items-center rounded-full text-[8.5px] font-bold ${
-            answered ? "bg-ink text-void" : "border border-hairline text-muted"
-          }`}
-        >
-          {answered ? "✓" : index + 1}
-        </span>
-        <span className="flex-1 truncate">{question}</span>
-      </button>
-      {open && (
-        <textarea
-          value={answer}
-          onChange={(e) => onChange(e.target.value)}
-          rows={2}
-          autoFocus
-          placeholder="Sua análise…"
-          className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
-        />
-      )}
-    </div>
-  );
-}
-
-// Modal simples (fecha com Esc/backdrop/X) — mesmo padrao ja usado em
-// outras telas do produto (Bankroll), reimplementado aqui local pra nao
-// criar dependencia cruzada entre modulos por um componente tao pequeno.
-function Modal({
-  open,
-  onClose,
-  title,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-lg rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold text-ink">{title}</h2>
-          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted hover:text-ink" aria-label="Fechar">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="mt-4">{children}</div>
-      </div>
-    </div>
-  );
-}
-
-// Perguntas guiadas em modal (pedido explicito): as primeiras
-// `clickableCount` continuam no formato de chip que precisa clicar pra
-// abrir (GuidedQuestionChip, "da forma que ja e'" — nao mudou nada
-// nelas). As demais aparecem direto como texto livre — o jogador ja
-// respondeu as prioritarias, o resto e' aprofundamento opcional, nao
-// precisa do gesto extra de abrir uma por uma.
-function GuidedQuestionsModal({
-  open,
-  onClose,
-  qas,
-  onChange,
-  clickableCount,
-}: {
-  open: boolean;
-  onClose: () => void;
-  qas: ReviewAnswer[];
-  onChange: (idx: number, val: string) => void;
-  clickableCount: number;
-}) {
-  return (
-    <Modal open={open} onClose={onClose} title="Perguntas guiadas">
-      <div className="flex flex-col gap-2">
-        {qas.slice(0, clickableCount).map((q, i) => (
-          <GuidedQuestionChip key={i} index={i} question={q.question} answer={q.answer} onChange={(val) => onChange(i, val)} />
-        ))}
-
-        {qas.length > clickableCount && (
-          <div className="mt-1 flex flex-col gap-3 border-t border-hairline pt-3">
-            {qas.slice(clickableCount).map((q, i) => {
-              const idx = i + clickableCount;
-              return (
-                <div key={idx}>
-                  <p className="text-[12.5px] font-semibold text-ink/90">{q.question}</p>
-                  <textarea
-                    value={q.answer}
-                    onChange={(e) => onChange(idx, e.target.value)}
-                    rows={2}
-                    placeholder="Sua análise…"
-                    className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-      </div>
-    </Modal>
-  );
-}
-
 export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack: () => void }) {
   const [userId, setUserId] = useState<string | null>(null);
   const [review, setReview] = useState<ReviewDetail | null>(null);
@@ -240,6 +104,13 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [streetEvals, setStreetEvals] = useState<StreetEval[]>(
     STREETS.map((s) => ({ street: s, self_rating: "", reason_code: "", notes: "" }))
   );
+  // Qual street esta expandida no fluxo unificado abaixo. null = segue o
+  // padrao automatico (primeira street ainda sem nota); um numero fixa a
+  // escolha manual do jogador; -1 = tudo recolhido (fluxo concluido ou
+  // fechado por vontade propria). Existe pra permitir avancar sozinho
+  // (toque na nota = ja abre a proxima) sem travar o jogador se ele quiser
+  // voltar numa street anterior.
+  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -274,20 +145,14 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [newTagLabel, setNewTagLabel] = useState("");
   const [savingTags, setSavingTags] = useState(false);
 
-  // Perguntas guiadas em modal (pedido explicito): botao num lugar
-  // estrategico (cabecalho, sempre visivel) abre o modal — as primeiras
-  // continuam clicaveis pra abrir (GuidedQuestionChip, "da forma que ja
-  // e'"), as demais aparecem direto como texto livre (sem precisar
-  // clicar pra expandir).
-  const GUIDED_CLICKABLE_COUNT = 2;
-  const [guidedModalOpen, setGuidedModalOpen] = useState(false);
-
   // Compartilhar com o coach do time (base minima de Times: role coach/
   // jogador em team_members) — mesmo formato de replayer no lado do
   // coach, via notificacao com deep-link.
   const [teamCoaches, setTeamCoaches] = useState<TeamCoach[]>([]);
-  const [shareMenuOpen, setShareMenuOpen] = useState(false);
-  const [shareStatus, setShareStatus] = useState<"idle" | "sending" | "sent">("idle");
+  // Modal de compartilhamento (mesma infra que o botao "Compartilhar" do
+  // Hand Replayer ja usa, ver share-hand-modal.tsx) -- reusado aqui pra
+  // nao ter dois jeitos diferentes de mandar mao pro coach na mesma tela.
+  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // Vinculo com sessao de banca -- antes era write-only na criacao da
   // mao, sem jeito de corrigir/desvincular depois nem de ver aqui qual
@@ -470,21 +335,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
     }
   }
 
-  async function handleShareWithCoach(coach: TeamCoach) {
-    setShareStatus("sending");
-    try {
-      await shareReviewWithCoach(reviewId, coach.userId, review?.title || "Mão sem título");
-      setShareStatus("sent");
-      setTimeout(() => {
-        setShareStatus("idle");
-        setShareMenuOpen(false);
-      }, 1600);
-    } catch {
-      setShareStatus("idle");
-      setError("Não foi possível compartilhar com o coach.");
-    }
-  }
-
   async function saveTicket(next: ManualTicket) {
     setTicket(next);
     if (!next.format || !next.action) return;
@@ -566,12 +416,21 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
 
   const answeredCount = qas.filter((q) => q.answer.trim()).length;
   const canConclude = learning.trim().length > 0;
+  // Fluxo unificado de autoavaliacao (rating + pergunta guiada por street,
+  // sem modal): a street aberta e' a escolha manual do jogador (openIdx),
+  // ou por padrao a primeira ainda sem nota -- assim que ele bate uma nota
+  // a proxima abre sozinha (a "acao rapida": um toque avanca, nao precisa
+  // abrir/fechar nada a parte). allStreetsRated tambem gate o CTA de
+  // "Enviar ao coach", que so' faz sentido depois da revisao completa.
+  const firstUnratedIdx = streetEvals.findIndex((e) => !e.self_rating);
+  const effectiveOpenIdx = openIdx !== null ? openIdx : firstUnratedIdx;
+  const allStreetsRated = streetEvals.length === STREETS.length && streetEvals.every((e) => e.self_rating);
   const isPrintOnly = review.source === "print" || (!review.hand_history && review.parsed_data?.kind !== "parsed");
 
   // Secoes mais compactas (pedido explicito: "diminua as perguntas") —
-  // padding p-4->p-3, margens mb-3.5->mb-2.5, chips e textarea menores
-  // (ver GuidedQuestionChip acima). Objetivo: sobrar mais espaco visual
-  // pra coluna da mesa, que ficou maior (ver grid abaixo).
+  // padding p-4->p-3, margens mb-3.5->mb-2.5, chips e textarea menores.
+  // Objetivo: sobrar mais espaco visual pra coluna da mesa, que ficou
+  // maior (ver grid abaixo).
   const secondaryContent = (
     <>
       {imgUrls.length > 0 && (
@@ -656,83 +515,201 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </section>
       )}
 
+      {/* Fluxo unificado (pedido explicito): antes eram tres pecas soltas
+          -- rating por street aqui, perguntas guiadas atras de um botao que
+          abria modal, compartilhar com coach atras de outro botao com
+          dropdown. Virou uma coisa so: cada street e' um cartao que abre
+          sozinho na sequencia (bate a nota, avanca pra proxima -- a "acao
+          rapida" pedida, sem precisar abrir/fechar nada a parte), com a
+          pergunta guiada correspondente ja dentro do cartao (texto sempre
+          visivel, sem o gesto extra de clicar pra revelar). O botao de
+          enviar ao coach aparece no final, depois que as 4 streets tem
+          nota -- e' a conclusao natural do fluxo, nao mais uma acao solta
+          no cabecalho. */}
       <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
-        <div className="mb-2 flex items-center gap-2">
-          <Scale size={15} className="text-review" />
-          <h3 className="m-0 text-sm font-semibold text-ink">Auto-avaliação por street</h3>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <div className="flex items-center gap-2">
+            <Scale size={15} className="text-review" />
+            <h3 className="m-0 text-sm font-semibold text-ink">Avaliação por street</h3>
+          </div>
+          {qas.length > 0 && (
+            <span className="text-[10.5px] text-muted">
+              {answeredCount}/{qas.length} perguntas
+            </span>
+          )}
         </div>
 
-        <div className="flex flex-col gap-2">
-          {streetEvals.map((ev, idx) => (
-            <div key={ev.street} className="rounded-lg border border-hairline bg-void p-2">
-              <div className="mb-1.5 flex items-center justify-between">
-                <span className="text-xs font-semibold uppercase text-ink/85">{ev.street}</span>
-                <div className="flex gap-1">
-                  {RATINGS.map((r) => {
-                    const active = ev.self_rating === r.code;
-                    return (
-                      <button
-                        key={r.code}
-                        type="button"
-                        onClick={() =>
-                          setStreetEvals((prev) => prev.map((e, i) => (i === idx ? { ...e, self_rating: r.code } : e)))
-                        }
-                        className="rounded-md border px-1.5 py-0.5 text-[10.5px] transition-colors"
-                        style={{
-                          borderColor: active ? r.color : "#2a2a2a",
-                          background: active ? r.color : "transparent",
-                          color: active ? "#000" : "#fff",
-                          fontWeight: active ? 600 : 400,
+        <div className="flex flex-col gap-1.5">
+          {streetEvals.map((ev, idx) => {
+            const isOpen = effectiveOpenIdx === idx;
+            const rating = RATINGS.find((r) => r.code === ev.self_rating);
+            const question = qas[idx];
+
+            return (
+              <div key={ev.street} className="overflow-hidden rounded-lg border border-hairline bg-void">
+                <button
+                  type="button"
+                  onClick={() => setOpenIdx(isOpen ? -1 : idx)}
+                  className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left"
+                >
+                  <span className="text-xs font-semibold uppercase text-ink/85">{ev.street}</span>
+                  {rating ? (
+                    <span
+                      className="rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold"
+                      style={{ background: rating.color, color: "#000" }}
+                    >
+                      {rating.label}
+                    </span>
+                  ) : (
+                    <span className="text-[10.5px] text-muted">Toque pra avaliar</span>
+                  )}
+                </button>
+
+                {isOpen && (
+                  <div className="flex flex-col gap-2 border-t border-hairline p-2.5">
+                    <div className="flex gap-1.5">
+                      {RATINGS.map((r) => {
+                        const active = ev.self_rating === r.code;
+                        return (
+                          <button
+                            key={r.code}
+                            type="button"
+                            onClick={() => {
+                              setStreetEvals((prev) => prev.map((e, i) => (i === idx ? { ...e, self_rating: r.code } : e)));
+                              // So' "errei" fica esperando o motivo antes de
+                              // avancar -- as outras notas ja levam direto
+                              // pra proxima street, um toque = feito.
+                              if (r.code !== "errei") setOpenIdx(idx + 1 < STREETS.length ? idx + 1 : -1);
+                            }}
+                            className="flex-1 rounded-md border px-1.5 py-1 text-[11px] transition-colors"
+                            style={{
+                              borderColor: active ? r.color : "#2a2a2a",
+                              background: active ? r.color : "transparent",
+                              color: active ? "#000" : "#fff",
+                              fontWeight: active ? 600 : 400,
+                            }}
+                          >
+                            {r.label}
+                          </button>
+                        );
+                      })}
+                    </div>
+
+                    {ev.self_rating === "errei" && (
+                      <select
+                        value={ev.reason_code}
+                        onChange={(e) => {
+                          const val = e.target.value;
+                          setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: val } : x)));
+                          if (val) setOpenIdx(idx + 1 < STREETS.length ? idx + 1 : -1);
                         }}
+                        className="w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[11.5px] text-ink outline-none"
                       >
-                        {r.label}
-                      </button>
-                    );
-                  })}
-                </div>
+                        <option value="">Motivo do erro…</option>
+                        {reasons.map((r) => (
+                          <option key={r.code} value={r.code}>
+                            {r.label}
+                          </option>
+                        ))}
+                      </select>
+                    )}
+
+                    {/* Veredito objetivo do solver, so' quando a mao veio da
+                        Aderencia a Range -- compara sua autoavaliacao com o
+                        que o GTO realmente recomenda, em vez de confiar so
+                        no auto-relato. */}
+                    {ev.street === "preflop" && objectiveVerdict && (
+                      <div
+                        className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10.5px]"
+                        style={{ borderColor: `${verdictColor(objectiveVerdict.verdict)}40`, background: `${verdictColor(objectiveVerdict.verdict)}12` }}
+                      >
+                        <Gauge size={11} style={{ color: verdictColor(objectiveVerdict.verdict) }} />
+                        <span style={{ color: verdictColor(objectiveVerdict.verdict) }} className="font-semibold">
+                          GTO: {objectiveVerdict.verdict.replace("_", " ")}
+                        </span>
+                        <span className="text-muted">
+                          fold {objectiveVerdict.decision.fold}% · call {objectiveVerdict.decision.call}% · raise{" "}
+                          {objectiveVerdict.decision.raise}%
+                          {objectiveVerdict.rangeName ? ` · vs ${objectiveVerdict.rangeName} (${objectiveVerdict.position})` : ""}
+                        </span>
+                      </div>
+                    )}
+
+                    {question && (
+                      <div>
+                        <p className="text-[11.5px] font-medium text-ink/80">{question.question}</p>
+                        <textarea
+                          value={question.answer}
+                          onChange={(e) => updateAnswer(idx, e.target.value)}
+                          rows={2}
+                          placeholder="Sua análise…"
+                          className="mt-1 w-full resize-y rounded-lg border border-hairline bg-surface p-2 text-[12px] text-ink outline-none focus:border-ink/40"
+                        />
+                      </div>
+                    )}
+                  </div>
+                )}
               </div>
-
-              {ev.self_rating === "errei" && (
-                <select
-                  value={ev.reason_code}
-                  onChange={(e) =>
-                    setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: e.target.value } : x)))
-                  }
-                  className="w-full rounded-lg border border-hairline bg-void px-2 py-1.5 text-[11.5px] text-ink outline-none"
-                >
-                  <option value="">Motivo do erro…</option>
-                  {reasons.map((r) => (
-                    <option key={r.code} value={r.code}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-              )}
-
-              {/* Veredito objetivo do solver, so' quando a mao veio da
-                  Aderencia a Range -- compara sua autoavaliacao com o que
-                  o GTO realmente recomenda, em vez de confiar so no
-                  auto-relato. */}
-              {ev.street === "preflop" && objectiveVerdict && (
-                <div
-                  className="mt-1.5 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10.5px]"
-                  style={{ borderColor: `${verdictColor(objectiveVerdict.verdict)}40`, background: `${verdictColor(objectiveVerdict.verdict)}12` }}
-                >
-                  <Gauge size={11} style={{ color: verdictColor(objectiveVerdict.verdict) }} />
-                  <span style={{ color: verdictColor(objectiveVerdict.verdict) }} className="font-semibold">
-                    GTO: {objectiveVerdict.verdict.replace("_", " ")}
-                  </span>
-                  <span className="text-muted">
-                    fold {objectiveVerdict.decision.fold}% · call {objectiveVerdict.decision.call}% · raise{" "}
-                    {objectiveVerdict.decision.raise}%
-                    {objectiveVerdict.rangeName ? ` · vs ${objectiveVerdict.rangeName} (${objectiveVerdict.position})` : ""}
-                  </span>
-                </div>
-              )}
-            </div>
-          ))}
+            );
+          })}
         </div>
+
+        {/* Perguntas extras (baseadas em marcadores como ICM/3-bet/PKO) que
+            sobram das 4 primeiras, ja distribuidas 1 por street acima --
+            ficam aqui como aprofundamento opcional, sempre visiveis (sem
+            clique pra revelar). */}
+        {qas.length > STREETS.length && (
+          <div className="mt-2 flex flex-col gap-2 border-t border-hairline pt-2">
+            <span className="text-[10.5px] uppercase tracking-wide text-muted">Aprofundamento (opcional)</span>
+            {qas.slice(STREETS.length).map((q, i) => {
+              const idx = i + STREETS.length;
+              return (
+                <div key={idx}>
+                  <p className="text-[11.5px] font-medium text-ink/80">{q.question}</p>
+                  <textarea
+                    value={q.answer}
+                    onChange={(e) => updateAnswer(idx, e.target.value)}
+                    rows={2}
+                    placeholder="Sua análise…"
+                    className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12px] text-ink outline-none focus:border-ink/40"
+                  />
+                </div>
+              );
+            })}
+          </div>
+        )}
+
+        {/* Enviar ao coach: sempre disponivel (nao trava por streets sem
+            nota -- decisao revertida, ver historico) -- abre a MESMA modal
+            que o botao "Compartilhar" do Hand Replayer ja usa (perguntas
+            guiadas obrigatorias/opcionais, todas editaveis). Assim so
+            existe UM jeito de compartilhar mao com o coach no produto
+            inteiro, nao dois padroes parecidos disputando espaco. */}
+        {teamCoaches.length > 0 && (
+          <div className="mt-3 border-t border-hairline pt-3">
+            <button
+              type="button"
+              onClick={() => setShareModalOpen(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5 text-[12px] font-semibold text-training transition-colors hover:bg-training/20"
+            >
+              <Users size={13} />
+              Enviar ao coach
+            </button>
+          </div>
+        )}
       </section>
+
+      <ShareHandModal
+        open={shareModalOpen}
+        reviewId={reviewId}
+        onClose={() => setShareModalOpen(false)}
+        onShared={() => {
+          // As respostas foram salvas pela propria modal (mesmo reviewId) --
+          // recarrega pra essa tela refletir o que acabou de ser enviado
+          // (ex: CoachThread aparecendo com a conversa nova).
+          load();
+        }}
+      />
 
       <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
@@ -920,62 +897,9 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             <Bookmark size={15} fill={review.saved ? "currentColor" : "none"} />
           </button>
 
-          {/* Perguntas guiadas — lugar estrategico (cabecalho, sempre
-              visivel, nao precisa rolar) — abre modal em vez de ocupar
-              espaco fixo na coluna. */}
-          <button
-            onClick={() => setGuidedModalOpen(true)}
-            className="relative flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40"
-          >
-            <HelpCircle size={14} className="text-review" />
-            Perguntas
-            <span className="text-[11px] text-muted">
-              {answeredCount}/{qas.length}
-            </span>
-          </button>
-
-          {teamCoaches.length > 0 && (
-            <div className="relative">
-              <button
-                onClick={() => setShareMenuOpen((v) => !v)}
-                className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-training/40"
-              >
-                <Users size={14} className="text-training" />
-                Coach
-              </button>
-              {shareMenuOpen && (
-                <div className="absolute right-0 top-[calc(100%+4px)] z-20 w-56 rounded-xl border border-hairline bg-surface p-2 shadow-2xl">
-                  {shareStatus === "sent" ? (
-                    <p className="p-2 text-center text-[12px] text-positive">Mão compartilhada!</p>
-                  ) : (
-                    teamCoaches.map((c) => (
-                      <button
-                        key={c.userId}
-                        onClick={() => handleShareWithCoach(c)}
-                        disabled={shareStatus === "sending"}
-                        className="flex w-full items-center justify-between rounded-lg px-2.5 py-2 text-left text-[13px] text-ink transition-colors hover:bg-elevated disabled:opacity-50"
-                      >
-                        <span className="min-w-0 truncate">{c.name}</span>
-                        <ChevronRight size={13} className="text-muted" />
-                      </button>
-                    ))
-                  )}
-                </div>
-              )}
-            </div>
-          )}
-
           <ShareButton review={review} parsedHand={parsedHandForTable} />
         </div>
       </div>
-
-      <GuidedQuestionsModal
-        open={guidedModalOpen}
-        onClose={() => setGuidedModalOpen(false)}
-        qas={qas}
-        onChange={updateAnswer}
-        clickableCount={GUIDED_CLICKABLE_COUNT}
-      />
 
       {/* Conversa do compartilhamento: so renderiza se existir share
           envolvendo quem esta olhando (o proprio componente decide). */}
@@ -989,7 +913,11 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[0.8fr_1.5fr]">
           <div>{secondaryContent}</div>
           <div>
-            <RevisorHandTable parsedHand={parsedHandForTable} />
+            {/* reviewId habilita o botao "Compartilhar" nativo da mesa --
+                antes ficava oculto aqui (so' existia dentro da fila/sessao),
+                entao a unica forma de compartilhar era o bloco abaixo da
+                autoavaliacao. Agora os dois levam pra mesma modal. */}
+            <RevisorHandTable parsedHand={parsedHandForTable} reviewId={reviewId} />
           </div>
         </div>
       ) : (

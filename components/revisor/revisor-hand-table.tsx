@@ -2,9 +2,10 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
+import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { ShareHandModal } from "./share-hand-modal";
+import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
@@ -176,6 +177,47 @@ export function RevisorHandTable({
   // Modal de compartilhamento (pedido explicito) — abre com as mesmas
   // perguntas guiadas do "Analisar mão"; ver share-hand-modal.tsx.
   const [shareModalOpen, setShareModalOpen] = useState(false);
+
+  // "Salvar spot" direto na mesa (pedido explicito, 2026-08): antes so
+  // existia dentro de "Analisar mão" (RevisorDetalhe) -- pra maos de
+  // torneio, navegadas aqui uma a uma numa sessao, isso significava abrir
+  // a analise completa so pra marcar "quero rever essa depois", entao na
+  // pratica o botao so era usado em maos avulsas. Mesma biblioteca de
+  // destino dos dois casos (aba "Salvos", ver revisor-spots-salvos.tsx).
+  const [saved, setSaved] = useState(false);
+  const [savingSpot, setSavingSpot] = useState(false);
+
+  useEffect(() => {
+    if (!reviewId) {
+      setSaved(false);
+      return;
+    }
+    let cancelled = false;
+    fetchSpotSaved(reviewId)
+      .then((v) => {
+        if (!cancelled) setSaved(v);
+      })
+      .catch(() => {
+        // sem permissao/erro de rede -- fica como "nao salvo", nao trava a mesa
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [reviewId]);
+
+  async function toggleSaved() {
+    if (!reviewId || savingSpot) return;
+    const next = !saved;
+    setSaved(next);
+    setSavingSpot(true);
+    try {
+      await setSpotSaved(reviewId, next);
+    } catch {
+      setSaved(!next);
+    } finally {
+      setSavingSpot(false);
+    }
+  }
 
   // Resolvido uma vez por mao (a situacao preflop nao muda step a step,
   // so a rua muda). Consulta situation_dictionary no Supabase — por isso
@@ -350,6 +392,12 @@ export function RevisorHandTable({
 
   const canAnalyze = !!replayState && !!onOpenHand;
   const canShare = !!reviewId;
+  // So aparece quando ha pra onde "Analisar mao" levar (onOpenHand) --
+  // ou seja, quando esta tela e' a mesa de navegacao de uma sessao
+  // (RevisorSessao), nao a propria RevisorDetalhe. La' o header ja tem
+  // seu proprio bookmark (o mesmo campo, mesma acao) -- mostrar os dois
+  // ao mesmo tempo na mesma tela seria redundante.
+  const canSave = !!reviewId && !!onOpenHand;
 
   return (
     <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
@@ -450,6 +498,15 @@ export function RevisorHandTable({
               </span>
             </div>
 
+            {canSave && (
+              <ChipButton
+                icon={<Bookmark size={13} fill={saved ? "currentColor" : "none"} />}
+                label={saved ? "Salvo" : "Salvar"}
+                title={saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
+                onClick={toggleSaved}
+                disabled={savingSpot}
+              />
+            )}
             {canShare && (
               <ChipButton
                 icon={<Share2 size={13} />}

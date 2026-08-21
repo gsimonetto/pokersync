@@ -347,6 +347,17 @@ export async function setSpotSaved(reviewId: string, saved: boolean) {
   await updateReviewProgress(reviewId, { saved });
 }
 
+// Leitura leve de "saved" pra quem so precisa desse booleano (ex: o
+// bookmark do Hand Replayer quando navega mão a mão dentro de um
+// torneio) -- sem puxar o resto de ReviewDetail (tags/imagens/respostas)
+// que getReview() carrega e que nao serve pra nada nesse contexto.
+export async function fetchSpotSaved(reviewId: string): Promise<boolean> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("hand_reviews").select("saved").eq("id", reviewId).single();
+  if (error) throw error;
+  return Boolean(data?.saved);
+}
+
 // ============================================================
 // Auto-avaliação por street
 // ============================================================
