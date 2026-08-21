@@ -24,7 +24,9 @@ const TABS = [
 
 type OpenMenu = "profile" | "notifications" | "help" | null;
 
-const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha"];
+// "/modulos" tem sua propria topbar/sidebar (redesenho 2026-08) --
+// mostrar as duas juntas duplicaria navegacao no topo da tela.
+const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha", "/modulos"];
 
 export function TopNav() {
   const pathname = usePathname();
