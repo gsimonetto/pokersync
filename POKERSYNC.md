@@ -283,12 +283,13 @@ de verdade hoje.
 | 2 | Gerar estoque pré-flop: push/fold ICM e stacks 10/20/30/50bb | Treino | motor, job e endpoint já existem — falta disparar (escreve em produção) |
 | 3 | Score de evolução consolidado do jogador | Times / Hub | há matéria-prima (XP, leaks, aderência, ROI) |
 | 4 | Agente desktop | Times | schema pronto, agente inexistente; decisão 005 mantém como futuro |
-| 5 | Ações rápidas nos leaks: "criar fila de revisão" além de "treinar spot" | Cross-module | metade já existe |
+| 5 | Decidir o catálogo de formatos | Banca | o formulário oferece MTT/Cash/SNG/Spin, mas 61 das 73 sessões gravadas dizem `"Torneio"`; ou o catálogo muda, ou as sessões antigas migram |
 | 6 | Sincronizar o board do roadmap com a realidade | Roadmap | todos os itens estão marcados "Planejado", inclusive os 7 módulos no ar |
 
 **Concluídos desde a consolidação (2026-08-21):** handoff leak → treino
-(PR #35) e os três itens de Banca — edição de sessão, filtros do
-histórico e formulário por formato (PR #36).
+(PR #35); os três itens de Banca — edição de sessão, filtros do
+histórico e formulário por formato (PR #36); ações rápidas nos leaks
+(PR #37).
 
 **Ideias futuras** (mantidas dos documentos originais): integrações
 externas de dados; integrações opcionais com solvers de terceiros —
@@ -325,6 +326,13 @@ inteira tem **8 linhas**, todas RFI/Jam de pré-flop.
   e sem leitura do formato novo no frontend.
 
 ## 9. Changelog
+
+### 2026-08-21 — Primeira rodada sobre o backlog consolidado (cont.)
+- Ações rápidas no painel de leaks da Banca: "Treinar" (só onde o estoque
+  casa com a fatia) e "Registrar mão", ligando Banca a Treino e Revisor.
+- Corrigido: `TOURNEY_FORMATS` não incluía `"Torneio"`, o valor usado por
+  61 das 73 sessões reais — a ponte Banca → Treino estava muda para a
+  maior parte da base.
 
 ### 2026-08-21 — Primeira rodada sobre o backlog consolidado
 - Motor: `upsert` por `spot_id` nos dois jobs e `spot_id` determinístico
