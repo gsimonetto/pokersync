@@ -188,9 +188,9 @@ Legenda: **✅ no ar** · **🟡 parcial** · **⬜ não iniciado** ·
 | Dashboard de evolução | ✅ | página de 1.918 linhas, heatmap de volume |
 | Fluxo de caixa (depósitos/saques) | ✅ | `bankroll_transactions`: depósito, saque, caixinha |
 | Métrica de tempo / winrate horário | ✅ | KPIs R$/hora **e** bb/hora com intervalo de confiança |
-| Histórico expandido com filtros | 🟡 | "Ver todas" existe, com busca livre que casa data, formato e local; faltam filtros dedicados (seletor de período/formato) |
-| **Edição de sessão (lápis)** | ⬜ | só existem `addSession`, `deleteSession` e `updateSessionDiary` — editar ainda exige excluir e refazer |
-| Formulário dinâmico por formato | 🟡 | campos já se adaptam (big blind só em cash), mas "Reentradas" não vira "Rebuy/Add-on" em cash |
+| Histórico expandido com filtros | ✅ | "Ver todas" + busca livre + filtros dedicados de formato e período (PR #36) |
+| Edição de sessão (lápis) | ✅ | `updateSession()`; edita na mesma linha, sem perder vínculo com as mãos revisadas nem conceder XP de novo (PR #36) |
+| Formulário dinâmico por formato | ✅ | "Rebuys/Add-on" em cash, big blind promovido a campo principal quando o formato é Cash (PR #36) |
 
 **Além do backlog** (não estava previsto e está no ar): rake e rakeback,
 multi-moeda, staking/backing com markup, BRM com limites por formato,
@@ -208,7 +208,7 @@ alertas de banca, anotações no gráfico.
 | Histórico de revisões | ✅ | `user_review_summary()` |
 | Perguntas guiadas | ✅ | `hand_review_answers` |
 | Registro de aprendizado | ✅ | `hand_reviews.learning_note` |
-| Sugestão de drills | 🔒 | 12 sugestões cadastradas e 3 RPCs prontas — **sem estoque de drills pra apontar** (ver §8) |
+| Sugestão de drills | 🔒 | 12 sugestões cadastradas, 3 RPCs prontas e o handoff pro Treino fechado (PR #35) — falta **estoque de drills pra apontar** (ver §8) |
 
 **Além do backlog:** replay de mão com atalhos de teclado, avaliação por
 rua (`hand_review_street_evals`), aderência à range com histórico,
@@ -219,7 +219,7 @@ compartilhar mão com o time e thread de coach, sessões de mãos.
 | Item | Estado | Evidência |
 | --- | :-: | --- |
 | Drills personalizados | 🟡 | filtros de posição/stack/tipo funcionam, mas só há 8 spots (RFI/Jam pré-flop) |
-| Sugestões baseadas em reviews | 🔒 | `suggest_drills_for_user()` pronta, bloqueada por estoque e por um bug de mapeamento de rua (§8) |
+| Sugestões baseadas em reviews | 🔒 | encanamento completo (PR #35): o botão resolve o alvo, o Treino honra o `suggestionId` e aplica matchup/stack. Segue bloqueado só por estoque — os 5 leaks reais da base são todos pós-flop (§8) |
 | Sugestões baseadas em performance | ✅ | o leak de formato da Banca vira sugestão de stack curto no treino |
 
 **Além do backlog:** XP, combo de acertos, missões e veredito na mesa;
@@ -273,21 +273,22 @@ notificações. ✅ no ar — não estava em nenhum documento.
 
 ## 7. Backlog vivo — só o que falta
 
-Ordenado por relação valor/esforço. Os itens 1–4 fecham o loop central
-do produto ("dados geram ação"), que hoje está aberto.
+Ordenado pelo que os dados reais pedem, não pelo custo: o item 1 é o
+único que faz o loop central do produto ("dados geram ação") funcionar
+de verdade hoje.
 
 | # | Item | Módulo | Nota |
 | :-: | --- | --- | --- |
-| 1 | Corrigir o mapa de ruas e o validador de `gto_nodes` do drill-service | Treino ↔ Review | ~1h; destrava o botão "treinar isso" nos leaks |
-| 2 | Gerar estoque de drills: push/fold ICM e stacks 10/20/30/50bb | Treino | motor, job e endpoint já existem — falta disparar |
-| 3 | Edição de sessão sem excluir e refazer | Banca | único item do backlog original de Banca ainda intocado |
-| 4 | "Ver todo o histórico" com filtro por data | Banca | |
-| 5 | Formulário dinâmico completo (Rebuy/Add-on em cash) | Banca | |
-| 6 | Pipeline de pós-flop ponta a ponta (job → contrato → UI) | Treino ↔ Review | projeto grande; destrava 8 das 12 sugestões de leak |
-| 7 | Score de evolução consolidado do jogador | Times / Hub | há matéria-prima (XP, leaks, aderência, ROI) |
-| 8 | Agente desktop | Times | schema pronto, agente inexistente; decisão 005 mantém como futuro |
-| 9 | Ações rápidas nos leaks: "criar fila de revisão" além de "treinar spot" | Cross-module | metade já existe |
-| 10 | Sincronizar o board do roadmap com a realidade | Roadmap | todos os itens estão marcados "Planejado", inclusive os 7 módulos no ar |
+| 1 | Pipeline de pós-flop ponta a ponta (job → contrato → UI) | Treino ↔ Review | **subiu pro topo**: os 5 leaks reais da base são todos pós-flop, então é o único item que faz o loop leak → treino funcionar de verdade hoje |
+| 2 | Gerar estoque pré-flop: push/fold ICM e stacks 10/20/30/50bb | Treino | motor, job e endpoint já existem — falta disparar (escreve em produção) |
+| 3 | Score de evolução consolidado do jogador | Times / Hub | há matéria-prima (XP, leaks, aderência, ROI) |
+| 4 | Agente desktop | Times | schema pronto, agente inexistente; decisão 005 mantém como futuro |
+| 5 | Ações rápidas nos leaks: "criar fila de revisão" além de "treinar spot" | Cross-module | metade já existe |
+| 6 | Sincronizar o board do roadmap com a realidade | Roadmap | todos os itens estão marcados "Planejado", inclusive os 7 módulos no ar |
+
+**Concluídos desde a consolidação (2026-08-21):** handoff leak → treino
+(PR #35) e os três itens de Banca — edição de sessão, filtros do
+histórico e formulário por formato (PR #36).
 
 **Ideias futuras** (mantidas dos documentos originais): integrações
 externas de dados; integrações opcionais com solvers de terceiros —
@@ -310,15 +311,30 @@ inteira tem **8 linhas**, todas RFI/Jam de pré-flop.
   river), sem job, sem endpoint, sem UI. Dois ativos prontos e órfãos no
   banco: `flop_subsets` (184 flops ponderados) e `preflop_ranges` (29
   ranges nomeadas), que nenhum dos repositórios lê.
-- **Bug de idempotência**: 3 de 4 jobs perderam 2,5 milhões de iterações
-  no `insert` final por `spot_id` duplicado — falta `upsert`.
-- **Bug de mapeamento**: o drill-service documenta que a base é toda
-  Flop/Turn/River e exclui "preflop"; hoje é o inverso exato, e o botão
-  "treinar isso" do card de leaks nunca aparece.
+- ~~**Bug de idempotência**: 3 de 4 jobs perderam 2,5 milhões de iterações
+  no `insert` final por `spot_id` duplicado.~~ Corrigido no motor: `upsert`
+  por `spot_id` nos dois jobs, e `spot_id` determinístico no push/fold.
+- ~~**Bug de mapeamento**: o drill-service documentava que a base era toda
+  Flop/Turn/River.~~ Corrigido (PR #35): tradução por cenário, e o Treino
+  passou a honrar o `suggestionId` que o Revisor manda.
+- **Estoque é o gargalo restante**: os leaks reais da base são `tilt`/flop,
+  `sizing_errado`/turn, `valor_perdido`/river, `range_mal_lido`/flop e
+  `timing_ruim`/turn. Todos pós-flop — três viram drill assim que o
+  pipeline existir; `tilt` é comportamental e não vira drill.
 - **Multiway e multi-tamanho**: motores prontos, sem caminho de ingestão
   e sem leitura do formato novo no frontend.
 
 ## 9. Changelog
+
+### 2026-08-21 — Primeira rodada sobre o backlog consolidado
+- Motor: `upsert` por `spot_id` nos dois jobs e `spot_id` determinístico
+  no push/fold — re-rodar um spot deixou de custar o job inteiro.
+- Handoff leak → treino fechado nas três pontas: tradução por cenário,
+  `suggestionId` honrado pela tela de Treino, `initialMatchup` no drill.
+- Banca: edição de sessão sem excluir e refazer, filtros dedicados de
+  formato e período no histórico, e formulário adaptado por formato.
+- Registrado que o gargalo do loop leak → treino é estoque de pós-flop,
+  não mapeamento: todos os leaks reais da base são pós-flop.
 
 ### 2026-08-21 — Consolidação da documentação
 - Cinco documentos (`AI_CONTEXT`, `PRODUCT`, `DECISIONS`, `BACKLOG`,
