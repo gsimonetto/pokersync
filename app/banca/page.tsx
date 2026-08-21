@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
+import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, bbHourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
@@ -13,6 +13,7 @@ import {
   fetchSessions,
   fetchSettings,
   addSession as apiAddSession,
+  updateSession as apiUpdateSession,
   deleteSession as apiDeleteSession,
   updateSessionDiary as apiUpdateSessionDiary,
   fetchTransactions,
@@ -37,6 +38,28 @@ const RANGES: { value: RangeOption; label: string }[] = [
   { value: "1Y", label: "Ano" },
   { value: "all", label: "Tudo" },
 ];
+
+// Mesmos periodos do resto da tela (RANGES), com rotulo por extenso: aqui
+// o select fica solto numa toolbar, sem o contexto que faz "7D" bastar.
+const HISTORY_RANGE_LABELS: Record<RangeOption, string> = {
+  "7D": "Ultimos 7 dias",
+  "30D": "Ultimos 30 dias",
+  "1Y": "Ultimo ano",
+  all: "Todo o periodo",
+};
+const HISTORY_RANGES = [...RANGES]
+  .sort((a, b) => (a.value === "all" ? -1 : b.value === "all" ? 1 : 0))
+  .map((r) => ({ value: r.value, label: HISTORY_RANGE_LABELS[r.value] }));
+
+// Vocabulario do formulario por formato: "reentradas" e' termo de torneio;
+// em cash o jogador recompra/recarrega o stack. Mesmo campo, o nome que ele
+// usa de verdade em cada formato.
+const REENTRY_LABEL: Record<string, string> = {
+  MTT: "Reentradas",
+  SNG: "Reentradas",
+  Spin: "Reentradas",
+  Cash: "Rebuys/Add-on",
+};
 
 const TX_LABELS: Record<TransactionType, string> = {
   deposito: "Deposito",
@@ -93,6 +116,10 @@ export default function BankrollPage() {
 
   const [historyOpen, setHistoryOpen] = useState(false);
   const [historySearch, setHistorySearch] = useState("");
+  // Filtros dedicados do historico -- a busca livre resolve "achar aquela
+  // sessao", mas nao responde "como foi meu MTT nos ultimos 30 dias".
+  const [historyFormat, setHistoryFormat] = useState<string>("all");
+  const [historyRange, setHistoryRange] = useState<RangeOption>("all");
 
   const [goalType, setGoalType] = useState<GoalType>("volume");
   const [goalPeriod, setGoalPeriod] = useState<GoalPeriod>("semanal");
@@ -101,6 +128,8 @@ export default function BankrollPage() {
   const [coachExpanded, setCoachExpanded] = useState(false);
 
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
+  // id da sessao sendo editada (null = o modal esta em modo "registrar")
+  const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [txModalOpen, setTxModalOpen] = useState(false);
   const [goalsModalOpen, setGoalsModalOpen] = useState(false);
   const [brmModalOpen, setBrmModalOpen] = useState(false);
@@ -250,12 +279,15 @@ export default function BankrollPage() {
   const recentTx = [...platformTransactions].reverse().slice(0, 6);
   const historyFiltered = useMemo(() => {
     const q = historySearch.trim().toLowerCase();
-    const list = [...platformSessions].reverse();
+    let base = platformSessions;
+    if (historyFormat !== "all") base = base.filter((s) => s.format === historyFormat);
+    if (historyRange !== "all") base = filterSessionsByRange(base, historyRange);
+    const list = [...base].reverse();
     if (!q) return list;
     return list.filter((s) =>
       [s.format, s.date, s.stake, s.venue, s.notes, s.mood].filter(Boolean).some((f) => String(f).toLowerCase().includes(q))
     );
-  }, [platformSessions, historySearch]);
+  }, [platformSessions, historySearch, historyFormat, historyRange]);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
 
   // Quantas maos foram revisadas por sessao -- antes o vinculo so existia
@@ -288,36 +320,10 @@ export default function BankrollPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [loading, currentBrm?.status, currentBrm?.format]);
 
-  async function handleAddSession() {
-    if (!buyIn || !cashout || !date) {
-      setErr("Preencha data, buy-in e cashout.");
-      return;
-    }
-    const resolvedVenue = venue === OUTRO_PLATFORM ? venueOther.trim() : venue;
-    const draft: Session = {
-      id: `tmp-${Date.now()}`,
-      date,
-      time: time || undefined,
-      format,
-      buyIn: Number(buyIn),
-      reentries: Number(reentries) || 0,
-      cashout: Number(cashout),
-      stake,
-      hours: hours ? Number(hours) : undefined,
-      venue: resolvedVenue || undefined,
-      currency,
-      notes,
-      mood: mood || undefined,
-      tilt: tilt ? Number(tilt) : undefined,
-      diaryNote: diaryNote || undefined,
-      rake: rake ? Number(rake) : undefined,
-      rakeback: rakeback ? Number(rakeback) : undefined,
-      bigBlind: bigBlind ? Number(bigBlind) : undefined,
-      ownPct: ownPct ? Number(ownPct) : undefined,
-      markup: markup ? Number(markup) : undefined,
-      backerName: backerName || undefined,
-    };
-    setSessions((prev) => [...prev, draft]);
+  // Reset dos campos do formulario de sessao -- usado ao salvar e ao sair do
+  // modo de edicao, pra um "editar" nunca deixar campo preenchido sujando o
+  // proximo "registrar".
+  function resetSessionForm() {
     setBuyIn("");
     setCashout("");
     setStake("");
@@ -339,14 +345,92 @@ export default function BankrollPage() {
     setMarkup("");
     setBackerName("");
     setShowAdvanced(false);
+    setEditingSessionId(null);
+  }
+
+  // Abre o mesmo modal do registro, mas preenchido -- editar e registrar sao
+  // o mesmo formulario, entao qualquer campo novo entra nos dois de graca.
+  function handleEditSession(s: Session) {
+    setEditingSessionId(s.id);
+    setDate(s.date);
+    setTime(s.time ?? "");
+    setFormat(s.format);
+    setBuyIn(String(s.buyIn));
+    setReentries(String(s.reentries ?? 0));
+    setCashout(String(s.cashout));
+    setStake(s.stake ?? "");
+    setHours(s.hours != null ? String(s.hours) : "");
+    setCurrency(s.currency ?? "BRL");
+    setNotes(s.notes ?? "");
+    // Plataforma fora do catalogo volta como "Outro" + texto livre, senao o
+    // select cairia no primeiro item e a edicao trocaria a plataforma sozinha.
+    const known = s.venue && (PLATFORMS as readonly string[]).includes(s.venue);
+    setVenue(known ? (s.venue as string) : s.venue ? OUTRO_PLATFORM : PLATFORMS[0]);
+    setVenueOther(known ? "" : s.venue ?? "");
+    setMood(s.mood ?? "");
+    setTilt(s.tilt != null ? String(s.tilt) : "");
+    setDiaryNote(s.diaryNote ?? "");
+    setRake(s.rake != null ? String(s.rake) : "");
+    setRakeback(s.rakeback != null ? String(s.rakeback) : "");
+    setBigBlind(s.bigBlind != null ? String(s.bigBlind) : "");
+    setOwnPct(s.ownPct != null ? String(s.ownPct) : "");
+    setMarkup(s.markup != null ? String(s.markup) : "");
+    setBackerName(s.backerName ?? "");
+    // Secoes recolhidas abrem quando ja tem conteudo -- senao o jogador
+    // editaria sem ver que existe diario/staking preenchido ali dentro.
+    setShowDiary(Boolean(s.mood || s.tilt != null || s.diaryNote));
+    setShowAdvanced(Boolean(s.rake != null || s.rakeback != null || s.bigBlind != null || s.ownPct != null || s.markup != null || s.backerName));
+    setErr("");
+    setSessionModalOpen(true);
+  }
+
+  function closeSessionModal() {
+    setSessionModalOpen(false);
+    if (editingSessionId) resetSessionForm();
+  }
+
+  async function handleSaveSession() {
+    if (!buyIn || !cashout || !date) {
+      setErr("Preencha data, buy-in e cashout.");
+      return;
+    }
+    const resolvedVenue = venue === OUTRO_PLATFORM ? venueOther.trim() : venue;
+    const draft: Session = {
+      id: editingSessionId ?? `tmp-${Date.now()}`,
+      date,
+      time: time || undefined,
+      format,
+      buyIn: Number(buyIn),
+      reentries: Number(reentries) || 0,
+      cashout: Number(cashout),
+      stake,
+      hours: hours ? Number(hours) : undefined,
+      venue: resolvedVenue || undefined,
+      currency,
+      notes,
+      mood: mood || undefined,
+      tilt: tilt ? Number(tilt) : undefined,
+      diaryNote: diaryNote || undefined,
+      rake: rake ? Number(rake) : undefined,
+      rakeback: rakeback ? Number(rakeback) : undefined,
+      bigBlind: bigBlind ? Number(bigBlind) : undefined,
+      ownPct: ownPct ? Number(ownPct) : undefined,
+      markup: markup ? Number(markup) : undefined,
+      backerName: backerName || undefined,
+    };
+    const editingId = editingSessionId;
+    const backup = sessions;
+    setSessions((prev) => (editingId ? prev.map((x) => (x.id === editingId ? draft : x)) : [...prev, draft]));
+    resetSessionForm();
     setErr("");
     setSessionModalOpen(false);
     try {
-      const saved = await apiAddSession(draft);
+      const saved = editingId ? await apiUpdateSession(editingId, draft) : await apiAddSession(draft);
       setSessions((prev) => prev.map((x) => (x.id === draft.id ? saved : x)));
     } catch {
-      setErr("Nao foi possivel salvar a sessao.");
-      setSessions((prev) => prev.filter((x) => x.id !== draft.id));
+      // Edicao volta ao estado anterior; registro novo some da lista.
+      setErr(editingId ? "Nao foi possivel salvar a edicao." : "Nao foi possivel salvar a sessao.");
+      setSessions(editingId ? backup : (prev) => prev.filter((x) => x.id !== draft.id));
     }
   }
 
@@ -528,7 +612,12 @@ export default function BankrollPage() {
               </select>
             </div>
             <button
-              onClick={() => setSessionModalOpen(true)}
+              onClick={() => {
+                // Sempre entra em modo "registrar": se o modal foi usado pra
+                // editar antes, os campos preenchidos ficariam ali.
+                if (editingSessionId) resetSessionForm();
+                setSessionModalOpen(true);
+              }}
               aria-label="Registrar sessao"
               title="Registrar sessao"
               className="group flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform duration-200 hover:scale-110 active:scale-90"
@@ -1067,7 +1156,7 @@ export default function BankrollPage() {
         )}
       </Modal>
 
-      <Modal open={sessionModalOpen} onClose={() => setSessionModalOpen(false)} title="Registrar sessao">
+      <Modal open={sessionModalOpen} onClose={closeSessionModal} title={editingSessionId ? "Editar sessao" : "Registrar sessao"}>
         <div className="grid grid-cols-2 gap-3">
           <select
             value={format}
@@ -1102,6 +1191,18 @@ export default function BankrollPage() {
             onChange={(e) => setHours(e.target.value)}
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
           />
+          {format === "Cash" && (
+            <input
+              type="number"
+              step="0.01"
+              min="0"
+              placeholder="Big blind (p/ bb/hora)"
+              title="Big blind da mesa — alimenta o bb/hora"
+              value={bigBlind}
+              onChange={(e) => setBigBlind(e.target.value)}
+              className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            />
+          )}
           <input
             placeholder="Buy-in"
             value={buyIn}
@@ -1109,7 +1210,8 @@ export default function BankrollPage() {
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
           />
           <input
-            placeholder="Reentradas"
+            placeholder={REENTRY_LABEL[format] ?? "Reentradas"}
+            title={REENTRY_LABEL[format] ?? "Reentradas"}
             value={reentries}
             onChange={(e) => setReentries(e.target.value)}
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
@@ -1225,14 +1327,18 @@ export default function BankrollPage() {
               onChange={(e) => setRakeback(e.target.value)}
               className="rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
             />
-            <input
-              type="number"
-              step="0.01"
-              placeholder="Big blind (só cash, p/ bb/hora)"
-              value={bigBlind}
-              onChange={(e) => setBigBlind(e.target.value)}
-              className="col-span-2 rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
-            />
+            {/* Em Cash o big blind sai daqui e sobe pro formulario principal:
+                la ele e' campo de rotina (alimenta bb/hora), nao "avancado". */}
+            {format !== "Cash" && (
+              <input
+                type="number"
+                step="0.01"
+                placeholder="Big blind (só cash, p/ bb/hora)"
+                value={bigBlind}
+                onChange={(e) => setBigBlind(e.target.value)}
+                className="col-span-2 rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
+              />
+            )}
             <div className="col-span-2 mt-1 border-t border-hairline pt-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted">
               Staking (deixe em branco se a banca é 100% sua)
             </div>
@@ -1264,10 +1370,10 @@ export default function BankrollPage() {
         )}
 
         <button
-          onClick={handleAddSession}
+          onClick={handleSaveSession}
           className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
         >
-          Salvar sessao
+          {editingSessionId ? "Salvar alteracoes" : "Salvar sessao"}
         </button>
       </Modal>
 
@@ -1278,15 +1384,42 @@ export default function BankrollPage() {
           </h2>
           <div className="flex items-center gap-2">
             {historyOpen && (
-              <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
-                <Search size={12} className="text-muted" />
-                <input
-                  placeholder="Buscar por formato, stake, plataforma..."
-                  value={historySearch}
-                  onChange={(e) => setHistorySearch(e.target.value)}
-                  className="w-52 bg-transparent text-[11px] text-ink outline-none placeholder:text-muted"
-                />
-              </div>
+              <>
+                <select
+                  value={historyFormat}
+                  onChange={(e) => setHistoryFormat(e.target.value)}
+                  aria-label="Filtrar por formato"
+                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink transition-colors hover:border-ink/30"
+                >
+                  <option value="all">Todos os formatos</option>
+                  {FORMATS.map((f) => (
+                    <option key={f} value={f}>
+                      {f}
+                    </option>
+                  ))}
+                </select>
+                <select
+                  value={historyRange}
+                  onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
+                  aria-label="Filtrar por periodo"
+                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink transition-colors hover:border-ink/30"
+                >
+                  {HISTORY_RANGES.map((r) => (
+                    <option key={r.value} value={r.value}>
+                      {r.label}
+                    </option>
+                  ))}
+                </select>
+                <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
+                  <Search size={12} className="text-muted" />
+                  <input
+                    placeholder="Buscar por formato, stake, plataforma..."
+                    value={historySearch}
+                    onChange={(e) => setHistorySearch(e.target.value)}
+                    className="w-52 bg-transparent text-[11px] text-ink outline-none placeholder:text-muted"
+                  />
+                </div>
+              </>
             )}
             {platformSessions.length > 8 && (
               <button
@@ -1337,7 +1470,15 @@ export default function BankrollPage() {
                     <span className={`text-sm font-bold ${result >= 0 ? "text-positive" : "text-negative"}`}>
                       {fmtSigned(result)}
                     </span>
-                    <button onClick={() => handleRemove(s.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                    <button
+                      onClick={() => handleEditSession(s)}
+                      aria-label="Editar sessao"
+                      title="Editar sessao"
+                      className="text-muted transition-all duration-150 hover:scale-125 hover:text-ink"
+                    >
+                      <Pencil size={15} />
+                    </button>
+                    <button onClick={() => handleRemove(s.id)} aria-label="Excluir sessao" title="Excluir sessao" className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
                       <Trash2 size={15} />
                     </button>
                   </div>
