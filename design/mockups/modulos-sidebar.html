@@ -328,6 +328,127 @@
 
   /* Icons */
   .icon { width: 18px; height: 18px; display: inline-block; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ============ GRID DE MÓDULOS ============ */
+  /* Preenche o espaço abaixo do perfil com a função real desta tela --
+     lançador rápido dos módulos -- em vez de deixar area nobre vazia. */
+  .modules-section {
+    flex: 1;
+    min-height: 0;
+    display: flex;
+    flex-direction: column;
+  }
+  .modules-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 10px;
+    flex-shrink: 0;
+  }
+  .modules-head h3 {
+    margin: 0;
+    font-size: 13px;
+    font-weight: 500;
+    color: var(--muted);
+  }
+  .modules-head span { font-size: 12px; color: rgba(196, 199, 200, 0.6); }
+
+  .modules-grid {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    grid-template-rows: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .module-card {
+    --acc: #2fb89a;
+    position: relative;
+    height: 100%;
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    padding: 16px;
+    text-decoration: none;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    transition: border-color 0.2s ease, box-shadow 0.2s ease, transform 0.2s ease;
+  }
+  .module-card:hover,
+  .module-card.is-active {
+    border-color: var(--acc);
+    box-shadow: 0 12px 34px -10px var(--acc);
+    transform: translateY(-2px);
+  }
+  .module-glow {
+    position: absolute;
+    left: -32px;
+    top: -32px;
+    width: 112px;
+    height: 112px;
+    border-radius: 999px;
+    background: var(--acc);
+    filter: blur(28px);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+    pointer-events: none;
+  }
+  .module-card:hover .module-glow,
+  .module-card.is-active .module-glow { opacity: 0.22; }
+
+  .module-top { position: relative; display: flex; align-items: flex-start; justify-content: space-between; }
+  .module-icon-box {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    transition: color 0.2s ease, border-color 0.2s ease;
+  }
+  .module-card:hover .module-icon-box,
+  .module-card.is-active .module-icon-box { color: var(--acc); border-color: color-mix(in srgb, var(--acc) 40%, transparent); }
+
+  .module-arrow {
+    color: var(--acc);
+    opacity: 0;
+    transform: translateX(-4px);
+    transition: opacity 0.2s ease, transform 0.2s ease;
+  }
+  .module-card:hover .module-arrow,
+  .module-card.is-active .module-arrow { opacity: 1; transform: translateX(0); }
+
+  .module-badge {
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+    padding: 2px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.04em;
+    color: var(--muted);
+  }
+
+  .module-card h4 {
+    position: relative;
+    margin: 12px 0 0;
+    font-size: 14px;
+    font-weight: 600;
+    color: var(--ink);
+    transition: color 0.2s ease;
+  }
+  .module-card:hover h4,
+  .module-card.is-active h4 { color: var(--acc); }
+  .module-card p {
+    position: relative;
+    margin: 4px 0 0;
+    font-size: 12px;
+    line-height: 1.4;
+    color: var(--muted);
+  }
 </style>
 </head>
 <body>
@@ -354,6 +475,8 @@
     <symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="15" r="6"/><path d="M9 10.5 6 3h3l3 5.5L15 3h3l-3 7.5"/></symbol>
     <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a1.5 1.5 0 0 0 0 3V15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.5a1.5 1.5 0 0 0 0-3Z"/><line x1="10" y1="7" x2="10" y2="17" stroke-dasharray="2 2"/></symbol>
     <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.5 3 6.2 6.5.9-4.7 4.6 1.1 6.6L12 17.7l-5.9 3.1 1.1-6.6L2.5 9.6l6.5-.9Z"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="4" x2="12" y2="20"/><line x1="4" y1="12" x2="20" y2="12"/></symbol>
   </defs>
 </svg>
 
@@ -523,6 +646,95 @@
               <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#c4c7c8"><use href="#i-star"/></svg></div>
             </div>
           </div>
+        </div>
+      </section>
+
+      <!-- Grid de módulos: preenche o resto da tela com a funcao real
+           desta pagina -- lancador rapido, mesma paleta de accent de
+           lib/modules-data.tsx, mesmo glow de hover que o produto ja usa
+           (acc-card / acc-glow em app/globals.css). -->
+      <section class="modules-section">
+        <div class="modules-head">
+          <h3>Todos os módulos</h3>
+          <span>7 módulos</span>
+        </div>
+        <div class="modules-grid">
+
+          <a href="#" class="module-card is-active" style="--acc:#2FB89A">
+            <div class="module-glow"></div>
+            <div class="module-top">
+              <div class="module-icon-box"><svg class="icon" style="width:18px;height:18px"><use href="#i-target"/></svg></div>
+              <svg class="icon module-arrow" style="width:16px;height:16px"><use href="#i-arrow-right"/></svg>
+            </div>
+            <h4>Modo Treino</h4>
+            <p>Ranges e frequências GTO</p>
+          </a>
+
+          <a href="#" class="module-card" style="--acc:#5AA6E0">
+            <div class="module-glow"></div>
+            <div class="module-top">
+              <div class="module-icon-box"><svg class="icon" style="width:18px;height:18px"><use href="#i-trending-up"/></svg></div>
+              <svg class="icon module-arrow" style="width:16px;height:16px"><use href="#i-arrow-right"/></svg>
+            </div>
+            <h4>Gestão de Banca</h4>
+            <p>Controle de risco e ROI</p>
+          </a>
+
+          <a href="#" class="module-card" style="--acc:#A855F7">
+            <div class="module-glow"></div>
+            <div class="module-top">
+              <div class="module-icon-box"><svg class="icon" style="width:18px;height:18px"><use href="#i-book-open"/></svg></div>
+              <svg class="icon module-arrow" style="width:16px;height:16px"><use href="#i-arrow-right"/></svg>
+            </div>
+            <h4>Revisão de Mãos</h4>
+            <p>Análise técnica de jogadas</p>
+          </a>
+
+          <a href="#" class="module-card" style="--acc:#E0B24C">
+            <div class="module-glow"></div>
+            <div class="module-top">
+              <div class="module-icon-box"><svg class="icon" style="width:18px;height:18px"><use href="#i-trophy"/></svg></div>
+              <span class="module-badge">Nv. 12</span>
+            </div>
+            <h4>Hub de Evolução</h4>
+            <p>XP, missões e ranking</p>
+          </a>
+
+          <a href="#" class="module-card" style="--acc:#6366F1">
+            <div class="module-glow"></div>
+            <div class="module-top">
+              <div class="module-icon-box"><svg class="icon" style="width:18px;height:18px"><use href="#i-users"/></svg></div>
+              <span class="module-badge">FURIA</span>
+            </div>
+            <h4>Meu Time</h4>
+            <p>Membros, papéis e convites</p>
+          </a>
+
+          <a href="#" class="module-card" style="--acc:#22D3EE">
+            <div class="module-glow"></div>
+            <div class="module-top">
+              <div class="module-icon-box"><svg class="icon" style="width:18px;height:18px"><use href="#i-line-chart"/></svg></div>
+              <svg class="icon module-arrow" style="width:16px;height:16px"><use href="#i-arrow-right"/></svg>
+            </div>
+            <h4>Player Evolution</h4>
+            <p>ROI, ABI e tendências</p>
+          </a>
+
+          <a href="#" class="module-card" style="--acc:#E0559E">
+            <div class="module-glow"></div>
+            <div class="module-top">
+              <div class="module-icon-box"><svg class="icon" style="width:18px;height:18px"><use href="#i-layers"/></svg></div>
+              <svg class="icon module-arrow" style="width:16px;height:16px"><use href="#i-arrow-right"/></svg>
+            </div>
+            <h4>Construtor de Ranges</h4>
+            <p>Mapeamento estratégico</p>
+          </a>
+
+          <div class="module-card" style="border-style:dashed; align-items:center; justify-content:center; text-align:center; color:rgba(196,199,200,.5)">
+            <svg class="icon" style="width:18px;height:18px"><use href="#i-plus"/></svg>
+            <p style="margin-top:6px; font-weight:500; color:inherit">Próximo módulo</p>
+          </div>
+
         </div>
       </section>
 
