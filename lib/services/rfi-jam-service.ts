@@ -7,7 +7,7 @@ import type { RangeHands } from "@/components/ranges/range-grid";
 // RangeGrid já entende (fold/call/raise em %) antes de renderizar.
 export interface RfiJamPhaseRaw {
   ev_fold: number;
-  action: "open" | "jam" | "call";
+  action: "open" | "allin" | "call";
   hands: Record<string, [freq: number, ev: number, gap: number]>;
 }
 
@@ -56,16 +56,16 @@ export function parseMatchup(matchup: string): { hero: string | null; villain: s
   return { hero: TOKEN_TO_POS[heroToken] ?? null, villain: TOKEN_TO_POS[villainToken] ?? null };
 }
 
-// action='open'/'jam' pinta na cor de "raise" do grid (verde), porque
-// tecnicamente são all-in — não existe uma 4a cor pronta no componente
+// action='open' pinta na cor de "raise" do grid (verde), porque
+// tecnicamente é all-in — não existe uma 4a cor pronta no componente
 // e criar uma agora só pra isso não vale o esforço nesse estágio de
 // teste. action='call' pinta na cor de "call" (azul), que já existe.
-// action='jam' e' um all-in de verdade -- marca o raiseType pra a
+// action='allin' e' um all-in de verdade -- marca o raiseType pra a
 // grade do construtor colorir igual ao botao "All-in" (nao o verde
 // generico de "Raise"), consistente com o que o solver de fato resolveu.
 const ACTION_RAISE_TYPE: Record<RfiJamPhaseRaw["action"], "raise" | "allin" | undefined> = {
   open: "raise",
-  jam: "allin",
+  allin: "allin",
   call: undefined,
 };
 

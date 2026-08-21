@@ -73,7 +73,7 @@ const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam"; label: string }[] = [
 
 const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
   open: "Abrir (raise)",
-  jam: "Jam (all-in)",
+  allin: "Jam (all-in)",
   call: "Pagar (call)",
 };
 
