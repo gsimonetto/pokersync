@@ -19,7 +19,7 @@ import {
   type PreflopSituation,
 } from "@/lib/services/performance-service";
 import { fetchSessions, fetchSettings, fetchTransactions } from "@/lib/services/bankroll-service";
-import { aggregate, netWorth, dailyActivity, type DayActivity } from "@/lib/bankroll/calc";
+import { aggregate, netWorth, dailyActivity, evolutionSeries, type DayActivity } from "@/lib/bankroll/calc";
 import { modules } from "@/lib/modules-data";
 
 // Mesmas faixas de referencia de app/performance/page.tsx (funcao
@@ -70,6 +70,7 @@ export default function ModulosPage() {
   const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
   const [bankrollAtual, setBankrollAtual] = useState<number | null>(null);
   const [bankrollProfit, setBankrollProfit] = useState<number | null>(null);
+  const [bankrollRecent, setBankrollRecent] = useState<number[]>([]);
   const [activity, setActivity] = useState<Record<string, DayActivity>>({});
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
@@ -118,6 +119,10 @@ export default function ModulosPage() {
         setBankrollAtual(nw.playingBankroll);
         setBankrollProfit(agg.profit);
         setActivity(dailyActivity(sessions));
+        // Ultimas sessoes (net por sessao, ja em ordem cronologica pela
+        // propria evolutionSeries) -- preenche o card de Banca Atual com
+        // forma real em vez de deixar so o numero grande sobrando.
+        setBankrollRecent(evolutionSeries(sessions, settings.bankroll).slice(-14).map((p) => p.net));
       }
 
       // Time: precisa do user.id da chamada de auth acima -- RLS de
@@ -391,22 +396,53 @@ export default function ModulosPage() {
               logica de cor/celula), alimentados pelos mesmos servicos
               (fetchSessions/fetchSettings/fetchTransactions). */}
           <div className="grid flex-1 grid-cols-[1fr_1.6fr] gap-4">
-            <section className="flex flex-col justify-center rounded-xl border border-hairline bg-elevated px-5 py-4">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">
-                <Wallet size={14} className="text-training" />
-                Banca atual
+            <section className="flex flex-col rounded-xl border border-hairline bg-elevated px-5 py-4">
+              <div className="flex shrink-0 items-center justify-between">
+                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">
+                  <Wallet size={14} className="text-training" />
+                  Banca atual
+                </div>
+                {bankrollProfit !== null && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
+                      bankrollProfit >= 0 ? "bg-positive/10 text-positive" : "bg-negative/10 text-negative"
+                    }`}
+                  >
+                    {fmtSignedMoney(bankrollProfit)}
+                  </span>
+                )}
               </div>
-              <p className={`mt-1.5 text-3xl font-bold tabular-nums ${(bankrollAtual ?? 0) < 0 ? "text-negative" : "text-positive"}`}>
+              <p className={`mt-1.5 shrink-0 text-3xl font-bold tabular-nums ${(bankrollAtual ?? 0) < 0 ? "text-negative" : "text-positive"}`}>
                 {bankrollAtual !== null ? fmtMoney(bankrollAtual) : "—"}
               </p>
-              {bankrollProfit !== null && (
-                <p className="mt-2 text-xs text-muted">
-                  <strong className={bankrollProfit >= 0 ? "text-positive" : "text-negative"}>
-                    {fmtSignedMoney(bankrollProfit)}
-                  </strong>{" "}
-                  de resultado
+
+              <div className="mt-3 flex flex-1 flex-col justify-end">
+                <p className="mb-1.5 text-[10px] text-muted/60">
+                  {bankrollRecent.length > 0 ? `Últimas ${bankrollRecent.length} sessões` : "Sem sessões registradas ainda"}
                 </p>
-              )}
+                {bankrollRecent.length > 0 ? (
+                  <div className="flex h-full items-end gap-[3px]">
+                    {bankrollRecent.map((net, i) => {
+                      const maxAbs = Math.max(...bankrollRecent.map((n) => Math.abs(n)), 1);
+                      const h = Math.max(8, Math.round((Math.abs(net) / maxAbs) * 100));
+                      return (
+                        <div
+                          key={i}
+                          title={fmtSignedMoney(net)}
+                          className={`flex-1 rounded-t-sm ${net >= 0 ? "bg-positive/60" : "bg-negative/60"}`}
+                          style={{ height: `${h}%` }}
+                        />
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="flex h-full items-end gap-[3px]">
+                    {Array.from({ length: 14 }).map((_, i) => (
+                      <div key={i} className="h-2 flex-1 rounded-t-sm bg-hairline" />
+                    ))}
+                  </div>
+                )}
+              </div>
             </section>
 
             <section className="flex flex-col rounded-xl border border-hairline bg-elevated px-5 py-4">
