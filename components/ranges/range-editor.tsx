@@ -4,6 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { GitCompare, Save, Trash2, Download, Check, Users, X, History, FolderOpen, ChevronDown, ChevronUp, Percent } from "lucide-react";
 import { RangeGrid, getDecision, type RangeHands } from "@/components/ranges/range-grid";
+import { useConfirm } from "@/components/confirm-dialog";
 import { BoardAnalyzer } from "@/components/ranges/board-analyzer";
 import { MultiBoardAnalyzer } from "@/components/ranges/multi-board-analyzer";
 import { MotorLibraryPanel } from "@/components/ranges/motor-library-panel";
@@ -28,6 +29,7 @@ import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
 // real, carregado do Supabase.
 export function RangeEditor({ id }: { id: string }) {
   const router = useRouter();
+  const confirm = useConfirm();
   const isNew = id === "novo";
 
   const [loading, setLoading] = useState(!isNew);
@@ -147,7 +149,7 @@ export function RangeEditor({ id }: { id: string }) {
 
   async function handleDelete() {
     if (!rangeId) return;
-    if (!confirm("Excluir este range? Essa ação não pode ser desfeita.")) return;
+    if (!(await confirm({ title: "Excluir range", message: "Essa ação não pode ser desfeita.", confirmLabel: "Excluir" }))) return;
     try {
       await deleteRange(rangeId);
       router.push("/ranges");

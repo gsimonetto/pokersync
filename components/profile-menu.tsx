@@ -6,6 +6,7 @@ import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AVATARS } from "./avatar";
 import { ModalPortal } from "./modal-portal";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import {
   updateAvatarIcon,
   uploadAvatarPhoto,
@@ -37,6 +38,7 @@ export function ProfileMenu({
   const [uploading, setUploading] = useState(false);
   const [salvandoDetalhes, setSalvandoDetalhes] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  useEscapeToClose(onClose);
 
   async function salvarDetalhe(patch: Parameters<typeof updateProfileDetails>[0], atualiza: Partial<Profile>) {
     setSalvandoDetalhes(true);

@@ -5,6 +5,7 @@ import { Camera, Check, Pencil, Plus, ShieldCheck, Trash2, Users, X } from "luci
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { TeamBanner } from "@/components/time/team-banner";
+import { useConfirm } from "@/components/confirm-dialog";
 import { ACCENT } from "@/lib/modules-data";
 import {
   createLabel,
@@ -277,6 +278,7 @@ function EtiquetasCard({
 }: {
   info: TeamInfo; labels: TeamLabel[]; podeEditar: boolean; onChange: () => void; onErro: (s: string) => void;
 }) {
+  const confirm = useConfirm();
   const [nova, setNova] = useState("");
   const [cor, setCor] = useState(ACCENT.blue);
   const [salvando, setSalvando] = useState(false);
@@ -311,7 +313,7 @@ function EtiquetasCard({
             {podeEditar && (
               <button
                 onClick={async () => {
-                  if (!confirm(`Excluir a etiqueta "${l.name}"? Os jogadores ficam sem etiqueta.`)) return;
+                  if (!(await confirm({ title: "Excluir etiqueta", message: `Os jogadores com "${l.name}" ficam sem etiqueta.`, confirmLabel: "Excluir" }))) return;
                   try { await deleteLabel(l.id); onChange(); } catch (e) { onErro(traduzErroTime(e)); }
                 }}
                 aria-label={`Excluir etiqueta ${l.name}`}

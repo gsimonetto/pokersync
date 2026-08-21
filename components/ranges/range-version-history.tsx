@@ -3,6 +3,7 @@
 import { useEffect, useState } from "react";
 import { ChevronDown, ChevronUp, History, RotateCcw } from "lucide-react";
 import { listRangeVersions, restoreRangeVersion, type RangeVersion } from "@/lib/services/range-service";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export function RangeVersionHistory({
   rangeId,
@@ -14,6 +15,7 @@ export function RangeVersionHistory({
   startOpen?: boolean;
 }) {
   const [open, setOpen] = useState(startOpen);
+  const confirm = useConfirm();
   const [versions, setVersions] = useState<RangeVersion[] | null>(null);
   const [restoringId, setRestoringId] = useState<string | null>(null);
   const [error, setError] = useState("");
@@ -26,7 +28,7 @@ export function RangeVersionHistory({
   }, [open, rangeId, versions]);
 
   async function handleRestore(v: RangeVersion) {
-    if (!confirm(`Restaurar a versão de ${new Date(v.created_at).toLocaleString("pt-BR")}? A versão atual não é perdida — vira um novo item no histórico.`)) return;
+    if (!(await confirm({ tone: "default", title: "Restaurar versão", message: `Voltar para a versão de ${new Date(v.created_at).toLocaleString("pt-BR")}? A versão atual não é perdida — vira um novo item no histórico.`, confirmLabel: "Restaurar" }))) return;
     setRestoringId(v.id);
     try {
       await restoreRangeVersion(rangeId, v);

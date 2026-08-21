@@ -251,7 +251,13 @@ export default function HubPage() {
       <AppHeader
         subtitle={
           <>
-            {view === "missoes" ? "Missões e progresso de nível." : "Ranking de todos os membros PokerSync."}
+            {/* Nada pra "missoes": o proprio seletor MISSÕES/RANKING ao
+                lado ja' diz em que view voce esta, e o card de nivel
+                logo abaixo mostra o progresso — a frase so' repetia o
+                que a tela ja' mostra. Em "ranking" o texto fica porque
+                carrega informacao nova (o escopo e' TODO o PokerSync,
+                nao so' o seu time). */}
+            {view === "ranking" && "Ranking de todos os membros PokerSync."}
             {membership && (
               <Link
                 href="/time"
@@ -371,9 +377,15 @@ export default function HubPage() {
         </div>
       </div>
 
+      {/* Nota discreta, nao alerta ambar de largura total: a informacao
+          e' util (explica por que as missoes parecem genericas), mas o
+          tratamento de aviso dava a ela peso de problema e anunciava
+          produto inacabado logo no topo do modulo. Sem a promessa de
+          roadmap ("em breve...") de proposito -- promessa dentro do
+          produto envelhece mal e nao ajuda a decidir nada agora. */}
       {showingCatalog && (
-        <p className="mt-5 rounded-lg border border-evolution/25 bg-evolution/10 px-4 py-3 text-xs" style={{ color: ACCENT }}>
-          As missões abaixo são um preview do catálogo. Em breve você receberá missões diárias personalizadas ao seu nível.
+        <p className="mt-4 text-xs text-muted">
+          Missões do catálogo geral — ainda não personalizadas pro seu nível.
         </p>
       )}
 

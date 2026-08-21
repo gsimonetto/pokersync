@@ -41,6 +41,7 @@ import { TabConvites } from "@/components/time/tab-convites";
 import { TabTime } from "@/components/time/tab-time";
 import { TabCalendario } from "@/components/time/tab-calendario";
 import { TeamPrintStyles } from "@/components/time/print-styles";
+import { useConfirm } from "@/components/confirm-dialog";
 
 // Painel do time: um so lugar, cinco abas (Funil tem pagina propria em
 // /time/painel/funil — precisa de mais espaco vertical que uma aba
@@ -72,6 +73,7 @@ export default function PainelPage() {
 }
 
 function PainelConteudo() {
+  const confirm = useConfirm();
   const router = useRouter();
   const params = useSearchParams();
   const abaUrl = (params.get("tab") as Aba) || "visao";
@@ -171,7 +173,7 @@ function PainelConteudo() {
   }
 
   async function removerBanner() {
-    if (!confirm("Remover o banner do time? Volta pro degradê padrão.")) return;
+    if (!(await confirm({ title: "Remover banner", message: "O time volta pro degradê padrão.", confirmLabel: "Remover" }))) return;
     setEnviandoBanner(true);
     try {
       await removeTeamBanner();

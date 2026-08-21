@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { TopNav } from "@/components/top-nav";
+import { ConfirmProvider } from "@/components/confirm-dialog";
 import { Analytics } from "@vercel/analytics/next";
 
 const spaceGrotesk = Space_Grotesk({
@@ -23,8 +24,10 @@ export default function RootLayout({
   return (
     <html lang="pt-BR" className={`dark ${spaceGrotesk.variable}`}>
       <body className="min-h-screen bg-void text-ink antialiased">
-        <TopNav />
-        {children}
+        <ConfirmProvider>
+          <TopNav />
+          {children}
+        </ConfirmProvider>
         <Analytics />
       </body>
     </html>

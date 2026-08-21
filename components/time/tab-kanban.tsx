@@ -47,6 +47,7 @@ import {
   type TeamLabel,
 } from "@/lib/services/team-service";
 import { ACCENT } from "@/lib/modules-data";
+import { useConfirm } from "@/components/confirm-dialog";
 
 // Kanban estilo Trello: arrastar o card entre colunas move de fase (drag
 // nativo HTML5, sem lib extra); o card tambem pode ser aberto pra editar
@@ -1063,6 +1064,7 @@ function ModalConfigFunil({
   onChange: () => Promise<void> | void;
   onErro: (s: string) => void;
 }) {
+  const confirm = useConfirm();
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [nome, setNome] = useState("");
   const [cor, setCor] = useState(ACCENT.blue);
@@ -1108,7 +1110,7 @@ function ModalConfigFunil({
   }
 
   async function excluir(f: FunnelPhase) {
-    if (!confirm(`Excluir a fase "${f.name}"? Só funciona se não houver ninguém nela.`)) return;
+    if (!(await confirm({ title: "Excluir fase", message: `A fase "${f.name}" sai do funil. Só funciona se não houver ninguém nela.`, confirmLabel: "Excluir" }))) return;
     try {
       await deletePhase(f.id);
       await onChange();

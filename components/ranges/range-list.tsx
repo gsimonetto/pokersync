@@ -5,9 +5,11 @@ import { useRouter } from "next/navigation";
 import { Plus, Copy, Trash2, Layers, Search, Upload } from "lucide-react";
 import { listRanges, deleteRange, duplicateRange, createRange, parseRangeImport, type RangeListItem } from "@/lib/services/range-service";
 import { RangeGridPreview } from "@/components/ranges/range-grid-preview";
+import { useConfirm } from "@/components/confirm-dialog";
 
 export function RangeList() {
   const router = useRouter();
+  const confirm = useConfirm();
   const [items, setItems] = useState<RangeListItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
@@ -48,7 +50,7 @@ export function RangeList() {
   }
 
   async function handleDelete(id: string) {
-    if (!confirm("Excluir este range? Essa ação não pode ser desfeita.")) return;
+    if (!(await confirm({ title: "Excluir range", message: "Essa ação não pode ser desfeita.", confirmLabel: "Excluir" }))) return;
     setBusyId(id);
     try {
       await deleteRange(id);

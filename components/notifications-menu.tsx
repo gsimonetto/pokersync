@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { CheckCheck, Trash2, Info, CheckCircle2, AlertTriangle, ChevronRight, X } from "lucide-react";
 import { ModalPortal } from "./modal-portal";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import {
   fetchNotifications,
   markAsRead,
@@ -32,6 +33,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
   const router = useRouter();
   const [items, setItems] = useState<Notification[]>([]);
   const [loading, setLoading] = useState(false);
+  useEscapeToClose(onClose);
 
   const unread = items.length;
 

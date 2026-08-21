@@ -10,6 +10,7 @@ import {
 } from "@/lib/services/hand-import-service";
 import { buildTreeChainFromHand } from "@/lib/poker/tree-from-hand";
 import type { TreeNode } from "@/lib/services/strategy-tree-service";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 
 export function ImportHandModal({
   onImport,
@@ -22,6 +23,7 @@ export function ImportHandModal({
   const [selectedSession, setSelectedSession] = useState<ImportableSession | null>(null);
   const [hands, setHands] = useState<ImportableHand[] | null>(null);
   const [error, setError] = useState("");
+  useEscapeToClose(onClose);
 
   useEffect(() => {
     listSessionsForImport()

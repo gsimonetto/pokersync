@@ -88,6 +88,13 @@ export default function NotificacoesPage() {
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader
         backHref="/modulos"
+        // Sem `title` o subtitulo ("Tudo lido" / "N por ler") ficava
+        // sozinho na linha do topo, ocupando o lugar do titulo: uma
+        // linha de STATUS lida como se fosse o nome da tela. A regra do
+        // AppHeader de omitir titulo vale quando ele e' obvio pelo
+        // contexto (nav logo acima) -- aqui e' rota propria, chegando
+        // pelo sino ou por link direto de notificacao, sem nav nenhuma.
+        title="Notificações"
         subtitle={totalNaoLidas > 0 ? `${totalNaoLidas} por ler` : "Tudo lido"}
         right={
           totalNaoLidas > 0 && (
