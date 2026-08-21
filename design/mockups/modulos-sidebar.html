@@ -1,0 +1,330 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PokerSync — Tela de Módulos (proposta sidebar)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<script src="https://cdn.tailwindcss.com"></script>
+<script>
+  // Tokens 1:1 com app/globals.css (@theme) do produto real — nada de
+  // paleta nova. Esta tela e' uma proposta de layout, nao de identidade.
+  tailwind.config = {
+    theme: {
+      extend: {
+        colors: {
+          void: "#000000",
+          surface: "#111111",
+          elevated: "#1e1e1e",
+          ink: "#ffffff",
+          muted: "#c4c7c8",
+          hairline: "rgba(255,255,255,0.08)",
+          positive: "#22c55e",
+          negative: "#e0555a",
+          training: "#3b82f6",
+          evolution: "#f59e0b",
+          review: "#a855f7",
+        },
+        fontFamily: {
+          sans: ["Space Grotesk", "ui-sans-serif", "system-ui", "sans-serif"],
+        },
+      },
+    },
+  };
+</script>
+<script src="https://unpkg.com/lucide@latest/dist/umd/lucide.js"></script>
+<style>
+  html, body { background: #000; color: #fff; font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif; }
+  /* Mockup roda em viewport fixa — sem scroll na tela, como pedido. */
+  html, body { height: 100vh; overflow: hidden; }
+  .icon { width: 18px; height: 18px; stroke-width: 1.75; }
+
+  .acc-card { transition: border-color .2s ease, box-shadow .2s ease, transform .2s ease; }
+  .acc-card:hover, .acc-card.is-active { transform: translateY(-2px); }
+  .acc-glow { background: var(--acc); opacity: 0; transition: opacity .3s ease; }
+  .group:hover .acc-glow, .group.is-active .acc-glow { opacity: .22; }
+  .group:hover .acc-fg, .group.is-active .acc-fg { color: var(--acc); }
+  .group:hover .acc-border, .group.is-active .acc-border { border-color: var(--acc); }
+  .group:hover .acc-card, .group.is-active .acc-card { box-shadow: 0 12px 34px -10px var(--acc); border-color: var(--acc); }
+
+  .nav-item { transition: background-color .15s ease, color .15s ease; }
+  .nav-item.is-active { background: rgba(255,255,255,0.06); }
+  .nav-item.is-active .nav-bar { opacity: 1; }
+  .nav-bar { opacity: 0; transition: opacity .15s ease; }
+</style>
+</head>
+<body class="antialiased">
+
+<div class="flex h-screen w-screen bg-void">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="hidden md:flex flex-col w-[264px] shrink-0 h-full border-r border-hairline bg-surface">
+
+    <!-- Logo acima do menu -->
+    <div class="flex items-center gap-2.5 px-5 h-16 border-b border-hairline shrink-0">
+      <div class="grid size-8 place-items-center rounded-lg bg-elevated border border-hairline">
+        <i data-lucide="spade" class="icon text-ink" style="width:16px;height:16px;"></i>
+      </div>
+      <span class="text-[15px] font-bold tracking-tight text-ink">PokerSync</span>
+    </div>
+
+    <!-- Navegação de módulos -->
+    <nav class="flex-1 px-3 py-4 flex flex-col gap-0.5 overflow-hidden">
+      <p class="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>
+
+      <a href="#" class="nav-item is-active relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-ink">
+        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#2FB89A]"></span>
+        <i data-lucide="target" class="icon" style="color:#2FB89A"></i>
+        Modo Treino
+      </a>
+      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
+        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#5AA6E0]"></span>
+        <i data-lucide="trending-up" class="icon"></i>
+        Gestão de Banca
+      </a>
+      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
+        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#A855F7]"></span>
+        <i data-lucide="book-open" class="icon"></i>
+        Revisão de Mãos
+      </a>
+      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
+        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#E0B24C]"></span>
+        <i data-lucide="trophy" class="icon"></i>
+        Hub de Evolução
+      </a>
+      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
+        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#6366F1]"></span>
+        <i data-lucide="users" class="icon"></i>
+        Meu Time
+      </a>
+      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
+        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#22D3EE]"></span>
+        <i data-lucide="line-chart" class="icon"></i>
+        Player Evolution
+      </a>
+      <a href="#" class="nav-item relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
+        <span class="nav-bar absolute left-0 top-1.5 bottom-1.5 w-[3px] rounded-full bg-[#E0559E]"></span>
+        <i data-lucide="layers" class="icon"></i>
+        Construtor de Ranges
+      </a>
+    </nav>
+
+    <!-- Configuração e Sair, embaixo -->
+    <div class="px-3 py-3 border-t border-hairline shrink-0 flex flex-col gap-0.5">
+      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-ink hover:bg-white/[0.04]">
+        <i data-lucide="settings" class="icon"></i>
+        Configurações
+      </a>
+      <a href="#" class="flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium text-muted hover:text-negative hover:bg-negative/[0.08]">
+        <i data-lucide="log-out" class="icon"></i>
+        Sair
+      </a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="flex-1 flex flex-col h-full min-w-0">
+
+    <!-- Top bar -->
+    <header class="flex items-center justify-between h-16 px-6 border-b border-hairline shrink-0">
+      <div>
+        <h1 class="text-sm font-semibold text-ink leading-tight">Módulos</h1>
+        <p class="text-xs text-muted">Bem-vindo de volta, simoNetto</p>
+      </div>
+      <div class="flex items-center gap-1.5">
+        <button class="grid size-9 place-items-center rounded-lg text-muted hover:bg-white hover:text-void transition-colors">
+          <i data-lucide="bell" class="icon"></i>
+        </button>
+        <button class="grid size-9 place-items-center rounded-lg text-muted hover:bg-white hover:text-void transition-colors">
+          <i data-lucide="circle-help" class="icon"></i>
+        </button>
+        <div class="flex items-center gap-2 ml-2 rounded-full border border-hairline bg-elevated pl-1 pr-3 py-1 cursor-pointer hover:border-white/20 transition-colors">
+          <div class="size-7 rounded-full bg-[#2FB89A]/15 border border-[#2FB89A]/40 grid place-items-center text-[11px] font-bold text-[#2FB89A]">SN</div>
+          <span class="text-xs font-semibold text-ink">Nv. 12</span>
+        </div>
+      </div>
+    </header>
+
+    <!-- Conteúdo central -->
+    <main class="flex-1 min-h-0 px-6 py-5 flex flex-col gap-5">
+
+      <!-- Player summary -->
+      <section class="rounded-xl border border-hairline bg-surface px-6 py-5 flex items-center justify-between gap-6 shrink-0">
+        <div class="flex items-center gap-4">
+          <div class="size-14 rounded-full bg-elevated border border-hairline grid place-items-center">
+            <i data-lucide="user" class="icon text-muted" style="width:22px;height:22px;"></i>
+          </div>
+          <div>
+            <div class="flex items-center gap-2">
+              <h2 class="text-xl font-bold text-ink tracking-tight">simoNetto</h2>
+              <span class="rounded-full border border-[#E0B24C]/40 bg-[#E0B24C]/10 px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-[#E0B24C]">Nível 12</span>
+            </div>
+            <p class="text-xs text-muted mt-0.5">Gabriel Toledo · Time FURIA</p>
+          </div>
+        </div>
+        <div class="text-right">
+          <p class="text-[10px] font-bold uppercase tracking-wider text-muted/60">Lucro acumulado (30d)</p>
+          <p class="text-2xl font-bold text-positive tnum">+ R$ 14.250,00</p>
+        </div>
+      </section>
+
+      <!-- Stats: Player Evolution -->
+      <section class="shrink-0">
+        <div class="mb-2.5 flex items-center justify-between">
+          <h3 class="text-sm font-medium text-muted flex items-center gap-1.5">
+            <i data-lucide="line-chart" class="icon" style="width:14px;height:14px;color:#22D3EE"></i>
+            Player Evolution
+          </h3>
+          <a href="#" class="text-xs text-muted hover:text-ink flex items-center gap-1">
+            Ver tudo <i data-lucide="arrow-right" style="width:12px;height:12px;"></i>
+          </a>
+        </div>
+        <div class="grid grid-cols-5 gap-3">
+          <div class="rounded-lg border border-hairline bg-elevated px-4 py-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</p>
+            <p class="text-xl font-bold text-ink tnum mt-1">24,5%</p>
+          </div>
+          <div class="rounded-lg border border-hairline bg-elevated px-4 py-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</p>
+            <p class="text-xl font-bold text-ink tnum mt-1">8,2%</p>
+          </div>
+          <div class="rounded-lg border border-hairline bg-elevated px-4 py-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted/60">ROI acumulado</p>
+            <p class="text-xl font-bold text-positive tnum mt-1">+24,5%</p>
+          </div>
+          <div class="rounded-lg border border-hairline bg-elevated px-4 py-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</p>
+            <p class="text-xl font-bold text-ink tnum mt-1">18,2%</p>
+          </div>
+          <div class="rounded-lg border border-[#E0B24C]/30 bg-[#E0B24C]/[0.06] px-4 py-3">
+            <p class="text-[10px] font-bold uppercase tracking-wider text-[#E0B24C]/80">Premiação total</p>
+            <p class="text-xl font-bold text-[#E0B24C] tnum mt-1">R$ 1.515.307</p>
+            <p class="text-[9px] text-muted/60 mt-0.5 leading-tight">Torneios + HH via agente desktop</p>
+          </div>
+        </div>
+      </section>
+
+      <!-- Grid de módulos -->
+      <section class="flex-1 min-h-0">
+        <div class="mb-2.5 flex items-center justify-between">
+          <h3 class="text-sm font-medium text-muted">Todos os módulos</h3>
+          <span class="text-xs text-muted/60">7 módulos</span>
+        </div>
+        <div class="grid grid-cols-4 grid-rows-2 gap-3 h-[calc(100%-28px)]">
+
+          <a href="#" class="group relative" style="--acc:#2FB89A">
+            <div class="acc-card is-active relative h-full rounded-xl border border-[#2FB89A]/50 bg-surface p-4 overflow-hidden" style="box-shadow:0 12px 34px -10px #2FB89A">
+              <div class="acc-glow absolute -left-8 -top-8 size-28 rounded-full blur-2xl" style="opacity:.22"></div>
+              <div class="relative flex items-start justify-between">
+                <div class="flex h-9 w-9 items-center justify-center rounded-lg border" style="border-color:#2FB89A66;background:#1e1e1e">
+                  <i data-lucide="target" class="icon" style="color:#2FB89A"></i>
+                </div>
+                <i data-lucide="arrow-right" class="icon" style="width:15px;height:15px;color:#2FB89A"></i>
+              </div>
+              <p class="relative mt-3 text-sm font-semibold" style="color:#2FB89A">Modo Treino</p>
+              <p class="relative mt-0.5 text-xs text-muted leading-snug">Ranges e frequências GTO</p>
+            </div>
+          </a>
+
+          <a href="#" class="group relative" style="--acc:#5AA6E0">
+            <div class="acc-card relative h-full rounded-xl border border-hairline bg-surface p-4 overflow-hidden">
+              <div class="acc-glow absolute -left-8 -top-8 size-28 rounded-full blur-2xl"></div>
+              <div class="relative flex items-start justify-between">
+                <div class="acc-border flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                  <i data-lucide="trending-up" class="icon acc-fg text-muted"></i>
+                </div>
+                <i data-lucide="arrow-right" class="icon acc-fg text-transparent group-hover:text-[--acc] transition-colors" style="width:15px;height:15px;"></i>
+              </div>
+              <p class="acc-fg relative mt-3 text-sm font-semibold text-ink">Gestão de Banca</p>
+              <p class="relative mt-0.5 text-xs text-muted leading-snug">Controle de risco e ROI</p>
+            </div>
+          </a>
+
+          <a href="#" class="group relative" style="--acc:#A855F7">
+            <div class="acc-card relative h-full rounded-xl border border-hairline bg-surface p-4 overflow-hidden">
+              <div class="acc-glow absolute -left-8 -top-8 size-28 rounded-full blur-2xl"></div>
+              <div class="relative flex items-start justify-between">
+                <div class="acc-border flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                  <i data-lucide="book-open" class="icon acc-fg text-muted"></i>
+                </div>
+                <i data-lucide="arrow-right" class="icon acc-fg text-transparent group-hover:text-[--acc] transition-colors" style="width:15px;height:15px;"></i>
+              </div>
+              <p class="acc-fg relative mt-3 text-sm font-semibold text-ink">Revisão de Mãos</p>
+              <p class="relative mt-0.5 text-xs text-muted leading-snug">Análise técnica de jogadas</p>
+            </div>
+          </a>
+
+          <a href="#" class="group relative" style="--acc:#E0B24C">
+            <div class="acc-card relative h-full rounded-xl border border-hairline bg-surface p-4 overflow-hidden">
+              <div class="acc-glow absolute -left-8 -top-8 size-28 rounded-full blur-2xl"></div>
+              <div class="relative flex items-start justify-between">
+                <div class="acc-border flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                  <i data-lucide="trophy" class="icon acc-fg text-muted"></i>
+                </div>
+                <span class="acc-fg acc-border rounded-full border border-hairline px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">Nv. 12</span>
+              </div>
+              <p class="acc-fg relative mt-3 text-sm font-semibold text-ink">Hub de Evolução</p>
+              <p class="relative mt-0.5 text-xs text-muted leading-snug">XP, missões e ranking</p>
+            </div>
+          </a>
+
+          <a href="#" class="group relative" style="--acc:#6366F1">
+            <div class="acc-card relative h-full rounded-xl border border-hairline bg-surface p-4 overflow-hidden">
+              <div class="acc-glow absolute -left-8 -top-8 size-28 rounded-full blur-2xl"></div>
+              <div class="relative flex items-start justify-between">
+                <div class="acc-border flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                  <i data-lucide="users" class="icon acc-fg text-muted"></i>
+                </div>
+                <span class="acc-fg acc-border rounded-full border border-hairline px-2 py-0.5 text-[10px] font-bold uppercase tracking-wide text-muted">FURIA</span>
+              </div>
+              <p class="acc-fg relative mt-3 text-sm font-semibold text-ink">Meu Time</p>
+              <p class="relative mt-0.5 text-xs text-muted leading-snug">Membros, papéis e convites</p>
+            </div>
+          </a>
+
+          <a href="#" class="group relative" style="--acc:#22D3EE">
+            <div class="acc-card relative h-full rounded-xl border border-hairline bg-surface p-4 overflow-hidden">
+              <div class="acc-glow absolute -left-8 -top-8 size-28 rounded-full blur-2xl"></div>
+              <div class="relative flex items-start justify-between">
+                <div class="acc-border flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                  <i data-lucide="line-chart" class="icon acc-fg text-muted"></i>
+                </div>
+                <i data-lucide="arrow-right" class="icon acc-fg text-transparent group-hover:text-[--acc] transition-colors" style="width:15px;height:15px;"></i>
+              </div>
+              <p class="acc-fg relative mt-3 text-sm font-semibold text-ink">Player Evolution</p>
+              <p class="relative mt-0.5 text-xs text-muted leading-snug">ROI, ABI e tendências</p>
+            </div>
+          </a>
+
+          <a href="#" class="group relative" style="--acc:#E0559E">
+            <div class="acc-card relative h-full rounded-xl border border-hairline bg-surface p-4 overflow-hidden">
+              <div class="acc-glow absolute -left-8 -top-8 size-28 rounded-full blur-2xl"></div>
+              <div class="relative flex items-start justify-between">
+                <div class="acc-border flex h-9 w-9 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                  <i data-lucide="layers" class="icon acc-fg text-muted"></i>
+                </div>
+                <i data-lucide="arrow-right" class="icon acc-fg text-transparent group-hover:text-[--acc] transition-colors" style="width:15px;height:15px;"></i>
+              </div>
+              <p class="acc-fg relative mt-3 text-sm font-semibold text-ink">Construtor de Ranges</p>
+              <p class="relative mt-0.5 text-xs text-muted leading-snug">Mapeamento estratégico</p>
+            </div>
+          </a>
+
+          <!-- Célula vazia reservada (proximo modulo / CTA) -->
+          <div class="rounded-xl border border-dashed border-hairline bg-transparent p-4 flex flex-col items-center justify-center gap-1.5 text-muted/50">
+            <i data-lucide="plus" class="icon"></i>
+            <p class="text-[11px] font-medium">Próximo módulo</p>
+          </div>
+
+        </div>
+      </section>
+
+    </main>
+  </div>
+</div>
+
+<script>lucide.createIcons();</script>
+</body>
+</html>
