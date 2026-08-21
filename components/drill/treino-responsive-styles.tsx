@@ -84,23 +84,9 @@ export function TreinoResponsiveStyles() {
         }
         .ps-tr-filters--open { transform: translateX(0); }
         .ps-tr-filters-backdrop { display: block; }
-        .ps-tr-feedback-idle { display: none !important; }
-        .ps-tr-feedback-sheet {
-          position: fixed;
-          left: 0;
-          right: 0;
-          bottom: 0;
-          z-index: 30;
-          max-height: 62dvh;
-          overflow-y: auto;
-          border-radius: 18px 18px 0 0 !important;
-          box-shadow: 0 -20px 50px rgba(0,0,0,.6);
-          padding-bottom: calc(14px + env(safe-area-inset-bottom)) !important;
-        }
         .ps-tr-table-col { gap: 6px !important; min-height: 0 !important; }
         .ps-tr-table-inner { padding-top: 0 !important; }
         .ps-tr-table-wrap { max-width: none !important; max-height: none !important; }
-        .ps-tr-sheet-close { display: flex !important; }
         /* Barra de apostas compacta: botões menores e sempre visíveis
            dentro da tela, sem scroll (bug reportado). */
         .ps-tr-actions {
