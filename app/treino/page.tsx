@@ -1,9 +1,11 @@
 "use client";
 
 import { Suspense, useEffect, useRef, useState } from "react";
-import { X } from "lucide-react";
+import { useSearchParams } from "next/navigation";
+import { Target, X } from "lucide-react";
 import { RfiJamDrill } from "@/components/drill/rfi-jam-drill";
 import { F } from "@/lib/poker/drill-theme";
+import { fetchSuggestionTarget } from "@/lib/services/drill-service";
 import { fetchSessions } from "@/lib/services/bankroll-service";
 import { groupStats } from "@/lib/bankroll/calc";
 import { fmtPct } from "@/lib/bankroll/format";
@@ -52,6 +54,37 @@ function useBankrollLeakTip(): LeakTip | null {
   return tip;
 }
 
+interface AppliedSuggestion {
+  title: string;
+  matchup: string;
+  stackBb?: number;
+}
+
+// O Revisor manda o jogador pra ca com /treino?suggestionId=<id> quando ele
+// clica "Treinar" num leak recorrente. Ate agora essa tela ignorava o
+// parametro e abria o drill padrao — o jogador clicava em "treinar esse
+// leak" e caia num spot qualquer, sem relacao com o erro dele.
+function useSuggestedSpot(): AppliedSuggestion | null {
+  const suggestionId = useSearchParams().get("suggestionId");
+  const [suggestion, setSuggestion] = useState<AppliedSuggestion | null>(null);
+  useEffect(() => {
+    if (!suggestionId) return;
+    let alive = true;
+    fetchSuggestionTarget(suggestionId)
+      .then((res) => {
+        if (!alive || !res) return;
+        setSuggestion({ title: res.title, matchup: res.target.position, stackBb: res.target.stackBb });
+      })
+      .catch(() => {
+        // sugestao invalida/inativa — treino abre normal, sem banner
+      });
+    return () => {
+      alive = false;
+    };
+  }, [suggestionId]);
+  return suggestion;
+}
+
 function TreinoShell() {
   // Altura disponível medida, não chutada. O card usava
   // `calc(100vh - 32px)`, ignorando o header global do app que fica
@@ -68,6 +101,7 @@ function TreinoShell() {
   // baixo e a barra de apostas cai fora da dobra.
   const [topOffset, setTopOffset] = useState(0);
   const leakTip = useBankrollLeakTip();
+  const suggestion = useSuggestedSpot();
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
 
@@ -130,7 +164,30 @@ function TreinoShell() {
           overflow: "hidden",
         }}
       >
-        {leakTip && !tipDismissed && (
+        {suggestion && (
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              flexShrink: 0,
+              padding: "8px 12px",
+              borderRadius: 10,
+              background: "rgba(168,85,247,0.08)",
+              border: "1px solid rgba(168,85,247,0.3)",
+              fontFamily: F,
+              fontSize: 12,
+              color: "rgba(255,255,255,0.85)",
+            }}
+          >
+            <Target size={14} style={{ flexShrink: 0, color: "#A855F7" }} />
+            <span style={{ flex: 1, minWidth: 0 }}>
+              Treinando o leak que o Revisor apontou: <strong>{suggestion.title}</strong>.
+            </span>
+          </div>
+        )}
+
+        {!suggestion && leakTip && !tipDismissed && (
           <div
             style={{
               display: "flex",
@@ -184,7 +241,10 @@ function TreinoShell() {
         )}
 
         <div style={{ flex: 1, minHeight: 0 }}>
-          <RfiJamDrill initialStackBb={appliedStackBb} />
+          <RfiJamDrill
+            initialMatchup={suggestion?.matchup}
+            initialStackBb={suggestion?.stackBb ?? appliedStackBb}
+          />
         </div>
       </div>
     </div>

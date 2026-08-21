@@ -310,17 +310,19 @@ function EvDetailsModal({
 
 interface RfiJamDrillProps {
   tabs?: React.ReactNode;
-  // Sugestao vinda de fora (hoje: leak da Gestao de Banca — "voce perde
-  // em MTT" aponta pra praticar stack curto). So' aplica se existir spot
-  // de verdade com esse stack; senao cai no default de sempre.
+  // Sugestao vinda de fora (leak da Gestao de Banca — "voce perde em MTT"
+  // aponta pra stack curto; leak do Revisor — "posicao ignorada" aponta
+  // pro matchup blind vs blind). So' aplica se existir spot de verdade;
+  // senao cai no default de sempre.
   initialStackBb?: number;
+  initialMatchup?: string;
 }
 
 // Tela única de treino (pré-flop RFI/Jam por enquanto -- é o único
 // tipo de spot com dado real no banco hoje). Sem abas: filtros à
 // esquerda, mesa (com o herói de verdade sentado, feltro azul) no
 // meio, resultado GTO numa linha acima da mesa.
-export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
+export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDrillProps) {
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   const [heroPos, setHeroPos] = useState<string>("SB");
   const [villainPos, setVillainPos] = useState<string>("BB");
@@ -347,8 +349,17 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
       .then((rows) => {
         setSpots(rows);
         if (rows.length > 0) {
-          const suggested = initialStackBb != null ? rows.find((r) => r.stackBb === initialStackBb) : undefined;
-          const base = suggested ?? rows[0];
+          // Preferencia em cascata: o par exato (matchup + stack) pedido de
+          // fora; senao so' o matchup; senao so' o stack; senao o primeiro
+          // spot que existir. Nunca trava numa combinacao sem dado.
+          const matches = (r: RfiJamListItem) =>
+            (initialMatchup == null || r.matchup === initialMatchup) &&
+            (initialStackBb == null || r.stackBb === initialStackBb);
+          const base =
+            rows.find(matches) ??
+            (initialMatchup != null ? rows.find((r) => r.matchup === initialMatchup) : undefined) ??
+            (initialStackBb != null ? rows.find((r) => r.stackBb === initialStackBb) : undefined) ??
+            rows[0];
           const { hero, villain } = parseMatchup(base.matchup);
           if (hero) setHeroPos(hero);
           if (villain) setVillainPos(villain);
@@ -362,7 +373,7 @@ export function RfiJamDrill({ tabs, initialStackBb }: RfiJamDrillProps) {
         setLoading(false);
       });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [initialStackBb]);
+  }, [initialStackBb, initialMatchup]);
 
   // Disponibilidade de cada dimensão do filtro, dado o que já está
   // selecionado nas outras -- mesmo padrão do FilterSidebar da aba

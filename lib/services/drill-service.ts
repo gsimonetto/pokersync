@@ -103,20 +103,97 @@ export async function fetchDrillBatch(size = 20, filters: DrillFilters = {}): Pr
   return queryDrills(size, filters);
 }
 
+// ---- Sugestao de leak -> alvo de treino ---------------------------------
+//
 // O filter_config das sugestoes NAO usa o mesmo vocabulario dos drills:
 //   sugestao: { action: "cbet", street: "flop", board_texture: [...] }
-//             { street: "preflop", scenario: "3bet_defense" }
-//   drills:   position BB|BTN|SB, action "vs Open"|"3-Bet", street Flop|Turn|River
+//             { street: "preflop", scenario: "bvb" }
+//   drills:   position sb_vs_bb|btn_vs_bb, action rfi_jam, street Preflop
 // Nenhuma sugestao traz position, e o vocabulario de action nao tem
-// correspondencia confiavel ("cbet" nao e' "vs Open" nem "3-Bet").
-// Traduzir so a rua e' o unico mapeamento honesto hoje — inventar o
+// correspondencia direta. Traduzir CENARIO -> alvo, um a um e so' quando
+// a equivalencia e' exata, e' o unico mapeamento honesto — inventar o
 // resto geraria drill errado, que e' pior que drill nenhum.
+//
+// (Ate 2026-08 este arquivo assumia o inverso: que a base era toda
+// Flop/Turn/River e nao tinha nada de preflop. Hoje e' exatamente o
+// contrario -- a base e' 100% Preflop, RFI/Jam -- e por isso nenhum leak
+// aparecia como treinavel.)
+
+/** Chaves que casam com drill_facets, mais o que a tela de Treino precisa. */
+export interface SuggestionTarget {
+  position: string;
+  action: string;
+  street: string;
+  /** Stack preferido quando o cenario implica um; sem isso, o Treino escolhe. */
+  stackBb?: number;
+}
+
+// Um cenario so entra aqui quando (1) o estoque de drills resolve a MESMA
+// decisao que o leak descreve e (2) a tela de Treino sabe renderizar esse
+// formato. Ficam de fora, de proposito, ate que as duas coisas existam:
+//   push_fold  -> o job de push/fold ICM ja existe no motor mas nunca foi
+//                 disparado; e a decisao nao e' a mesma do RFI/Jam (la o SB
+//                 abre 2.2x, aqui ele shova), entao NAO da pra apontar um
+//                 pro outro.
+//   3bet_defense, pko_call -> a arvore do motor trata toda resposta a um
+//                 raise como all-in; nao existe 3-bet "de verdade" ainda.
+//   cbet, bluffcatch, thin_value, hero_call, pot_control, river_bluff,
+//   cbet_called_barrel -> dependem do pipeline de pos-flop (motor pronto,
+//                 sem job, sem estoque, sem UI).
+const SCENARIO_TARGET: Record<string, SuggestionTarget> = {
+  // Blind vs blind pre-flop e' exatamente a decisao que o spot de
+  // sb_vs_bb resolve: abrir ou foldar do SB, responder do BB.
+  bvb: { position: "sb_vs_bb", action: "rfi_jam", street: "Preflop" },
+};
+
+export function resolveSuggestionTarget(filterConfig: unknown): SuggestionTarget | null {
+  if (!filterConfig || typeof filterConfig !== "object") return null;
+  const scenario = (filterConfig as Record<string, unknown>).scenario;
+  if (typeof scenario !== "string") return null;
+  return SCENARIO_TARGET[scenario.toLowerCase()] ?? null;
+}
+
+// Uma sugestao so e' "treinavel" quando existe estoque de verdade pro alvo
+// dela. Usado pelo card de leaks pra so mostrar o botao quando o clique
+// leva a uma mao real — botao que abre tela vazia e' pior que botao nenhum.
+export function suggestionHasDrills(filterConfig: unknown, facets: DrillFacet[]): boolean {
+  const target = resolveSuggestionTarget(filterConfig);
+  if (!target) return false;
+  return facets.some(
+    (f) => f.position === target.position && f.action === target.action && f.street === target.street && f.n > 0
+  );
+}
+
+// Usado pela tela de Treino pra honrar /treino?suggestionId=... — devolve
+// o alvo e o titulo da sugestao (pro banner "voce esta treinando X").
+export async function fetchSuggestionTarget(
+  suggestionId: string
+): Promise<{ title: string; target: SuggestionTarget } | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("hand_review_drill_suggestions")
+    .select("drill_title, filter_config, active")
+    .eq("id", suggestionId)
+    .eq("active", true)
+    .maybeSingle();
+
+  if (error) throw error;
+  if (!data) return null;
+
+  const target = resolveSuggestionTarget(data.filter_config);
+  if (!target) return null;
+  return { title: (data.drill_title as string) ?? "", target };
+}
+
+// Caminho de pos-flop (ainda sem estoque): traduz so' a rua, que e' a
+// unica dimensao com correspondencia 1:1 entre os dois vocabularios.
 const SUGGESTION_STREET_MAP: Record<string, string> = {
   flop: "Flop",
   turn: "Turn",
   river: "River",
-  // "preflop" fica de fora de proposito: nao existe nenhum drill de
-  // preflop na base hoje (confirmado — todos sao Flop/Turn/River).
+  // "preflop" fica de fora aqui de proposito: leak de preflop e' resolvido
+  // por SCENARIO_TARGET acima, que aponta pro spot exato em vez de sortear
+  // qualquer mao da rua.
 };
 
 export function resolveSuggestionStreet(filterConfig: unknown): string | null {
@@ -124,14 +201,6 @@ export function resolveSuggestionStreet(filterConfig: unknown): string | null {
   const street = (filterConfig as Record<string, unknown>).street;
   if (typeof street !== "string") return null;
   return SUGGESTION_STREET_MAP[street.toLowerCase()] ?? null;
-}
-
-// Uma sugestao so e' "treinavel" se a rua dela existir na base de drills.
-// Usado pelo card de leaks pra so mostrar o botao quando ha mao de verdade.
-export function suggestionHasDrills(filterConfig: unknown, facets: DrillFacet[]): boolean {
-  const street = resolveSuggestionStreet(filterConfig);
-  if (!street) return false;
-  return facets.some((f) => f.street === street && f.n > 0);
 }
 
 // Caminho do Revisor de Maos: resolve o filter_config de uma sugestao ativa
