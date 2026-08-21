@@ -44,7 +44,11 @@ function RevisorPageInner() {
     if (shared) {
       setSelectedReviewId(shared);
       setScreen("detalhe");
+      return;
     }
+    // Acao rapida do painel de leaks da Banca: "vi onde perco, quero
+    // registrar a mao agora" cai direto na captura, sem passar pela fila.
+    if (searchParams.get("nova")) setScreen("nova");
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 

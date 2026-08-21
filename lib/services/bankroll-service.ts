@@ -97,6 +97,29 @@ export async function addSession(session: Omit<Session, "id">): Promise<Session>
   return rowToSession(data);
 }
 
+// Edicao de sessao (2026-08): antes so' dava pra excluir e refazer, o que
+// perdia o vinculo com as maos revisadas (hand_reviews.session_id) e o XP
+// ja concedido. Aqui a linha e' a mesma -- so' os campos mudam.
+//
+// Nao concede XP: XP e' pela sessao registrada, nao por edicao. Sem isso,
+// abrir e salvar a mesma sessao viraria uma fonte infinita de XP.
+export async function updateSession(id: string, session: Omit<Session, "id">): Promise<Session> {
+  const supabase = createClient();
+  // getUserId() aqui e' guarda de sessao (levanta NO_SESSION sem login), nao
+  // dado: user_id da linha nao muda numa edicao, entao sai do payload -- quem
+  // garante que a linha e' do proprio jogador e' a RLS da tabela.
+  const userId = await getUserId();
+  const { user_id: _ignored, ...fields } = sessionToRow(session, userId);
+  const { data, error } = await supabase
+    .from("bankroll_sessions")
+    .update(fields)
+    .eq("id", id)
+    .select()
+    .single();
+  if (error) throw error;
+  return rowToSession(data);
+}
+
 export async function deleteSession(id: string) {
   const supabase = createClient();
   const { error } = await supabase.from("bankroll_sessions").delete().eq("id", id);
