@@ -60,6 +60,30 @@ function Field({ icon: Icon, value, onChange, placeholder, type = "text", right,
   );
 }
 
+// Ícone do Google (SVG oficial multicolor)
+function GoogleIcon({ className }: { className?: string }) {
+  return (
+    <svg className={className} viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+      <path
+        d="M23.52 12.27c0-.85-.08-1.67-.22-2.45H12v4.64h6.47c-.28 1.5-1.13 2.77-2.4 3.62v3h3.88c2.27-2.09 3.57-5.17 3.57-8.81z"
+        fill="#4285F4"
+      />
+      <path
+        d="M12 24c3.24 0 5.96-1.07 7.95-2.92l-3.88-3c-1.08.72-2.45 1.15-4.07 1.15-3.13 0-5.78-2.11-6.73-4.96H1.26v3.11C3.24 21.3 7.28 24 12 24z"
+        fill="#34A853"
+      />
+      <path
+        d="M5.27 14.27c-.24-.72-.38-1.49-.38-2.27s.14-1.55.38-2.27V6.62H1.26A11.97 11.97 0 000 12c0 1.94.46 3.77 1.26 5.38l4.01-3.11z"
+        fill="#FBBC05"
+      />
+      <path
+        d="M12 4.77c1.77 0 3.35.61 4.6 1.8l3.44-3.44C17.95 1.19 15.24 0 12 0 7.28 0 3.24 2.7 1.26 6.62l4.01 3.11c.95-2.85 3.6-4.96 6.73-4.96z"
+        fill="#EA4335"
+      />
+    </svg>
+  );
+}
+
 // Máscara progressiva: (41) 99999-9999
 function formatWhatsapp(raw: string) {
   const digits = raw.replace(/\D/g, "").slice(0, 11);
@@ -83,6 +107,7 @@ export default function LoginForm() {
   const [activeTab, setActiveTab] = useState<Mode>("login");
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
+  const [isGoogleLoading, setIsGoogleLoading] = useState(false);
 
   const [name, setName] = useState("");
   const [nickname, setNickname] = useState("");
@@ -179,6 +204,27 @@ export default function LoginForm() {
     }
   }
 
+  async function handleGoogleLogin() {
+    reset();
+    setIsGoogleLoading(true);
+    try {
+      const supabase = createClient();
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: `${window.location.origin}/auth/confirm`,
+        },
+      });
+      if (error) throw error;
+      // Não precisa fazer mais nada aqui: o navegador é redirecionado
+      // para o Google e depois para /auth/confirm.
+    } catch (e) {
+      const message = e instanceof Error ? e.message : "";
+      setErr(message || "Não foi possível entrar com o Google.");
+      setIsGoogleLoading(false);
+    }
+  }
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     isRegister ? handleRegister() : handleLogin();
@@ -233,6 +279,30 @@ export default function LoginForm() {
               <span className="relative z-10">{tab === "login" ? "Entrar" : "Criar Conta"}</span>
             </button>
           ))}
+        </div>
+
+        {/* Botão Google */}
+        <button
+          type="button"
+          onClick={handleGoogleLogin}
+          disabled={isGoogleLoading || isLoading}
+          className="w-full mb-4 bg-elevated hover:bg-white/10 border border-hairline text-ink font-medium text-sm py-2.5 px-4 rounded-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+        >
+          {isGoogleLoading ? (
+            <div className="w-4 h-4 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
+          ) : (
+            <>
+              <GoogleIcon className="w-4 h-4" />
+              <span>Continuar com Google</span>
+            </>
+          )}
+        </button>
+
+        {/* Divisor */}
+        <div className="flex items-center gap-3 mb-4">
+          <div className="h-px flex-1 bg-hairline" />
+          <span className="text-[11px] uppercase tracking-wider text-muted">ou</span>
+          <div className="h-px flex-1 bg-hairline" />
         </div>
 
         {/* Formulário Animado */}
