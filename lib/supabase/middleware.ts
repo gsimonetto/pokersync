@@ -5,8 +5,7 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 horas
 const LAST_ACTIVITY_COOKIE = "pokersync_last_activity";
-
-const PUBLIC_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha"];
+const PUBLIC_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha", "/auth/confirm"];
 
 function isPublicRoute(pathname: string) {
   return PUBLIC_ROUTES.some(
@@ -55,6 +54,7 @@ export async function updateSession(request: NextRequest) {
     const last = Number(
       request.cookies.get(LAST_ACTIVITY_COOKIE)?.value ?? 0
     );
+
     if (last && Date.now() - last > INACTIVITY_LIMIT_MS) {
       await supabase.auth.signOut();
       const redirect = NextResponse.redirect(
@@ -68,6 +68,7 @@ export async function updateSession(request: NextRequest) {
       redirect.cookies.delete(LAST_ACTIVITY_COOKIE);
       return redirect;
     }
+
     response.cookies.set(LAST_ACTIVITY_COOKIE, String(Date.now()), {
       httpOnly: true,
       sameSite: "lax",
