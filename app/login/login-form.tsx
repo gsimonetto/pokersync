@@ -77,6 +77,8 @@ export default function LoginForm() {
   const redirectTo = searchParams.get("redirectTo") || "/modulos";
   const expirado = searchParams.get("expirado") === "1";
   const senhaRedefinida = searchParams.get("senha_redefinida") === "1";
+  const emailConfirmado = searchParams.get("email_confirmado") === "1";
+  const erroConfirmacao = searchParams.get("erro_confirmacao") === "1";
 
   const [activeTab, setActiveTab] = useState<Mode>("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -88,8 +90,20 @@ export default function LoginForm() {
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
 
-  const [err, setErr] = useState(expirado ? "Sua sessão expirou por inatividade." : "");
-  const [ok, setOk] = useState(senhaRedefinida ? "Senha redefinida com sucesso! Faça login." : "");
+  const [err, setErr] = useState(
+    expirado
+      ? "Sua sessão expirou por inatividade."
+      : erroConfirmacao
+      ? "O link de confirmação é inválido ou expirou. Tente se cadastrar novamente."
+      : ""
+  );
+  const [ok, setOk] = useState(
+    senhaRedefinida
+      ? "Senha redefinida com sucesso! Faça login."
+      : emailConfirmado
+      ? "E-mail confirmado com sucesso! Faça login para continuar."
+      : ""
+  );
 
   const isRegister = activeTab === "register";
 
@@ -152,7 +166,7 @@ export default function LoginForm() {
 
       setPass("");
       setActiveTab("login");
-      setOk("Conta criada com sucesso! Faça login para continuar.");
+      setOk("Quase lá! Enviamos um link de confirmação para seu e-mail. Clique nele para poder entrar.");
     } catch (e) {
       const message = e instanceof Error ? e.message.toLowerCase() : "";
       if (message.includes("registered") || message.includes("already")) {
