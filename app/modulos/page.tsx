@@ -112,8 +112,8 @@ export default function ModulosPage() {
             nota, igual ao padrao ja usado em ITM aproximado na tela de
             Performance -- nunca numero inventado. */}
         <section className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface sm:flex-row">
-          <div className="flex h-40 shrink-0 items-center justify-center bg-elevated sm:h-auto sm:w-[220px]">
-            <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={120} />
+          <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center bg-elevated sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
+            <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={120} className="shrink-0" />
           </div>
 
           <div className="flex-1 p-5">
@@ -134,7 +134,7 @@ export default function ModulosPage() {
               )}
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-x-6 border-t border-hairline pt-4 sm:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-1 border-t border-hairline pt-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col gap-2.5">
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Idade</span>
