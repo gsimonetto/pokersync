@@ -2,23 +2,17 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Settings, LogOut, ArrowRight, Target, PanelLeftClose, PanelLeftOpen } from "lucide-react";
-import { Logo } from "@/components/logo";
+import { ArrowRight, Target } from "lucide-react";
+import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
-import { NotificationsMenu } from "@/components/notifications-menu";
-import { HelpMenu } from "@/components/help-menu";
-import { ProfileMenu } from "@/components/profile-menu";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
-import { fetchUnreadCount } from "@/lib/services/notification-service";
 import {
   fetchPlayerPerformance,
   fetchPreflopSituations,
   type PlayerPerformance,
   type PreflopSituation,
 } from "@/lib/services/performance-service";
-import { modules } from "@/lib/modules-data";
 
 // Mesmas faixas de referencia de app/performance/page.tsx (funcao
 // Frequencia) -- contexto visual, nunca veredito de certo/errado.
@@ -44,43 +38,12 @@ function calcAge(dataNascimento: string | null): number | null {
   return age;
 }
 
-type OpenMenu = "notifications" | "help" | "profile" | null;
-
 export default function ModulosPage() {
-  const pathname = usePathname();
-  const router = useRouter();
-
   const [profile, setProfile] = useState<Profile | null>(null);
   const [level, setLevel] = useState<number | null>(null);
-  const [unread, setUnread] = useState(0);
   const [team, setTeam] = useState<{ name: string; accent: string } | null>(null);
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
-  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
-  // Colapsar so' esconde os rotulos e encolhe a largura da sidebar --
-  // o main já é flex-1 independente, então isso nunca reflui/altera o
-  // conteúdo da tela do módulo em si, só o espaço horizontal disponível.
-  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-
-  useEffect(() => {
-    try {
-      setSidebarCollapsed(localStorage.getItem("pokersync:sidebar-collapsed") === "1");
-    } catch {
-      // localStorage indisponível (ex: modo privado) -- mantém expandida
-    }
-  }, []);
-
-  function toggleSidebar() {
-    setSidebarCollapsed((prev) => {
-      const next = !prev;
-      try {
-        localStorage.setItem("pokersync:sidebar-collapsed", next ? "1" : "0");
-      } catch {
-        // segue sem persistir se localStorage falhar
-      }
-      return next;
-    });
-  }
 
   useEffect(() => {
     let alive = true;
@@ -95,11 +58,10 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [profileRes, userRes, progressRes, unreadRes, perfRes, preflopRes] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, perfRes, preflopRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
-        fetchUnreadCount(),
         fetchPlayerPerformance(),
         fetchPreflopSituations(),
       ]);
@@ -107,7 +69,6 @@ export default function ModulosPage() {
 
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
-      if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
       if (perfRes.status === "fulfilled") setPerf(perfRes.value);
       if (preflopRes.status === "fulfilled") setPreflop(preflopRes.value);
 
@@ -140,291 +101,145 @@ export default function ModulosPage() {
   const foldTo3bet = preflop.find((p) => p.label === "Fold para 3-Bet");
   const blindDefense = preflop.find((p) => p.label === "Defesa de Blinds");
 
-  function toggle(menu: OpenMenu) {
-    setOpenMenu((prev) => (prev === menu ? null : menu));
-  }
-
-  async function handleLogout() {
-    const supabase = createClient();
-    try {
-      await supabase.auth.signOut();
-    } catch {
-      // segue o logout mesmo se a chamada falhar
-    }
-    router.push("/login");
-    router.refresh();
-  }
-
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-void">
-      {/* ============ SIDEBAR ============ */}
-      <aside
-        className={`hidden md:flex h-full shrink-0 flex-col border-r border-hairline bg-surface transition-[width] duration-200 ease-in-out ${
-          sidebarCollapsed ? "w-[76px]" : "w-[264px]"
-        }`}
-      >
-        <div
-          className={`flex h-16 shrink-0 items-center border-b border-hairline ${
-            sidebarCollapsed ? "justify-center px-2" : "justify-between px-5"
-          }`}
-        >
-          {!sidebarCollapsed && (
-            <Link href="/modulos" aria-label="Ir para Módulos">
-              <Logo className="h-7 w-auto" />
-            </Link>
-          )}
-          <button
-            onClick={toggleSidebar}
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-ink"
-            aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
-            title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
-          >
-            {sidebarCollapsed ? <PanelLeftOpen size={18} strokeWidth={1.75} /> : <PanelLeftClose size={18} strokeWidth={1.75} />}
-          </button>
-        </div>
-
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-hidden px-3 py-4">
-          {!sidebarCollapsed && (
-            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>
-          )}
-          {modules.map((m) => {
-            const Icon = m.icon;
-            const active = pathname === m.href;
-            return (
-              <Link
-                key={m.key}
-                href={m.href ?? "#"}
-                title={sidebarCollapsed ? m.title : undefined}
-                className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  sidebarCollapsed ? "justify-center" : ""
-                } ${active ? "bg-white/[0.06] text-ink" : "text-muted hover:bg-white/[0.04] hover:text-ink"}`}
-              >
-                <span
-                  className="absolute inset-y-1.5 left-0 w-[3px] rounded-full transition-opacity"
-                  style={{ background: m.accent, opacity: active ? 1 : 0 }}
-                />
-                <Icon size={18} strokeWidth={1.75} className="shrink-0" style={{ color: active ? m.accent : undefined }} />
-                {!sidebarCollapsed && m.title}
-              </Link>
-            );
-          })}
-        </nav>
-
-        <div className="flex shrink-0 flex-col gap-0.5 border-t border-hairline px-3 py-3">
-          <button
-            onClick={() => toggle("profile")}
-            title={sidebarCollapsed ? "Configurações" : undefined}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.04] hover:text-ink ${
-              sidebarCollapsed ? "justify-center" : ""
-            }`}
-          >
-            <Settings size={18} strokeWidth={1.75} className="shrink-0" />
-            {!sidebarCollapsed && "Configurações"}
-          </button>
-          <button
-            onClick={handleLogout}
-            title={sidebarCollapsed ? "Sair" : undefined}
-            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-negative/[0.08] hover:text-negative ${
-              sidebarCollapsed ? "justify-center" : ""
-            }`}
-          >
-            <LogOut size={18} strokeWidth={1.75} className="shrink-0" />
-            {!sidebarCollapsed && "Sair"}
-          </button>
-        </div>
-      </aside>
-
-      {/* ============ MAIN ============ */}
-      <div className="flex h-full min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-center border-b border-hairline px-6">
-          <div className="flex items-center gap-1.5">
-            <div className="relative">
-              <button
-                onClick={() => toggle("notifications")}
-                className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
-                aria-label="Notificações"
-              >
-                <Bell className="size-[18px]" />
-                {unread > 0 && (
-                  <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </button>
-              {openMenu === "notifications" && (
-                <NotificationsMenu
-                  onClose={() => {
-                    setOpenMenu(null);
-                    fetchUnreadCount()
-                      .then(setUnread)
-                      .catch(() => {});
-                  }}
-                />
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => toggle("help")}
-                className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
-                aria-label="Ajuda"
-              >
-                <CircleHelp className="size-[18px]" />
-              </button>
-              {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => toggle("profile")}
-                className="ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-elevated py-1 pl-1 pr-3 transition-colors hover:border-white/20"
-              >
-                <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={28} />
-                {level != null && <span className="text-xs font-semibold text-ink">Nv. {level}</span>}
-              </button>
-              {openMenu === "profile" && profile && (
-                <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />
-              )}
-            </div>
+    <AppShell>
+      <main className="flex flex-1 flex-col gap-4 px-4 py-6 md:px-6">
+        {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
+            + metricas mais relevantes (coluna 3), mesma ordem/estilo de
+            linha -- estrutura pedida pelo usuario. Ganhos totais/Ranking
+            ainda nao tem fonte de dado real (chegam com o agente
+            desktop importando HH/torneios), entao aparecem como "—" com
+            nota, igual ao padrao ja usado em ITM aproximado na tela de
+            Performance -- nunca numero inventado. */}
+        <section className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface sm:flex-row">
+          <div className="flex h-40 shrink-0 items-center justify-center bg-elevated sm:h-auto sm:w-[220px]">
+            <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={120} />
           </div>
-        </header>
 
-        <main className="flex flex-1 flex-col gap-4 overflow-hidden px-6 py-6">
-          {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
-              + metricas mais relevantes (coluna 3), mesma ordem/estilo de
-              linha -- estrutura pedida pelo usuario. Ganhos totais/Ranking
-              ainda nao tem fonte de dado real (chegam com o agente
-              desktop importando HH/torneios), entao aparecem como "—" com
-              nota, igual ao padrao ja usado em ITM aproximado na tela de
-              Performance -- nunca numero inventado. */}
-          <section className="flex shrink-0 overflow-hidden rounded-xl border border-hairline bg-surface">
-            <div className="flex w-[220px] shrink-0 items-center justify-center bg-elevated">
-              <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={120} />
-            </div>
-
-            <div className="flex-1 p-5">
-              <div className="flex items-start justify-between gap-3">
-                <div className="min-w-0">
-                  <h2 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h2>
-                  {profile?.nome && profile.nome !== displayName && (
-                    <p className="mt-0.5 text-sm text-muted">{profile.nome}</p>
-                  )}
-                </div>
-                {team && (
-                  <span
-                    className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold"
-                    style={{ borderColor: `${team.accent}66`, background: `${team.accent}1A`, color: team.accent }}
-                  >
-                    {team.name}
-                  </span>
+          <div className="flex-1 p-5">
+            <div className="flex items-start justify-between gap-3">
+              <div className="min-w-0">
+                <h2 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h2>
+                {profile?.nome && profile.nome !== displayName && (
+                  <p className="mt-0.5 text-sm text-muted">{profile.nome}</p>
                 )}
               </div>
+              {team && (
+                <span
+                  className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold"
+                  style={{ borderColor: `${team.accent}66`, background: `${team.accent}1A`, color: team.accent }}
+                >
+                  {team.name}
+                </span>
+              )}
+            </div>
 
-              <div className="mt-4 grid grid-cols-3 gap-x-6 border-t border-hairline pt-4">
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Idade</span>
-                    <span className="text-sm text-ink">{age !== null ? `${age} anos` : "—"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Time atual</span>
-                    <span className="text-sm text-ink">{team?.name ?? "Sem time"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
-                    <span className="text-sm text-muted">—</span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ranking</span>
-                    <span className="text-sm text-muted">—</span>
-                  </div>
+            <div className="mt-4 grid grid-cols-1 gap-x-6 border-t border-hairline pt-4 sm:grid-cols-3">
+              <div className="flex flex-col gap-2.5">
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Idade</span>
+                  <span className="text-sm text-ink">{age !== null ? `${age} anos` : "—"}</span>
                 </div>
-
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</span>
-                    <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.vpip_pct) ?? "—"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</span>
-                    <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.three_bet_pct) ?? "—"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ROI acumulado</span>
-                    <span
-                      className={`text-sm font-semibold tabular-nums ${
-                        perf?.roi_pct != null ? (Number(perf.roi_pct) >= 0 ? "text-positive" : "text-negative") : "text-ink"
-                      }`}
-                    >
-                      {perf?.roi_pct != null ? `${Number(perf.roi_pct) >= 0 ? "+" : ""}${fmtPct(perf.roi_pct)}` : "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</span>
-                    <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.itm_pct_aproximado) ?? "—"}</span>
-                  </div>
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Time atual</span>
+                  <span className="text-sm text-ink">{team?.name ?? "Sem time"}</span>
                 </div>
-
-                <div className="flex flex-col gap-2.5">
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Nível</span>
-                    <span className="text-sm tabular-nums text-ink">{level != null ? level : "—"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Sessões</span>
-                    <span className="text-sm tabular-nums text-ink">{perf?.num_sessoes ?? "—"}</span>
-                  </div>
-                  <div className="flex justify-between border-b border-hairline/50 pb-2">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas jogadas</span>
-                    <span className="text-sm tabular-nums text-ink">
-                      {perf?.horas_jogadas != null ? `${perf.horas_jogadas}h` : "—"}
-                    </span>
-                  </div>
-                  <div className="flex justify-between">
-                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Streak atual</span>
-                    <span className="text-sm tabular-nums text-ink">
-                      {perf?.streak_atual != null ? `${perf.streak_atual}d` : "—"}
-                    </span>
-                  </div>
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
+                  <span className="text-sm text-muted">—</span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ranking</span>
+                  <span className="text-sm text-muted">—</span>
                 </div>
               </div>
 
-              <p className="mt-3 border-t border-hairline pt-3 text-[11px] text-muted/70">
-                Ganhos totais, ranking e conquistas chegam com a importação de HH e histórico de torneios pelo agente
-                desktop.
-              </p>
-            </div>
-          </section>
-
-          {/* Frequências pré-flop: mesmo componente-régua de
-              app/performance/page.tsx (funcao Frequencia). Fold p/ 3-Bet
-              e Defesa de Blinds vem de fetchPreflopSituations, mesma fonte
-              real usada na aba "Situações pré-flop" da Performance. */}
-          <section className="flex shrink-0 flex-col rounded-xl border border-hairline bg-surface p-4">
-            <div className="mb-3 flex shrink-0 items-center justify-between">
-              <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-                <Target size={14} className="text-training" />
-                Frequências pré-flop
+              <div className="flex flex-col gap-2.5">
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</span>
+                  <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.vpip_pct) ?? "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</span>
+                  <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.three_bet_pct) ?? "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ROI acumulado</span>
+                  <span
+                    className={`text-sm font-semibold tabular-nums ${
+                      perf?.roi_pct != null ? (Number(perf.roi_pct) >= 0 ? "text-positive" : "text-negative") : "text-ink"
+                    }`}
+                  >
+                    {perf?.roi_pct != null ? `${Number(perf.roi_pct) >= 0 ? "+" : ""}${fmtPct(perf.roi_pct)}` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</span>
+                  <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.itm_pct_aproximado) ?? "—"}</span>
+                </div>
               </div>
-              <Link href="/performance" className="flex items-center gap-1 text-xs text-muted hover:text-ink">
-                Ver Player Evolution <ArrowRight size={12} />
-              </Link>
+
+              <div className="flex flex-col gap-2.5">
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Nível</span>
+                  <span className="text-sm tabular-nums text-ink">{level != null ? level : "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Sessões</span>
+                  <span className="text-sm tabular-nums text-ink">{perf?.num_sessoes ?? "—"}</span>
+                </div>
+                <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas jogadas</span>
+                  <span className="text-sm tabular-nums text-ink">
+                    {perf?.horas_jogadas != null ? `${perf.horas_jogadas}h` : "—"}
+                  </span>
+                </div>
+                <div className="flex justify-between">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Streak atual</span>
+                  <span className="text-sm tabular-nums text-ink">
+                    {perf?.streak_atual != null ? `${perf.streak_atual}d` : "—"}
+                  </span>
+                </div>
+              </div>
             </div>
 
-            <div className="grid grid-cols-5 gap-2.5">
-              <FreqCard label="VPIP" valor={perf?.vpip_pct ?? null} referencia={REF.vpip} />
-              <FreqCard label="PFR" valor={perf?.pfr_pct ?? null} referencia={REF.pfr} />
-              <FreqCard label="3-Bet" valor={perf?.three_bet_pct ?? null} referencia={REF.threeBet} />
-              <FreqSimples label="Fold p/ 3-Bet" pct={foldTo3bet?.pct ?? null} sample={foldTo3bet?.sample ?? null} />
-              <FreqSimples label="Defesa de Blinds" pct={blindDefense?.pct ?? null} sample={blindDefense?.sample ?? null} />
-            </div>
-
-            <p className="mt-2.5 shrink-0 text-[11px] text-muted/70">
-              Calculado sobre <strong className="text-ink/85">{perf?.maos_com_dados_frequencia ?? 0}</strong> mãos com
-              hand history estruturada.
+            <p className="mt-3 border-t border-hairline pt-3 text-[11px] text-muted/70">
+              Ganhos totais, ranking e conquistas chegam com a importação de HH e histórico de torneios pelo agente
+              desktop.
             </p>
-          </section>
-        </main>
-      </div>
-    </div>
+          </div>
+        </section>
+
+        {/* Frequências pré-flop: mesmo componente-régua de
+            app/performance/page.tsx (funcao Frequencia). Fold p/ 3-Bet
+            e Defesa de Blinds vem de fetchPreflopSituations, mesma fonte
+            real usada na aba "Situações pré-flop" da Performance. */}
+        <section className="flex shrink-0 flex-col rounded-xl border border-hairline bg-surface p-4">
+          <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
+              <Target size={14} className="text-training" />
+              Frequências pré-flop
+            </div>
+            <Link href="/performance" className="flex items-center gap-1 text-xs text-muted hover:text-ink">
+              Ver Player Evolution <ArrowRight size={12} />
+            </Link>
+          </div>
+
+          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
+            <FreqCard label="VPIP" valor={perf?.vpip_pct ?? null} referencia={REF.vpip} />
+            <FreqCard label="PFR" valor={perf?.pfr_pct ?? null} referencia={REF.pfr} />
+            <FreqCard label="3-Bet" valor={perf?.three_bet_pct ?? null} referencia={REF.threeBet} />
+            <FreqSimples label="Fold p/ 3-Bet" pct={foldTo3bet?.pct ?? null} sample={foldTo3bet?.sample ?? null} />
+            <FreqSimples label="Defesa de Blinds" pct={blindDefense?.pct ?? null} sample={blindDefense?.sample ?? null} />
+          </div>
+
+          <p className="mt-2.5 shrink-0 text-[11px] text-muted/70">
+            Calculado sobre <strong className="text-ink/85">{perf?.maos_com_dados_frequencia ?? 0}</strong> mãos com
+            hand history estruturada.
+          </p>
+        </section>
+      </main>
+    </AppShell>
   );
 }
 

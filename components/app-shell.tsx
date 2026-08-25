@@ -1,0 +1,277 @@
+"use client";
+
+import { useEffect, useState } from "react";
+import Link from "next/link";
+import { usePathname, useRouter } from "next/navigation";
+import { Bell, CircleHelp, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
+import { Logo } from "@/components/logo";
+import { Avatar } from "@/components/avatar";
+import { NotificationsMenu } from "@/components/notifications-menu";
+import { HelpMenu } from "@/components/help-menu";
+import { ProfileMenu } from "@/components/profile-menu";
+import { createClient } from "@/lib/supabase/client";
+import { fetchProfile, type Profile } from "@/lib/services/profile-service";
+import { fetchUnreadCount } from "@/lib/services/notification-service";
+import { modules } from "@/lib/modules-data";
+
+type OpenMenu = "notifications" | "help" | "profile" | null;
+
+const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
+
+// Casca compartilhada (sidebar + topbar) entre os módulos que já migraram
+// pro layout novo -- hoje /modulos e /banca. Cada módulo continua dono do
+// próprio conteúdo/dados; isto aqui é só navegação e identidade (perfil,
+// notificações, ajuda), igual ao TopNav global fazia antes pra essas rotas
+// (que agora ficam escondidas dele, ver components/top-nav.tsx).
+export function AppShell({ children }: { children: React.ReactNode }) {
+  const pathname = usePathname();
+  const router = useRouter();
+
+  const [profile, setProfile] = useState<Profile | null>(null);
+  const [level, setLevel] = useState<number | null>(null);
+  const [unread, setUnread] = useState(0);
+  const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+  const [collapsed, setCollapsed] = useState(false);
+  const [mobileOpen, setMobileOpen] = useState(false);
+
+  useEffect(() => {
+    try {
+      setCollapsed(localStorage.getItem(SIDEBAR_COLLAPSE_KEY) === "1");
+    } catch {
+      // localStorage indisponível (ex: modo privado) -- mantém expandida
+    }
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      let supabase: ReturnType<typeof createClient>;
+      try {
+        supabase = createClient();
+      } catch {
+        return;
+      }
+      const [profileRes, progressRes, unreadRes] = await Promise.allSettled([
+        fetchProfile(),
+        supabase.from("user_progress").select("level").maybeSingle(),
+        fetchUnreadCount(),
+      ]);
+      if (!alive) return;
+      if (profileRes.status === "fulfilled") setProfile(profileRes.value);
+      if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
+      if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  function toggleCollapsed() {
+    setCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem(SIDEBAR_COLLAPSE_KEY, next ? "1" : "0");
+      } catch {
+        // segue sem persistir se localStorage falhar
+      }
+      return next;
+    });
+  }
+
+  function toggleMenu(menu: OpenMenu) {
+    setOpenMenu((prev) => (prev === menu ? null : menu));
+  }
+
+  async function handleLogout() {
+    const supabase = createClient();
+    try {
+      await supabase.auth.signOut();
+    } catch {
+      // segue o logout mesmo se a chamada falhar
+    }
+    router.push("/login");
+    router.refresh();
+  }
+
+  const nav = (
+    <>
+      {modules.map((m) => {
+        const Icon = m.icon;
+        const active = pathname === m.href;
+        return (
+          <Link
+            key={m.key}
+            href={m.href ?? "#"}
+            title={collapsed ? m.title : undefined}
+            onClick={() => setMobileOpen(false)}
+            className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+              collapsed ? "justify-center" : ""
+            } ${active ? "bg-white/[0.06] text-ink" : "text-muted hover:bg-white/[0.04] hover:text-ink"}`}
+          >
+            <span
+              className="absolute inset-y-1.5 left-0 w-[3px] rounded-full transition-opacity"
+              style={{ background: m.accent, opacity: active ? 1 : 0 }}
+            />
+            <Icon size={18} strokeWidth={1.75} className="shrink-0" style={{ color: active ? m.accent : undefined }} />
+            {!collapsed && m.title}
+          </Link>
+        );
+      })}
+    </>
+  );
+
+  const footer = (
+    <>
+      <button
+        onClick={() => toggleMenu("profile")}
+        title={collapsed ? "Configurações" : undefined}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.04] hover:text-ink ${
+          collapsed ? "justify-center" : ""
+        }`}
+      >
+        <Settings size={18} strokeWidth={1.75} className="shrink-0" />
+        {!collapsed && "Configurações"}
+      </button>
+      <button
+        onClick={handleLogout}
+        title={collapsed ? "Sair" : undefined}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-negative/[0.08] hover:text-negative ${
+          collapsed ? "justify-center" : ""
+        }`}
+      >
+        <LogOut size={18} strokeWidth={1.75} className="shrink-0" />
+        {!collapsed && "Sair"}
+      </button>
+    </>
+  );
+
+  return (
+    <div className="flex h-screen w-full overflow-hidden bg-void">
+      {/* ============ SIDEBAR (desktop) ============ */}
+      <aside
+        className={`hidden md:flex h-full shrink-0 flex-col border-r border-hairline bg-surface transition-[width] duration-200 ease-in-out ${
+          collapsed ? "w-[76px]" : "w-[264px]"
+        }`}
+      >
+        <div
+          className={`flex h-16 shrink-0 items-center border-b border-hairline ${
+            collapsed ? "justify-center px-2" : "justify-between px-5"
+          }`}
+        >
+          {!collapsed && (
+            <Link href="/modulos" aria-label="Ir para Módulos">
+              <Logo className="h-7 w-auto" />
+            </Link>
+          )}
+          <button
+            onClick={toggleCollapsed}
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-ink"
+            aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
+            title={collapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {collapsed ? <PanelLeftOpen size={18} strokeWidth={1.75} /> : <PanelLeftClose size={18} strokeWidth={1.75} />}
+          </button>
+        </div>
+
+        <nav className="flex flex-1 flex-col gap-0.5 overflow-hidden px-3 py-4">
+          {!collapsed && <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>}
+          {nav}
+        </nav>
+
+        <div className="flex shrink-0 flex-col gap-0.5 border-t border-hairline px-3 py-3">{footer}</div>
+      </aside>
+
+      {/* ============ SIDEBAR (mobile drawer) ============ */}
+      {mobileOpen && (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+          <div className="fixed inset-0 bg-black/60" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+          <div className="relative flex h-full w-[264px] flex-col border-r border-hairline bg-surface">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-hairline px-5">
+              <Link href="/modulos" aria-label="Ir para Módulos" onClick={() => setMobileOpen(false)}>
+                <Logo className="h-7 w-auto" />
+              </Link>
+              <button
+                onClick={() => setMobileOpen(false)}
+                className="grid size-8 place-items-center rounded-lg text-muted hover:bg-white/[0.06] hover:text-ink"
+                aria-label="Fechar menu"
+              >
+                <X size={18} strokeWidth={1.75} />
+              </button>
+            </div>
+            <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
+              <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>
+              {nav}
+            </nav>
+            <div className="flex shrink-0 flex-col gap-0.5 border-t border-hairline px-3 py-3">{footer}</div>
+          </div>
+        </div>
+      )}
+
+      {/* ============ MAIN ============ */}
+      <div className="flex h-full min-w-0 flex-1 flex-col">
+        <header className="flex h-16 shrink-0 items-center justify-center gap-2 border-b border-hairline px-4 md:px-6">
+          <button
+            onClick={() => setMobileOpen(true)}
+            className="mr-auto grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void md:hidden"
+            aria-label="Abrir menu"
+          >
+            <Menu className="size-[18px]" />
+          </button>
+          <div className="flex items-center gap-1.5">
+            <div className="relative">
+              <button
+                onClick={() => toggleMenu("notifications")}
+                className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
+                aria-label="Notificações"
+              >
+                <Bell className="size-[18px]" />
+                {unread > 0 && (
+                  <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </button>
+              {openMenu === "notifications" && (
+                <NotificationsMenu
+                  onClose={() => {
+                    setOpenMenu(null);
+                    fetchUnreadCount()
+                      .then(setUnread)
+                      .catch(() => {});
+                  }}
+                />
+              )}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => toggleMenu("help")}
+                className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
+                aria-label="Ajuda"
+              >
+                <CircleHelp className="size-[18px]" />
+              </button>
+              {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
+            </div>
+            <div className="relative">
+              <button
+                onClick={() => toggleMenu("profile")}
+                className="ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-elevated py-1 pl-1 pr-3 transition-colors hover:border-white/20"
+              >
+                <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={28} />
+                {level != null && <span className="text-xs font-semibold text-ink">Nv. {level}</span>}
+              </button>
+              {openMenu === "profile" && profile && (
+                <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />
+              )}
+            </div>
+          </div>
+          {/* espaçador simétrico ao botão de hamburguer, só pra manter os
+              ícones centralizados também no mobile */}
+          <div className="ml-auto size-9 md:hidden" aria-hidden="true" />
+        </header>
+
+        <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
+      </div>
+    </div>
+  );
+}
