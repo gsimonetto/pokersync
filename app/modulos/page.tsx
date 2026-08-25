@@ -236,7 +236,7 @@ export default function ModulosPage() {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col justify-center gap-6 overflow-hidden px-6 py-5">
+        <main className="flex flex-1 flex-col gap-4 overflow-hidden px-6 py-6">
           {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
               + metricas mais relevantes (coluna 3), mesma ordem/estilo de
               linha -- estrutura pedida pelo usuario. Ganhos totais/Ranking
@@ -267,7 +267,7 @@ export default function ModulosPage() {
                 )}
               </div>
 
-              <div className="mt-4 grid grid-cols-2 gap-x-8 border-t border-hairline pt-4">
+              <div className="mt-4 grid grid-cols-3 gap-x-6 border-t border-hairline pt-4">
                 <div className="flex flex-col gap-2.5">
                   <div className="flex justify-between border-b border-hairline/50 pb-2">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Idade</span>
@@ -309,6 +309,29 @@ export default function ModulosPage() {
                   <div className="flex justify-between">
                     <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</span>
                     <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.itm_pct_aproximado) ?? "—"}</span>
+                  </div>
+                </div>
+
+                <div className="flex flex-col gap-2.5">
+                  <div className="flex justify-between border-b border-hairline/50 pb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Nível</span>
+                    <span className="text-sm tabular-nums text-ink">{level != null ? level : "—"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-hairline/50 pb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Sessões</span>
+                    <span className="text-sm tabular-nums text-ink">{perf?.num_sessoes ?? "—"}</span>
+                  </div>
+                  <div className="flex justify-between border-b border-hairline/50 pb-2">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas jogadas</span>
+                    <span className="text-sm tabular-nums text-ink">
+                      {perf?.horas_jogadas != null ? `${perf.horas_jogadas}h` : "—"}
+                    </span>
+                  </div>
+                  <div className="flex justify-between">
+                    <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Streak atual</span>
+                    <span className="text-sm tabular-nums text-ink">
+                      {perf?.streak_atual != null ? `${perf.streak_atual}d` : "—"}
+                    </span>
                   </div>
                 </div>
               </div>
