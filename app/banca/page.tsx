@@ -9,6 +9,7 @@ import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/co
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
+import { AppShell } from "@/components/app-shell";
 import {
   fetchSessions,
   fetchSettings,
@@ -579,11 +580,16 @@ export default function BankrollPage() {
   }
 
   if (loading) {
-    return <main className="p-10 text-center text-sm text-muted">Carregando sua banca...</main>;
+    return (
+      <AppShell>
+        <main className="p-10 text-center text-sm text-muted">Carregando sua banca...</main>
+      </AppShell>
+    );
   }
 
   return (
-    <main className="mx-auto max-w-[1280px] px-6 py-10">
+    <AppShell>
+    <main className="mx-auto max-w-[1280px] px-4 py-10 md:px-6">
       {err && (
         <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
@@ -1647,6 +1653,7 @@ export default function BankrollPage() {
 
 
     </main>
+    </AppShell>
   );
 }
 

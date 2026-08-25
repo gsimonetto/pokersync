@@ -1,0 +1,843 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>PokerSync — Tela de Módulos (proposta sidebar)</title>
+<link rel="preconnect" href="https://fonts.googleapis.com" />
+<link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+<link href="https://fonts.googleapis.com/css2?family=Space+Grotesk:wght@400;500;600;700&display=swap" rel="stylesheet" />
+<style>
+  /* Tokens 1:1 com app/globals.css (@theme) do produto real — nada de
+     paleta nova. Esta tela e' uma proposta de layout, nao de identidade.
+     Sem Tailwind CDN / lucide CDN: CSS puro e SVG inline, pra renderizar
+     sem depender de rede (inclusive dentro do sandbox de artifacts). */
+  :root {
+    --void: #000000;
+    --surface: #111111;
+    --elevated: #1e1e1e;
+    --ink: #ffffff;
+    --muted: #c4c7c8;
+    --hairline: rgba(255, 255, 255, 0.08);
+    --positive: #22c55e;
+    --negative: #e0555a;
+    --training: #3b82f6;
+    --green: #2fb89a;
+    --blue: #5aa6e0;
+    --purple: #a855f7;
+    --amber: #e0b24c;
+    --indigo: #6366f1;
+    --cyan: #22d3ee;
+    --pink: #e0559e;
+  }
+
+  * { box-sizing: border-box; }
+  html, body {
+    margin: 0;
+    height: 100vh;
+    overflow: hidden;
+    background: var(--void);
+    color: var(--ink);
+    font-family: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
+    -webkit-font-smoothing: antialiased;
+  }
+  .tnum { font-variant-numeric: tabular-nums; }
+
+  .app { display: flex; height: 100vh; width: 100vw; background: var(--void); }
+
+  /* ============ SIDEBAR ============ */
+  .sidebar {
+    display: flex;
+    flex-direction: column;
+    width: 264px;
+    flex-shrink: 0;
+    height: 100%;
+    border-right: 1px solid var(--hairline);
+    background: var(--surface);
+  }
+  .sidebar-logo {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 0 20px;
+    height: 64px;
+    border-bottom: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .logo-badge {
+    display: grid;
+    place-items: center;
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+  }
+  .logo-text { font-size: 15px; font-weight: 700; letter-spacing: -0.01em; }
+
+  .sidebar-nav {
+    flex: 1;
+    padding: 16px 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    overflow: hidden;
+  }
+  .nav-label {
+    padding: 0 12px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.08em;
+    color: rgba(196, 199, 200, 0.6);
+  }
+  .nav-item {
+    position: relative;
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    border-radius: 8px;
+    padding: 10px 12px;
+    font-size: 14px;
+    font-weight: 500;
+    color: var(--muted);
+    text-decoration: none;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .nav-item:hover { background: rgba(255, 255, 255, 0.04); color: var(--ink); }
+  .nav-item.is-active { background: rgba(255, 255, 255, 0.06); color: var(--ink); }
+  .nav-bar {
+    position: absolute;
+    left: 0;
+    top: 6px;
+    bottom: 6px;
+    width: 3px;
+    border-radius: 999px;
+    opacity: 0;
+  }
+  .nav-item.is-active .nav-bar { opacity: 1; }
+
+  .sidebar-footer {
+    padding: 12px;
+    border-top: 1px solid var(--hairline);
+    flex-shrink: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .sidebar-footer .nav-item:hover.is-logout { background: rgba(224, 85, 90, 0.08); color: var(--negative); }
+
+  /* ============ MAIN ============ */
+  .main {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    height: 100%;
+    min-width: 0;
+  }
+  .topbar {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    height: 64px;
+    padding: 0 24px;
+    border-bottom: 1px solid var(--hairline);
+    flex-shrink: 0;
+  }
+  .topbar h1 { margin: 0; font-size: 14px; font-weight: 600; line-height: 1.2; }
+  .topbar p { margin: 2px 0 0; font-size: 12px; color: var(--muted); }
+  .topbar-actions { display: flex; align-items: center; gap: 6px; }
+  .icon-btn {
+    display: grid;
+    place-items: center;
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    color: var(--muted);
+    background: transparent;
+    border: none;
+    cursor: pointer;
+    transition: background-color 0.15s ease, color 0.15s ease;
+  }
+  .icon-btn:hover { background: #fff; color: var(--void); }
+  .profile-chip {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: 8px;
+    border-radius: 999px;
+    border: 1px solid var(--hairline);
+    background: var(--elevated);
+    padding: 4px 12px 4px 4px;
+    cursor: pointer;
+  }
+  .avatar-sm {
+    width: 28px;
+    height: 28px;
+    border-radius: 999px;
+    background: rgba(47, 184, 154, 0.15);
+    border: 1px solid rgba(47, 184, 154, 0.4);
+    display: grid;
+    place-items: center;
+    font-size: 11px;
+    font-weight: 700;
+    color: var(--green);
+  }
+  .profile-chip span.level { font-size: 12px; font-weight: 600; }
+
+  .content {
+    flex: 1;
+    min-height: 0;
+    padding: 20px 24px;
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+    overflow: hidden;
+  }
+
+  /* Card de perfil */
+  .profile-card {
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    overflow: hidden;
+    flex-shrink: 0;
+  }
+  .profile-card-inner { display: flex; }
+  .profile-photo {
+    position: relative;
+    width: 240px;
+    height: 240px;
+    flex-shrink: 0;
+    background: var(--elevated);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    overflow: hidden;
+  }
+  .profile-photo .initials {
+    font-size: 80px;
+    font-weight: 700;
+    color: rgba(255, 255, 255, 0.1);
+    user-select: none;
+  }
+  .photo-badges {
+    position: absolute;
+    top: 12px;
+    left: 12px;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+  .photo-badges div {
+    background: rgba(0, 0, 0, 0.6);
+    border-radius: 4px;
+    padding: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .photo-badges .flag {
+    padding: 4px 6px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--ink);
+  }
+
+  .profile-data {
+    flex: 1;
+    padding: 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    min-width: 0;
+  }
+  .profile-head { display: flex; justify-content: space-between; align-items: flex-start; gap: 12px; }
+  .profile-head h2 { margin: 0; font-size: 24px; font-weight: 700; letter-spacing: -0.01em; }
+  .profile-head p { margin: 4px 0 0; font-size: 14px; color: var(--muted); }
+  .profile-head-actions { display: flex; gap: 8px; flex-shrink: 0; }
+  .square-btn {
+    width: 32px;
+    height: 32px;
+    border-radius: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    display: grid;
+    place-items: center;
+    color: var(--muted);
+    cursor: pointer;
+  }
+  .square-btn:hover { border-color: rgba(255, 255, 255, 0.2); }
+
+  .profile-cols {
+    margin-top: 16px;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    column-gap: 32px;
+    border-top: 1px solid var(--hairline);
+    padding-top: 16px;
+  }
+  .profile-col { display: flex; flex-direction: column; gap: 10px; }
+  .profile-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.04);
+    padding-bottom: 8px;
+  }
+  .profile-row:last-child { border-bottom: none; padding-bottom: 0; }
+  .profile-row .label {
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.06em;
+    color: rgba(196, 199, 200, 0.6);
+  }
+  .profile-row .value { font-size: 14px; color: var(--ink); display: flex; align-items: center; gap: 6px; }
+  .profile-row .value.gold { color: var(--amber); font-weight: 600; }
+  .profile-row .value.positive { color: var(--positive); font-weight: 600; }
+
+  .achievements-row {
+    margin-top: 12px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    border-top: 1px solid var(--hairline);
+    padding-top: 12px;
+  }
+  .badge-gold {
+    border-radius: 999px;
+    border: 1px solid rgba(224, 178, 76, 0.4);
+    background: rgba(224, 178, 76, 0.1);
+    padding: 3px 8px;
+    font-size: 10px;
+    font-weight: 700;
+    color: var(--amber);
+  }
+
+  .trophy-row { margin-top: 12px; display: flex; gap: 8px; }
+  .trophy-slot {
+    width: 36px;
+    height: 36px;
+    border-radius: 8px;
+    background: var(--elevated);
+    border: 1px solid var(--hairline);
+    display: grid;
+    place-items: center;
+  }
+
+  /* Icons */
+  .icon { width: 18px; height: 18px; display: inline-block; stroke: currentColor; fill: none; stroke-width: 1.75; stroke-linecap: round; stroke-linejoin: round; }
+
+  /* ============ FREQUÊNCIAS PRÉ-FLOP ============ */
+  /* Reusa o mesmo componente-régua (faixa de referência + marcador) que
+     ja existe hoje em app/performance/page.tsx (função Frequencia) --
+     estatística real do Player Evolution, sem duplicar navegação. */
+  .freq-panel {
+    flex-shrink: 0;
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    background: var(--surface);
+    padding: 16px 20px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .freq-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 14px;
+    flex-shrink: 0;
+  }
+  .freq-head-title {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: var(--muted);
+  }
+  .freq-head a {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    font-size: 12px;
+    color: var(--muted);
+    text-decoration: none;
+  }
+  .freq-head a:hover { color: var(--ink); }
+
+  .freq-grid {
+    display: grid;
+    grid-template-columns: repeat(5, 1fr);
+    gap: 10px;
+  }
+  .freq-card {
+    border-radius: 10px;
+    border: 1px solid var(--hairline);
+    background: var(--elevated);
+    padding: 10px 12px;
+  }
+  .freq-card .label {
+    font-size: 9px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.1em;
+    color: rgba(196, 199, 200, 0.8);
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .freq-card .value {
+    margin-top: 3px;
+    font-size: 18px;
+    font-weight: 700;
+    line-height: 1;
+    color: var(--ink);
+  }
+  .freq-track {
+    position: relative;
+    margin-top: 9px;
+    height: 3px;
+    width: 100%;
+    border-radius: 999px;
+    background: rgba(0, 0, 0, 0.5);
+  }
+  .freq-band {
+    position: absolute;
+    top: 0;
+    bottom: 0;
+    border-radius: 999px;
+    background: rgba(255, 255, 255, 0.15);
+  }
+  .freq-marker {
+    position: absolute;
+    top: 50%;
+    width: 2px;
+    height: 11px;
+    transform: translate(-50%, -50%);
+    border-radius: 999px;
+    background: var(--training);
+    box-shadow: 0 0 6px rgba(59, 130, 246, 0.6);
+  }
+  .freq-card .foot {
+    margin-top: 7px;
+    font-size: 9.5px;
+    line-height: 1.3;
+    color: rgba(196, 199, 200, 0.65);
+  }
+  .freq-sample {
+    margin-top: 10px;
+    font-size: 11px;
+    color: rgba(196, 199, 200, 0.7);
+    flex-shrink: 0;
+  }
+  .freq-sample strong { color: rgba(255, 255, 255, 0.85); }
+
+  /* ============ FAIXA FINANCEIRA: BANCA ATUAL + ATIVIDADE ============ */
+  /* Dois paineis de verdade, cada um do proprio tamanho -- sem esticar
+     nada pra preencher vazio. Banca atual usa o mesmo rotulo/formato do
+     StatCard de app/banca/page.tsx; o heatmap replica 1:1 o componente
+     VolumeHeatmap ja existente la (mesmas cores/alfa/tamanho de celula). */
+  .fin-row {
+    flex: 1;
+    min-height: 0;
+    display: grid;
+    grid-template-columns: 1fr 1.6fr;
+    gap: 16px;
+  }
+  .fin-card {
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    background: var(--elevated);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+  }
+  .fin-card .fin-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: rgba(196, 199, 200, 0.8);
+  }
+  .fin-card .fin-value { margin-top: 6px; font-size: 30px; font-weight: 700; line-height: 1; color: var(--positive); }
+  .fin-card .fin-delta { margin-top: 8px; font-size: 12px; color: var(--muted); }
+  .fin-card .fin-delta strong { color: var(--positive); font-weight: 600; }
+
+  .heatmap-card {
+    border-radius: 12px;
+    border: 1px solid var(--hairline);
+    background: var(--elevated);
+    padding: 16px 20px;
+    display: flex;
+    flex-direction: column;
+  }
+  .heatmap-head {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    flex-shrink: 0;
+  }
+  .heatmap-head .fin-label {
+    display: flex;
+    align-items: center;
+    gap: 7px;
+    font-size: 10px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.14em;
+    color: rgba(196, 199, 200, 0.8);
+  }
+  .heatmap-legend { font-size: 10px; color: rgba(196, 199, 200, 0.6); }
+  .heatmap-grid {
+    flex: 1;
+    min-height: 0;
+    margin-top: 12px;
+    display: flex;
+    align-items: center;
+    gap: 3px;
+  }
+  .heatmap-week { display: flex; flex-direction: column; gap: 3px; }
+  .heatmap-cell { width: 11px; height: 11px; border-radius: 2px; background: var(--hairline); }
+</style>
+</head>
+<body>
+
+<!-- Definicoes de icone (estilo lucide: stroke fino, minimalista) -->
+<svg style="display:none" aria-hidden="true">
+  <defs>
+    <symbol id="i-spade" viewBox="0 0 24 24"><path d="M12 2c-4 4.5-8 8-8 12a5 5 0 0 0 8.5 3.5C12 19 12 20 10 22h4c-2-2-2-3-0.5-4.5A5 5 0 0 0 20 14c0-4-4-7.5-8-12Z"/></symbol>
+    <symbol id="i-target" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9"/><circle cx="12" cy="12" r="5.5"/><circle cx="12" cy="12" r="2"/></symbol>
+    <symbol id="i-trending-up" viewBox="0 0 24 24"><polyline points="22 7 13.5 15.5 8.5 10.5 2 17"/><polyline points="16 7 22 7 22 13"/></symbol>
+    <symbol id="i-book-open" viewBox="0 0 24 24"><path d="M12 7v14"/><path d="M3 18a1 1 0 0 1-1-1V5a1 1 0 0 1 1-1h5a4 4 0 0 1 4 4 4 4 0 0 1 4-4h5a1 1 0 0 1 1 1v12a1 1 0 0 1-1 1h-6a3 3 0 0 0-3 3 3 3 0 0 0-3-3z"/></symbol>
+    <symbol id="i-trophy" viewBox="0 0 24 24"><path d="M8 21h8"/><path d="M12 17v4"/><path d="M7 4h10v5a5 5 0 0 1-10 0Z"/><path d="M7 5H4a2 2 0 0 0 0 4h3"/><path d="M17 5h3a2 2 0 0 1 0 4h-3"/></symbol>
+    <symbol id="i-users" viewBox="0 0 24 24"><circle cx="9" cy="8" r="3.5"/><path d="M2.5 20a6.5 6.5 0 0 1 13 0"/><path d="M16.5 8.5a3.2 3.2 0 0 1 0 6.4"/><path d="M17 12.2a5.8 5.8 0 0 1 4.5 7.3"/></symbol>
+    <symbol id="i-line-chart" viewBox="0 0 24 24"><path d="M4 4v15a1 1 0 0 0 1 1h15"/><path d="M6 16l4-5 3.5 3 5-6.5"/></symbol>
+    <symbol id="i-layers" viewBox="0 0 24 24"><path d="M12 2 2 8l10 6 10-6z"/><path d="M2 14l10 6 10-6"/><path d="M2 11l10 6 10-6"/></symbol>
+    <symbol id="i-settings" viewBox="0 0 24 24"><circle cx="12" cy="12" r="3.2"/><path d="M19 12a7 7 0 0 0-.2-1.6l2-1.4-2-3.4-2.3.8a7 7 0 0 0-2.8-1.6L13.2 2h-2.4l-.5 2.8a7 7 0 0 0-2.8 1.6l-2.3-.8-2 3.4 2 1.4A7 7 0 0 0 5 12c0 .5.1 1.1.2 1.6l-2 1.4 2 3.4 2.3-.8a7 7 0 0 0 2.8 1.6l.5 2.8h2.4l.5-2.8a7 7 0 0 0 2.8-1.6l2.3.8 2-3.4-2-1.4c.1-.5.2-1.1.2-1.6Z"/></symbol>
+    <symbol id="i-log-out" viewBox="0 0 24 24"><path d="M9 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h4"/><polyline points="16 17 21 12 16 7"/><line x1="21" y1="12" x2="9" y2="12"/></symbol>
+    <symbol id="i-bell" viewBox="0 0 24 24"><path d="M6 8a6 6 0 0 1 12 0c0 5 2 6 2 6H4s2-1 2-6Z"/><path d="M10 21a2 2 0 0 0 4 0"/></symbol>
+    <symbol id="i-help" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M9.1 9a3 3 0 0 1 5.7 1.3c0 2-3 2.6-3 4.2"/><line x1="12" y1="17.5" x2="12" y2="17.6"/></symbol>
+    <symbol id="i-award" viewBox="0 0 24 24"><circle cx="12" cy="8" r="6"/><path d="M8.2 13.5 6 22l6-3 6 3-2.2-8.5"/></symbol>
+    <symbol id="i-shield" viewBox="0 0 24 24"><path d="M12 2 4 5v6c0 5.2 3.4 8.6 8 11 4.6-2.4 8-5.8 8-11V5Z"/></symbol>
+    <symbol id="i-share" viewBox="0 0 24 24"><circle cx="6" cy="12" r="2.5"/><circle cx="18" cy="6" r="2.5"/><circle cx="18" cy="18" r="2.5"/><line x1="8.2" y1="10.8" x2="15.8" y2="7.2"/><line x1="8.2" y1="13.2" x2="15.8" y2="16.8"/></symbol>
+    <symbol id="i-globe" viewBox="0 0 24 24"><circle cx="12" cy="12" r="9.5"/><path d="M2.5 12h19"/><path d="M12 2.5c2.6 2.7 4 6 4 9.5s-1.4 6.8-4 9.5c-2.6-2.7-4-6-4-9.5s1.4-6.8 4-9.5Z"/></symbol>
+    <symbol id="i-medal" viewBox="0 0 24 24"><circle cx="12" cy="15" r="6"/><path d="M9 10.5 6 3h3l3 5.5L15 3h3l-3 7.5"/></symbol>
+    <symbol id="i-ticket" viewBox="0 0 24 24"><path d="M3 9a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v1.5a1.5 1.5 0 0 0 0 3V15a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-1.5a1.5 1.5 0 0 0 0-3Z"/><line x1="10" y1="7" x2="10" y2="17" stroke-dasharray="2 2"/></symbol>
+    <symbol id="i-star" viewBox="0 0 24 24"><path d="m12 2.5 3 6.2 6.5.9-4.7 4.6 1.1 6.6L12 17.7l-5.9 3.1 1.1-6.6L2.5 9.6l6.5-.9Z"/></symbol>
+    <symbol id="i-arrow-right" viewBox="0 0 24 24"><line x1="4" y1="12" x2="19" y2="12"/><polyline points="13 6 19 12 13 18"/></symbol>
+    <symbol id="i-plus" viewBox="0 0 24 24"><line x1="12" y1="4" x2="12" y2="20"/><line x1="4" y1="12" x2="20" y2="12"/></symbol>
+  </defs>
+</svg>
+
+<div class="app">
+
+  <!-- ============ SIDEBAR ============ -->
+  <aside class="sidebar">
+    <div class="sidebar-logo">
+      <div class="logo-badge"><svg class="icon" style="width:16px;height:16px;color:#fff"><use href="#i-spade"/></svg></div>
+      <span class="logo-text">POKERSYNC</span>
+    </div>
+
+    <nav class="sidebar-nav">
+      <p class="nav-label">Módulos</p>
+
+      <a href="#" class="nav-item is-active">
+        <span class="nav-bar" style="background:#2FB89A"></span>
+        <svg class="icon" style="color:#2FB89A"><use href="#i-target"/></svg>
+        Modo Treino
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#5AA6E0"></span>
+        <svg class="icon"><use href="#i-trending-up"/></svg>
+        Gestão de Banca
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#A855F7"></span>
+        <svg class="icon"><use href="#i-book-open"/></svg>
+        Revisão de Mãos
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#E0B24C"></span>
+        <svg class="icon"><use href="#i-trophy"/></svg>
+        Hub de Evolução
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#6366F1"></span>
+        <svg class="icon"><use href="#i-users"/></svg>
+        Meu Time
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#22D3EE"></span>
+        <svg class="icon"><use href="#i-line-chart"/></svg>
+        Player Evolution
+      </a>
+      <a href="#" class="nav-item">
+        <span class="nav-bar" style="background:#E0559E"></span>
+        <svg class="icon"><use href="#i-layers"/></svg>
+        Construtor de Ranges
+      </a>
+    </nav>
+
+    <div class="sidebar-footer">
+      <a href="#" class="nav-item">
+        <svg class="icon"><use href="#i-settings"/></svg>
+        Configurações
+      </a>
+      <a href="#" class="nav-item is-logout">
+        <svg class="icon"><use href="#i-log-out"/></svg>
+        Sair
+      </a>
+    </div>
+  </aside>
+
+  <!-- ============ MAIN ============ -->
+  <div class="main">
+
+    <header class="topbar">
+      <div>
+        <h1>Módulos</h1>
+        <p>Bem-vindo de volta, simoNetto</p>
+      </div>
+      <div class="topbar-actions">
+        <button class="icon-btn"><svg class="icon"><use href="#i-bell"/></svg></button>
+        <button class="icon-btn"><svg class="icon"><use href="#i-help"/></svg></button>
+        <div class="profile-chip">
+          <div class="avatar-sm">SN</div>
+          <span class="level">Nv. 12</span>
+        </div>
+      </div>
+    </header>
+
+    <main class="content">
+
+      <!-- Card de perfil: foto (coluna 1) + dados do jogador (coluna 2,
+           empilhados) + métricas relevantes (coluna 3, do lado, mesma
+           ordem/estilo de linha da coluna 2) -- estrutura 1:1 com a
+           referencia enviada, so trocando a pele visual pra nossos
+           tokens (surface/elevated/hairline, sem foto externa). -->
+      <section class="profile-card">
+        <div class="profile-card-inner">
+          <div class="profile-photo">
+            <span class="initials">SN</span>
+            <div class="photo-badges">
+              <div><svg class="icon" style="width:16px;height:16px;color:#E0B24C"><use href="#i-award"/></svg></div>
+              <div class="flag">BR</div>
+            </div>
+          </div>
+
+          <div class="profile-data">
+            <div>
+              <div class="profile-head">
+                <div>
+                  <h2>simoNetto</h2>
+                  <p>Gabriel Toledo</p>
+                </div>
+                <div class="profile-head-actions">
+                  <div class="square-btn"><svg class="icon" style="width:15px;height:15px"><use href="#i-share"/></svg></div>
+                  <div class="square-btn"><svg class="icon" style="width:15px;height:15px"><use href="#i-globe"/></svg></div>
+                </div>
+              </div>
+
+              <div class="profile-cols">
+                <!-- Coluna 2: dados do jogador, um embaixo do outro -->
+                <div class="profile-col">
+                  <div class="profile-row">
+                    <span class="label">Idade</span>
+                    <span class="value">35 anos</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="label">Time atual</span>
+                    <span class="value"><svg class="icon" style="width:13px;height:13px;color:#6366F1"><use href="#i-shield"/></svg> FURIA</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="label">Ganhos totais</span>
+                    <span class="value gold tnum">R$ 1.515.307</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="label">Ranking</span>
+                    <span class="value">#2 ('16) · #6 ('17)</span>
+                  </div>
+                </div>
+
+                <!-- Coluna 3: métricas mais relevantes, mesma ordem/estilo de linha -->
+                <div class="profile-col">
+                  <div class="profile-row">
+                    <span class="label">VPIP</span>
+                    <span class="value tnum">24,5%</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="label">3-Bet</span>
+                    <span class="value tnum">8,2%</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="label">ROI acumulado</span>
+                    <span class="value positive tnum">+24,5%</span>
+                  </div>
+                  <div class="profile-row">
+                    <span class="label">ITM aproximado</span>
+                    <span class="value tnum">18,2%</span>
+                  </div>
+                </div>
+              </div>
+
+              <div class="achievements-row">
+                <span class="label">Conquistas</span>
+                <span class="badge-gold">2x Vencedor de Bracelete WSOP</span>
+              </div>
+            </div>
+
+            <div class="trophy-row">
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#E0B24C"><use href="#i-medal"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#E0B24C"><use href="#i-medal"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#2FB89A"><use href="#i-trophy"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#2FB89A"><use href="#i-trophy"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#c4c7c8"><use href="#i-ticket"/></svg></div>
+              <div class="trophy-slot"><svg class="icon" style="width:16px;height:16px;color:#c4c7c8"><use href="#i-star"/></svg></div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <!-- Frequências pré-flop: mesmo componente-régua do Player Evolution
+           hoje (app/performance/page.tsx, função Frequencia) -- faixa de
+           referência + marcador, não estatística inventada nem card
+           genérico. VPIP/ROI/ITM já aparecem na coluna 3 do perfil, então
+           aqui entra só o que falta: PFR e a leitura visual das 3. -->
+      <section class="freq-panel">
+        <div class="freq-head">
+          <div class="freq-head-title">
+            <svg class="icon" style="width:14px;height:14px;color:#3b82f6"><use href="#i-target"/></svg>
+            Frequências pré-flop
+          </div>
+          <a href="#">
+            Ver Player Evolution
+            <svg class="icon" style="width:12px;height:12px"><use href="#i-arrow-right"/></svg>
+          </a>
+        </div>
+
+        <div class="freq-grid">
+          <!-- VPIP: valor 24,5 / escala 60 -> 40.8%; ref 18-28 -->
+          <div class="freq-card">
+            <p class="label">VPIP</p>
+            <p class="value tnum">24,5%</p>
+            <div class="freq-track">
+              <div class="freq-band" style="left:30%; width:16.7%;"></div>
+              <div class="freq-marker" style="left:40.8%;"></div>
+            </div>
+            <p class="foot">ref. 18–28%</p>
+          </div>
+
+          <!-- PFR: valor 17,8 / escala 60 -> 29.7%; ref 14-22 -->
+          <div class="freq-card">
+            <p class="label">PFR</p>
+            <p class="value tnum">17,8%</p>
+            <div class="freq-track">
+              <div class="freq-band" style="left:23.3%; width:13.3%;"></div>
+              <div class="freq-marker" style="left:29.7%;"></div>
+            </div>
+            <p class="foot">ref. 14–22%</p>
+          </div>
+
+          <!-- 3-Bet: valor 8,2 / escala 20 -> 41%; ref 5-10 -->
+          <div class="freq-card">
+            <p class="label">3-Bet</p>
+            <p class="value tnum">8,2%</p>
+            <div class="freq-track">
+              <div class="freq-band" style="left:25%; width:25%;"></div>
+              <div class="freq-marker" style="left:41%;"></div>
+            </div>
+            <p class="foot">ref. 5–10%</p>
+          </div>
+
+          <!-- Fold para 3-Bet: mesma metrica de preflopSit em performance-service.ts -->
+          <div class="freq-card">
+            <p class="label">Fold p/ 3-Bet</p>
+            <p class="value tnum">62%</p>
+            <p class="foot" style="margin-top:16px">sobre 84 mãos</p>
+          </div>
+
+          <!-- Defesa de Blinds: idem -->
+          <div class="freq-card">
+            <p class="label">Defesa de Blinds</p>
+            <p class="value tnum">55%</p>
+            <p class="foot" style="margin-top:16px">sobre 210 mãos</p>
+          </div>
+        </div>
+
+        <p class="freq-sample">Calculado sobre <strong>4.812</strong> mãos com hand history estruturada.</p>
+      </section>
+
+      <!-- Banca atual + Atividade: dois paineis financeiros de verdade,
+           cada um com identidade propria -- nao um so esticado.
+           "Banca atual" copia o rotulo/formato do StatCard real de
+           app/banca/page.tsx; o heatmap replica 1:1 o VolumeHeatmap que
+           ja existe la (mesmo tamanho de celula, mesma escala de cor). -->
+      <div class="fin-row">
+        <div class="fin-card">
+          <div class="fin-label">
+            <svg class="icon" style="width:14px;height:14px;color:#2FB89A"><use href="#i-trending-up"/></svg>
+            Banca atual
+          </div>
+          <p class="fin-value tnum">R$ 42.180,00</p>
+          <p class="fin-delta"><strong>+R$ 14.250,00</strong> de resultado (30d)</p>
+        </div>
+
+        <div class="heatmap-card">
+          <div class="heatmap-head">
+            <div class="fin-label">
+              <svg class="icon" style="width:14px;height:14px;color:#2FB89A"><use href="#i-line-chart"/></svg>
+              Atividade
+            </div>
+            <span class="heatmap-legend">verde = dia positivo · vermelho = negativo · cinza = sem sessão</span>
+          </div>
+          <div class="heatmap-grid" id="heatmap"></div>
+        </div>
+      </div>
+
+    </main>
+  </div>
+</div>
+
+<script>
+  // Mesma logica de cor do VolumeHeatmap real (app/banca/page.tsx):
+  // cinza sem sessao, verde/vermelho por sinal do dia, alfa = magnitude.
+  // So o preenchimento das celulas roda em JS aqui -- e' mockup estatico,
+  // sem chamada de rede nem dependencia externa.
+  (function () {
+    const grid = document.getElementById("heatmap");
+    const weeks = 44;
+    let seed = 42;
+    function rand() {
+      seed = (seed * 1103515245 + 12345) & 0x7fffffff;
+      return seed / 0x7fffffff;
+    }
+    for (let w = 0; w < weeks; w++) {
+      const col = document.createElement("div");
+      col.className = "heatmap-week";
+      for (let d = 0; d < 7; d++) {
+        const cell = document.createElement("div");
+        cell.className = "heatmap-cell";
+        const r = rand();
+        if (r > 0.4) {
+          const positive = rand() > 0.22;
+          const intensity = 0.25 + rand() * 0.65;
+          cell.style.background = positive
+            ? `rgba(34,197,94,${intensity.toFixed(2)})`
+            : `rgba(224,85,90,${intensity.toFixed(2)})`;
+        }
+        col.appendChild(cell);
+      }
+      grid.appendChild(col);
+    }
+  })();
+</script>
+</body>
+</html>
