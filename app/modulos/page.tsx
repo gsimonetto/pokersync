@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Settings, LogOut, ArrowRight, Target } from "lucide-react";
+import { Bell, CircleHelp, Settings, LogOut, ArrowRight, Target, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -57,6 +57,30 @@ export default function ModulosPage() {
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+  // Colapsar so' esconde os rotulos e encolhe a largura da sidebar --
+  // o main já é flex-1 independente, então isso nunca reflui/altera o
+  // conteúdo da tela do módulo em si, só o espaço horizontal disponível.
+  const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+
+  useEffect(() => {
+    try {
+      setSidebarCollapsed(localStorage.getItem("pokersync:sidebar-collapsed") === "1");
+    } catch {
+      // localStorage indisponível (ex: modo privado) -- mantém expandida
+    }
+  }, []);
+
+  function toggleSidebar() {
+    setSidebarCollapsed((prev) => {
+      const next = !prev;
+      try {
+        localStorage.setItem("pokersync:sidebar-collapsed", next ? "1" : "0");
+      } catch {
+        // segue sem persistir se localStorage falhar
+      }
+      return next;
+    });
+  }
 
   useEffect(() => {
     let alive = true;
@@ -134,15 +158,35 @@ export default function ModulosPage() {
   return (
     <div className="flex h-screen w-full overflow-hidden bg-void">
       {/* ============ SIDEBAR ============ */}
-      <aside className="hidden md:flex h-full w-[264px] shrink-0 flex-col border-r border-hairline bg-surface">
-        <div className="flex h-16 shrink-0 items-center gap-2.5 border-b border-hairline px-5">
-          <Link href="/modulos" aria-label="Ir para Módulos">
-            <Logo className="h-7 w-auto" />
-          </Link>
+      <aside
+        className={`hidden md:flex h-full shrink-0 flex-col border-r border-hairline bg-surface transition-[width] duration-200 ease-in-out ${
+          sidebarCollapsed ? "w-[76px]" : "w-[264px]"
+        }`}
+      >
+        <div
+          className={`flex h-16 shrink-0 items-center border-b border-hairline ${
+            sidebarCollapsed ? "justify-center px-2" : "justify-between px-5"
+          }`}
+        >
+          {!sidebarCollapsed && (
+            <Link href="/modulos" aria-label="Ir para Módulos">
+              <Logo className="h-7 w-auto" />
+            </Link>
+          )}
+          <button
+            onClick={toggleSidebar}
+            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-ink"
+            aria-label={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+            title={sidebarCollapsed ? "Expandir menu" : "Recolher menu"}
+          >
+            {sidebarCollapsed ? <PanelLeftOpen size={18} strokeWidth={1.75} /> : <PanelLeftClose size={18} strokeWidth={1.75} />}
+          </button>
         </div>
 
         <nav className="flex flex-1 flex-col gap-0.5 overflow-hidden px-3 py-4">
-          <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>
+          {!sidebarCollapsed && (
+            <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>
+          )}
           {modules.map((m) => {
             const Icon = m.icon;
             const active = pathname === m.href;
@@ -150,16 +194,17 @@ export default function ModulosPage() {
               <Link
                 key={m.key}
                 href={m.href ?? "#"}
+                title={sidebarCollapsed ? m.title : undefined}
                 className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
-                  active ? "bg-white/[0.06] text-ink" : "text-muted hover:bg-white/[0.04] hover:text-ink"
-                }`}
+                  sidebarCollapsed ? "justify-center" : ""
+                } ${active ? "bg-white/[0.06] text-ink" : "text-muted hover:bg-white/[0.04] hover:text-ink"}`}
               >
                 <span
                   className="absolute inset-y-1.5 left-0 w-[3px] rounded-full transition-opacity"
                   style={{ background: m.accent, opacity: active ? 1 : 0 }}
                 />
-                <Icon size={18} strokeWidth={1.75} style={{ color: active ? m.accent : undefined }} />
-                {m.title}
+                <Icon size={18} strokeWidth={1.75} className="shrink-0" style={{ color: active ? m.accent : undefined }} />
+                {!sidebarCollapsed && m.title}
               </Link>
             );
           })}
@@ -168,17 +213,23 @@ export default function ModulosPage() {
         <div className="flex shrink-0 flex-col gap-0.5 border-t border-hairline px-3 py-3">
           <button
             onClick={() => toggle("profile")}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.04] hover:text-ink"
+            title={sidebarCollapsed ? "Configurações" : undefined}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.04] hover:text-ink ${
+              sidebarCollapsed ? "justify-center" : ""
+            }`}
           >
-            <Settings size={18} strokeWidth={1.75} />
-            Configurações
+            <Settings size={18} strokeWidth={1.75} className="shrink-0" />
+            {!sidebarCollapsed && "Configurações"}
           </button>
           <button
             onClick={handleLogout}
-            className="flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-negative/[0.08] hover:text-negative"
+            title={sidebarCollapsed ? "Sair" : undefined}
+            className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-negative/[0.08] hover:text-negative ${
+              sidebarCollapsed ? "justify-center" : ""
+            }`}
           >
-            <LogOut size={18} strokeWidth={1.75} />
-            Sair
+            <LogOut size={18} strokeWidth={1.75} className="shrink-0" />
+            {!sidebarCollapsed && "Sair"}
           </button>
         </div>
       </aside>
