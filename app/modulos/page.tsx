@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Settings, LogOut, ArrowRight, Wallet, Target, LineChart } from "lucide-react";
+import { Bell, CircleHelp, Settings, LogOut, ArrowRight, Target } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -18,8 +18,6 @@ import {
   type PlayerPerformance,
   type PreflopSituation,
 } from "@/lib/services/performance-service";
-import { fetchSessions, fetchSettings, fetchTransactions } from "@/lib/services/bankroll-service";
-import { aggregate, netWorth, dailyActivity, evolutionSeries, type DayActivity } from "@/lib/bankroll/calc";
 import { modules } from "@/lib/modules-data";
 
 // Mesmas faixas de referencia de app/performance/page.tsx (funcao
@@ -33,16 +31,6 @@ const REF = {
 function fmtPct(v: number | null | undefined, digits = 1): string | null {
   if (v === null || v === undefined) return null;
   return `${Number(v).toFixed(digits)}%`;
-}
-
-function fmtMoney(v: number | null | undefined): string {
-  if (v === null || v === undefined) return "—";
-  return Number(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-}
-
-function fmtSignedMoney(v: number): string {
-  const s = Math.abs(v).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
-  return v < 0 ? `-${s}` : `+${s}`;
 }
 
 function calcAge(dataNascimento: string | null): number | null {
@@ -68,10 +56,6 @@ export default function ModulosPage() {
   const [team, setTeam] = useState<{ name: string; accent: string } | null>(null);
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
-  const [bankrollAtual, setBankrollAtual] = useState<number | null>(null);
-  const [bankrollProfit, setBankrollProfit] = useState<number | null>(null);
-  const [bankrollRecent, setBankrollRecent] = useState<number[]>([]);
-  const [activity, setActivity] = useState<Record<string, DayActivity>>({});
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
 
   useEffect(() => {
@@ -87,22 +71,13 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [
-        profileRes,
-        userRes,
-        progressRes,
-        unreadRes,
-        perfRes,
-        preflopRes,
-        bankrollRes,
-      ] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, unreadRes, perfRes, preflopRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchUnreadCount(),
         fetchPlayerPerformance(),
         fetchPreflopSituations(),
-        Promise.all([fetchSessions(), fetchSettings(), fetchTransactions()]),
       ]);
       if (!alive) return;
 
@@ -111,19 +86,6 @@ export default function ModulosPage() {
       if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
       if (perfRes.status === "fulfilled") setPerf(perfRes.value);
       if (preflopRes.status === "fulfilled") setPreflop(preflopRes.value);
-
-      if (bankrollRes.status === "fulfilled") {
-        const [sessions, settings, transactions] = bankrollRes.value;
-        const agg = aggregate(sessions);
-        const nw = netWorth(settings.bankroll, agg.profit, transactions);
-        setBankrollAtual(nw.playingBankroll);
-        setBankrollProfit(agg.profit);
-        setActivity(dailyActivity(sessions));
-        // Ultimas sessoes (net por sessao, ja em ordem cronologica pela
-        // propria evolutionSeries) -- preenche o card de Banca Atual com
-        // forma real em vez de deixar so o numero grande sobrando.
-        setBankrollRecent(evolutionSeries(sessions, settings.bankroll).slice(-14).map((p) => p.net));
-      }
 
       // Time: precisa do user.id da chamada de auth acima -- RLS de
       // team_members libera todo membro do mesmo time, entao o filtro por
@@ -390,74 +352,6 @@ export default function ModulosPage() {
               hand history estruturada.
             </p>
           </section>
-
-          {/* Banca atual + Atividade: mesmo rotulo/formato do StatCard de
-              app/banca/page.tsx e o mesmo VolumeHeatmap de la (mesma
-              logica de cor/celula), alimentados pelos mesmos servicos
-              (fetchSessions/fetchSettings/fetchTransactions). */}
-          <div className="grid flex-1 grid-cols-[1fr_1.6fr] gap-4">
-            <section className="flex flex-col rounded-xl border border-hairline bg-elevated px-5 py-4">
-              <div className="flex shrink-0 items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">
-                  <Wallet size={14} className="text-training" />
-                  Banca atual
-                </div>
-                {bankrollProfit !== null && (
-                  <span
-                    className={`rounded-full px-1.5 py-0.5 text-[10px] font-bold ${
-                      bankrollProfit >= 0 ? "bg-positive/10 text-positive" : "bg-negative/10 text-negative"
-                    }`}
-                  >
-                    {fmtSignedMoney(bankrollProfit)}
-                  </span>
-                )}
-              </div>
-              <p className={`mt-1.5 shrink-0 text-3xl font-bold tabular-nums ${(bankrollAtual ?? 0) < 0 ? "text-negative" : "text-positive"}`}>
-                {bankrollAtual !== null ? fmtMoney(bankrollAtual) : "—"}
-              </p>
-
-              <div className="mt-3 flex flex-1 flex-col justify-end">
-                <p className="mb-1.5 text-[10px] text-muted/60">
-                  {bankrollRecent.length > 0 ? `Últimas ${bankrollRecent.length} sessões` : "Sem sessões registradas ainda"}
-                </p>
-                {bankrollRecent.length > 0 ? (
-                  <div className="flex h-full items-end gap-[3px]">
-                    {bankrollRecent.map((net, i) => {
-                      const maxAbs = Math.max(...bankrollRecent.map((n) => Math.abs(n)), 1);
-                      const h = Math.max(8, Math.round((Math.abs(net) / maxAbs) * 100));
-                      return (
-                        <div
-                          key={i}
-                          title={fmtSignedMoney(net)}
-                          className={`flex-1 rounded-t-sm ${net >= 0 ? "bg-positive/60" : "bg-negative/60"}`}
-                          style={{ height: `${h}%` }}
-                        />
-                      );
-                    })}
-                  </div>
-                ) : (
-                  <div className="flex h-full items-end gap-[3px]">
-                    {Array.from({ length: 14 }).map((_, i) => (
-                      <div key={i} className="h-2 flex-1 rounded-t-sm bg-hairline" />
-                    ))}
-                  </div>
-                )}
-              </div>
-            </section>
-
-            <section className="flex flex-col rounded-xl border border-hairline bg-elevated px-5 py-4">
-              <div className="flex shrink-0 items-center justify-between">
-                <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">
-                  <LineChart size={14} className="text-training" />
-                  Atividade
-                </div>
-                <span className="text-[10px] text-muted/60">verde = positivo · vermelho = negativo · cinza = sem sessão</span>
-              </div>
-              <div className="mt-3 flex flex-1 items-center">
-                <VolumeHeatmapMini activity={activity} />
-              </div>
-            </section>
-          </div>
         </main>
       </div>
     </div>
@@ -520,61 +414,6 @@ function FreqSimples({ label, pct, sample }: { label: string; pct: number | null
       <p className="mt-[26px] text-[9.5px] leading-tight text-muted/65">
         {sample !== null ? `sobre ${sample} mãos` : "sem amostra"}
       </p>
-    </div>
-  );
-}
-
-// Mesma logica de VolumeHeatmap (app/banca/page.tsx): 20 semanas, cinza
-// sem sessao, verde/vermelho por sinal do dia com alfa = magnitude do
-// resultado. Sem tooltip/hover state aqui -- so leitura rapida.
-function VolumeHeatmapMini({ activity }: { activity: Record<string, DayActivity> }) {
-  const weeksCount = 20;
-  const today = new Date();
-  today.setHours(0, 0, 0, 0);
-  const endOfWeek = new Date(today);
-  endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
-  const totalDays = weeksCount * 7;
-  const start = new Date(endOfWeek);
-  start.setDate(endOfWeek.getDate() - totalDays + 1);
-
-  const days: { date: string; d: Date }[] = [];
-  for (let i = 0; i < totalDays; i++) {
-    const d = new Date(start);
-    d.setDate(start.getDate() + i);
-    days.push({ date: d.toISOString().slice(0, 10), d });
-  }
-
-  const values = Object.values(activity).map((a) => Math.abs(a.net));
-  const maxAbsNet = values.length > 0 ? Math.max(...values, 1) : 1;
-
-  function cellColor(a: DayActivity | undefined) {
-    if (!a || a.n === 0) return "var(--color-hairline)";
-    const intensity = Math.min(1, Math.abs(a.net) / maxAbsNet);
-    const alpha = 0.25 + intensity * 0.65;
-    return a.net >= 0 ? `rgba(34,197,94,${alpha})` : `rgba(224,85,90,${alpha})`;
-  }
-
-  const weeks: { date: string; d: Date }[][] = [];
-  for (let i = 0; i < days.length; i += 7) weeks.push(days.slice(i, i + 7));
-
-  return (
-    <div className="flex gap-[3px] overflow-x-auto">
-      {weeks.map((week, wi) => (
-        <div key={wi} className="flex flex-col gap-[3px]">
-          {week.map(({ date, d }) => {
-            const a = activity[date];
-            const future = d > today;
-            return (
-              <div
-                key={date}
-                title={a ? `${date} · ${a.n} sessão(ões) · ${fmtSignedMoney(a.net)}` : date}
-                className="size-[11px] rounded-[2px] transition-transform duration-100 hover:scale-125"
-                style={{ background: future ? "transparent" : cellColor(a) }}
-              />
-            );
-          })}
-        </div>
-      ))}
     </div>
   );
 }
