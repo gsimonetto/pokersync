@@ -185,11 +185,7 @@ export default function ModulosPage() {
 
       {/* ============ MAIN ============ */}
       <div className="flex h-full min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-between border-b border-hairline px-6">
-          <div>
-            <h1 className="text-sm font-semibold leading-tight text-ink">Módulos</h1>
-            <p className="text-xs text-muted">Bem-vindo de volta, {displayName}</p>
-          </div>
+        <header className="flex h-16 shrink-0 items-center justify-center border-b border-hairline px-6">
           <div className="flex items-center gap-1.5">
             <div className="relative">
               <button
@@ -240,7 +236,7 @@ export default function ModulosPage() {
           </div>
         </header>
 
-        <main className="flex flex-1 flex-col gap-4 overflow-hidden px-6 py-5">
+        <main className="flex flex-1 flex-col justify-center gap-6 overflow-hidden px-6 py-5">
           {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
               + metricas mais relevantes (coluna 3), mesma ordem/estilo de
               linha -- estrutura pedida pelo usuario. Ganhos totais/Ranking
