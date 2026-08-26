@@ -2049,14 +2049,13 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
           </div>
         ))}
       </div>
-      <div className="mt-3 flex items-center justify-between text-[10px] text-muted">
-        <span>{weeksCount} semanas · verde = dia positivo, vermelho = dia negativo, cinza = sem sessão</span>
-        {hovered && (
+      {hovered && (
+        <div className="mt-3 flex items-center justify-end text-[10px] text-muted">
           <span className="font-semibold text-ink">
             {hovered.date} · {hovered.n} {hovered.n === 1 ? "sessão" : "sessões"} · {fmtSigned(hovered.net)}
           </span>
-        )}
-      </div>
+        </div>
+      )}
     </div>
   );
 }
