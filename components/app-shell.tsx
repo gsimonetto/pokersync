@@ -3,18 +3,20 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Home, LogOut, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
+import { Bell, CircleHelp, Home, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { HelpMenu } from "@/components/help-menu";
 import { ProfileMenu } from "@/components/profile-menu";
+import { ChatCenter } from "@/components/chat/chat-center";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
+import { fetchTeamUnreadCount } from "@/lib/services/team-service";
 import { modules } from "@/lib/modules-data";
 
-type OpenMenu = "notifications" | "help" | "profile" | null;
+type OpenMenu = "notifications" | "help" | "profile" | "chats" | null;
 
 const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
 
@@ -50,10 +52,17 @@ const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();
+  // Deep link do sino de notificacao de chat (?chat=<userId>) -- abre a
+  // Central de Conversas ja na thread de quem mandou a mensagem. Le
+  // direto de window.location (nao useSearchParams): esse hook exige
+  // suspense boundary em toda pagina que usa AppShell, so' pra um valor
+  // que a gente le uma unica vez no mount.
+  const [pendingChatId, setPendingChatId] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Profile | null>(null);
   const [level, setLevel] = useState<number | null>(null);
   const [unread, setUnread] = useState(0);
+  const [unreadChats, setUnreadChats] = useState(0);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
@@ -76,19 +85,31 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       } catch {
         return;
       }
-      const [profileRes, progressRes, unreadRes] = await Promise.allSettled([
+      const [profileRes, progressRes, unreadRes, unreadChatsRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchUnreadCount(),
+        fetchTeamUnreadCount(),
       ]);
       if (!alive) return;
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
+      if (unreadChatsRes.status === "fulfilled") setUnreadChats(unreadChatsRes.value);
     })();
     return () => {
       alive = false;
     };
+  }, []);
+
+  useEffect(() => {
+    const chatId = new URLSearchParams(window.location.search).get("chat");
+    if (!chatId) return;
+    setPendingChatId(chatId);
+    setOpenMenu("chats");
+    // limpa o parametro da URL pra nao reabrir num refresh/voltar
+    router.replace(pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   function toggleCollapsed() {
@@ -255,6 +276,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Home className="size-[18px]" />
             </Link>
+            <button
+              onClick={() => toggleMenu("chats")}
+              className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
+              aria-label="Conversas"
+              title="Conversas"
+            >
+              <MessageCircle className="size-[18px]" />
+              {unreadChats > 0 && (
+                <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
+                  {unreadChats > 9 ? "9+" : unreadChats}
+                </span>
+              )}
+            </button>
             <div className="relative">
               <button
                 onClick={() => toggleMenu("notifications")}
@@ -310,6 +344,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
       </div>
+
+      {openMenu === "chats" && (
+        <ChatCenter
+          initialOtherUserId={pendingChatId}
+          onClose={() => {
+            setOpenMenu(null);
+            setPendingChatId(null);
+            fetchTeamUnreadCount()
+              .then(setUnreadChats)
+              .catch(() => {});
+          }}
+        />
+      )}
     </div>
   );
 }

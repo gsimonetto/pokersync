@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
@@ -12,17 +12,13 @@ import {
   assignTeamDrill,
   diasSemAtividade,
   fetchTeamLeakPlayers,
-  fetchTeamThread,
-  markThreadRead,
   removeMember,
-  sendTeamMessage,
   setMemberLabel,
   traduzErroTime,
   type TeamDashboardRow,
   type TeamLabel,
   type TeamLeak,
   type TeamLeakPlayer,
-  type TeamMessage,
 } from "@/lib/services/team-service";
 import { BRL } from "@/lib/format";
 
@@ -75,12 +71,20 @@ export function TabJogadores({
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
+  const router = useRouter();
   const [filtroLabel, setFiltroLabel] = useState<string>("todas");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("nome");
   const [acaoAberta, setAcaoAberta] = useState<TeamDashboardRow | null>(null);
-  const [conversaCom, setConversaCom] = useState<TeamDashboardRow | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+
+  // Conversar nunca abre um chat solto -- sempre manda pra Central de
+  // Conversas (topbar, components/chat/chat-center.tsx), que ja sabe
+  // ler ?chat=<userId> e abrir a thread certa (mesmo mecanismo do
+  // deep-link da notificacao).
+  function abrirConversa(userId: string) {
+    router.push(`/modulos?chat=${userId}`);
+  }
 
   function alternarExpandido(userId: string) {
     setExpandidos((prev) => {
@@ -228,7 +232,7 @@ export function TabJogadores({
 
                   {podeConversar ? (
                     <button
-                      onClick={() => setConversaCom(j)}
+                      onClick={() => abrirConversa(j.userId)}
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
                       aria-label={`Conversar com ${j.nome}`}
                     >
@@ -281,16 +285,12 @@ export function TabJogadores({
           isAdmin={isAdmin}
           onFechar={() => setAcaoAberta(null)}
           onAbrirConversa={() => {
-            setConversaCom(acaoAberta);
+            abrirConversa(acaoAberta.userId);
             setAcaoAberta(null);
           }}
           onChange={onChange}
           onErro={onErro}
         />
-      )}
-
-      {conversaCom && (
-        <ConversaDrawer jogador={conversaCom} onFechar={() => setConversaCom(null)} onErro={onErro} />
       )}
       </section>
     </div>
@@ -460,134 +460,6 @@ function AcoesJogadorModal({
               )}
             </div>
           )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------
-// Drawer de conversa 1:1 com o jogador. Fica reservado (nao vive
-// dentro do modal de Acoes) pra nao competir com os controles rapidos
-// de etiqueta/coach — o coach abre so quando de fato vai conversar.
-// O envio ja dispara a notificacao de sino pro jogador (via RPC
-// send_team_message -> notify_system, categoria "team").
-// ------------------------------------------------------------
-function ConversaDrawer({
-  jogador,
-  onFechar,
-  onErro,
-}: {
-  jogador: TeamDashboardRow;
-  onFechar: () => void;
-  onErro: (s: string) => void;
-}) {
-  const [mensagens, setMensagens] = useState<TeamMessage[]>([]);
-  const [meId, setMeId] = useState<string | null>(null);
-  const [texto, setTexto] = useState("");
-  const [carregando, setCarregando] = useState(true);
-  const [enviando, setEnviando] = useState(false);
-
-  useEffect(() => {
-    let ativo = true;
-    (async () => {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
-        if (!ativo) return;
-        setMeId(data.user?.id ?? null);
-        const thread = await fetchTeamThread(jogador.userId);
-        if (!ativo) return;
-        setMensagens(thread);
-        await markThreadRead(jogador.userId).catch(() => {});
-      } catch (e) {
-        if (ativo) onErro(traduzErroTime(e));
-      } finally {
-        if (ativo) setCarregando(false);
-      }
-    })();
-    return () => {
-      ativo = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jogador.userId]);
-
-  async function enviar() {
-    if (!texto.trim()) return;
-    setEnviando(true);
-    const corpo = texto.trim();
-    setTexto("");
-    try {
-      await sendTeamMessage(jogador.userId, corpo);
-      const thread = await fetchTeamThread(jogador.userId);
-      setMensagens(thread);
-    } catch (e) {
-      onErro(traduzErroTime(e));
-      setTexto(corpo);
-    } finally {
-      setEnviando(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-void/70" onClick={onFechar}>
-      <div
-        className="flex h-full w-full max-w-sm flex-col border-l border-hairline bg-surface"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-3 border-b border-hairline p-4">
-          <Avatar id={jogador.avatarId} url={jogador.avatarUrl} size={34} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{jogador.nome}</p>
-            <p className="text-xs text-muted">Conversa</p>
-          </div>
-          <button onClick={onFechar} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-2 overflow-y-auto p-4">
-          {carregando ? (
-            <p className="text-sm text-muted">Carregando…</p>
-          ) : mensagens.length === 0 ? (
-            <p className="text-sm text-muted">Nenhuma mensagem ainda. Diga oi.</p>
-          ) : (
-            mensagens.map((m) => {
-              const minha = m.senderId === meId;
-              return (
-                <div key={m.id} className={`flex ${minha ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-[13px] ${
-                      minha ? "bg-ink text-void" : "border border-hairline bg-elevated text-ink"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                    <p className={`mt-1 text-[10px] ${minha ? "text-void/60" : "text-muted"}`}>
-                      {new Date(m.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
-          )}
-        </div>
-
-        <div className="flex items-center gap-2 border-t border-hairline p-3">
-          <input
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !enviando && enviar()}
-            placeholder="Escreva uma mensagem…"
-            className="flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none placeholder:text-muted/50"
-          />
-          <button
-            onClick={enviar}
-            disabled={enviando || !texto.trim()}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void disabled:opacity-50"
-            aria-label="Enviar"
-          >
-            <Send size={15} />
-          </button>
         </div>
       </div>
     </div>

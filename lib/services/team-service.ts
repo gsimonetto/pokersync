@@ -1040,11 +1040,14 @@ export async function deactivatePlayerGoal(goalId: string) {
 }
 
 // ============================================================
-// Chat 1:1 (coach/admin <-> jogador), dentro do mesmo time
+// Chat 1:1, dentro do mesmo time (Central de Conversas)
 // ============================================================
 // RLS libera so remetente e destinatario. Insert sempre via RPC
 // send_team_message (valida "mesmo time" + dispara notificacao de
-// sino). Leitura e marcar-como-lida podem ir direto na tabela.
+// sino; ja suporta kind='audio' desde a v5-arg). Leitura e
+// marcar-como-lida podem ir direto na tabela.
+
+export type TeamMessageKind = "texto" | "audio";
 
 export interface TeamMessage {
   id: string;
@@ -1052,8 +1055,32 @@ export interface TeamMessage {
   senderId: string;
   recipientId: string;
   body: string;
+  kind: TeamMessageKind;
+  /** Path dentro do bucket privado "team-audio" (nao a URL publica --
+      o bucket exige signed URL, ver getTeamAudioUrl). */
+  audioUrl: string | null;
+  durationSeconds: number | null;
   createdAt: string;
   readAt: string | null;
+}
+
+const TEAM_MESSAGE_COLUMNS =
+  "id, team_id, sender_id, recipient_id, body, kind, audio_url, duration_seconds, created_at, read_at";
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function mapTeamMessage(r: any): TeamMessage {
+  return {
+    id: r.id,
+    teamId: r.team_id,
+    senderId: r.sender_id,
+    recipientId: r.recipient_id,
+    body: r.body,
+    kind: (r.kind as TeamMessageKind) ?? "texto",
+    audioUrl: r.audio_url,
+    durationSeconds: r.duration_seconds,
+    createdAt: r.created_at,
+    readAt: r.read_at,
+  };
 }
 
 export async function fetchTeamThread(otherUserId: string, limit = 100): Promise<TeamMessage[]> {
@@ -1061,22 +1088,14 @@ export async function fetchTeamThread(otherUserId: string, limit = 100): Promise
   const meId = await getUserId();
   const { data, error } = await supabase
     .from("team_messages")
-    .select("id, team_id, sender_id, recipient_id, body, created_at, read_at")
+    .select(TEAM_MESSAGE_COLUMNS)
     .or(
       `and(sender_id.eq.${meId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${meId})`
     )
     .order("created_at", { ascending: true })
     .limit(limit);
   if (error) throw error;
-  return (data ?? []).map((r) => ({
-    id: r.id,
-    teamId: r.team_id,
-    senderId: r.sender_id,
-    recipientId: r.recipient_id,
-    body: r.body,
-    createdAt: r.created_at,
-    readAt: r.read_at,
-  }));
+  return (data ?? []).map(mapTeamMessage);
 }
 
 export async function sendTeamMessage(recipientId: string, body: string): Promise<string> {
@@ -1089,6 +1108,50 @@ export async function sendTeamMessage(recipientId: string, body: string): Promis
   return data as string;
 }
 
+// Upload do blob gravado (webm/opus, ver ChatCenter) pro bucket privado
+// "team-audio". Path segue a convencao exigida pela policy de INSERT
+// (storage.foldername(name)[2] = auth.uid()): "{teamId}/{meId}/{arquivo}".
+// Guardamos so' o path em team_messages.audio_url -- a policy de SELECT
+// casa por sufixo (audio_url LIKE '%'||objects.name), entao path e URL
+// publica funcionariam igual, mas o bucket nao e' publico.
+export async function uploadTeamAudio(teamId: string, blob: Blob): Promise<string> {
+  const supabase = createClient();
+  const meId = await getUserId();
+  const path = `${teamId}/${meId}/${crypto.randomUUID()}.webm`;
+  const { error } = await supabase.storage.from("team-audio").upload(path, blob, {
+    contentType: blob.type || "audio/webm",
+    cacheControl: "3600",
+  });
+  if (error) throw error;
+  return path;
+}
+
+export async function sendTeamAudioMessage(
+  recipientId: string,
+  audioPath: string,
+  durationSeconds: number
+): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("send_team_message", {
+    p_recipient: recipientId,
+    p_body: "",
+    p_kind: "audio",
+    p_audio_url: audioPath,
+    p_duration_seconds: Math.min(120, Math.max(1, Math.round(durationSeconds))),
+  });
+  if (error) throw error;
+  return data as string;
+}
+
+// Bucket privado -- precisa de signed URL pra tocar o audio (curta,
+// so' pro player abrir; nao guardamos/cacheamos entre sessoes).
+export async function getTeamAudioUrl(path: string): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.storage.from("team-audio").createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
 export async function markThreadRead(otherUserId: string) {
   const supabase = createClient();
   const meId = await getUserId();
@@ -1099,4 +1162,82 @@ export async function markThreadRead(otherUserId: string) {
     .eq("recipient_id", meId)
     .is("read_at", null);
   if (error) throw error;
+}
+
+// ============================================================
+// Central de Conversas (topbar) -- lista todas as conversas que o
+// usuario ja tem no time, tipo Discord. Reusa fetchMyTeamCached() pra
+// nome/avatar/papel de cada contato (qualquer membro pode conversar
+// com qualquer outro, mesma regra ja validada pelo RPC).
+// ============================================================
+
+export interface TeamThreadSummary {
+  otherUserId: string;
+  nome: string;
+  avatarId: number;
+  avatarUrl: string | null;
+  role: TeamRole;
+  lastMessage: string;
+  lastKind: TeamMessageKind;
+  lastAt: string;
+  lastIsMine: boolean;
+  unreadCount: number;
+}
+
+const THREADS_SCAN_LIMIT = 500;
+
+export async function fetchTeamThreads(): Promise<TeamThreadSummary[]> {
+  const supabase = createClient();
+  const meId = await getUserId();
+  const [{ data: msgs, error }, myTeam] = await Promise.all([
+    supabase
+      .from("team_messages")
+      .select("id, sender_id, recipient_id, body, kind, created_at, read_at")
+      .or(`sender_id.eq.${meId},recipient_id.eq.${meId}`)
+      .order("created_at", { ascending: false })
+      .limit(THREADS_SCAN_LIMIT),
+    fetchMyTeamCached(),
+  ]);
+  if (error) throw error;
+  if (!myTeam) return [];
+
+  const memberById = new Map(myTeam.members.map((m) => [m.userId, m]));
+  const byOther = new Map<string, TeamThreadSummary>();
+
+  for (const m of msgs ?? []) {
+    const otherId = m.sender_id === meId ? m.recipient_id : m.sender_id;
+    const unread = m.recipient_id === meId && !m.read_at;
+    const existing = byOther.get(otherId);
+    if (existing) {
+      if (unread) existing.unreadCount += 1;
+      continue;
+    }
+    const member = memberById.get(otherId);
+    byOther.set(otherId, {
+      otherUserId: otherId,
+      nome: member?.name ?? "Ex-membro do time",
+      avatarId: member?.avatarId ?? 1,
+      avatarUrl: member?.avatarUrl ?? null,
+      role: member?.role ?? "player",
+      lastMessage: m.kind === "audio" ? "🎤 Mensagem de voz" : m.body,
+      lastKind: (m.kind as TeamMessageKind) ?? "texto",
+      lastAt: m.created_at,
+      lastIsMine: m.sender_id === meId,
+      unreadCount: unread ? 1 : 0,
+    });
+  }
+
+  return Array.from(byOther.values()).sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
+}
+
+export async function fetchTeamUnreadCount(): Promise<number> {
+  const supabase = createClient();
+  const meId = await getUserId();
+  const { count, error } = await supabase
+    .from("team_messages")
+    .select("id", { count: "exact", head: true })
+    .eq("recipient_id", meId)
+    .is("read_at", null);
+  if (error) throw error;
+  return count ?? 0;
 }
