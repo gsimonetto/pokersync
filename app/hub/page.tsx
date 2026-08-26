@@ -325,17 +325,19 @@ export default function HubPage() {
         }
       `}</style>
 
-      {/* Sem AppHeader (barra sticky) -- o alternador Missões/Ranking
-          entra dentro do container principal de cada vista (mesmo padrao
-          do Treino: controles vivem dentro do card, nao numa faixa fixa
-          por cima). Conteudo comeca flush no topo, igual aos demais
-          modulos. */}
+      {/* Sem AppHeader (barra sticky) -- o alternador Missões/Ranking vive
+          na sua propria linha no topo, igual a barra de filtros do Funil
+          (mesmo padrao: linha de controles + container por fora
+          envolvendo o conteudo abaixo dela, pedido explicito: "container
+          por fora igual ficou no funil"). Conteudo comeca flush no topo,
+          igual aos demais modulos. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
+        <ViewToggle view={view} setView={setView} />
+      </div>
+
       {view === "missoes" && (
       <>
       <div className="hub-level-card relative overflow-hidden rounded-xl border border-hairline bg-surface p-6">
-        <div className="relative mb-4 flex flex-wrap items-center justify-between gap-2">
-          <ViewToggle view={view} setView={setView} />
-        </div>
         <div
           className="pointer-events-none absolute inset-0"
           style={{ background: `radial-gradient(ellipse at 100% 0%, ${ACCENT}12 0%, transparent 60%)` }}
@@ -347,10 +349,17 @@ export default function HubPage() {
           style={{ color: ACCENT }}
         />
 
-        <div className="relative grid grid-cols-[auto_1fr_auto] items-center gap-5">
+        {/* flex-wrap em vez de grid de 3 colunas fixas -- no grid, badge
+            (80px) + FlameStat (min 84px) sobravam pouquissimo espaco pro
+            texto em telas de celular estreitas (~320-360px), espremendo
+            "Nivel X/99" e a barra de XP quase a zero (layout quebrado no
+            celular, pedido explicito pra corrigir). Com flex-wrap o
+            FlameStat desce pra propria linha quando nao cabe, em vez de
+            espremer o meio. */}
+        <div className="relative flex flex-wrap items-center gap-4 sm:gap-5">
           <LevelBadge level={level} />
 
-          <div className="min-w-0">
+          <div className="min-w-[160px] flex-1">
             {/* Rotulo de patente (Bronze/Prata/Ouro...) volta como chip
                 colorido -- pedido explicito: "detalhes que remetam o
                 nivel igual as patentes de jogos". Numeral romano imita a
@@ -424,56 +433,62 @@ export default function HubPage() {
         </div>
       </div>
 
-      {/* Nota discreta, nao alerta ambar de largura total: a informacao
-          e' util (explica por que as missoes parecem genericas), mas o
-          tratamento de aviso dava a ela peso de problema e anunciava
-          produto inacabado logo no topo do modulo. Sem a promessa de
-          roadmap ("em breve...") de proposito -- promessa dentro do
-          produto envelhece mal e nao ajuda a decidir nada agora. */}
-      {showingCatalog && (
-        <p className="mt-4 text-xs text-muted">
-          Missões do catálogo geral — ainda não personalizadas pro seu nível.
-        </p>
-      )}
-
-      {/* Abas Diario/Semanal/Mensal/Desafios (pedido explicito: "separar
-          por diario, semanal e mensal") — Mensal ainda nao tem missoes
-          cadastradas no catalogo, aparece vazia ate existirem. */}
-      <div className="mt-6 flex flex-wrap gap-2">
-        {TABS.map((t) => {
-          const Icon = t.icon;
-          const active = tab === t.key;
-          return (
-            <button
-              key={t.key}
-              onClick={() => setTab(t.key)}
-              className={`hub-tab-btn flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold uppercase tracking-[0.08em] ${
-                active ? "is-active border-transparent text-void" : "border-hairline bg-elevated text-muted hover:text-ink"
-              }`}
-              style={active ? { background: ACCENT } : undefined}
-            >
-              <Icon size={13} />
-              {t.label}
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-void/20" : "bg-white/[0.06]"}`}>
-                {t.items.length}
-              </span>
-            </button>
-          );
-        })}
-      </div>
-
-      <div className="mt-4">
-        {activeTab.items.length === 0 ? (
-          <div className="rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-sm text-muted">
-            {tab === "monthly" ? "Missões mensais chegam em breve." : "Nenhuma missão aqui ainda."}
-          </div>
-        ) : (
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            {activeTab.items.map((item, idx) => (
-              <MissionCard key={idx} item={item} preview={showingCatalog} />
-            ))}
-          </div>
+      {/* Container por fora envolvendo abas + lista, no mesmo padrao do
+          board do Funil (barra de controles + conteudo dentro de UM
+          card so', em vez de soltos na pagina) -- pedido explicito:
+          "coloque um container por fora igual ficou no funil". */}
+      <div className="mt-4 rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+        {/* Nota discreta, nao alerta ambar de largura total: a informacao
+            e' util (explica por que as missoes parecem genericas), mas o
+            tratamento de aviso dava a ela peso de problema e anunciava
+            produto inacabado logo no topo do modulo. Sem a promessa de
+            roadmap ("em breve...") de proposito -- promessa dentro do
+            produto envelhece mal e nao ajuda a decidir nada agora. */}
+        {showingCatalog && (
+          <p className="mb-3 text-xs text-muted">
+            Missões do catálogo geral — ainda não personalizadas pro seu nível.
+          </p>
         )}
+
+        {/* Abas Diario/Semanal/Mensal/Desafios (pedido explicito: "separar
+            por diario, semanal e mensal") — Mensal ainda nao tem missoes
+            cadastradas no catalogo, aparece vazia ate existirem. */}
+        <div className="flex flex-wrap gap-2">
+          {TABS.map((t) => {
+            const Icon = t.icon;
+            const active = tab === t.key;
+            return (
+              <button
+                key={t.key}
+                onClick={() => setTab(t.key)}
+                className={`hub-tab-btn flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold uppercase tracking-[0.08em] ${
+                  active ? "is-active border-transparent text-void" : "border-hairline bg-elevated text-muted hover:text-ink"
+                }`}
+                style={active ? { background: ACCENT } : undefined}
+              >
+                <Icon size={13} />
+                {t.label}
+                <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-void/20" : "bg-white/[0.06]"}`}>
+                  {t.items.length}
+                </span>
+              </button>
+            );
+          })}
+        </div>
+
+        <div className="mt-4">
+          {activeTab.items.length === 0 ? (
+            <div className="rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-sm text-muted">
+              {tab === "monthly" ? "Missões mensais chegam em breve." : "Nenhuma missão aqui ainda."}
+            </div>
+          ) : (
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+              {activeTab.items.map((item, idx) => (
+                <MissionCard key={idx} item={item} preview={showingCatalog} />
+              ))}
+            </div>
+          )}
+        </div>
       </div>
       </>
       )}
@@ -485,8 +500,6 @@ export default function HubPage() {
           meId={meId}
           myRank={myRank}
           season={season}
-          view={view}
-          setView={setView}
         />
       )}
     </main>
@@ -818,16 +831,12 @@ function RankingSection({
   meId,
   myRank,
   season,
-  view,
-  setView,
 }: {
   entries: LeaderboardEntry[] | null;
   loading: boolean;
   meId: string | null;
   myRank: MyRank | null;
   season: Season | null;
-  view: "missoes" | "ranking";
-  setView: (v: "missoes" | "ranking") => void;
 }) {
   const meInList = entries?.some((e) => e.userId === meId) ?? false;
   const podium = entries?.slice(0, 3) ?? [];
@@ -835,13 +844,14 @@ function RankingSection({
   const leaderXp = entries?.[0]?.xpTotal || 1;
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <ViewToggle view={view} setView={setView} />
-      </div>
-
+    // Banner + lista dentro de UM container so' (mesmo padrao do board do
+    // Funil: barra/aviso no topo + conteudo abaixo, tudo dentro de um
+    // unico card) -- pedido explicito: "container por fora igual ficou
+    // no funil". O ViewToggle mora fora, na linha de cima (ver HubPage),
+    // igual nas duas vistas.
+    <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
       <div
-        className="rk-banner relative mb-4 overflow-hidden rounded-xl border p-4"
+        className="rk-banner relative overflow-hidden rounded-xl border p-4"
         style={{ borderColor: `${ACCENT}40`, background: `linear-gradient(120deg, ${ACCENT}14, transparent 65%)` }}
       >
         <Sparkles size={110} strokeWidth={1} className="pointer-events-none absolute -right-4 -top-6 opacity-[0.08]" style={{ color: ACCENT }} />
@@ -858,8 +868,12 @@ function RankingSection({
             </p>
             {season?.rewardDescription && <p className="mt-0.5 text-xs text-muted">{season.rewardDescription}</p>}
           </div>
+          {/* w-full no mobile -- sem isso, quando o resto do banner nao
+              cabe e quebra linha, essa coluna de datas ficava colada a
+              direita sozinha em vez de ocupar a linha inteira (pedido
+              explicito: corrigir layout no celular). */}
           {season && (
-            <div className="text-right text-xs text-muted">
+            <div className="w-full text-left text-xs text-muted sm:w-auto sm:text-right">
               <p>{fmtDate(season.startsAt)} — {fmtDate(season.endsAt)}</p>
               <p className="rk-countdown font-semibold" style={{ color: ACCENT }}>
                 {season.daysRemaining === 0 ? "Termina hoje" : `${season.daysRemaining} dias restantes`}
@@ -869,49 +883,47 @@ function RankingSection({
         </div>
       </div>
 
-      <div className="rounded-xl border border-hairline bg-surface p-5">
-        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
-          <Trophy size={16} /> Ranking da temporada
-        </h2>
+      <h2 className="mt-4 flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
+        <Trophy size={16} /> Ranking da temporada
+      </h2>
 
-        <div className="mt-4">
-          {loading ? (
-            <div className="flex flex-col items-center gap-2 p-10 text-sm text-muted">
-              <Trophy size={22} className="rk-loading-spin" style={{ color: ACCENT }} />
-              Carregando ranking…
+      <div className="mt-4">
+        {loading ? (
+          <div className="flex flex-col items-center gap-2 p-10 text-sm text-muted">
+            <Trophy size={22} className="rk-loading-spin" style={{ color: ACCENT }} />
+            Carregando ranking…
+          </div>
+        ) : !entries || entries.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted">
+            <Trophy size={28} strokeWidth={1.3} className="opacity-30" />
+            {!season ? "Nenhuma temporada ativa no momento." : "Ninguém ganhou XP nessa temporada ainda."}
+          </div>
+        ) : (
+          <>
+            {podium.length === 3 && <Podium entries={podium} meId={meId} />}
+            <div className="flex flex-col gap-1.5">
+              {(podium.length === 3 ? rest : entries).map((e, idx) => (
+                <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} idx={idx} leaderXp={leaderXp} />
+              ))}
+              {myRank && !meInList && (
+                <>
+                  <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
+                    <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
+                  </div>
+                  <div className="hub-lb-row flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
+                    <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
+                    <p className="min-w-0 flex-1 text-sm font-semibold">
+                      Sua posição <span className="text-[10px] text-review">(você)</span>
+                    </p>
+                    <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+                      {myRank.xp.toLocaleString("pt-BR")} XP
+                    </span>
+                  </div>
+                </>
+              )}
             </div>
-          ) : !entries || entries.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted">
-              <Trophy size={28} strokeWidth={1.3} className="opacity-30" />
-              {!season ? "Nenhuma temporada ativa no momento." : "Ninguém ganhou XP nessa temporada ainda."}
-            </div>
-          ) : (
-            <>
-              {podium.length === 3 && <Podium entries={podium} meId={meId} />}
-              <div className="flex flex-col gap-1.5">
-                {(podium.length === 3 ? rest : entries).map((e, idx) => (
-                  <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} idx={idx} leaderXp={leaderXp} />
-                ))}
-                {myRank && !meInList && (
-                  <>
-                    <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
-                      <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
-                    </div>
-                    <div className="hub-lb-row flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
-                      <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
-                      <p className="min-w-0 flex-1 text-sm font-semibold">
-                        Sua posição <span className="text-[10px] text-review">(você)</span>
-                      </p>
-                      <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
-                        {myRank.xp.toLocaleString("pt-BR")} XP
-                      </span>
-                    </div>
-                  </>
-                )}
-              </div>
-            </>
-          )}
-        </div>
+          </>
+        )}
       </div>
     </div>
   );
@@ -929,7 +941,11 @@ const PODIUM_META = [
 function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string | null }) {
   const byRank = (r: number) => entries.find((e) => e.rank === r);
   return (
-    <div className="mb-5 flex items-end justify-center gap-3">
+    // Colunas de 112px (w-28) x3 + gaps estouravam a largura de
+    // celulares estreitos (~360px de tela, menos padding do card ja' nao
+    // sobra espaco) -- pedido explicito: corrigir layout no celular.
+    // w-20/gap-2 no mobile, volta a w-28/gap-3 a partir de sm.
+    <div className="mb-5 flex items-end justify-center gap-2 sm:gap-3">
       {PODIUM_META.map((meta) => {
         const e = byRank(meta.rank);
         if (!e) return null;
@@ -937,7 +953,7 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
         return (
           <div
             key={meta.rank}
-            className={`rk-riser flex w-28 flex-col items-center ${meta.order}`}
+            className={`rk-riser flex w-20 flex-col items-center sm:w-28 ${meta.order}`}
             style={{ animationDelay: meta.delay }}
           >
             <span className="relative grid place-items-center">
