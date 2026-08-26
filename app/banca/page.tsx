@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Landmark, Search, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, Search, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
@@ -799,6 +799,54 @@ export default function BankrollPage() {
           </div>
         </Painel>
 
+        <section className="rounded-xl border border-hairline bg-surface p-5">
+          <div className="flex items-center gap-2 text-[15px] font-semibold">
+            <Sparkles size={16} className="text-evolution" />
+            AI Coach
+            <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
+          </div>
+
+          <div className="mt-3 grid gap-3">
+            {tipsVisiveis.length === 0 ? (
+              <p className="text-sm text-muted">
+                Sem novidades por enquanto — volte amanhã ou registre mais sessões pra o coach analisar.
+              </p>
+            ) : (
+              COACH_LEVELS.map((level) => {
+                const items = tipsVisiveis.filter((t) => t.level === level);
+                if (items.length === 0) return null;
+                const meta = COACH_LEVEL_META[level];
+                return (
+                  <div key={level} className={`rounded-lg border p-3 ${toneClasses(level)}`}>
+                    <p className={`flex items-center gap-1.5 text-[12px] font-semibold ${meta.text}`}>
+                      <meta.Icon size={13} /> {meta.label}
+                    </p>
+                    <ul className="mt-2 space-y-2">
+                      {items.map((tip) => (
+                        <li key={tip.id} className="flex items-start justify-between gap-2 text-[13px]">
+                          <div className="min-w-0">
+                            <p className="font-medium text-ink">{tip.title}</p>
+                            <p className="text-[11.5px] leading-snug text-muted">{tip.text}</p>
+                          </div>
+                          <button
+                            onClick={() => dispensarCoachTip(tip.id)}
+                            aria-label="Dispensar"
+                            className="shrink-0 text-muted/60 transition-colors hover:text-muted"
+                          >
+                            <X size={12} />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  </div>
+                );
+              })
+            )}
+          </div>
+        </section>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Painel
           titulo="Metas"
           icone={<Target size={14} className="text-review" />}
@@ -856,6 +904,117 @@ export default function BankrollPage() {
               ))}
             </div>
           )}
+        </Painel>
+
+        <Painel
+          titulo={historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
+          icone={<History size={14} className="text-training" />}
+          acao={
+            <div className="flex flex-wrap items-center gap-2">
+              {historyOpen && (
+                <>
+                  <select
+                    value={historyFormat}
+                    onChange={(e) => setHistoryFormat(e.target.value)}
+                    aria-label="Filtrar por formato"
+                    className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+                  >
+                    <option value="all">Todos os formatos</option>
+                    {historyFormats.map((f) => (
+                      <option key={f} value={f}>
+                        {f}
+                      </option>
+                    ))}
+                  </select>
+                  <select
+                    value={historyRange}
+                    onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
+                    aria-label="Filtrar por periodo"
+                    className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+                  >
+                    {HISTORY_RANGES.map((r) => (
+                      <option key={r.value} value={r.value}>
+                        {r.label}
+                      </option>
+                    ))}
+                  </select>
+                  <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
+                    <Search size={12} className="text-muted" />
+                    <input
+                      placeholder="Buscar..."
+                      value={historySearch}
+                      onChange={(e) => setHistorySearch(e.target.value)}
+                      className="w-32 bg-transparent text-[11px] text-ink outline-none placeholder:text-muted"
+                    />
+                  </div>
+                </>
+              )}
+              {platformSessions.length > 8 && (
+                <button
+                  onClick={() => setHistoryOpen((v) => !v)}
+                  className="text-[11px] font-semibold text-muted transition-colors hover:text-ink"
+                >
+                  {historyOpen ? "Mostrar recentes" : `Ver todas (${platformSessions.length})`}
+                </button>
+              )}
+            </div>
+          }
+        >
+          {recent.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
+          ) : (
+            <div className={`mt-4 divide-y divide-hairline ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
+              {(historyOpen ? historyFiltered : recent).map((s) => {
+                const result = net(s);
+                return (
+                  <div
+                    key={s.id}
+                    className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
+                    >
+                      <div className="min-w-0 flex-1">
+                        <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+                          <span className="truncate">
+                            {s.format} · {s.date}
+                            {s.stake ? ` · ${s.stake}` : ""}
+                            {s.mood ? ` · ${s.mood}` : ""}
+                            {s.ownPct != null && s.ownPct < 100 ? ` · ${s.ownPct}% sua` : ""}
+                          </span>
+                          {reviewCounts[s.id] > 0 && (
+                            <Link
+                              href="/revisor"
+                              onClick={(e) => e.stopPropagation()}
+                              title={`${reviewCounts[s.id]} mão(s) revisada(s) desta sessão`}
+                              className="flex shrink-0 items-center gap-0.5 rounded border border-review/30 bg-review/[0.12] px-1 py-0.5 text-[10px] font-semibold text-review"
+                            >
+                              <BookOpen size={9} /> {reviewCounts[s.id]}
+                            </Link>
+                          )}
+                        </p>
+                        <p className="truncate text-xs text-muted">
+                          {s.venue || "—"}
+                          {s.notes ? ` · ${s.notes}` : ""}
+                          {s.diaryNote ? ` · ${s.diaryNote}` : ""}
+                        </p>
+                      </div>
+                      <span className={`text-sm font-bold ${result >= 0 ? "text-positive" : "text-negative"}`}>
+                        {fmtSigned(result)}
+                      </span>
+                      <button
+                        onClick={() => handleEditSession(s)}
+                        aria-label="Editar sessao"
+                        title="Editar sessao"
+                        className="text-muted transition-colors hover:text-ink"
+                      >
+                        <Pencil size={15} />
+                      </button>
+                      <button onClick={() => handleRemove(s.id)} aria-label="Excluir sessao" title="Excluir sessao" className="text-muted transition-colors hover:text-negative">
+                        <Trash2 size={15} />
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
         </Painel>
       </div>
 
@@ -953,52 +1112,6 @@ export default function BankrollPage() {
           </div>
         </Painel>
       </div>
-
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5">
-        <div className="flex items-center gap-2 text-[15px] font-semibold">
-          <Sparkles size={16} className="text-evolution" />
-          AI Coach
-          <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
-        </div>
-
-        <div className="mt-3 grid gap-3 sm:grid-cols-2">
-          {tipsVisiveis.length === 0 ? (
-            <p className="text-sm text-muted sm:col-span-2">
-              Sem novidades por enquanto — volte amanhã ou registre mais sessões pra o coach analisar.
-            </p>
-          ) : (
-            COACH_LEVELS.map((level) => {
-              const items = tipsVisiveis.filter((t) => t.level === level);
-              if (items.length === 0) return null;
-              const meta = COACH_LEVEL_META[level];
-              return (
-                <div key={level} className={`rounded-lg border p-3 ${toneClasses(level)}`}>
-                  <p className={`flex items-center gap-1.5 text-[12px] font-semibold ${meta.text}`}>
-                    <meta.Icon size={13} /> {meta.label}
-                  </p>
-                  <ul className="mt-2 space-y-2">
-                    {items.map((tip) => (
-                      <li key={tip.id} className="flex items-start justify-between gap-2 text-[13px]">
-                        <div className="min-w-0">
-                          <p className="font-medium text-ink">{tip.title}</p>
-                          <p className="text-[11.5px] leading-snug text-muted">{tip.text}</p>
-                        </div>
-                        <button
-                          onClick={() => dispensarCoachTip(tip.id)}
-                          aria-label="Dispensar"
-                          className="shrink-0 text-muted/60 transition-colors hover:text-muted"
-                        >
-                          <X size={12} />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              );
-            })
-          )}
-        </div>
-      </section>
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1353,126 +1466,6 @@ export default function BankrollPage() {
         </button>
       </Modal>
 
-      <Painel titulo="Movimentações" icone={<Wallet size={14} className="text-training" />} className="mt-6">
-        <Linha label="Sessões" valor={String(agg.n)} icone={<Hash size={13} />} />
-        {agg.totalRake > 0 && <Linha label="Rake pago" valor={fmt(agg.totalRake)} tom="ruim" />}
-        {agg.totalRakeback > 0 && <Linha label="Rakeback" valor={fmt(agg.totalRakeback)} tom="bom" />}
-        {nw.withdrawn > 0 && <Linha label="Sacado" valor={fmt(nw.withdrawn)} />}
-        {nw.caixinha > 0 && <Linha label="Guardado (caixinha)" valor={fmt(nw.caixinha)} icone={<PiggyBank size={13} />} />}
-      </Painel>
-
-      <Painel
-        titulo={historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
-        icone={<History size={14} className="text-training" />}
-        className="mt-6"
-        acao={
-          <div className="flex items-center gap-2">
-            {historyOpen && (
-              <>
-                <select
-                  value={historyFormat}
-                  onChange={(e) => setHistoryFormat(e.target.value)}
-                  aria-label="Filtrar por formato"
-                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
-                >
-                  <option value="all">Todos os formatos</option>
-                  {historyFormats.map((f) => (
-                    <option key={f} value={f}>
-                      {f}
-                    </option>
-                  ))}
-                </select>
-                <select
-                  value={historyRange}
-                  onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
-                  aria-label="Filtrar por periodo"
-                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
-                >
-                  {HISTORY_RANGES.map((r) => (
-                    <option key={r.value} value={r.value}>
-                      {r.label}
-                    </option>
-                  ))}
-                </select>
-                <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
-                  <Search size={12} className="text-muted" />
-                  <input
-                    placeholder="Buscar por formato, stake, plataforma..."
-                    value={historySearch}
-                    onChange={(e) => setHistorySearch(e.target.value)}
-                    className="w-52 bg-transparent text-[11px] text-ink outline-none placeholder:text-muted"
-                  />
-                </div>
-              </>
-            )}
-            {platformSessions.length > 8 && (
-              <button
-                onClick={() => setHistoryOpen((v) => !v)}
-                className="text-[11px] font-semibold text-muted transition-colors hover:text-ink"
-              >
-                {historyOpen ? "Mostrar recentes" : `Ver todas (${platformSessions.length})`}
-              </button>
-            )}
-          </div>
-        }
-      >
-        {recent.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
-        ) : (
-          <div className={`mt-4 divide-y divide-hairline ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
-            {(historyOpen ? historyFiltered : recent).map((s) => {
-              const result = net(s);
-              return (
-                <div
-                  key={s.id}
-                  className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
-                  >
-                    <div className="min-w-0 flex-1">
-                      <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
-                        <span className="truncate">
-                          {s.format} · {s.date}
-                          {s.stake ? ` · ${s.stake}` : ""}
-                          {s.mood ? ` · ${s.mood}` : ""}
-                          {s.ownPct != null && s.ownPct < 100 ? ` · ${s.ownPct}% sua` : ""}
-                        </span>
-                        {reviewCounts[s.id] > 0 && (
-                          <Link
-                            href="/revisor"
-                            onClick={(e) => e.stopPropagation()}
-                            title={`${reviewCounts[s.id]} mão(s) revisada(s) desta sessão`}
-                            className="flex shrink-0 items-center gap-0.5 rounded border border-review/30 bg-review/[0.12] px-1 py-0.5 text-[10px] font-semibold text-review"
-                          >
-                            <BookOpen size={9} /> {reviewCounts[s.id]}
-                          </Link>
-                        )}
-                      </p>
-                      <p className="truncate text-xs text-muted">
-                        {s.venue || "—"}
-                        {s.notes ? ` · ${s.notes}` : ""}
-                        {s.diaryNote ? ` · ${s.diaryNote}` : ""}
-                      </p>
-                    </div>
-                    <span className={`text-sm font-bold ${result >= 0 ? "text-positive" : "text-negative"}`}>
-                      {fmtSigned(result)}
-                    </span>
-                    <button
-                      onClick={() => handleEditSession(s)}
-                      aria-label="Editar sessao"
-                      title="Editar sessao"
-                      className="text-muted transition-colors hover:text-ink"
-                    >
-                      <Pencil size={15} />
-                    </button>
-                    <button onClick={() => handleRemove(s.id)} aria-label="Excluir sessao" title="Excluir sessao" className="text-muted transition-colors hover:text-negative">
-                      <Trash2 size={15} />
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-          )}
-      </Painel>
-
       <Modal open={txModalOpen} onClose={() => setTxModalOpen(false)} title="Deposito / saque / caixinha">
         <p className="text-xs text-muted">
           Nao entra no resultado de jogo — so move dinheiro entre banca de jogo e patrimonio guardado.
@@ -1652,29 +1645,6 @@ function Painel({
 }
 
 // Linha densa label/valor — substitui o card por metrica dentro de um Painel.
-function Linha({
-  label,
-  valor,
-  tom,
-  icone,
-}: {
-  label: string;
-  valor: string;
-  tom?: "bom" | "ruim";
-  icone?: React.ReactNode;
-}) {
-  const cor = tom === "bom" ? "text-positive" : tom === "ruim" ? "text-negative" : "text-ink";
-  return (
-    <div className="flex items-baseline justify-between gap-3 border-b border-hairline py-2.5 last:border-b-0">
-      <p className="flex items-center gap-1.5 text-[13px] text-muted">
-        {icone}
-        {label}
-      </p>
-      <span className={`shrink-0 text-sm font-semibold tabular-nums ${cor}`}>{valor}</span>
-    </div>
-  );
-}
-
 function BrmThresholdRow({
   threshold,
   onSave,
