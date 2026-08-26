@@ -14,9 +14,21 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { fetchTeamUnreadCount } from "@/lib/services/team-service";
+import { fetchFriendUnreadCount } from "@/lib/services/friend-service";
 import { modules } from "@/lib/modules-data";
 
 type OpenMenu = "notifications" | "help" | "profile" | "chats" | null;
+
+// Badge do icone de Conversas soma as duas fontes -- time e amigos sao
+// tabelas separadas (team_messages/friend_messages), ver
+// components/chat/chat-center.tsx.
+async function fetchAllChatUnread(): Promise<number> {
+  const [time, amigos] = await Promise.all([
+    fetchTeamUnreadCount().catch(() => 0),
+    fetchFriendUnreadCount().catch(() => 0),
+  ]);
+  return time + amigos;
+}
 
 const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
 
@@ -89,7 +101,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         fetchProfile(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchUnreadCount(),
-        fetchTeamUnreadCount(),
+        fetchAllChatUnread(),
       ]);
       if (!alive) return;
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
@@ -351,9 +363,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClose={() => {
             setOpenMenu(null);
             setPendingChatId(null);
-            fetchTeamUnreadCount()
-              .then(setUnreadChats)
-              .catch(() => {});
+            fetchAllChatUnread().then(setUnreadChats);
           }}
         />
       )}

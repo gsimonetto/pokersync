@@ -43,6 +43,10 @@ export interface Profile {
       alimenta o card do jogador em /modulos. */
   horas_treino_dia: number | null;
   dias_treino_semana: DiaSemana[] | null;
+  /** Gerado pelo banco (trigger) -- junto com apelido forma a tag pra
+      adicionar amigos (@apelido#friend_code). Nunca null na prática:
+      so' fica vazio no fallback local, antes do insert confirmar. */
+  friend_code: string;
 }
 
 async function getUser() {
@@ -63,7 +67,7 @@ export async function fetchProfile(): Promise<Profile> {
   const { data, error } = await supabase
     .from("profiles")
     .select(
-      "id, nome, apelido, avatar_id, avatar_url, data_nascimento, tempo_experiencia, horario_treino, horas_treino_dia, dias_treino_semana"
+      "id, nome, apelido, avatar_id, avatar_url, data_nascimento, tempo_experiencia, horario_treino, horas_treino_dia, dias_treino_semana, friend_code"
     )
     .eq("id", user.id)
     .maybeSingle();
@@ -71,7 +75,7 @@ export async function fetchProfile(): Promise<Profile> {
   if (data) return data;
 
   const meta = user.user_metadata || {};
-  const fallback: Profile = {
+  const fallback = {
     id: user.id,
     nome: meta.nome || "",
     apelido: meta.apelido || "",
@@ -83,9 +87,20 @@ export async function fetchProfile(): Promise<Profile> {
     horas_treino_dia: null,
     dias_treino_semana: null,
   };
+  // friend_code nao vai no insert -- e' gerado por trigger no banco
+  // (public.profiles_set_friend_code); relemos a linha pra devolver o
+  // valor de verdade em vez de inventar um placeholder aqui.
   const { error: eIns } = await supabase.from("profiles").insert(fallback);
   if (eIns) throw eIns;
-  return fallback;
+  const { data: nova, error: eNova } = await supabase
+    .from("profiles")
+    .select(
+      "id, nome, apelido, avatar_id, avatar_url, data_nascimento, tempo_experiencia, horario_treino, horas_treino_dia, dias_treino_semana, friend_code"
+    )
+    .eq("id", user.id)
+    .single();
+  if (eNova) throw eNova;
+  return nova;
 }
 
 export async function updateAvatarIcon(avatarId: number) {

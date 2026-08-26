@@ -2,26 +2,47 @@
 
 import { useEffect, useState } from "react";
 import { Loader2, Mic } from "lucide-react";
-import { getTeamAudioUrl, type TeamMessage } from "@/lib/services/team-service";
+
+// Formato minimo compartilhado por TeamMessage (team-service.ts) e
+// FriendMessage (friend-service.ts) -- a bolha nao precisa saber qual
+// dos dois esta renderizando, so' recebe getAudioUrl ja resolvido pro
+// bucket certo (team-audio ou friend-audio).
+export interface ChatMessageLike {
+  id: string;
+  senderId: string;
+  body: string;
+  kind: "texto" | "audio";
+  audioUrl: string | null;
+  durationSeconds: number | null;
+  createdAt: string;
+}
 
 // Bolha de mensagem 1:1 -- texto ou audio (kind='audio'). Compartilhada
-// entre a Central de Conversas (topbar) e o ConversaDrawer do Painel do
-// Time, pra manter os dois lugares consistentes. Audio mora num bucket
-// privado (team-audio); a signed URL e' pedida sob demanda quando a
+// entre chat de Time e de Amigos na Central de Conversas. Audio mora
+// num bucket privado; a signed URL e' pedida sob demanda quando a
 // bolha aparece, nunca cacheada entre sessoes.
-export function MessageBubble({ message, isMine }: { message: TeamMessage; isMine: boolean }) {
+export function MessageBubble({
+  message,
+  isMine,
+  getAudioUrl,
+}: {
+  message: ChatMessageLike;
+  isMine: boolean;
+  getAudioUrl: (path: string) => Promise<string>;
+}) {
   const [audioUrl, setAudioUrl] = useState<string | null>(null);
   const [erro, setErro] = useState(false);
 
   useEffect(() => {
     if (message.kind !== "audio" || !message.audioUrl) return;
     let ativo = true;
-    getTeamAudioUrl(message.audioUrl)
+    getAudioUrl(message.audioUrl)
       .then((url) => ativo && setAudioUrl(url))
       .catch(() => ativo && setErro(true));
     return () => {
       ativo = false;
     };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [message.kind, message.audioUrl]);
 
   return (
