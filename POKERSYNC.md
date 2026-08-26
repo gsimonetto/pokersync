@@ -263,7 +263,7 @@ biblioteca de time, journal de decisões.
 | Alertas | ✅ | `team_alerts` + `run_team_alerts()` |
 | Score de evolução | 🟡 | existe XP/nível e leaks por jogador; não existe um "score" único consolidado |
 | JSON padronizado / sincronização | 🟡 | o schema existe (`hand_sync_devices`, `hand_sync_batches`, `agent_version`, `raw_payload`) |
-| **Agente desktop** | ⬜ | nenhum código o consome; zero dispositivos registrados — o schema espera um agente que ainda não existe |
+| **Agente desktop** | 🟡 | scaffold em `agent-desktop/` (Tauri + Rust): varredura de HH no disco, `/api/agent/{ping,sync}` gravando em `hand_sync_devices`/`hand_sync_batches`/`hand_reviews`. Falta validar contra instalações reais e extrair pra repo próprio — ver `agent-desktop/README.md` |
 
 ### 6.7 Hub de Evolução — `/hub`
 
@@ -282,7 +282,7 @@ de verdade hoje.
 | 1 | Pipeline de pós-flop ponta a ponta (job → contrato → UI) | Treino ↔ Review | **subiu pro topo**: os 5 leaks reais da base são todos pós-flop, então é o único item que faz o loop leak → treino funcionar de verdade hoje |
 | 2 | Gerar estoque pré-flop: push/fold ICM e stacks 10/20/30/50bb | Treino | motor, job e endpoint já existem — falta disparar (escreve em produção) |
 | 3 | Score de evolução consolidado do jogador | Times / Hub | há matéria-prima (XP, leaks, aderência, ROI) |
-| 4 | Agente desktop | Times | schema pronto, agente inexistente; decisão 005 mantém como futuro |
+| 4 | Agente desktop | Times | 🟡 iniciado (`agent-desktop/`) — falta validar varredura/parsing contra instalações reais de cada sala e extrair pra repo próprio (decisão 009) |
 | 5 | Decidir o catálogo de formatos | Banca | o formulário oferece MTT/Cash/SNG/Spin, mas 61 das 73 sessões gravadas dizem `"Torneio"`; ou o catálogo muda, ou as sessões antigas migram |
 | 6 | Sincronizar o board do roadmap com a realidade | Roadmap | todos os itens estão marcados "Planejado", inclusive os 7 módulos no ar |
 
@@ -326,6 +326,23 @@ inteira tem **8 linhas**, todas RFI/Jam de pré-flop.
   e sem leitura do formato novo no frontend.
 
 ## 9. Changelog
+
+### 2026-08-26 — Início do agente desktop
+- Scaffold do agente em `agent-desktop/` (Tauri + Rust): crate `scanner`
+  varre pastas de hand history por sala/SO e evita reenviar arquivos
+  inalterados; crate `sync-client` fala com o backend; shell Tauri com
+  login (Supabase), seleção de salas, busca e sync sob demanda.
+  PokerStars, GGPoker, PartyPoker e 888poker no MVP — os dois primeiros com
+  parsing validado no backend, os dois últimos chegam como `raw_payload`
+  até o parser ganhar suporte a esses formatos.
+- Novo endpoint `app/api/agent/sync` (+ `agent/ping`): autentica por bearer
+  token, reaproveita `lib/poker/hand-parser.ts` (nenhuma lógica de parsing
+  duplicada em Rust) e grava `hand_reviews` com `source: "agent"`,
+  atualizando `hand_sync_devices`/`hand_sync_batches`.
+- Ainda dentro do repo do produto — a separação em repositório próprio
+  (decisão 009) não saiu porque a integração de GitHub desta sessão não
+  tinha permissão pra criar repositório novo; fica registrado como
+  próximo passo em `agent-desktop/README.md`.
 
 ### 2026-08-21 — Primeira rodada sobre o backlog consolidado (cont.)
 - Ações rápidas no painel de leaks da Banca: "Treinar" (só onde o estoque
