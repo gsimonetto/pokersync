@@ -10,7 +10,6 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENC
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
 import { AppShell } from "@/components/app-shell";
-import { AppHeader } from "@/components/app-header";
 import { Kpi } from "@/components/time/kpi";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
@@ -593,81 +592,66 @@ export default function BankrollPage() {
   return (
     <AppShell>
     <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <AppHeader
-        insideShell
-        icon={TrendingUp}
-        iconColor="#5AA6E0"
-        title="Gestor de Banca"
-        subtitle={[
-          `${agg.n} ${agg.n === 1 ? "sessão registrada" : "sessões registradas"}`,
-          isPlatformFiltered ? platformFilter : null,
-          isMultiCurrency ? currencyFilter : null,
-        ]
-          .filter(Boolean)
-          .join(" · ")}
-        right={
-          <div className="flex items-center gap-2">
-            {isMultiCurrency && (
-              <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
-                <select
-                  value={currencyFilter}
-                  onChange={(e) => setCurrencyFilter(e.target.value)}
-                  title="Moeda — os stats abaixo nunca somam moedas diferentes"
-                  className="bg-transparent text-[11px] font-bold uppercase tracking-[0.06em] text-training outline-none"
-                >
-                  {currencies.map((c) => (
-                    <option key={c} value={c}>
-                      {c}
-                    </option>
-                  ))}
-                </select>
-              </div>
-            )}
-            <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
-              <Landmark size={13} className="text-muted" />
-              <select
-                value={platformFilter}
-                onChange={(e) => setPlatformFilter(e.target.value)}
-                className="bg-transparent text-[11px] font-semibold uppercase tracking-[0.06em] text-ink outline-none"
-              >
-                <option value="todas">Todas as plataformas</option>
-                {platformNames.map((p) => (
-                  <option key={p} value={p}>
-                    {p}
-                  </option>
-                ))}
-              </select>
-            </div>
-            <button
-              onClick={() => {
-                // Sempre entra em modo "registrar": se o modal foi usado pra
-                // editar antes, os campos preenchidos ficariam ali.
-                if (editingSessionId) resetSessionForm();
-                setSessionModalOpen(true);
-              }}
-              aria-label="Registrar sessao"
-              title="Registrar sessao"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void transition-colors hover:opacity-90"
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        {isMultiCurrency && (
+          <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
+            <select
+              value={currencyFilter}
+              onChange={(e) => setCurrencyFilter(e.target.value)}
+              title="Moeda — os stats abaixo nunca somam moedas diferentes"
+              className="bg-transparent text-[11px] font-bold uppercase tracking-[0.06em] text-training outline-none"
             >
-              <Plus size={18} strokeWidth={2.5} />
-            </button>
-            <button
-              onClick={() => setTxModalOpen(true)}
-              aria-label="Deposito / saque"
-              title="Deposito / saque"
-              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-            >
-              <Wallet size={17} />
-            </button>
+              {currencies.map((c) => (
+                <option key={c} value={c}>
+                  {c}
+                </option>
+              ))}
+            </select>
           </div>
-        }
-      />
+        )}
+        <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
+          <Landmark size={13} className="text-muted" />
+          <select
+            value={platformFilter}
+            onChange={(e) => setPlatformFilter(e.target.value)}
+            className="bg-transparent text-[11px] font-semibold uppercase tracking-[0.06em] text-ink outline-none"
+          >
+            <option value="todas">Todas as plataformas</option>
+            {platformNames.map((p) => (
+              <option key={p} value={p}>
+                {p}
+              </option>
+            ))}
+          </select>
+        </div>
+        <button
+          onClick={() => {
+            // Sempre entra em modo "registrar": se o modal foi usado pra
+            // editar antes, os campos preenchidos ficariam ali.
+            if (editingSessionId) resetSessionForm();
+            setSessionModalOpen(true);
+          }}
+          aria-label="Registrar sessao"
+          title="Registrar sessao"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void transition-colors hover:opacity-90"
+        >
+          <Plus size={18} strokeWidth={2.5} />
+        </button>
+        <button
+          onClick={() => setTxModalOpen(true)}
+          aria-label="Deposito / saque"
+          title="Deposito / saque"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
+        >
+          <Wallet size={17} />
+        </button>
+      </div>
 
       {err && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+      <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
         <Kpi
           icon={Wallet}
           label="Banca atual"
@@ -722,13 +706,79 @@ export default function BankrollPage() {
         {nw.caixinha > 0 && <Kpi icon={PiggyBank} label="Guardado (caixinha)" value={fmt(nw.caixinha)} />}
       </section>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
-        <h2 className="text-base font-semibold">Consistência de volume</h2>
-        <p className="mt-1 text-sm text-muted">Sessões jogadas por dia, no formato de calendário.</p>
-        <div className="mt-4">
-          <VolumeHeatmap activity={activity} currency={currencyFilter} />
-        </div>
-      </section>
+      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
+        <section className="flex h-full flex-col rounded-xl border border-hairline bg-surface p-6">
+          <div className="flex flex-wrap items-center justify-between gap-2">
+            <h2 className="text-base font-semibold">Evolução da banca</h2>
+            <div className="flex flex-wrap items-center gap-2">
+              <SegmentedControl value={range} onChange={setRange} options={RANGES} />
+              <button
+                onClick={() => setAnnoModalOpen(true)}
+                title="Anotar evento na timeline"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-review/50 hover:text-review"
+              >
+                <StickyNote size={13} />
+              </button>
+              <button
+                onClick={() => setCompareOpen((v) => !v)}
+                title="Comparar meses"
+                className={`grid h-7 w-7 place-items-center rounded-md border transition-colors ${
+                  compareOpen ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
+                }`}
+              >
+                <GitCompare size={13} />
+              </button>
+              <button
+                onClick={handleExportCSV}
+                title="Exportar CSV do periodo"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-positive/50 hover:text-positive"
+              >
+                <Download size={13} />
+              </button>
+            </div>
+          </div>
+          <div className="mt-4 flex-1">
+            <EvolutionChart series={filteredSeries} annotations={annotations} currency={currencyFilter} />
+          </div>
+
+          {compareOpen && (
+            <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
+              <p className="text-xs font-semibold text-muted">
+                {comparison.currentLabel} vs {comparison.previousLabel}
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-3 text-center">
+                <div />
+                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.currentLabel.split(" ")[0]}</p>
+                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.previousLabel.split(" ")[0]}</p>
+
+                <p className="text-left text-[11px] text-muted">Resultado</p>
+                <p className={`text-sm font-bold ${comparison.current.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSigned(comparison.current.profit)}
+                </p>
+                <p className={`text-sm font-bold ${comparison.previous.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSigned(comparison.previous.profit)}
+                </p>
+
+                <p className="text-left text-[11px] text-muted">ROI</p>
+                <p className="text-sm font-bold text-training">{fmtPct(comparison.current.roi)}</p>
+                <p className="text-sm font-bold text-training">{fmtPct(comparison.previous.roi)}</p>
+
+                <p className="text-left text-[11px] text-muted">Sessões</p>
+                <p className="text-sm font-bold text-ink">{comparison.current.n}</p>
+                <p className="text-sm font-bold text-ink">{comparison.previous.n}</p>
+              </div>
+            </div>
+          )}
+        </section>
+
+        <section className="flex h-full flex-col rounded-xl border border-hairline bg-surface p-6">
+          <h2 className="text-base font-semibold">Consistência de volume</h2>
+          <p className="mt-1 text-sm text-muted">Sessões jogadas por dia, no formato de calendário.</p>
+          <div className="mt-4 flex flex-1 items-center">
+            <VolumeHeatmap activity={activity} currency={currencyFilter} />
+          </div>
+        </section>
+      </div>
 
       <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
@@ -837,76 +887,10 @@ export default function BankrollPage() {
             </div>
           </div>
         )}
-      </section>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <section className="rounded-xl border border-hairline bg-surface p-6 lg:col-span-2">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">Evolução da banca</h2>
-            <div className="flex flex-wrap items-center gap-2">
-              <SegmentedControl value={range} onChange={setRange} options={RANGES} />
-              <button
-                onClick={() => setAnnoModalOpen(true)}
-                title="Anotar evento na timeline"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-review/50 hover:text-review"
-              >
-                <StickyNote size={13} />
-              </button>
-              <button
-                onClick={() => setCompareOpen((v) => !v)}
-                title="Comparar meses"
-                className={`grid h-7 w-7 place-items-center rounded-md border transition-colors ${
-                  compareOpen ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
-                }`}
-              >
-                <GitCompare size={13} />
-              </button>
-              <button
-                onClick={handleExportCSV}
-                title="Exportar CSV do periodo"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-positive/50 hover:text-positive"
-              >
-                <Download size={13} />
-              </button>
-            </div>
-          </div>
-          <div className="mt-4">
-            <EvolutionChart series={filteredSeries} annotations={annotations} currency={currencyFilter} />
-          </div>
-
-          {compareOpen && (
-            <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-              <p className="text-xs font-semibold text-muted">
-                {comparison.currentLabel} vs {comparison.previousLabel}
-              </p>
-              <div className="mt-2 grid grid-cols-3 gap-3 text-center">
-                <div />
-                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.currentLabel.split(" ")[0]}</p>
-                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.previousLabel.split(" ")[0]}</p>
-
-                <p className="text-left text-[11px] text-muted">Resultado</p>
-                <p className={`text-sm font-bold ${comparison.current.profit >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtSigned(comparison.current.profit)}
-                </p>
-                <p className={`text-sm font-bold ${comparison.previous.profit >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtSigned(comparison.previous.profit)}
-                </p>
-
-                <p className="text-left text-[11px] text-muted">ROI</p>
-                <p className="text-sm font-bold text-training">{fmtPct(comparison.current.roi)}</p>
-                <p className="text-sm font-bold text-training">{fmtPct(comparison.previous.roi)}</p>
-
-                <p className="text-left text-[11px] text-muted">Sessões</p>
-                <p className="text-sm font-bold text-ink">{comparison.current.n}</p>
-                <p className="text-sm font-bold text-ink">{comparison.previous.n}</p>
-              </div>
-            </div>
-          )}
-        </section>
-
-        <div className="flex flex-col gap-3">
-          <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-4">
-            <h2 className="text-sm font-semibold">AI Coach</h2>
+        <div className="mt-6 grid grid-cols-1 gap-5 border-t border-hairline pt-5 sm:grid-cols-2 lg:grid-cols-4">
+          <div className="flex max-h-[150px] flex-col">
+            <h3 className="text-sm font-semibold">AI Coach</h3>
             <div className="mt-2 flex flex-col gap-1.5 overflow-y-auto">
               {featuredTip && (
                 <div className={`rounded-lg border p-2 text-[11px] ${toneClasses(featuredTip.level)}`}>
@@ -933,13 +917,13 @@ export default function BankrollPage() {
                 <ChevronDown size={12} className={`transition-transform ${coachExpanded ? "rotate-180" : ""}`} />
               </button>
             )}
-          </section>
+          </div>
 
           {platforms.length > 0 && (
-            <section className="rounded-xl border border-hairline bg-surface p-4">
+            <div>
               <div className="flex items-center gap-1.5">
                 <Landmark size={13} className="text-evolution" />
-                <h2 className="text-sm font-semibold">Saldo por plataforma</h2>
+                <h3 className="text-sm font-semibold">Saldo por plataforma</h3>
               </div>
               <div className="mt-2 flex flex-col gap-1">
                 {platforms.map((p) => (
@@ -957,17 +941,17 @@ export default function BankrollPage() {
                   </button>
                 ))}
               </div>
-            </section>
+            </div>
           )}
 
-          <section className="rounded-xl border border-hairline bg-surface p-4">
+          <div>
             <button
               onClick={() => setGoalsModalOpen(true)}
               className="flex w-full items-center gap-1.5 text-left"
               title="Clique pra criar ou ajustar metas"
             >
               <Target size={13} className="text-review" />
-              <h2 className="text-sm font-semibold">Metas</h2>
+              <h3 className="text-sm font-semibold">Metas</h3>
             </button>
             {goalsProgress.length === 0 ? (
               <button onClick={() => setGoalsModalOpen(true)} className="mt-2 block text-left text-[11px] text-muted hover:text-ink">
@@ -1013,16 +997,16 @@ export default function BankrollPage() {
                 ))}
               </div>
             )}
-          </section>
+          </div>
 
           <button
             onClick={() => setBrmModalOpen(true)}
-            className="w-full rounded-xl border border-hairline bg-surface p-4 text-left transition-colors hover:border-training/40"
+            className="text-left"
             title="Clique pra ajustar os limites de BRM"
           >
             <div className="flex items-center gap-1.5">
               <Gauge size={13} className="text-training" />
-              <h2 className="text-sm font-semibold">BRM</h2>
+              <h3 className="text-sm font-semibold">BRM</h3>
             </div>
             {currentBrm ? (
               <div className="mt-2">
@@ -1047,7 +1031,7 @@ export default function BankrollPage() {
             )}
           </button>
         </div>
-      </div>
+      </section>
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
