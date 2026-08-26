@@ -12,6 +12,7 @@ import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-servic
 import { AppShell } from "@/components/app-shell";
 import { AppHeader } from "@/components/app-header";
 import { Kpi } from "@/components/time/kpi";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   fetchSessions,
   fetchSettings,
@@ -729,26 +730,21 @@ export default function BankrollPage() {
         </div>
       </section>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Painel de leaks</h2>
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            {[
+          <div>
+            <h2 className="text-base font-semibold">Painel de leaks</h2>
+            <p className="mt-1 text-sm text-muted">Onde o seu resultado mais vaza.</p>
+          </div>
+          <SegmentedControl
+            value={leakDimension}
+            onChange={setLeakDimension}
+            options={[
               { value: "format" as const, label: "Formato" },
               { value: "weekday" as const, label: "Dia" },
               { value: "time" as const, label: "Horario" },
-            ].map((d) => (
-              <button
-                key={d.value}
-                onClick={() => setLeakDimension(d.value)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
-                  leakDimension === d.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
+            ]}
+          />
         </div>
 
         {leakStats.length === 0 ? (
@@ -761,7 +757,7 @@ export default function BankrollPage() {
               const negative = g.net < 0;
               const lowSample = g.n < 5;
               return (
-                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
+                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{g.key}</p>
                     <p className="text-[10.5px] text-muted">
@@ -844,34 +840,22 @@ export default function BankrollPage() {
       </section>
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20 lg:col-span-2">
+        <section className="rounded-xl border border-hairline bg-surface p-6 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Evolucao da banca</h2>
+            <h2 className="text-base font-semibold">Evolução da banca</h2>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex gap-1">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.value}
-                    onClick={() => setRange(r.value)}
-                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
-                      range === r.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl value={range} onChange={setRange} options={RANGES} />
               <button
                 onClick={() => setAnnoModalOpen(true)}
                 title="Anotar evento na timeline"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-all hover:scale-110 hover:border-review/50 hover:text-review"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-review/50 hover:text-review"
               >
                 <StickyNote size={13} />
               </button>
               <button
                 onClick={() => setCompareOpen((v) => !v)}
                 title="Comparar meses"
-                className={`grid h-7 w-7 place-items-center rounded-md border transition-all hover:scale-110 ${
+                className={`grid h-7 w-7 place-items-center rounded-md border transition-colors ${
                   compareOpen ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
                 }`}
               >
@@ -880,7 +864,7 @@ export default function BankrollPage() {
               <button
                 onClick={handleExportCSV}
                 title="Exportar CSV do periodo"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-all hover:scale-110 hover:border-positive/50 hover:text-positive"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-positive/50 hover:text-positive"
               >
                 <Download size={13} />
               </button>
@@ -921,11 +905,11 @@ export default function BankrollPage() {
         </section>
 
         <div className="flex flex-col gap-3">
-          <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">AI Coach</h2>
+          <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-4">
+            <h2 className="text-sm font-semibold">AI Coach</h2>
             <div className="mt-2 flex flex-col gap-1.5 overflow-y-auto">
               {featuredTip && (
-                <div className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(featuredTip.level)}`}>
+                <div className={`rounded-lg border p-2 text-[11px] ${toneClasses(featuredTip.level)}`}>
                   <p className="font-semibold leading-snug">{featuredTip.title}</p>
                   <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{featuredTip.text}</p>
                 </div>
@@ -934,7 +918,7 @@ export default function BankrollPage() {
                 tips
                   .filter((t) => t.id !== featuredTip?.id)
                   .map((tip: CoachTip) => (
-                    <div key={tip.id} className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(tip.level)}`}>
+                    <div key={tip.id} className={`rounded-lg border p-2 text-[11px] ${toneClasses(tip.level)}`}>
                       <p className="font-semibold leading-snug">{tip.title}</p>
                       <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{tip.text}</p>
                     </div>
@@ -952,17 +936,17 @@ export default function BankrollPage() {
           </section>
 
           {platforms.length > 0 && (
-            <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+            <section className="rounded-xl border border-hairline bg-surface p-4">
               <div className="flex items-center gap-1.5">
-                <Landmark size={12} className="text-evolution" />
-                <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Saldo por plataforma</h2>
+                <Landmark size={13} className="text-evolution" />
+                <h2 className="text-sm font-semibold">Saldo por plataforma</h2>
               </div>
               <div className="mt-2 flex flex-col gap-1">
                 {platforms.map((p) => (
                   <button
                     key={p.platform}
                     onClick={() => setPlatformFilter(platformFilter === p.platform ? "todas" : p.platform)}
-                    className={`flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all duration-150 hover:bg-elevated ${
+                    className={`flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-colors hover:bg-elevated ${
                       platformFilter === p.platform ? "bg-elevated ring-1 ring-inset ring-evolution/40" : ""
                     }`}
                   >
@@ -976,14 +960,14 @@ export default function BankrollPage() {
             </section>
           )}
 
-          <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+          <section className="rounded-xl border border-hairline bg-surface p-4">
             <button
               onClick={() => setGoalsModalOpen(true)}
               className="flex w-full items-center gap-1.5 text-left"
               title="Clique pra criar ou ajustar metas"
             >
-              <Target size={12} className="text-review" />
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Metas</h2>
+              <Target size={13} className="text-review" />
+              <h2 className="text-sm font-semibold">Metas</h2>
             </button>
             {goalsProgress.length === 0 ? (
               <button onClick={() => setGoalsModalOpen(true)} className="mt-2 block text-left text-[11px] text-muted hover:text-ink">
@@ -1001,7 +985,7 @@ export default function BankrollPage() {
                         <span className="text-[10px] text-muted">
                           {current}/{goal.target}
                         </span>
-                        <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                        <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-colors hover:text-negative">
                           <Trash2 size={11} />
                         </button>
                       </div>
@@ -1018,7 +1002,7 @@ export default function BankrollPage() {
                           <button
                             key={m}
                             onClick={() => handleQuickStudy(m)}
-                            className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-all duration-150 hover:scale-110 hover:border-evolution/50 hover:text-evolution"
+                            className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-colors hover:border-evolution/50 hover:text-evolution"
                           >
                             +{m}min
                           </button>
@@ -1033,12 +1017,12 @@ export default function BankrollPage() {
 
           <button
             onClick={() => setBrmModalOpen(true)}
-            className="w-full rounded-xl border border-hairline bg-surface p-3.5 text-left transition-colors hover:border-training/40"
+            className="w-full rounded-xl border border-hairline bg-surface p-4 text-left transition-colors hover:border-training/40"
             title="Clique pra ajustar os limites de BRM"
           >
             <div className="flex items-center gap-1.5">
-              <Gauge size={12} className="text-training" />
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">BRM</h2>
+              <Gauge size={13} className="text-training" />
+              <h2 className="text-sm font-semibold">BRM</h2>
             </div>
             {currentBrm ? (
               <div className="mt-2">
@@ -1418,9 +1402,9 @@ export default function BankrollPage() {
         </button>
       </Modal>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+          <h2 className="text-base font-semibold">
             {historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
           </h2>
           <div className="flex items-center gap-2">
@@ -1475,13 +1459,13 @@ export default function BankrollPage() {
         {recent.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
         ) : (
-          <div className={`mt-2 flex flex-col ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
+          <div className={`mt-4 divide-y divide-hairline ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
             {(historyOpen ? historyFiltered : recent).map((s) => {
               const result = net(s);
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-all duration-200 first:border-t-0 hover:translate-x-1 hover:bg-elevated"
+                  className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
@@ -1515,11 +1499,11 @@ export default function BankrollPage() {
                       onClick={() => handleEditSession(s)}
                       aria-label="Editar sessao"
                       title="Editar sessao"
-                      className="text-muted transition-all duration-150 hover:scale-125 hover:text-ink"
+                      className="text-muted transition-colors hover:text-ink"
                     >
                       <Pencil size={15} />
                     </button>
-                    <button onClick={() => handleRemove(s.id)} aria-label="Excluir sessao" title="Excluir sessao" className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                    <button onClick={() => handleRemove(s.id)} aria-label="Excluir sessao" title="Excluir sessao" className="text-muted transition-colors hover:text-negative">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -1604,16 +1588,16 @@ export default function BankrollPage() {
         </button>
       </Modal>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Historico de transacoes</h2>
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
+        <h2 className="text-base font-semibold">Historico de transacoes</h2>
         {recentTx.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
         ) : (
-          <div className="mt-2 flex flex-col">
+          <div className="mt-4 divide-y divide-hairline">
             {recentTx.map((t) => (
               <div
                 key={t.id}
-                className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-all duration-200 first:border-t-0 hover:translate-x-1 hover:bg-elevated"
+                className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
               >
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-void/40">
                   {t.type === "deposito" ? (
@@ -1635,7 +1619,7 @@ export default function BankrollPage() {
                   {t.type === "deposito" ? "+" : "-"}
                   {fmt(t.amount)}
                 </span>
-                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-colors hover:text-negative">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -1643,8 +1627,6 @@ export default function BankrollPage() {
           </div>
         )}
       </section>
-
-
     </main>
     </AppShell>
   );
