@@ -10,6 +10,9 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENC
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
 import { AppShell } from "@/components/app-shell";
+import { AppHeader } from "@/components/app-header";
+import { Kpi } from "@/components/time/kpi";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   fetchSessions,
   fetchSettings,
@@ -582,22 +585,28 @@ export default function BankrollPage() {
   if (loading) {
     return (
       <AppShell>
-        <main className="p-10 text-center text-sm text-muted">Carregando sua banca...</main>
+        <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-center text-sm text-muted">Carregando sua banca...</main>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-4 py-10 md:px-6">
-      {err && (
-        <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
-      )}
-
-      <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
-          <div className="flex items-center gap-2.5">
+    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+      <AppHeader
+        insideShell
+        icon={TrendingUp}
+        iconColor="#5AA6E0"
+        title="Gestor de Banca"
+        subtitle={[
+          `${agg.n} ${agg.n === 1 ? "sessão registrada" : "sessões registradas"}`,
+          isPlatformFiltered ? platformFilter : null,
+          isMultiCurrency ? currencyFilter : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        right={
+          <div className="flex items-center gap-2">
             {isMultiCurrency && (
               <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
                 <select
@@ -638,124 +647,104 @@ export default function BankrollPage() {
               }}
               aria-label="Registrar sessao"
               title="Registrar sessao"
-              className="group flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform duration-200 hover:scale-110 active:scale-90"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void transition-colors hover:opacity-90"
             >
-              <Plus size={18} strokeWidth={2.5} className="transition-transform duration-200 group-hover:rotate-90" />
+              <Plus size={18} strokeWidth={2.5} />
             </button>
             <button
               onClick={() => setTxModalOpen(true)}
               aria-label="Deposito / saque"
               title="Deposito / saque"
-              className="group flex h-9 w-9 items-center justify-center rounded-xl border border-hairline bg-elevated text-ink shadow-lg shadow-black/20 transition-transform duration-200 hover:scale-110 hover:border-ink/40 active:scale-90"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
             >
-              <Wallet size={17} className="transition-transform duration-200 group-hover:-rotate-12" />
+              <Wallet size={17} />
             </button>
           </div>
-        </div>
-        <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Banca atual + Resultado mesclados num card so' — eram duas
-              informacoes sobrepostas (saldo atual e o quanto rendeu),
-              antes cada uma com seu proprio card grande. */}
-          <StatCard
-            size="lg"
-            label="Banca atual"
-            value={fmt(currentBankroll)}
-            tone={currentBankroll < 0 ? "negative" : undefined}
-            accent={currentBankroll < 0 ? "#e0555a" : "#22c55e"}
-            delta={{ text: `${fmtSigned(agg.profit)} de resultado`, positive: agg.profit >= 0 }}
-          />
-          <StatCard
-            size="lg"
-            label="ROI"
-            value={fmtPct(agg.roi)}
-            accent="#22d3ee"
-            delta={
-              comparison.previous.n > 0
-                ? { text: `${fmtPct(roiDelta)} vs mês passado`, positive: roiDelta >= 0 }
-                : undefined
-            }
-          />
-          <StatCard
-            size="lg"
-            label="R$/hora"
-            value={rate ? fmt(rate.value) : "—"}
-            tone={rate ? (rate.value >= 0 ? "positive" : "negative") : undefined}
-            icon={<Clock size={12} />}
-            accent={rate ? (rate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
-            hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
-          />
-          <StatCard
-            size="lg"
-            label="bb/hora"
-            value={bbRate ? bbRate.value.toFixed(1) : "—"}
-            tone={bbRate ? (bbRate.value >= 0 ? "positive" : "negative") : undefined}
-            icon={<Hash size={12} />}
-            accent={bbRate ? (bbRate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
-            hint={
-              bbRate
-                ? bbRate.n >= 2
-                  ? `IC 95%: ${bbRate.ciLow.toFixed(1)} a ${bbRate.ciHigh.toFixed(1)} (${bbRate.n} sessões)`
-                  : "Amostra pequena — registre mais sessões de cash com bb."
-                : "Só cash, precisa de horas e bb registrados."
-            }
-          />
-        </div>
+        }
+      />
 
-        <p className="mt-5 border-t border-hairline pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-          Atividade &amp; risco
-        </p>
-        <div className="mt-2.5 flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
-            <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
-            <StatCard label="Buy-in médio" value={fmt(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
-            <StatCard
-              label="Drawdown atual"
-              value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
-              tone={currentDrawdown >= 15 ? "negative" : undefined}
-              icon={<History size={11} />}
-              accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
-            />
-            {agg.totalRake > 0 && (
-              <StatCard label="Rake pago" value={fmt(agg.totalRake)} icon={<Landmark size={11} />} accent="#e0555a" />
-            )}
-            {agg.totalRakeback > 0 && (
-              <StatCard label="Rakeback" value={fmt(agg.totalRakeback)} icon={<Landmark size={11} />} accent="#22c55e" />
-            )}
-            {nw.withdrawn > 0 && (
-              <StatCard label="Sacado" value={fmt(nw.withdrawn)} icon={<Wallet size={11} />} accent="#e0555a" />
-            )}
-            {nw.caixinha > 0 && (
-              <StatCard label="Guardado (caixinha)" value={fmt(nw.caixinha)} icon={<PiggyBank size={11} />} accent="#ec4899" />
-            )}
-          </div>
-          <div className="shrink-0 rounded-lg border border-hairline bg-elevated p-3 lg:w-[300px]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Consistência de volume</p>
-            <VolumeHeatmap activity={activity} currency={currencyFilter} />
-          </div>
+      {err && (
+        <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
+      )}
+
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi
+          icon={Wallet}
+          label="Banca atual"
+          value={fmt(currentBankroll)}
+          tom={currentBankroll < 0 ? "negativo" : undefined}
+          hint={`${fmtSigned(agg.profit)} de resultado`}
+          destaque
+        />
+        <Kpi
+          icon={TrendingUp}
+          label="ROI"
+          value={fmtPct(agg.roi)}
+          hint={comparison.previous.n > 0 ? `${fmtPct(roiDelta)} vs mês passado` : undefined}
+        />
+        <Kpi
+          icon={Clock}
+          label="R$/hora"
+          value={rate ? fmt(rate.value) : "—"}
+          tom={rate ? (rate.value >= 0 ? "positivo" : "negativo") : undefined}
+          hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
+        />
+        <Kpi
+          icon={Hash}
+          label="bb/hora"
+          value={bbRate ? bbRate.value.toFixed(1) : "—"}
+          tom={bbRate ? (bbRate.value >= 0 ? "positivo" : "negativo") : undefined}
+          hint={
+            bbRate
+              ? bbRate.n >= 2
+                ? `IC 95%: ${bbRate.ciLow.toFixed(1)} a ${bbRate.ciHigh.toFixed(1)} (${bbRate.n} sessões)`
+                : "Amostra pequena — registre mais sessões de cash com bb."
+              : "Só cash, precisa de horas e bb registrados."
+          }
+        />
+      </section>
+
+      <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Kpi icon={Target} label="ITM" value={`${agg.itm.toFixed(1)}%`} />
+        <Kpi icon={Hash} label="Sessões" value={String(agg.n)} />
+        <Kpi icon={Wallet} label="Buy-in médio" value={fmt(agg.avgBuyIn)} />
+        <Kpi
+          icon={History}
+          label="Drawdown atual"
+          value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+          tom={currentDrawdown >= 15 ? "negativo" : undefined}
+        />
+        {agg.totalRake > 0 && <Kpi icon={Landmark} label="Rake pago" value={fmt(agg.totalRake)} tom="negativo" />}
+        {agg.totalRakeback > 0 && (
+          <Kpi icon={Landmark} label="Rakeback" value={fmt(agg.totalRakeback)} tom="positivo" />
+        )}
+        {nw.withdrawn > 0 && <Kpi icon={Wallet} label="Sacado" value={fmt(nw.withdrawn)} />}
+        {nw.caixinha > 0 && <Kpi icon={PiggyBank} label="Guardado (caixinha)" value={fmt(nw.caixinha)} />}
+      </section>
+
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
+        <h2 className="text-base font-semibold">Consistência de volume</h2>
+        <p className="mt-1 text-sm text-muted">Sessões jogadas por dia, no formato de calendário.</p>
+        <div className="mt-4">
+          <VolumeHeatmap activity={activity} currency={currencyFilter} />
         </div>
       </section>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Painel de leaks</h2>
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            {[
+          <div>
+            <h2 className="text-base font-semibold">Painel de leaks</h2>
+            <p className="mt-1 text-sm text-muted">Onde o seu resultado mais vaza.</p>
+          </div>
+          <SegmentedControl
+            value={leakDimension}
+            onChange={setLeakDimension}
+            options={[
               { value: "format" as const, label: "Formato" },
               { value: "weekday" as const, label: "Dia" },
               { value: "time" as const, label: "Horario" },
-            ].map((d) => (
-              <button
-                key={d.value}
-                onClick={() => setLeakDimension(d.value)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
-                  leakDimension === d.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
-                }`}
-              >
-                {d.label}
-              </button>
-            ))}
-          </div>
+            ]}
+          />
         </div>
 
         {leakStats.length === 0 ? (
@@ -768,7 +757,7 @@ export default function BankrollPage() {
               const negative = g.net < 0;
               const lowSample = g.n < 5;
               return (
-                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/30 hover:shadow-md">
+                <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_2fr_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
                   <div className="min-w-0">
                     <p className="truncate text-sm font-semibold">{g.key}</p>
                     <p className="text-[10.5px] text-muted">
@@ -831,7 +820,7 @@ export default function BankrollPage() {
 
         {tiltStats && tiltStats.tiltN > 0 && (
           <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Sessoes com tilt vs demais</p>
+            <p className="text-xs font-semibold text-muted">Sessoes com tilt vs demais</p>
             <div className="mt-2 grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
@@ -851,34 +840,22 @@ export default function BankrollPage() {
       </section>
 
       <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-3">
-        <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20 lg:col-span-2">
+        <section className="rounded-xl border border-hairline bg-surface p-6 lg:col-span-2">
           <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Evolucao da banca</h2>
+            <h2 className="text-base font-semibold">Evolução da banca</h2>
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex gap-1">
-                {RANGES.map((r) => (
-                  <button
-                    key={r.value}
-                    onClick={() => setRange(r.value)}
-                    className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
-                      range === r.value ? "bg-ink text-void" : "text-muted hover:scale-105 hover:text-ink"
-                    }`}
-                  >
-                    {r.label}
-                  </button>
-                ))}
-              </div>
+              <SegmentedControl value={range} onChange={setRange} options={RANGES} />
               <button
                 onClick={() => setAnnoModalOpen(true)}
                 title="Anotar evento na timeline"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-all hover:scale-110 hover:border-review/50 hover:text-review"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-review/50 hover:text-review"
               >
                 <StickyNote size={13} />
               </button>
               <button
                 onClick={() => setCompareOpen((v) => !v)}
                 title="Comparar meses"
-                className={`grid h-7 w-7 place-items-center rounded-md border transition-all hover:scale-110 ${
+                className={`grid h-7 w-7 place-items-center rounded-md border transition-colors ${
                   compareOpen ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
                 }`}
               >
@@ -887,7 +864,7 @@ export default function BankrollPage() {
               <button
                 onClick={handleExportCSV}
                 title="Exportar CSV do periodo"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-all hover:scale-110 hover:border-positive/50 hover:text-positive"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-positive/50 hover:text-positive"
               >
                 <Download size={13} />
               </button>
@@ -899,7 +876,7 @@ export default function BankrollPage() {
 
           {compareOpen && (
             <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-              <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">
+              <p className="text-xs font-semibold text-muted">
                 {comparison.currentLabel} vs {comparison.previousLabel}
               </p>
               <div className="mt-2 grid grid-cols-3 gap-3 text-center">
@@ -928,11 +905,11 @@ export default function BankrollPage() {
         </section>
 
         <div className="flex flex-col gap-3">
-          <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
-            <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">AI Coach</h2>
+          <section className="flex max-h-[150px] flex-col rounded-xl border border-hairline bg-surface p-4">
+            <h2 className="text-sm font-semibold">AI Coach</h2>
             <div className="mt-2 flex flex-col gap-1.5 overflow-y-auto">
               {featuredTip && (
-                <div className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(featuredTip.level)}`}>
+                <div className={`rounded-lg border p-2 text-[11px] ${toneClasses(featuredTip.level)}`}>
                   <p className="font-semibold leading-snug">{featuredTip.title}</p>
                   <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{featuredTip.text}</p>
                 </div>
@@ -941,7 +918,7 @@ export default function BankrollPage() {
                 tips
                   .filter((t) => t.id !== featuredTip?.id)
                   .map((tip: CoachTip) => (
-                    <div key={tip.id} className={`rounded-lg border p-2 text-[11px] transition-all duration-200 hover:-translate-y-0.5 hover:shadow-md ${toneClasses(tip.level)}`}>
+                    <div key={tip.id} className={`rounded-lg border p-2 text-[11px] ${toneClasses(tip.level)}`}>
                       <p className="font-semibold leading-snug">{tip.title}</p>
                       <p className="mt-0.5 text-[10.5px] text-muted leading-snug">{tip.text}</p>
                     </div>
@@ -959,17 +936,17 @@ export default function BankrollPage() {
           </section>
 
           {platforms.length > 0 && (
-            <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+            <section className="rounded-xl border border-hairline bg-surface p-4">
               <div className="flex items-center gap-1.5">
-                <Landmark size={12} className="text-evolution" />
-                <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Saldo por plataforma</h2>
+                <Landmark size={13} className="text-evolution" />
+                <h2 className="text-sm font-semibold">Saldo por plataforma</h2>
               </div>
               <div className="mt-2 flex flex-col gap-1">
                 {platforms.map((p) => (
                   <button
                     key={p.platform}
                     onClick={() => setPlatformFilter(platformFilter === p.platform ? "todas" : p.platform)}
-                    className={`flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-all duration-150 hover:bg-elevated ${
+                    className={`flex items-center justify-between rounded-md px-2 py-1.5 text-left transition-colors hover:bg-elevated ${
                       platformFilter === p.platform ? "bg-elevated ring-1 ring-inset ring-evolution/40" : ""
                     }`}
                   >
@@ -983,14 +960,14 @@ export default function BankrollPage() {
             </section>
           )}
 
-          <section className="rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/20">
+          <section className="rounded-xl border border-hairline bg-surface p-4">
             <button
               onClick={() => setGoalsModalOpen(true)}
               className="flex w-full items-center gap-1.5 text-left"
               title="Clique pra criar ou ajustar metas"
             >
-              <Target size={12} className="text-review" />
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Metas</h2>
+              <Target size={13} className="text-review" />
+              <h2 className="text-sm font-semibold">Metas</h2>
             </button>
             {goalsProgress.length === 0 ? (
               <button onClick={() => setGoalsModalOpen(true)} className="mt-2 block text-left text-[11px] text-muted hover:text-ink">
@@ -1008,7 +985,7 @@ export default function BankrollPage() {
                         <span className="text-[10px] text-muted">
                           {current}/{goal.target}
                         </span>
-                        <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                        <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-colors hover:text-negative">
                           <Trash2 size={11} />
                         </button>
                       </div>
@@ -1025,7 +1002,7 @@ export default function BankrollPage() {
                           <button
                             key={m}
                             onClick={() => handleQuickStudy(m)}
-                            className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-all duration-150 hover:scale-110 hover:border-evolution/50 hover:text-evolution"
+                            className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-colors hover:border-evolution/50 hover:text-evolution"
                           >
                             +{m}min
                           </button>
@@ -1040,12 +1017,12 @@ export default function BankrollPage() {
 
           <button
             onClick={() => setBrmModalOpen(true)}
-            className="w-full rounded-xl border border-hairline bg-surface p-3.5 text-left transition-colors hover:border-training/40"
+            className="w-full rounded-xl border border-hairline bg-surface p-4 text-left transition-colors hover:border-training/40"
             title="Clique pra ajustar os limites de BRM"
           >
             <div className="flex items-center gap-1.5">
-              <Gauge size={12} className="text-training" />
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">BRM</h2>
+              <Gauge size={13} className="text-training" />
+              <h2 className="text-sm font-semibold">BRM</h2>
             </div>
             {currentBrm ? (
               <div className="mt-2">
@@ -1090,7 +1067,7 @@ export default function BankrollPage() {
           />
           <button
             onClick={handleAddGoal}
-            className="col-span-2 rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98] sm:col-span-4"
+            className="col-span-2 rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90 sm:col-span-4"
           >
             Criar meta
           </button>
@@ -1099,7 +1076,7 @@ export default function BankrollPage() {
 
       <Modal open={brmModalOpen} onClose={() => setBrmModalOpen(false)} title="BRM — moveup / movedown">
         <div className="rounded-lg border border-hairline bg-elevated p-3">
-          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Calculadora</p>
+          <p className="text-xs font-semibold text-muted">Calculadora</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <select
               value={calcFormat}
@@ -1142,7 +1119,7 @@ export default function BankrollPage() {
           )}
         </div>
 
-        <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em] text-muted">Thresholds por formato</p>
+        <p className="mt-4 text-xs font-semibold text-muted">Thresholds por formato</p>
         <div className="mt-2 flex flex-col gap-2">
           {brmThresholds.map((t) => (
             <BrmThresholdRow key={t.format} threshold={t} onSave={handleSaveBrmThreshold} />
@@ -1151,7 +1128,7 @@ export default function BankrollPage() {
 
         {ruin && (
           <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-muted">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
               <ShieldAlert size={13} className="text-negative" /> Risco de ruína
             </p>
             <p className="mt-1.5 text-sm text-muted">
@@ -1183,7 +1160,7 @@ export default function BankrollPage() {
         </div>
         <button
           onClick={handleAddAnnotation}
-          className="mt-2 w-full rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
+          className="mt-2 w-full rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90"
         >
           Adicionar
         </button>
@@ -1195,7 +1172,7 @@ export default function BankrollPage() {
                 <p className="text-xs text-ink">
                   <span className="text-muted">{a.date}</span> · {a.note}
                 </p>
-                <button onClick={() => handleRemoveAnnotation(a.id)} className="shrink-0 text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                <button onClick={() => handleRemoveAnnotation(a.id)} className="shrink-0 text-muted transition-colors hover:text-negative">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -1209,7 +1186,7 @@ export default function BankrollPage() {
           <select
             value={format}
             onChange={(e) => setFormat(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           >
             {FORMATS.map((f) => (
               <option key={f} value={f}>
@@ -1221,14 +1198,14 @@ export default function BankrollPage() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <input
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
             title="Horario que a sessao comecou"
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-muted transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-muted outline-none transition-colors focus:border-ink/40"
           />
           <input
             type="number"
@@ -1237,7 +1214,7 @@ export default function BankrollPage() {
             placeholder="Horas jogadas"
             value={hours}
             onChange={(e) => setHours(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           {format === "Cash" && (
             <input
@@ -1248,40 +1225,40 @@ export default function BankrollPage() {
               title="Big blind da mesa — alimenta o bb/hora"
               value={bigBlind}
               onChange={(e) => setBigBlind(e.target.value)}
-              className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
           )}
           <input
             placeholder="Buy-in"
             value={buyIn}
             onChange={(e) => setBuyIn(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <input
             placeholder={REENTRY_LABEL[format] ?? "Reentradas"}
             title={REENTRY_LABEL[format] ?? "Reentradas"}
             value={reentries}
             onChange={(e) => setReentries(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <input
             placeholder="Cashout"
             value={cashout}
             onChange={(e) => setCashout(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <div className="grid grid-cols-[1fr_64px] gap-2">
             <input
               placeholder="Stake"
               value={stake}
               onChange={(e) => setStake(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
               title="Moeda da sessao"
-              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
             >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
@@ -1293,7 +1270,7 @@ export default function BankrollPage() {
           <select
             value={venue}
             onChange={(e) => setVenue(e.target.value)}
-            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30 ${venue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
+            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40 ${venue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
           >
             {PLATFORMS.map((p) => (
               <option key={p} value={p}>
@@ -1307,14 +1284,14 @@ export default function BankrollPage() {
               placeholder="Qual plataforma?"
               value={venueOther}
               onChange={(e) => setVenueOther(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
           )}
           <input
             placeholder="Notas"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
         </div>
 
@@ -1419,15 +1396,15 @@ export default function BankrollPage() {
 
         <button
           onClick={handleSaveSession}
-          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90"
         >
           {editingSessionId ? "Salvar alteracoes" : "Salvar sessao"}
         </button>
       </Modal>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">
+          <h2 className="text-base font-semibold">
             {historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
           </h2>
           <div className="flex items-center gap-2">
@@ -1437,7 +1414,7 @@ export default function BankrollPage() {
                   value={historyFormat}
                   onChange={(e) => setHistoryFormat(e.target.value)}
                   aria-label="Filtrar por formato"
-                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink transition-colors hover:border-ink/30"
+                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
                 >
                   <option value="all">Todos os formatos</option>
                   {historyFormats.map((f) => (
@@ -1450,7 +1427,7 @@ export default function BankrollPage() {
                   value={historyRange}
                   onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
                   aria-label="Filtrar por periodo"
-                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink transition-colors hover:border-ink/30"
+                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
                 >
                   {HISTORY_RANGES.map((r) => (
                     <option key={r.value} value={r.value}>
@@ -1482,13 +1459,13 @@ export default function BankrollPage() {
         {recent.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
         ) : (
-          <div className={`mt-2 flex flex-col ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
+          <div className={`mt-4 divide-y divide-hairline ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
             {(historyOpen ? historyFiltered : recent).map((s) => {
               const result = net(s);
               return (
                 <div
                   key={s.id}
-                  className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-all duration-200 first:border-t-0 hover:translate-x-1 hover:bg-elevated"
+                  className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
                   >
                     <div className="min-w-0 flex-1">
                       <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
@@ -1522,11 +1499,11 @@ export default function BankrollPage() {
                       onClick={() => handleEditSession(s)}
                       aria-label="Editar sessao"
                       title="Editar sessao"
-                      className="text-muted transition-all duration-150 hover:scale-125 hover:text-ink"
+                      className="text-muted transition-colors hover:text-ink"
                     >
                       <Pencil size={15} />
                     </button>
-                    <button onClick={() => handleRemove(s.id)} aria-label="Excluir sessao" title="Excluir sessao" className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                    <button onClick={() => handleRemove(s.id)} aria-label="Excluir sessao" title="Excluir sessao" className="text-muted transition-colors hover:text-negative">
                       <Trash2 size={15} />
                     </button>
                   </div>
@@ -1544,7 +1521,7 @@ export default function BankrollPage() {
           <select
             value={txType}
             onChange={(e) => setTxType(e.target.value as TransactionType)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           >
             <option value="deposito">Deposito</option>
             <option value="saque">Saque</option>
@@ -1554,20 +1531,20 @@ export default function BankrollPage() {
             type="date"
             value={txDate}
             onChange={(e) => setTxDate(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <div className="grid grid-cols-[1fr_64px] gap-2">
             <input
               placeholder="Valor"
               value={txAmount}
               onChange={(e) => setTxAmount(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
             <select
               value={txCurrency}
               onChange={(e) => setTxCurrency(e.target.value)}
               title="Moeda"
-              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
             >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
@@ -1580,12 +1557,12 @@ export default function BankrollPage() {
             placeholder="Nota (opcional)"
             value={txNote}
             onChange={(e) => setTxNote(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <select
             value={txVenue}
             onChange={(e) => setTxVenue(e.target.value)}
-            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30 ${txVenue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
+            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40 ${txVenue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
           >
             {PLATFORMS.map((p) => (
               <option key={p} value={p}>
@@ -1599,28 +1576,28 @@ export default function BankrollPage() {
               placeholder="Qual plataforma?"
               value={txVenueOther}
               onChange={(e) => setTxVenueOther(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
           )}
         </div>
         <button
           onClick={handleAddTransaction}
-          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90"
         >
           Registrar
         </button>
       </Modal>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <h2 className="text-xs font-bold uppercase tracking-[0.14em] text-muted">Historico de transacoes</h2>
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
+        <h2 className="text-base font-semibold">Historico de transacoes</h2>
         {recentTx.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
         ) : (
-          <div className="mt-2 flex flex-col">
+          <div className="mt-4 divide-y divide-hairline">
             {recentTx.map((t) => (
               <div
                 key={t.id}
-                className="flex items-center gap-3 rounded-lg border-t border-hairline px-1.5 py-2.5 transition-all duration-200 first:border-t-0 hover:translate-x-1 hover:bg-elevated"
+                className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
               >
                 <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-void/40">
                   {t.type === "deposito" ? (
@@ -1642,7 +1619,7 @@ export default function BankrollPage() {
                   {t.type === "deposito" ? "+" : "-"}
                   {fmt(t.amount)}
                 </span>
-                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-colors hover:text-negative">
                   <Trash2 size={15} />
                 </button>
               </div>
@@ -1650,61 +1627,8 @@ export default function BankrollPage() {
           </div>
         )}
       </section>
-
-
     </main>
     </AppShell>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  tone,
-  icon,
-  accent,
-  delta,
-  size = "sm",
-  hint,
-}: {
-  label: string;
-  value: string;
-  tone?: "positive" | "negative" | "training" | "evolution";
-  icon?: React.ReactNode;
-  accent: string;
-  delta?: { text: string; positive: boolean };
-  size?: "sm" | "lg";
-  hint?: string;
-}) {
-  const color =
-    tone === "positive"
-      ? "text-positive"
-      : tone === "negative"
-        ? "text-negative"
-        : tone === "training"
-          ? "text-training"
-          : tone === "evolution"
-            ? "text-evolution"
-            : "text-ink";
-  const lg = size === "lg";
-  return (
-    <div
-      style={{ "--acc": accent } as React.CSSProperties}
-      className={`acc-card acc-lift group relative cursor-pointer overflow-hidden rounded-xl border border-hairline bg-surface ${lg ? "p-4" : "p-3.5"}`}
-    >
-      <div aria-hidden="true" className={`acc-glow pointer-events-none absolute -right-6 -top-6 rounded-full blur-2xl ${lg ? "size-24" : "size-20"}`} />
-      <p className={`relative flex items-center gap-1.5 font-bold uppercase tracking-[0.12em] text-muted ${lg ? "text-[10.5px]" : "text-[10px]"}`}>
-        {icon}
-        {label}
-      </p>
-      <p className={`relative mt-1 font-bold tabular-nums ${color} ${lg ? "text-3xl" : "text-2xl"}`}>{value}</p>
-      {delta && (
-        <p className={`relative mt-1 text-[11px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
-          {delta.positive ? "▲" : "▼"} {delta.text}
-        </p>
-      )}
-      {hint && !delta && <p className="relative mt-1 text-[10.5px] text-muted">{hint}</p>}
-    </div>
   );
 }
 
@@ -1832,7 +1756,7 @@ function Modal({
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
       <div className="relative w-full max-w-lg animate-[modalIn_.16s_ease-out] rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-ink">{title}</h2>
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
           <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink" aria-label="Fechar">
             <X size={16} />
           </button>
