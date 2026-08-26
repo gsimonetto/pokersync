@@ -139,6 +139,10 @@ export function EquityCalculator({ initialRangeId }: { initialRangeId?: string |
 
   return (
     <div>
+      {/* Container unico envolvendo toda a calculadora -- mesmo padrao
+          do Treino/Banca (uma tela, um card), em vez de cada pedaco
+          flutuando solto contra o void. */}
+      <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
       <p className="mb-4 text-sm text-muted">
         Calcula a equidade entre 2 a 6 mãos/ranges por amostragem (Monte Carlo) — funciona preflop, no flop ou no
         turn. Cada participante pode ser um range salvo, uma mão específica, ou montado na hora.
@@ -284,6 +288,7 @@ export function EquityCalculator({ initialRangeId }: { initialRangeId?: string |
           um cálculo exaustivo.
         </p>
       )}
+      </div>
 
       {showBoardPicker && (
         <CardPickerModal

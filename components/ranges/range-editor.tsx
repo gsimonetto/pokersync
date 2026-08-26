@@ -164,6 +164,11 @@ export function RangeEditor({ id }: { id: string }) {
     <div>
       {error && <p className="mb-3 text-sm text-negative">{error}</p>}
 
+      {/* Container unico envolvendo toda a ferramenta (barra + grade +
+          analise) -- antes cada pedaco flutuava solto contra o void,
+          sem nada amarrando visualmente que aquilo e' uma unica tela,
+          diferente do Treino/Banca (que sempre tiveram um card unico). */}
+      <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
       {/* Barra compacta: nome + tags + acoes, tudo numa linha so — o
           Salvar fica sempre visivel sem precisar rolar a pagina. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
@@ -286,6 +291,7 @@ export function RangeEditor({ id }: { id: string }) {
 
           <MotorLibraryPanel onLoad={setHands} />
         </div>
+      </div>
       </div>
 
       {editingComboLabel && (
