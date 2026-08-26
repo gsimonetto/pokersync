@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
 import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
 import { Chip } from "@/components/chip";
+import { AppShell } from "@/components/app-shell";
 import { PrintButton } from "@/components/period-selector";
 import { TeamBanner } from "@/components/time/team-banner";
 import {
@@ -66,7 +67,13 @@ const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
 
 export default function PainelPage() {
   return (
-    <Suspense fallback={<main className="mx-auto max-w-[1280px] px-6 py-10 text-sm text-muted">Carregando…</main>}>
+    <Suspense
+      fallback={
+        <AppShell>
+          <main className="mx-auto max-w-[1280px] px-6 py-10 text-sm text-muted">Carregando…</main>
+        </AppShell>
+      }
+    >
       <PainelConteudo />
     </Suspense>
   );
@@ -194,7 +201,7 @@ function PainelConteudo() {
   const podeEditarTime = time?.role !== "player";
 
   return (
-    <>
+    <AppShell>
       <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
         {/* Banner so' na Visao Geral (primeira tela) — nas outras abas ele
             so' empurrava conteudo pra baixo sem servir de navegacao real.
@@ -317,6 +324,6 @@ function PainelConteudo() {
       </main>
 
       <TeamPrintStyles />
-    </>
+    </AppShell>
   );
 }

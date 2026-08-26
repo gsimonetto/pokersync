@@ -16,6 +16,7 @@ import {
 } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
@@ -115,9 +116,10 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const maxDia = Math.max(1, ...atividade.map((d) => d.treinos + d.revisoes));
 
   return (
-    <>
+    <AppShell>
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
       <AppHeader
+        insideShell
         backHref="/time/painel?tab=jogadores"
         iconNode={p ? <Avatar id={p.avatarId} url={p.avatarUrl} size={38} /> : undefined}
         title={p?.nome ?? "Jogador"}
@@ -367,6 +369,6 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
     </main>
 
     <TeamPrintStyles />
-    </>
+    </AppShell>
   );
 }

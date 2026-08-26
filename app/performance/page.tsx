@@ -3,6 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import {
   LineChart,
   Lock,
@@ -146,15 +147,19 @@ export default function PerformancePage() {
 
   if (loading) {
     return (
-      <main className="mx-auto max-w-[1280px] px-6 py-10">
-        <p className="text-sm text-muted">Carregando sua performance…</p>
-      </main>
+      <AppShell>
+        <main className="mx-auto max-w-[1280px] px-6 py-10">
+          <p className="text-sm text-muted">Carregando sua performance…</p>
+        </main>
+      </AppShell>
     );
   }
 
   return (
+    <AppShell>
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader
+        insideShell
         subtitle="Banca, jogo e estudo em um só lugar"
         right={
           data?.score_geral !== null && data?.score_geral !== undefined ? (
@@ -314,6 +319,7 @@ export default function PerformancePage() {
         </>
       )}
     </main>
+    </AppShell>
   );
 }
 

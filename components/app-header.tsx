@@ -25,6 +25,7 @@ export function AppHeader({
   title,
   subtitle,
   right,
+  insideShell,
 }: {
   /** Fallback so' usado quando nao ha historico de navegacao (ex: link direto/notificacao) — o clique normal volta pra tela anterior de verdade (router.back), nao pra uma rota fixa, ja que "ir pro inicio" e' o icone Home do TopNav. */
   backHref?: string;
@@ -37,6 +38,11 @@ export function AppHeader({
   title?: string;
   subtitle?: ReactNode;
   right?: ReactNode;
+  /** true quando a pagina roda dentro do AppShell (components/app-shell.tsx)
+      -- ali a barra do shell fica fora da area com scroll (nao compete
+      pelo mesmo `top: 0`), entao o offset "sm:top-18" pensado pro TopNav
+      global deixaria uma folga vazia acima deste header. */
+  insideShell?: boolean;
 }) {
   const router = useRouter();
   const [compacto, setCompacto] = useState(false);
@@ -74,7 +80,7 @@ export function AppHeader({
 
   return (
     <header
-      className={`sticky top-0 sm:top-18 z-20 mb-6 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding,border-color] duration-300 ease-out print:static print:border-none print:bg-transparent ${
+      className={`sticky top-0 ${insideShell ? "" : "sm:top-18"} z-20 mb-6 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding,border-color] duration-300 ease-out print:static print:border-none print:bg-transparent ${
         compacto ? "border-hairline py-2.5" : "border-transparent py-4"
       }`}
     >

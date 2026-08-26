@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import {
   Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
@@ -149,15 +150,33 @@ export default function HubPage() {
         if (alive) setLoading(false);
       }
     })();
-    const supabase = createClient();
-    supabase.auth.getUser().then(({ data }) => setMeId(data.user?.id ?? null));
+    // createClient() lanca sincrono se as envs do Supabase nao estiverem
+    // configuradas -- sem o try/catch isso escapa do useEffect como
+    // excecao nao tratada (mesmo padrao ja corrigido em app/modulos e
+    // components/top-nav.tsx).
+    try {
+      const supabase = createClient();
+      supabase.auth.getUser().then(({ data }) => setMeId(data.user?.id ?? null));
+    } catch {
+      // sem sessao configurada: mantem meId nulo
+    }
     return () => {
       alive = false;
     };
   }, []);
 
-  if (loading) return <main className="p-10 text-center text-sm text-muted">Carregando Hub...</main>;
-  if (err || !progress) return <main className="p-10 text-center text-sm text-negative">{err}</main>;
+  if (loading)
+    return (
+      <AppShell>
+        <main className="p-10 text-center text-sm text-muted">Carregando Hub...</main>
+      </AppShell>
+    );
+  if (err || !progress)
+    return (
+      <AppShell>
+        <main className="p-10 text-center text-sm text-negative">{err}</main>
+      </AppShell>
+    );
 
   const level = progress.level;
   const isMaxLevel = level >= MAX_LEVEL;
@@ -183,6 +202,7 @@ export default function HubPage() {
   const activeTab = TABS.find((t) => t.key === tab) ?? TABS[0];
 
   return (
+    <AppShell>
     <main className="mx-auto max-w-[1280px] px-6 py-10">
       {/* Animacoes escopadas neste arquivo: nao depende do globals.css do restante do projeto. */}
       <style>{`
@@ -249,6 +269,7 @@ export default function HubPage() {
       `}</style>
 
       <AppHeader
+        insideShell
         subtitle={
           <>
             {/* Nada pra "missoes": o proprio seletor MISSÕES/RANKING ao
@@ -443,6 +464,7 @@ export default function HubPage() {
         />
       )}
     </main>
+    </AppShell>
   );
 }
 
