@@ -18,6 +18,7 @@ export function Avatar({
   id,
   url,
   size = 40,
+  shape = "circle",
   onClick,
   title,
   className,
@@ -25,10 +26,15 @@ export function Avatar({
   id: number;
   url?: string | null;
   size?: number;
+  /** "circle" nas miniaturas (padrão); "square" no card de perfil, onde a
+      foto ganha mais destaque. */
+  shape?: "circle" | "square";
   onClick?: () => void;
   title?: string;
   className?: string;
 }) {
+  const shapeClass = shape === "square" ? "rounded-2xl" : "rounded-full";
+
   if (url) {
     return (
       // eslint-disable-next-line @next/next/no-img-element
@@ -37,7 +43,7 @@ export function Avatar({
         alt={title || "Avatar"}
         onClick={onClick}
         title={title}
-        className={`rounded-full object-cover ${onClick ? "cursor-pointer" : ""} ${className ?? ""}`}
+        className={`${shapeClass} object-cover ${onClick ? "cursor-pointer" : ""} ${className ?? ""}`}
         style={{ width: size, height: size }}
       />
     );
@@ -50,7 +56,7 @@ export function Avatar({
     <div
       onClick={onClick}
       title={title}
-      className={`grid shrink-0 place-items-center rounded-full ${onClick ? "cursor-pointer" : ""} ${className ?? ""}`}
+      className={`grid shrink-0 place-items-center ${shapeClass} ${onClick ? "cursor-pointer" : ""} ${className ?? ""}`}
       style={{ width: size, height: size, background: `${found.bg}26`, border: `1.5px solid ${found.bg}66` }}
     >
       <Icon size={Math.round(size * 0.52)} color={found.bg} strokeWidth={1.8} />

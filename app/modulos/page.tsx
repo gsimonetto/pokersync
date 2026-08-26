@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Target } from "lucide-react";
+import { ArrowRight, Target, Trophy, Medal, Star, Award } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/client";
-import { fetchProfile, type Profile } from "@/lib/services/profile-service";
+import { fetchProfile, DIA_SEMANA_LABEL, type Profile } from "@/lib/services/profile-service";
 import {
   fetchPlayerPerformance,
   fetchPreflopSituations,
@@ -101,36 +101,40 @@ export default function ModulosPage() {
   const foldTo3bet = preflop.find((p) => p.label === "Fold para 3-Bet");
   const blindDefense = preflop.find((p) => p.label === "Defesa de Blinds");
 
+  const diasTreino = (profile?.dias_treino_semana ?? [])
+    .map((d) => DIA_SEMANA_LABEL[d])
+    .join(", ");
+  const horasTreino =
+    profile?.horas_treino_dia != null
+      ? `${profile.horas_treino_dia}h/dia${diasTreino ? ` · ${diasTreino}` : ""}`
+      : "—";
+
   return (
     <AppShell>
       <main className="flex flex-1 flex-col gap-4 px-4 py-6 md:px-6">
         {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
             + metricas mais relevantes (coluna 3), mesma ordem/estilo de
-            linha -- estrutura pedida pelo usuario. Ganhos totais/Ranking
-            ainda nao tem fonte de dado real (chegam com o agente
-            desktop importando HH/torneios), entao aparecem como "—" com
-            nota, igual ao padrao ja usado em ITM aproximado na tela de
-            Performance -- nunca numero inventado. */}
-        <section className="flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface sm:flex-row">
-          <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center bg-elevated sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
-            <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={120} className="shrink-0" />
+            linha -- estrutura pedida pelo usuario. Ganhos totais ainda
+            nao tem fonte de dado real (chega com o agente desktop
+            importando HH/torneios), entao aparece como "—", igual ao
+            padrao ja usado em ITM aproximado na tela de Performance --
+            nunca numero inventado. */}
+        <section className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface transition-all duration-300 hover:border-white/15 hover:shadow-[0_0_40px_-12px_rgba(255,255,255,0.18)] sm:flex-row">
+          <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center overflow-hidden bg-elevated p-4 sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
+            <Avatar
+              id={profile?.avatar_id ?? 1}
+              url={profile?.avatar_url}
+              shape="square"
+              size={190}
+              className="shrink-0 transition-transform duration-300 group-hover:scale-[1.03]"
+            />
           </div>
 
           <div className="flex-1 p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div className="min-w-0">
-                <h2 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h2>
-                {profile?.nome && profile.nome !== displayName && (
-                  <p className="mt-0.5 text-sm text-muted">{profile.nome}</p>
-                )}
-              </div>
-              {team && (
-                <span
-                  className="shrink-0 rounded-full border px-2.5 py-1 text-[11px] font-bold"
-                  style={{ borderColor: `${team.accent}66`, background: `${team.accent}1A`, color: team.accent }}
-                >
-                  {team.name}
-                </span>
+            <div className="min-w-0">
+              <h2 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h2>
+              {profile?.nome && profile.nome !== displayName && (
+                <p className="mt-0.5 text-sm text-muted">{profile.nome}</p>
               )}
             </div>
 
@@ -142,71 +146,97 @@ export default function ModulosPage() {
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Time atual</span>
-                  <span className="text-sm text-ink">{team?.name ?? "Sem time"}</span>
+                  <MetricValue href={team ? "/time" : undefined}>{team?.name ?? "Sem time"}</MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
                   <span className="text-sm text-muted">—</span>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ranking</span>
-                  <span className="text-sm text-muted">—</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas de treino</span>
+                  <span className="text-sm tabular-nums text-ink">{horasTreino}</span>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2.5">
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</span>
-                  <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.vpip_pct) ?? "—"}</span>
+                  <MetricValue href="/performance" mono>
+                    {fmtPct(perf?.vpip_pct) ?? "—"}
+                  </MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</span>
-                  <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.three_bet_pct) ?? "—"}</span>
+                  <MetricValue href="/performance" mono>
+                    {fmtPct(perf?.three_bet_pct) ?? "—"}
+                  </MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ROI acumulado</span>
-                  <span
-                    className={`text-sm font-semibold tabular-nums ${
+                  <Link
+                    href="/performance"
+                    className={`text-sm font-semibold tabular-nums transition-colors hover:underline ${
                       perf?.roi_pct != null ? (Number(perf.roi_pct) >= 0 ? "text-positive" : "text-negative") : "text-ink"
                     }`}
                   >
                     {perf?.roi_pct != null ? `${Number(perf.roi_pct) >= 0 ? "+" : ""}${fmtPct(perf.roi_pct)}` : "—"}
-                  </span>
+                  </Link>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</span>
-                  <span className="text-sm tabular-nums text-ink">{fmtPct(perf?.itm_pct_aproximado) ?? "—"}</span>
+                  <MetricValue href="/performance" mono>
+                    {fmtPct(perf?.itm_pct_aproximado) ?? "—"}
+                  </MetricValue>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2.5">
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Nível</span>
-                  <span className="text-sm tabular-nums text-ink">{level != null ? level : "—"}</span>
+                  <MetricValue href="/hub" mono>
+                    {level != null ? level : "—"}
+                  </MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Sessões</span>
-                  <span className="text-sm tabular-nums text-ink">{perf?.num_sessoes ?? "—"}</span>
+                  <MetricValue href="/performance" mono>
+                    {perf?.num_sessoes ?? "—"}
+                  </MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas jogadas</span>
-                  <span className="text-sm tabular-nums text-ink">
+                  <MetricValue href="/performance" mono>
                     {perf?.horas_jogadas != null ? `${perf.horas_jogadas}h` : "—"}
-                  </span>
+                  </MetricValue>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Streak atual</span>
-                  <span className="text-sm tabular-nums text-ink">
+                  <MetricValue href="/performance" mono>
                     {perf?.streak_atual != null ? `${perf.streak_atual}d` : "—"}
-                  </span>
+                  </MetricValue>
                 </div>
               </div>
             </div>
 
-            <p className="mt-3 border-t border-hairline pt-3 text-[11px] text-muted/70">
-              Ganhos totais, ranking e conquistas chegam com a importação de HH e histórico de torneios pelo agente
-              desktop.
-            </p>
+            {/* Conquistas: emblemas/trofeus do PokerSync. Sem dados reais
+                ainda (nenhum sistema de conquistas no backend), entao os
+                emblemas ficam bloqueados/apagados ate a primeira ser
+                desbloqueada -- nunca um numero ou selo inventado. */}
+            <div className="mt-3 border-t border-hairline pt-3">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas</p>
+              <div className="flex flex-wrap gap-2">
+                {[Trophy, Medal, Star, Award].map((Icon, i) => (
+                  <div
+                    key={i}
+                    title="Conquista bloqueada"
+                    className="grid size-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted/40"
+                  >
+                    <Icon size={16} strokeWidth={1.75} />
+                  </div>
+                ))}
+                <p className="ml-1 self-center text-[11px] text-muted/70">Suas conquistas aparecerão aqui.</p>
+              </div>
+            </div>
           </div>
         </section>
 
@@ -240,6 +270,19 @@ export default function ModulosPage() {
         </section>
       </main>
     </AppShell>
+  );
+}
+
+// Valor de metrica clicavel: leva direto pro modulo que produz aquele
+// numero (ex: VPIP -> Player Evolution, Nivel -> Hub). Sem href, cai pro
+// span estatico de sempre (ex: "Sem time").
+function MetricValue({ href, mono, children }: { href?: string; mono?: boolean; children: React.ReactNode }) {
+  const cls = `text-sm text-ink ${mono ? "tabular-nums" : ""}`;
+  if (!href) return <span className={cls}>{children}</span>;
+  return (
+    <Link href={href} className={`${cls} transition-colors hover:text-training hover:underline`}>
+      {children}
+    </Link>
   );
 }
 
