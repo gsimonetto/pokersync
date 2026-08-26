@@ -2084,10 +2084,10 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
   const hovered = hoverKey ? activity[hoverKey] : null;
 
   return (
-    <div className="mt-3">
-      <div className="flex gap-[3px] overflow-x-auto pb-1">
+    <div className="mt-3 w-full">
+      <div className="flex justify-center gap-[5px] overflow-x-auto pb-1">
         {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[3px]">
+          <div key={wi} className="flex flex-col gap-[5px]">
             {week.map(({ date, d }) => {
               const a = activity[date];
               const future = d > today;
@@ -2096,7 +2096,7 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
                   key={date}
                   onMouseEnter={() => !future && setHoverKey(date)}
                   onMouseLeave={() => setHoverKey((k) => (k === date ? null : k))}
-                  className="size-[11px] rounded-[2px] transition-transform duration-100 hover:scale-125"
+                  className="size-[20px] rounded-[4px] transition-transform duration-100 hover:scale-110"
                   style={{ background: future ? "transparent" : cellColor(a) }}
                   title={a ? `${date} · ${a.n} sessão(ões) · ${fmtSigned(a.net)}` : date}
                 />
@@ -2105,7 +2105,7 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
           </div>
         ))}
       </div>
-      <div className="mt-2 flex items-center justify-between text-[10px] text-muted">
+      <div className="mt-3 flex items-center justify-between text-[10px] text-muted">
         <span>{weeksCount} semanas · verde = dia positivo, vermelho = dia negativo, cinza = sem sessão</span>
         {hovered && (
           <span className="font-semibold text-ink">
