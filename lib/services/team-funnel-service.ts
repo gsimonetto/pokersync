@@ -372,7 +372,11 @@ export async function setCardLabel(cardId: string, labelId: string, ativo: boole
 }
 
 // ============================================================
-// Comentarios/atividade do card
+// Interações do card (ex-"atividade") — historico de auditoria: uma
+// vez postada, a interacao nao pode ser editada nem apagada por
+// ninguem (nem policy de UPDATE, nem de DELETE no banco). Suporta um
+// anexo por interacao (print/arquivo), guardado no bucket privado
+// "team-card-attachments".
 // ============================================================
 
 export interface CardComment {
@@ -382,13 +386,19 @@ export interface CardComment {
   authorName: string;
   body: string;
   createdAt: string;
+  /** Path dentro do bucket privado -- ver getCardAttachmentUrl. */
+  attachmentUrl: string | null;
+  attachmentName: string | null;
+  attachmentType: string | null;
 }
+
+const CARD_COMMENT_COLUMNS = "id, card_id, author_id, body, created_at, attachment_url, attachment_name, attachment_type";
 
 export async function fetchCardComments(cardId: string): Promise<CardComment[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("team_card_comments")
-    .select("id, card_id, author_id, body, created_at")
+    .select(CARD_COMMENT_COLUMNS)
     .eq("card_id", cardId)
     .order("created_at", { ascending: true });
   if (error) throw error;
@@ -407,20 +417,126 @@ export async function fetchCardComments(cardId: string): Promise<CardComment[]> 
       authorName: p?.apelido || p?.nome || "Alguém do time",
       body: r.body,
       createdAt: r.created_at,
+      attachmentUrl: r.attachment_url,
+      attachmentName: r.attachment_name,
+      attachmentType: r.attachment_type,
     };
   });
 }
 
-export async function addCardComment(cardId: string, body: string) {
+const ATTACHMENT_MAX_SIZE = 8 * 1024 * 1024;
+
+// Upload do print/arquivo pro bucket privado. Path comeca com o
+// card_id (1o segmento) -- e' o que a policy de storage usa pra
+// decidir quem pode ver/mandar (can_view_card/can_manage_card).
+export async function uploadCardAttachment(cardId: string, file: File): Promise<{ path: string; type: string; name: string }> {
+  if (file.size > ATTACHMENT_MAX_SIZE) throw new Error("Arquivo excede 8MB.");
   const supabase = createClient();
-  const { error } = await supabase.from("team_card_comments").insert({ card_id: cardId, body: body.trim() });
+  const ext = file.name.includes(".") ? file.name.split(".").pop() : "bin";
+  const path = `${cardId}/${crypto.randomUUID()}.${ext}`;
+  const { error } = await supabase.storage.from("team-card-attachments").upload(path, file, {
+    contentType: file.type || "application/octet-stream",
+    cacheControl: "3600",
+  });
   if (error) throw error;
+  return { path, type: file.type || "application/octet-stream", name: file.name };
+}
+
+export async function getCardAttachmentUrl(path: string): Promise<string> {
+  const supabase = createClient();
+  const { data, error } = await supabase.storage.from("team-card-attachments").createSignedUrl(path, 3600);
+  if (error) throw error;
+  return data.signedUrl;
+}
+
+export async function addCardComment(
+  cardId: string,
+  body: string,
+  attachment?: { path: string; type: string; name: string } | null
+) {
+  const supabase = createClient();
+  const { error } = await supabase.from("team_card_comments").insert({
+    card_id: cardId,
+    body: body.trim(),
+    attachment_url: attachment?.path ?? null,
+    attachment_name: attachment?.name ?? null,
+    attachment_type: attachment?.type ?? null,
+  });
+  if (error) throw error;
+}
+
+// ============================================================
+// Linha do tempo de conquistas do jogador (missoes completadas no Hub
+// de Evolucao) -- gate via RPC porque xp_events/user_missions so' sao
+// legiveis pelo proprio dono (RLS), o coach/admin precisa do
+// can_view_player() dentro da function pra ver o card de outra pessoa.
+// ============================================================
+
+export interface PlayerAchievement {
+  missionId: string;
+  title: string;
+  description: string | null;
+  xpReward: number;
+  icon: string | null;
+  completedAt: string;
+}
+
+// ============================================================
+// Historico de fases do card (team_player_card_history) -- mantido
+// automaticamente por move_player_card, so' leitura aqui. Completa o
+// "todo o historico do que foi feito" junto com interacoes e
+// conquistas, sem precisar duplicar nada.
+// ============================================================
+
+export interface CardPhaseHistoryEntry {
+  phaseId: string;
+  phaseName: string;
+  phaseColor: string;
+  enteredAt: string;
+  leftAt: string | null;
+}
+
+export async function fetchCardPhaseHistory(playerId: string): Promise<CardPhaseHistoryEntry[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("team_player_card_history")
+    .select("phase_id, entered_at, left_at, team_funnel_phases(name, color)")
+    .eq("player_id", playerId)
+    .order("entered_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []).map((r) => {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const fase = r.team_funnel_phases as any;
+    return {
+      phaseId: r.phase_id,
+      phaseName: fase?.name ?? "Fase removida",
+      phaseColor: fase?.color ?? "#8b8b8b",
+      enteredAt: r.entered_at,
+      leftAt: r.left_at,
+    };
+  });
+}
+
+export async function fetchPlayerAchievements(playerId: string, limit = 30): Promise<PlayerAchievement[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("player_achievement_timeline", { p_player: playerId, p_limit: limit });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    missionId: r.mission_id,
+    title: r.title,
+    description: r.description,
+    xpReward: r.xp_reward,
+    icon: r.icon,
+    completedAt: r.completed_at,
+  }));
 }
 
 export function traduzErroFunil(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("SEM_PERMISSAO")) return "Você não tem permissão para essa ação.";
   if (msg.includes("SEM_TIME")) return "Você precisa estar em um time ativo.";
+  if (msg.includes("excede 8MB")) return msg;
   if (msg.includes("foreign key constraint") && msg.includes("phase_id")) {
     return "Essa fase ainda tem jogador dentro — mova todos pra outra fase antes de excluir.";
   }

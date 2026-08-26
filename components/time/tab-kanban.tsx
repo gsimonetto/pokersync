@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, GripVertical, ListChecks, MessageSquare, Plus, Settings2, Sparkles, Tag, Trash2, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, Clock3, GripVertical, ListChecks, Loader2, MessageSquare, Paperclip, Plus, Search, Settings2, Sparkles, Tag, Trash2, Trophy, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
+import { EmojiPickerButton } from "@/components/emoji-picker";
 import {
   addCardComment,
   addChecklistItem,
@@ -17,10 +18,13 @@ import {
   fetchCardComments,
   fetchCardLabels,
   fetchCardLabelsForCards,
+  fetchCardPhaseHistory,
   fetchChecklist,
   fetchChecklistProgressForCards,
   fetchFunnelPhases,
+  fetchPlayerAchievements,
   fetchPlayerCards,
+  getCardAttachmentUrl,
   movePlayerCard,
   progressoPronto,
   seedDefaultPhases,
@@ -30,14 +34,17 @@ import {
   traduzErroFunil,
   updateCardDetails,
   updatePhase,
+  uploadCardAttachment,
   ARCHIVE_REASON_LABEL,
   STAT_METRIC_LABEL,
   type ArchivedCard,
   type ArchiveReason,
   type CardComment,
   type CardLabel,
+  type CardPhaseHistoryEntry,
   type ChecklistItem,
   type FunnelPhase,
+  type PlayerAchievement,
   type PlayerCard,
   type StatMetric,
 } from "@/lib/services/team-funnel-service";
@@ -89,9 +96,14 @@ export function TabKanban({
 
   // Filtros: com 50 jogadores no funil, sem isso o board vira uma
   // parede de cards. "Tarefas pendentes" olha o checklist (item aberto).
+  // Todos combinam entre si (AND) -- a lupa so' adiciona busca por texto
+  // em cima do que ja existia, nao substitui os outros filtros.
   const [filtroLabel, setFiltroLabel] = useState<string>("todas");
   const [filtroCoach, setFiltroCoach] = useState<string>("todos");
   const [soTarefasPendentes, setSoTarefasPendentes] = useState(false);
+  const [soMetasConcluidas, setSoMetasConcluidas] = useState(false);
+  const [buscaAberta, setBuscaAberta] = useState(false);
+  const [busca, setBusca] = useState("");
 
   const [modo, setModo] = useState<"board" | "arquivados">("board");
   const [arquivados, setArquivados] = useState<ArchivedCard[]>([]);
@@ -177,9 +189,17 @@ export function TabKanban({
         const chk = checklistPorCard.get(c.cardId);
         if (!chk || chk.total === 0 || chk.done >= chk.total) return false;
       }
+      if (soMetasConcluidas && !progressoPronto(c)) return false;
+      const termo = busca.trim().toLowerCase();
+      if (termo) {
+        const j = porNome.get(c.playerId);
+        const labels = labelsPorCard.get(c.cardId) ?? [];
+        const alvo = [j?.nome, c.notes, ...labels.map((l) => l.name)].filter(Boolean).join(" ").toLowerCase();
+        if (!alvo.includes(termo)) return false;
+      }
       return true;
     });
-  }, [cards, filtroLabel, filtroCoach, soTarefasPendentes, labelsPorCard, checklistPorCard, porNome]);
+  }, [cards, filtroLabel, filtroCoach, soTarefasPendentes, soMetasConcluidas, busca, labelsPorCard, checklistPorCard, porNome]);
 
   const cardsPorFase = useMemo(() => {
     const m = new Map<string, PlayerCard[]>();
@@ -247,6 +267,35 @@ export function TabKanban({
 
         {modo === "board" && (
           <>
+            {/* Lupa: busca por texto (nome, anotacao, etiqueta) que
+                combina com os demais filtros abaixo -- pedido explicito
+                pra achar qualquer jogador quando a lista crescer, e
+                mesclar com "metas concluidas", coach, etc. */}
+            <button
+              type="button"
+              onClick={() => {
+                setBuscaAberta((v) => !v);
+                if (buscaAberta) setBusca("");
+              }}
+              aria-label={buscaAberta ? "Fechar busca" : "Buscar jogador"}
+              title="Buscar jogador"
+              className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors ${
+                buscaAberta || busca ? "border-ink/40 bg-elevated text-ink" : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
+              }`}
+            >
+              <Search size={15} />
+            </button>
+            {buscaAberta && (
+              <input
+                autoFocus
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                onKeyDown={(e) => e.key === "Escape" && (setBuscaAberta(false), setBusca(""))}
+                placeholder="Nome, anotação, etiqueta…"
+                className="w-44 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-muted/50"
+              />
+            )}
+
             <select
               value={filtroLabel}
               onChange={(e) => setFiltroLabel(e.target.value)}
@@ -276,6 +325,12 @@ export function TabKanban({
               icon={<CheckSquare size={13} />}
               active={soTarefasPendentes}
               onClick={() => setSoTarefasPendentes((v) => !v)}
+            />
+            <FilterChip
+              label="Metas concluídas"
+              icon={<CheckCircle2 size={13} />}
+              active={soMetasConcluidas}
+              onClick={() => setSoMetasConcluidas((v) => !v)}
             />
           </>
         )}
@@ -553,26 +608,23 @@ function ModalCard({
   const [statAlvo, setStatAlvo] = useState<number | "">(card.statTarget ?? "");
   const [salvando, setSalvando] = useState(false);
 
+  const [aba, setAba] = useState<"detalhes" | "interacoes">("detalhes");
   const [labelsAtivas, setLabelsAtivas] = useState<Set<string>>(new Set());
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [novoItem, setNovoItem] = useState("");
-  const [comentarios, setComentarios] = useState<CardComment[]>([]);
-  const [novoComentario, setNovoComentario] = useState("");
   const [carregandoExtras, setCarregandoExtras] = useState(true);
 
   useEffect(() => {
     let ativo = true;
     (async () => {
       try {
-        const [lbl, chk, com] = await Promise.all([
+        const [lbl, chk] = await Promise.all([
           fetchCardLabels(card.cardId).catch(() => []),
           fetchChecklist(card.cardId).catch(() => []),
-          fetchCardComments(card.cardId).catch(() => []),
         ]);
         if (!ativo) return;
         setLabelsAtivas(new Set(lbl.map((l) => l.id)));
         setChecklist(chk);
-        setComentarios(com);
       } finally {
         if (ativo) setCarregandoExtras(false);
       }
@@ -629,18 +681,6 @@ function ModalCard({
     }
   }
 
-  async function enviarComentario() {
-    if (!novoComentario.trim()) return;
-    const texto = novoComentario.trim();
-    setNovoComentario("");
-    try {
-      await addCardComment(card.cardId, texto);
-      setComentarios(await fetchCardComments(card.cardId));
-    } catch (e) {
-      onErro(traduzErroFunil(e));
-    }
-  }
-
   async function salvar() {
     setSalvando(true);
     try {
@@ -690,6 +730,20 @@ function ModalCard({
           </button>
         </div>
 
+        <div className="mt-4">
+          <SegmentedControl
+            value={aba}
+            onChange={setAba}
+            options={[
+              { value: "detalhes", label: "Detalhes" },
+              { value: "interacoes", label: <><MessageSquare size={13} /> Interações</> },
+            ]}
+          />
+        </div>
+
+        {aba === "interacoes" ? (
+          <AbaInteracoes cardId={card.cardId} playerId={card.playerId} onErro={onErro} />
+        ) : (
         <div className="mt-4 space-y-4">
           <Campo label="Fase">
             <select value={fase} onChange={(e) => setFase(e.target.value)}
@@ -803,40 +857,6 @@ function ModalCard({
             </p>
           )}
 
-          <div className="border-t border-hairline pt-4">
-            <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-              <MessageSquare size={12} /> Atividade
-            </label>
-            {!carregandoExtras && comentarios.length > 0 && (
-              <ul className="mb-2 max-h-40 space-y-2 overflow-y-auto pr-1">
-                {comentarios.map((c) => (
-                  <li key={c.id} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2">
-                    <div className="flex items-center justify-between gap-2">
-                      <span className="text-[11px] font-semibold text-ink">{c.authorName}</span>
-                      <span className="text-[10px] text-muted">
-                        {new Date(c.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                      </span>
-                    </div>
-                    <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-ink/85">{c.body}</p>
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="flex gap-2">
-              <input
-                value={novoComentario}
-                onChange={(e) => setNovoComentario(e.target.value)}
-                onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), enviarComentario())}
-                placeholder="Deixar um comentário…"
-                className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
-              />
-              <button type="button" onClick={enviarComentario} disabled={!novoComentario.trim()}
-                className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40">
-                <MessageSquare size={14} />
-              </button>
-            </div>
-          </div>
-
           <button onClick={onAgendarConversa} type="button"
             className="flex w-full items-center justify-center gap-2 rounded-xl border border-hairline px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-ink/40">
             <CalendarPlus size={16} />
@@ -881,8 +901,256 @@ function ModalCard({
             )}
           </div>
         </div>
+        )}
       </div>
     </div>
+  );
+}
+
+// ------------------------------------------------------------
+// Aba "Interações" do card: historico de auditoria (comentarios do
+// coach, imutaveis, com anexo opcional), historico de fases e a linha
+// do tempo de conquistas do jogador -- tudo carregado sozinho, fora do
+// estado da aba Detalhes.
+// ------------------------------------------------------------
+function AbaInteracoes({
+  cardId,
+  playerId,
+  onErro,
+}: {
+  cardId: string;
+  playerId: string;
+  onErro: (s: string) => void;
+}) {
+  const [comentarios, setComentarios] = useState<CardComment[]>([]);
+  const [historicoFases, setHistoricoFases] = useState<CardPhaseHistoryEntry[]>([]);
+  const [conquistas, setConquistas] = useState<PlayerAchievement[] | null>(null);
+  const [carregando, setCarregando] = useState(true);
+
+  async function recarregarComentarios() {
+    try {
+      setComentarios(await fetchCardComments(cardId));
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    }
+  }
+
+  useEffect(() => {
+    let ativo = true;
+    (async () => {
+      const [com, hist, conq] = await Promise.allSettled([
+        fetchCardComments(cardId),
+        fetchCardPhaseHistory(playerId),
+        fetchPlayerAchievements(playerId),
+      ]);
+      if (!ativo) return;
+      if (com.status === "fulfilled") setComentarios(com.value);
+      if (hist.status === "fulfilled") setHistoricoFases(hist.value);
+      setConquistas(conq.status === "fulfilled" ? conq.value : []);
+      setCarregando(false);
+    })();
+    return () => {
+      ativo = false;
+    };
+  }, [cardId, playerId]);
+
+  return (
+    <div className="mt-4 space-y-5">
+      <div>
+        <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+          <MessageSquare size={12} /> Histórico de interações
+        </label>
+        {carregando ? (
+          <p className="text-[12.5px] text-muted">Carregando…</p>
+        ) : comentarios.length === 0 ? (
+          <p className="text-[12.5px] text-muted">Nenhuma interação registrada ainda.</p>
+        ) : (
+          <ul className="mb-2 max-h-56 space-y-2 overflow-y-auto pr-1">
+            {comentarios.map((c) => (
+              <li key={c.id} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2">
+                <div className="flex items-center justify-between gap-2">
+                  <span className="text-[11px] font-semibold text-ink">{c.authorName}</span>
+                  <span className="text-[10px] text-muted">
+                    {new Date(c.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
+                  </span>
+                </div>
+                {c.body && <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-ink/85">{c.body}</p>}
+                {c.attachmentUrl && (
+                  <AnexoInteracao path={c.attachmentUrl} name={c.attachmentName} type={c.attachmentType} />
+                )}
+              </li>
+            ))}
+          </ul>
+        )}
+        <ComposerInteracao cardId={cardId} onEnviado={recarregarComentarios} onErro={onErro} />
+        <p className="mt-1.5 text-[10.5px] text-muted/70">
+          Fica registrado pra sempre, sem editar ou apagar depois — segurança pro coach e pro jogador.
+        </p>
+      </div>
+
+      {historicoFases.length > 0 && (
+        <div className="border-t border-hairline pt-4">
+          <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            <Clock3 size={12} /> Histórico de fases
+          </label>
+          <ul className="space-y-1.5">
+            {historicoFases.map((h, i) => (
+              <li key={`${h.phaseId}-${h.enteredAt}-${i}`} className="flex items-center gap-2 text-[12px] text-ink/85">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: h.phaseColor }} />
+                <span className="min-w-0 flex-1 truncate">{h.phaseName}</span>
+                <span className="shrink-0 text-[10.5px] text-muted">
+                  {new Date(h.enteredAt).toLocaleDateString("pt-BR")}
+                  {h.leftAt ? ` – ${new Date(h.leftAt).toLocaleDateString("pt-BR")}` : " (atual)"}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
+
+      <div className="border-t border-hairline pt-4">
+        <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+          <Trophy size={12} /> Linha do tempo — conquistas e evolução
+        </label>
+        {conquistas === null ? (
+          <p className="text-[12.5px] text-muted">Carregando…</p>
+        ) : conquistas.length === 0 ? (
+          <p className="text-[12.5px] text-muted">Nenhuma missão concluída ainda no PokerSync.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {conquistas.map((a) => (
+              <li key={a.missionId} className="flex items-start gap-2 rounded-lg border border-hairline bg-elevated px-2.5 py-2">
+                <Trophy size={14} className="mt-0.5 shrink-0 text-evolution" />
+                <div className="min-w-0 flex-1">
+                  <p className="truncate text-[12.5px] font-medium text-ink">{a.title}</p>
+                  <p className="text-[10.5px] text-muted">
+                    +{a.xpReward} XP · {new Date(a.completedAt).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </div>
+  );
+}
+
+// Composer da interacao: texto e/ou um anexo (print/arquivo). Precisa
+// de pelo menos um dos dois pra habilitar o envio.
+function ComposerInteracao({
+  cardId,
+  onEnviado,
+  onErro,
+}: {
+  cardId: string;
+  onEnviado: () => void;
+  onErro: (s: string) => void;
+}) {
+  const [texto, setTexto] = useState("");
+  const [arquivo, setArquivo] = useState<File | null>(null);
+  const [enviando, setEnviando] = useState(false);
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  async function enviar() {
+    if (!texto.trim() && !arquivo) return;
+    setEnviando(true);
+    try {
+      const anexo = arquivo ? await uploadCardAttachment(cardId, arquivo) : null;
+      await addCardComment(cardId, texto, anexo);
+      setTexto("");
+      setArquivo(null);
+      onEnviado();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    } finally {
+      setEnviando(false);
+    }
+  }
+
+  return (
+    <div className="space-y-1.5">
+      {arquivo && (
+        <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink">
+          <Paperclip size={12} className="shrink-0 text-muted" />
+          <span className="min-w-0 flex-1 truncate">{arquivo.name}</span>
+          <button type="button" onClick={() => setArquivo(null)} className="shrink-0 text-muted hover:text-negative" aria-label="Remover anexo">
+            <X size={12} />
+          </button>
+        </div>
+      )}
+      <div className="flex gap-2">
+        <EmojiPickerButton
+          onPick={(emoji) => setTexto((t) => t + emoji)}
+          className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
+        />
+        <input
+          value={texto}
+          onChange={(e) => setTexto(e.target.value)}
+          onKeyDown={(e) => e.key === "Enter" && !enviando && (e.preventDefault(), enviar())}
+          placeholder="Registrar uma interação…"
+          className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
+        />
+        <input
+          ref={fileRef}
+          type="file"
+          accept="image/*,.pdf,.doc,.docx"
+          className="hidden"
+          onChange={(e) => e.target.files?.[0] && setArquivo(e.target.files[0])}
+        />
+        <button
+          type="button"
+          onClick={() => fileRef.current?.click()}
+          title="Anexar print ou arquivo"
+          className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
+        >
+          <Paperclip size={14} />
+        </button>
+        <button
+          type="button"
+          onClick={enviar}
+          disabled={enviando || (!texto.trim() && !arquivo)}
+          className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40"
+        >
+          {enviando ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />}
+        </button>
+      </div>
+    </div>
+  );
+}
+
+// Anexo de uma interacao -- bucket privado, entao a URL e' assinada sob
+// demanda (nao fica cacheada entre sessoes). Imagem mostra miniatura;
+// qualquer outro tipo vira link com nome do arquivo.
+function AnexoInteracao({ path, name, type }: { path: string; name: string | null; type: string | null }) {
+  const [url, setUrl] = useState<string | null>(null);
+  const [erro, setErro] = useState(false);
+
+  useEffect(() => {
+    let ativo = true;
+    getCardAttachmentUrl(path)
+      .then((u) => ativo && setUrl(u))
+      .catch(() => ativo && setErro(true));
+    return () => {
+      ativo = false;
+    };
+  }, [path]);
+
+  if (erro) return <p className="mt-1 text-[11px] text-negative">Anexo indisponível.</p>;
+  if (!url) return <p className="mt-1 flex items-center gap-1 text-[11px] text-muted"><Loader2 size={11} className="animate-spin" /> Carregando anexo…</p>;
+
+  if (type?.startsWith("image/")) {
+    return (
+      <a href={url} target="_blank" rel="noreferrer" className="mt-1.5 block">
+        {/* eslint-disable-next-line @next/next/no-img-element */}
+        <img src={url} alt={name ?? "Anexo"} className="max-h-40 rounded-lg border border-hairline object-cover" />
+      </a>
+    );
+  }
+  return (
+    <a href={url} target="_blank" rel="noreferrer" className="mt-1.5 flex items-center gap-1.5 text-[12px] text-training hover:underline">
+      <Paperclip size={12} /> {name ?? "Anexo"}
+    </a>
   );
 }
 

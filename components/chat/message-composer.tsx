@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { Check, Mic, Send, X } from "lucide-react";
 import { useAudioRecorder } from "@/lib/hooks/use-audio-recorder";
+import { EmojiPickerButton } from "@/components/emoji-picker";
 
 // Composer compartilhado: input de texto + botao de microfone que vira
 // uma barra de gravacao (cancelar/enviar), igual apps de chat com audio.
@@ -76,6 +77,7 @@ export function MessageComposer({
         </p>
       )}
       <div className="flex items-center gap-2 p-3">
+        <EmojiPickerButton onPick={(emoji) => setTexto((t) => t + emoji)} />
         <input
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
