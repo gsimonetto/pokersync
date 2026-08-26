@@ -332,14 +332,16 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Desktop comeca com os filtros abertos (igual sempre foi); mobile
-  // comeca fechado (gaveta, evita cobrir a mesa de cara). Sempre inicia
-  // true (igual ao SSR, que nao tem `window`) e corrige depois do mount
-  // -- ler matchMedia direto no useState causava hydration mismatch
-  // (server sempre renderiza aberto, cliente mobile abria fechado).
-  const [filtersOpen, setFiltersOpen] = useState(true);
-  useEffect(() => {
-    if (!window.matchMedia("(min-width: 769px)").matches) setFiltersOpen(false);
-  }, []);
+  // comeca fechado (gaveta, evita cobrir a mesa de cara). matchMedia so'
+  // roda uma vez no mount, no client. Isso gera um warning de hydration
+  // mismatch no console do modo dev (server sem `window` sempre renderiza
+  // aberto), mas e' inofensivo -- tentei "corrigir" via useEffect antes,
+  // mas isso criava um flash real (abre e fecha com animacao) no mobile,
+  // pior que o warning que resolvia.
+  const [filtersOpen, setFiltersOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 769px)").matches;
+  });
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<"fold" | "action" | "distractor" | null>(null);
