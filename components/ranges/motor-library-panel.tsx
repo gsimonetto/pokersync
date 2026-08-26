@@ -124,7 +124,7 @@ export function MotorLibraryPanel({ onLoad }: { onLoad: (hands: RangeHands) => v
       <section className="rounded-xl border border-hairline bg-surface p-4">
         <div className="flex items-center gap-2 text-sm font-semibold">
           <Library size={15} />
-          Biblioteca do motor
+          Ranges PokerSync
         </div>
         <p className="mt-1 text-[11px] text-muted">
           {erro || "Nenhum range pré-flop resolvido pelo solver disponível ainda."}
@@ -137,7 +137,7 @@ export function MotorLibraryPanel({ onLoad }: { onLoad: (hands: RangeHands) => v
     <section className="rounded-xl border border-hairline bg-surface p-4">
       <button onClick={() => setAberto((v) => !v)} className="flex w-full items-center gap-2 text-left text-sm font-semibold">
         <Library size={15} />
-        Biblioteca do motor
+        Ranges PokerSync
         <ChevronDown size={14} className={`ml-auto text-muted transition-transform ${aberto ? "rotate-180" : ""}`} />
       </button>
       <p className="mt-1 text-[11px] text-muted">

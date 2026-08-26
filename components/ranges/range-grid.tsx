@@ -9,6 +9,11 @@ export const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3"
 // Uma mao pode ser dividida entre as 3 acoes (estrategia mista, igual ao
 // que o solver ja retorna no Modo Treino). Mao ausente do mapa = fold
 // 100% implicito, mesma convencao do V1.
+export interface RaiseMixEntry {
+  type: RaiseType;
+  weight: number;
+}
+
 export interface HandDecision {
   fold: number;
   call: number;
@@ -18,6 +23,12 @@ export interface HandDecision {
       undefined = raise generico (cor verde padrao), pra nao quebrar
       ranges salvos antes dessa distincao existir. */
   raiseType?: RaiseType;
+  /** So' presente quando a fatia de raise (acima) foi pintada com o
+      pincel de mescla dividida entre dois sabores de raise (ex: metade
+      3-bet, metade all-in) — os pesos somam `raise`. Quando ausente, a
+      fatia inteira usa a cor de `raiseType`. Puramente cosmetico, igual
+      raiseType: o resto do produto so' le fold/call/raise. */
+  raiseMix?: RaiseMixEntry[];
 }
 
 export type RangeHands = Record<string, HandDecision>;
@@ -61,16 +72,50 @@ function decisionForTool(tool: ToolButton): HandDecision {
   };
 }
 
-// Se a celula ja' tem exatamente a decisao que essa ferramenta pintaria
-// (mesma acao E, no caso de raise, o mesmo sabor), a proxima pintada ali
-// vira "apagar" em vez de repintar em cima — sem checar o raiseType, o
-// botao 3-bet numa celula ja marcada como Raise simples entrava direto
-// em modo apagar ao inves de trocar pra 3-bet.
-function matchesTool(current: HandDecision, tool: ToolButton): boolean {
-  const { action, raiseType } = TOOL_META[tool];
-  if (action === "fold") return current.fold === 100;
-  if (action === "call") return current.call === 100;
-  return current.raise === 100 && (current.raiseType ?? "raise") === raiseType;
+// Pincel de mescla: combina duas ferramentas numa so' celula, cada uma
+// com seu peso (ex: 50% 3-bet + 50% All-in, ou 30% Fold + 70% Call).
+// Quando as duas caem em "raise" com sabores diferentes, guarda os dois
+// pesos em raiseMix pra colorir a fatia de raise dividida — o resto do
+// dado (fold/call/raise agregados) continua igual ao de sempre.
+function decisionForMix(toolA: ToolButton, toolB: ToolButton, weightA: number): HandDecision {
+  const weightB = 100 - weightA;
+  const buckets = { fold: 0, call: 0, raise: 0 };
+  const raiseWeights = new Map<RaiseType, number>();
+  for (const [tool, weight] of [
+    [toolA, weightA],
+    [toolB, weightB],
+  ] as const) {
+    if (weight <= 0) continue;
+    const { action, raiseType } = TOOL_META[tool];
+    buckets[action] += weight;
+    if (action === "raise") {
+      const rt = raiseType ?? "raise";
+      raiseWeights.set(rt, (raiseWeights.get(rt) ?? 0) + weight);
+    }
+  }
+  const raiseMix = Array.from(raiseWeights.entries()).map(([type, weight]) => ({ type, weight }));
+  return {
+    fold: buckets.fold,
+    call: buckets.call,
+    raise: buckets.raise,
+    raiseType: raiseMix[0]?.type,
+    raiseMix: raiseMix.length > 1 ? raiseMix : undefined,
+  };
+}
+
+// Compara duas decisoes pra saber se pintar de novo em cima deveria
+// apagar (mesmo resultado exato) ou repintar — usada tanto pro pincel
+// simples quanto pro de mescla, entao o gesto de "clicar nao muda nada
+// -> apaga" funciona igual nos dois modos.
+function decisionsEqual(a: HandDecision, b: HandDecision): boolean {
+  if (a.fold !== b.fold || a.call !== b.call || a.raise !== b.raise) return false;
+  if ((a.raiseType ?? null) !== (b.raiseType ?? null)) return false;
+  const key = (m?: RaiseMixEntry[]) =>
+    (m ?? [])
+      .map((e) => `${e.type}:${e.weight}`)
+      .sort()
+      .join(",");
+  return key(a.raiseMix) === key(b.raiseMix);
 }
 
 export function getDecision(hands: RangeHands, label: string): HandDecision {
@@ -114,10 +159,25 @@ function smartGroupCells(rowIdx: number, colIdx: number): [number, number][] {
 // proposito — so o que tem acao chama atencao visual.
 export function cellBackground(d: HandDecision): string {
   const foldC = "#c4c7c8", callC = "#3b82f6";
-  const raiseC = RAISE_TYPE_COLOR[d.raiseType ?? "raise"];
   const foldEnd = d.fold;
   const callEnd = d.fold + d.call;
-  return `linear-gradient(to top, ${foldC}22 0%, ${foldC}22 ${foldEnd}%, ${callC} ${foldEnd}%, ${callC} ${callEnd}%, ${raiseC} ${callEnd}%, ${raiseC} 100%)`;
+  const stops = [`${foldC}22 0%`, `${foldC}22 ${foldEnd}%`, `${callC} ${foldEnd}%`, `${callC} ${callEnd}%`];
+
+  // Fatia de raise: normalmente uma cor so' (raiseType). Quando raiseMix
+  // tem 2 entradas (pincel de mescla dividiu entre dois sabores de
+  // raise), empilha as duas dentro da mesma fatia — os pesos ja' somam
+  // d.raise, entao cada um vira exatamente aquele tanto de altura.
+  if (d.raise > 0) {
+    const mix = d.raiseMix && d.raiseMix.length > 1 ? d.raiseMix : [{ type: d.raiseType ?? "raise", weight: d.raise }];
+    let cursor = callEnd;
+    for (const seg of mix) {
+      const segEnd = cursor + seg.weight;
+      const color = RAISE_TYPE_COLOR[seg.type];
+      stops.push(`${color} ${cursor}%`, `${color} ${segEnd}%`);
+      cursor = segEnd;
+    }
+  }
+  return `linear-gradient(to top, ${stops.join(", ")})`;
 }
 
 // Combos totais do baralho (usado como denominador na barra de %) — 6
@@ -186,6 +246,14 @@ export function RangeGrid({
 }: RangeGridProps) {
   const [tool, setTool] = useState<ToolButton>("raise");
   const [percent, setPercent] = useState(100);
+  // Pincel de mescla: pinta uma celula dividida entre duas ferramentas
+  // (ex: metade Call metade Raise, ou metade 3-bet metade All-in) numa
+  // unica pintada, em vez de ter que abrir o editor de combo pra digitar
+  // os numeros na mao.
+  const [mixMode, setMixMode] = useState(false);
+  const [mixToolA, setMixToolA] = useState<ToolButton>("raise");
+  const [mixToolB, setMixToolB] = useState<ToolButton>("call");
+  const [mixRatio, setMixRatio] = useState(50);
   const isDragging = useRef(false);
   // Decidido uma vez no inicio da arrastada: se a celula clicada ja
   // tinha exatamente essa ferramenta a 100%, a arrastada inteira vira
@@ -214,34 +282,56 @@ export function RangeGrid({
     onChange(next);
   }
 
-  const applyGroup = useCallback(
-    (rowIdx: number, colIdx: number) => {
-      if (readOnly) return;
-      const cells = smartGroupCells(rowIdx, colIdx);
+  const currentBrush = useCallback(
+    () => (mixMode ? decisionForMix(mixToolA, mixToolB, mixRatio) : decisionForTool(tool)),
+    [mixMode, mixToolA, mixToolB, mixRatio, tool]
+  );
+
+  const paintCells = useCallback(
+    (cells: [number, number][]) => {
       const next = { ...value };
-      const painted = decisionForTool(tool);
-      for (const [r, c] of cells) {
-        const label = getHandLabel(r, c);
-        next[label] = dragMode.current === "erase" ? EMPTY_DECISION : painted;
-      }
+      const painted = dragMode.current === "erase" ? EMPTY_DECISION : currentBrush();
+      for (const [r, c] of cells) next[getHandLabel(r, c)] = painted;
       onChange(next);
     },
-    [value, onChange, readOnly, tool]
+    [value, onChange, currentBrush]
   );
+
+  // Toque/clique unico pinta so' a mao clicada — toque/clique duplo na
+  // MESMA mao (dentro de DOUBLE_TAP_MS) preenche o grupo "X+" inteiro
+  // (ex: clicar 55 pinta so' 55; clicar 55 de novo rapido preenche
+  // 55,66,77...ate' AA). Antes um unico clique ja preenchia o grupo
+  // todo, o que pintava mao demais sem querer.
+  const DOUBLE_TAP_MS = 400;
+  const lastTap = useRef<{ label: string; time: number } | null>(null);
 
   const startPaint = (rowIdx: number, colIdx: number) => {
     if (readOnly) return;
     isDragging.current = true;
     const label = getHandLabel(rowIdx, colIdx);
+    const now = Date.now();
+    const isDoubleTap = lastTap.current?.label === label && now - lastTap.current.time < DOUBLE_TAP_MS;
+
+    if (isDoubleTap) {
+      // Reaproveita o "past" ja' empilhado pelo primeiro toque —
+      // desfazer volta direto pro estado de antes do gesto inteiro,
+      // nao so' do segundo toque.
+      lastTap.current = null;
+      dragMode.current = "paint";
+      paintCells(smartGroupCells(rowIdx, colIdx));
+      return;
+    }
+
+    lastTap.current = { label, time: now };
     const current = getDecision(value, label);
-    dragMode.current = matchesTool(current, tool) ? "erase" : "paint";
+    dragMode.current = decisionsEqual(current, currentBrush()) ? "erase" : "paint";
     setPast((p) => [...p, value]);
     setFuture([]);
-    applyGroup(rowIdx, colIdx);
+    paintCells([[rowIdx, colIdx]]);
   };
   const continuePaint = (rowIdx: number, colIdx: number) => {
     if (!isDragging.current || readOnly) return;
-    applyGroup(rowIdx, colIdx);
+    paintCells([[rowIdx, colIdx]]);
   };
   const stopPaint = () => {
     isDragging.current = false;
@@ -278,13 +368,14 @@ export function RangeGrid({
         redo();
         return;
       }
+      if (mixMode) return;
       const idx = Number(e.key) - 1;
       if (idx >= 0 && idx < TOOL_ORDER.length) setTool(TOOL_ORDER[idx]);
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [readOnly, past, future, value]);
+  }, [readOnly, past, future, value, mixMode]);
 
   const summary = useMemo(() => {
     let combos = { fold: 0, call: 0, raise: 0 };
@@ -341,6 +432,21 @@ export function RangeGrid({
               <div className="flex shrink-0 gap-1">
                 <button
                   type="button"
+                  onClick={() => setMixMode((v) => !v)}
+                  title="Pintar celula dividida entre 2 acoes (ex: metade 3-bet, metade All-in)"
+                  aria-pressed={mixMode}
+                  className={`flex h-8 items-center gap-1.5 rounded-lg border px-2.5 text-xs font-medium transition-colors ${
+                    mixMode ? "border-evolution bg-evolution/10 text-evolution" : "border-hairline bg-elevated text-muted hover:text-ink"
+                  }`}
+                >
+                  <span className="flex h-3.5 w-3.5 overflow-hidden rounded-full border border-black/10">
+                    <span className="h-full w-1/2" style={{ backgroundColor: TOOL_META[mixToolA].color }} />
+                    <span className="h-full w-1/2" style={{ backgroundColor: TOOL_META[mixToolB].color }} />
+                  </span>
+                  Mesclar
+                </button>
+                <button
+                  type="button"
                   onClick={undo}
                   disabled={past.length === 0}
                   title="Desfazer (Ctrl+Z)"
@@ -360,19 +466,63 @@ export function RangeGrid({
               </div>
             </div>
 
-            <div className="flex items-center gap-2 rounded-full border border-hairline bg-elevated px-3 py-1.5">
-              <span className="shrink-0 text-[11px] text-muted">Top %</span>
-              <input
-                type="range"
-                min={0}
-                max={100}
-                value={percent}
-                onChange={(e) => applyPercent(Number(e.target.value))}
-                className="h-1 flex-1 cursor-pointer accent-current"
-                style={{ color: TOOL_META[tool].color }}
-              />
-              <span className="w-9 shrink-0 text-right text-[11px] font-medium tabular-nums text-ink">{percent}%</span>
-            </div>
+            {mixMode ? (
+              // Pincel de mescla: escolhe as 2 acoes e o quanto cada uma
+              // pesa — pinta a celula (ou o grupo "X+") inteira dividida
+              // nessa proporcao numa tacada so, sem precisar abrir o
+              // editor de combo pra digitar numero por numero.
+              <div className="flex flex-wrap items-center gap-2 rounded-xl border border-hairline bg-elevated px-3 py-2">
+                <select
+                  value={mixToolA}
+                  onChange={(e) => setMixToolA(e.target.value as ToolButton)}
+                  className="rounded-md border border-hairline bg-surface px-2 py-1 text-xs font-medium outline-none"
+                  style={{ color: TOOL_META[mixToolA].color }}
+                >
+                  {TOOL_ORDER.map((t) => (
+                    <option key={t} value={t}>
+                      {TOOL_META[t].label}
+                    </option>
+                  ))}
+                </select>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={mixRatio}
+                  onChange={(e) => setMixRatio(Number(e.target.value))}
+                  className="h-1 flex-1 cursor-pointer accent-current"
+                />
+                <select
+                  value={mixToolB}
+                  onChange={(e) => setMixToolB(e.target.value as ToolButton)}
+                  className="rounded-md border border-hairline bg-surface px-2 py-1 text-xs font-medium outline-none"
+                  style={{ color: TOOL_META[mixToolB].color }}
+                >
+                  {TOOL_ORDER.map((t) => (
+                    <option key={t} value={t}>
+                      {TOOL_META[t].label}
+                    </option>
+                  ))}
+                </select>
+                <span className="w-24 shrink-0 text-right text-[11px] font-medium tabular-nums text-muted">
+                  {mixRatio}% / {100 - mixRatio}%
+                </span>
+              </div>
+            ) : (
+              <div className="flex items-center gap-2 rounded-full border border-hairline bg-elevated px-3 py-1.5">
+                <span className="shrink-0 text-[11px] text-muted">Top %</span>
+                <input
+                  type="range"
+                  min={0}
+                  max={100}
+                  value={percent}
+                  onChange={(e) => applyPercent(Number(e.target.value))}
+                  className="h-1 flex-1 cursor-pointer accent-current"
+                  style={{ color: TOOL_META[tool].color }}
+                />
+                <span className="w-9 shrink-0 text-right text-[11px] font-medium tabular-nums text-ink">{percent}%</span>
+              </div>
+            )}
           </div>
         )}
 
@@ -386,7 +536,12 @@ export function RangeGrid({
               const label = getHandLabel(rowIdx, colIdx);
               const d = getDecision(value, label);
               const hasOverride = labelsWithOverrides?.has(label) ?? false;
-              const raiseTypeLabel = d.raise > 0 && d.raiseType && d.raiseType !== "raise" ? ` (${RAISE_TYPE_LABEL[d.raiseType]})` : "";
+              const raiseTypeLabel =
+                d.raise > 0 && d.raiseMix && d.raiseMix.length > 1
+                  ? ` (${d.raiseMix.map((seg) => `${RAISE_TYPE_LABEL[seg.type]} ${seg.weight}%`).join(" + ")})`
+                  : d.raise > 0 && d.raiseType && d.raiseType !== "raise"
+                    ? ` (${RAISE_TYPE_LABEL[d.raiseType]})`
+                    : "";
               const title = `${label} — Fold ${d.fold}% / Call ${d.call}% / Raise ${d.raise}%${raiseTypeLabel}${hasOverride ? " (tem combo customizado)" : ""}`;
               return (
                 <div
@@ -394,7 +549,7 @@ export function RangeGrid({
                   onPointerDown={() => startPaint(rowIdx, colIdx)}
                   onPointerEnter={() => continuePaint(rowIdx, colIdx)}
                   title={title}
-                  className={`relative flex aspect-square items-center justify-center rounded-[3px] text-[9px] font-medium text-ink transition-transform hover:z-10 hover:scale-[1.12] hover:shadow-md ${
+                  className={`relative flex aspect-square items-center justify-center rounded-[3px] text-[11px] font-semibold text-ink transition-transform hover:z-10 hover:scale-[1.12] hover:shadow-md ${
                     readOnly ? "cursor-default" : "cursor-pointer"
                   }`}
                   style={{ background: cellBackground(d) }}

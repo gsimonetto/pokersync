@@ -1,8 +1,28 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { GitCompare, Save, Trash2, Download, Check, Users, X, History, FolderOpen, ChevronDown, ChevronUp, Percent } from "lucide-react";
+import {
+  GitCompare,
+  Save,
+  Trash2,
+  Download,
+  Check,
+  Users,
+  X,
+  History,
+  FolderOpen,
+  ChevronDown,
+  ChevronUp,
+  ChevronRight,
+  Percent,
+  Maximize2,
+  MoreHorizontal,
+  PanelRightClose,
+  PanelRightOpen,
+  Library,
+} from "lucide-react";
 import { RangeGrid, getDecision, type RangeHands } from "@/components/ranges/range-grid";
 import { useConfirm } from "@/components/confirm-dialog";
 import { BoardAnalyzer } from "@/components/ranges/board-analyzer";
@@ -11,6 +31,7 @@ import { MotorLibraryPanel } from "@/components/ranges/motor-library-panel";
 import { RangeVersionHistory } from "@/components/ranges/range-version-history";
 import { ComboEditorModal } from "@/components/ranges/combo-editor-modal";
 import { RangeListModal } from "@/components/ranges/range-list-modal";
+import { RangeLibraryModal } from "@/components/ranges/range-library-modal";
 import { TagPicker } from "@/components/shared/tag-picker";
 import { labelForComboKey } from "@/lib/poker/range-board-analyzer";
 import {
@@ -50,6 +71,19 @@ export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }
   const [publishing, setPublishing] = useState(false);
   const [showMyRanges, setShowMyRanges] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
+  const [showExpandedGrid, setShowExpandedGrid] = useState(false);
+  const [showLibrary, setShowLibrary] = useState(false);
+  const [showMoreMenu, setShowMoreMenu] = useState(false);
+  const [showSidebar, setShowSidebar] = useState(true);
+  const moreMenuRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    function onClickOutside(e: MouseEvent) {
+      if (moreMenuRef.current && !moreMenuRef.current.contains(e.target as Node)) setShowMoreMenu(false);
+    }
+    document.addEventListener("mousedown", onClickOutside);
+    return () => document.removeEventListener("mousedown", onClickOutside);
+  }, []);
 
   useEffect(() => {
     fetchMyTeam().then(setMyTeam).catch(() => {});
@@ -170,8 +204,22 @@ export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }
           diferente do Treino/Banca (que sempre tiveram um card unico). */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
       {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+
+      {/* Breadcrumb: onde eu estou, sem depender do menu lateral pra
+          saber (ele so' diz o modulo, nao "estou dentro de um range"). */}
+      <div className="mb-2 flex items-center gap-1 text-xs text-muted">
+        <Link href="/ranges" className="hover:text-ink">
+          Ranges
+        </Link>
+        <ChevronRight size={12} />
+        <span className="text-ink">{name.trim() || (isNew ? "Novo range" : "Range sem nome")}</span>
+      </div>
+
       {/* Barra compacta: nome + tags + acoes, tudo numa linha so — o
-          Salvar fica sempre visivel sem precisar rolar a pagina. */}
+          Salvar fica sempre visivel sem precisar rolar a pagina. As
+          acoes secundarias (meus ranges, exportar, publicar, historico,
+          comparar, excluir) ficam atras de um "⋯" — eram 6-7 icones
+          identicos competindo com o Salvar pela atencao. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">
         <input
           value={name}
@@ -192,57 +240,89 @@ export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }
           {saving ? "Salvando…" : "Salvar"}
         </button>
 
-        <button
-          onClick={() => setShowMyRanges(true)}
-          title="Meus ranges"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
-        >
-          <FolderOpen size={16} />
-        </button>
-        <button
-          onClick={handleExport}
-          title="Exportar (copiar JSON)"
-          className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
-        >
-          {exported ? <Check size={16} className="text-positive" /> : <Download size={16} />}
-        </button>
-        {rangeId && myTeam && (
+        <div ref={moreMenuRef} className="relative shrink-0">
           <button
-            onClick={teamId ? handleUnpublish : handlePublish}
-            disabled={publishing}
-            title={teamId ? `Publicado no time ${myTeam.team.name} — clique pra remover` : `Publicar no time ${myTeam.team.name}`}
-            className={`grid h-9 w-9 place-items-center rounded-lg border disabled:opacity-50 ${
-              teamId ? "border-positive text-positive" : "border-hairline bg-elevated text-muted hover:text-ink"
-            }`}
+            onClick={() => setShowMoreMenu((v) => !v)}
+            title="Mais ações"
+            aria-pressed={showMoreMenu}
+            className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
           >
-            {teamId ? <X size={16} /> : <Users size={16} />}
+            <MoreHorizontal size={16} />
           </button>
-        )}
-        {rangeId && (
-          <>
-            <button
-              onClick={() => setShowHistory(true)}
-              title="Histórico de versões"
-              className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
-            >
-              <History size={16} />
-            </button>
-            <button
-              onClick={() => router.push(`/ranges/compare?a=${rangeId}`)}
-              title="Comparar"
-              className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted hover:text-ink"
-            >
-              <GitCompare size={16} />
-            </button>
-            <button
-              onClick={handleDelete}
-              title="Excluir"
-              className="grid h-9 w-9 place-items-center rounded-lg border border-hairline bg-elevated text-negative"
-            >
-              <Trash2 size={16} />
-            </button>
-          </>
-        )}
+
+          {showMoreMenu && (
+            <div className="absolute right-0 z-20 mt-1 w-56 rounded-xl border border-hairline bg-surface p-1 shadow-lg">
+              <button
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  setShowMyRanges(true);
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elevated"
+              >
+                <FolderOpen size={15} className="text-muted" />
+                Meus ranges
+              </button>
+              <button
+                onClick={() => {
+                  setShowMoreMenu(false);
+                  handleExport();
+                }}
+                className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elevated"
+              >
+                {exported ? <Check size={15} className="text-positive" /> : <Download size={15} className="text-muted" />}
+                {exported ? "Copiado!" : "Exportar (copiar JSON)"}
+              </button>
+              {rangeId && myTeam && (
+                <button
+                  onClick={() => {
+                    setShowMoreMenu(false);
+                    teamId ? handleUnpublish() : handlePublish();
+                  }}
+                  disabled={publishing}
+                  className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elevated disabled:opacity-50"
+                >
+                  <Users size={15} className={teamId ? "text-positive" : "text-muted"} />
+                  {teamId ? `Publicado (${myTeam.team.name}) — remover` : `Publicar no time ${myTeam.team.name}`}
+                </button>
+              )}
+              {rangeId && (
+                <>
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      setShowHistory(true);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elevated"
+                  >
+                    <History size={15} className="text-muted" />
+                    Histórico de versões
+                  </button>
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      router.push(`/ranges/compare?a=${rangeId}`);
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elevated"
+                  >
+                    <GitCompare size={15} className="text-muted" />
+                    Comparar
+                  </button>
+                  <div className="my-1 border-t border-hairline" />
+                  <button
+                    onClick={() => {
+                      setShowMoreMenu(false);
+                      handleDelete();
+                    }}
+                    className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-negative hover:bg-elevated"
+                  >
+                    <Trash2 size={15} />
+                    Excluir range
+                  </button>
+                </>
+              )}
+            </div>
+          )}
+        </div>
       </div>
 
       <button
@@ -266,9 +346,30 @@ export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }
           visivel (sticky) pra nao precisar rolar a pagina pra baixo pra
           ver analise/biblioteca. Em telas largas a lateral vira 2
           colunas (analise + biblioteca do motor) pra usar o espaco que
-          sobrava vazio ao lado da grade. */}
+          sobrava vazio ao lado da grade. O botao de esconder existe pra
+          quem quer a grade sozinha, sem competir por espaco. */}
       <div className="flex flex-col gap-4 lg:flex-row lg:items-start">
         <div className="lg:shrink-0">
+          <div className="mx-auto mb-2 flex items-center justify-end gap-2" style={{ maxWidth: 580 }}>
+            <button
+              type="button"
+              onClick={() => setShowSidebar((v) => !v)}
+              className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-xs text-muted hover:text-ink"
+              title={showSidebar ? "Esconder análise/biblioteca" : "Mostrar análise/biblioteca"}
+            >
+              {showSidebar ? <PanelRightClose size={13} /> : <PanelRightOpen size={13} />}
+              {showSidebar ? "Esconder análise" : "Mostrar análise"}
+            </button>
+            <button
+              type="button"
+              onClick={() => setShowExpandedGrid(true)}
+              className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-xs text-muted hover:text-ink"
+              title="Abrir a grade numa janela maior"
+            >
+              <Maximize2 size={13} />
+              Expandir
+            </button>
+          </div>
           <RangeGrid
             value={hands}
             onChange={setHands}
@@ -277,23 +378,70 @@ export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }
           />
         </div>
 
-        <div className="grid w-full flex-1 gap-4 lg:sticky lg:top-4 lg:grid-cols-2 lg:items-start xl:grid-cols-[460px_1fr]">
-          <div className="space-y-2">
-            <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
-            <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
-            <a
-              href={rangeId ? `/ranges/equidade?rangeId=${rangeId}` : "/ranges/equidade"}
-              className="flex items-center justify-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-2.5 text-xs text-muted hover:text-ink"
-            >
-              <Percent size={14} />
-              {rangeId ? "Calcular equidade desse range" : "Calcular equidade (salve o range primeiro)"}
-            </a>
-          </div>
+        {showSidebar && (
+          <div className="grid w-full flex-1 gap-4 lg:sticky lg:top-4 lg:grid-cols-2 lg:items-start xl:grid-cols-[460px_1fr]">
+            <div className="space-y-2">
+              <BoardAnalyzer hands={hands} comboOverrides={comboOverrides} startOpen />
+              <MultiBoardAnalyzer hands={hands} comboOverrides={comboOverrides} />
+              <a
+                href={rangeId ? `/ranges/equidade?rangeId=${rangeId}` : "/ranges/equidade"}
+                className="flex items-center justify-center gap-2 rounded-lg border border-hairline bg-surface px-3 py-2.5 text-xs text-muted hover:text-ink"
+              >
+                <Percent size={14} />
+                {rangeId ? "Calcular equidade desse range" : "Calcular equidade (salve o range primeiro)"}
+              </a>
+            </div>
 
-          <MotorLibraryPanel onLoad={setHands} />
+            <MotorLibraryPanel onLoad={setHands} />
+          </div>
+        )}
+      </div>
+      </div>
+
+      {showExpandedGrid && (
+        // Mesmo estado (hands/onChange) da grade pequena — nao e' uma
+        // copia, entao pintar aqui dentro ja' e' o range de verdade,
+        // sem precisar de "aplicar"/"confirmar" ao fechar.
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4"
+          onClick={() => setShowExpandedGrid(false)}
+        >
+          <div
+            className="flex max-h-[92vh] w-full max-w-[820px] flex-col overflow-y-auto rounded-2xl border border-hairline bg-surface p-5"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <h3 className="text-sm font-semibold">{name.trim() || "Range sem nome"}</h3>
+              <div className="flex items-center gap-2">
+                <div className="w-56 shrink-0">
+                  <TagPicker value={tags} onChange={setTags} />
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setShowLibrary(true)}
+                  title="Biblioteca de ranges (time/coach e motor PokerSync)"
+                  className="flex h-9 shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 text-xs text-muted hover:text-ink"
+                >
+                  <Library size={14} />
+                  Biblioteca
+                </button>
+                <button onClick={() => setShowExpandedGrid(false)} className="text-muted hover:text-ink" title="Fechar">
+                  <X size={18} />
+                </button>
+              </div>
+            </div>
+            <RangeGrid
+              value={hands}
+              onChange={setHands}
+              labelsWithOverrides={labelsWithOverrides}
+              onOpenComboEditor={setEditingComboLabel}
+              maxWidthPx={720}
+            />
+          </div>
         </div>
-      </div>
-      </div>
+      )}
+
+      {showLibrary && <RangeLibraryModal onLoad={setHands} onClose={() => setShowLibrary(false)} />}
 
       {editingComboLabel && (
         <ComboEditorModal
