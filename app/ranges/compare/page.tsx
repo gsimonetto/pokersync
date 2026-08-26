@@ -2,11 +2,11 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { GitCompare } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
 import { RangeCompare } from "@/components/ranges/range-compare";
 
+// Sem AppHeader (nome do modulo + voltar) de proposito -- o menu lateral
+// do AppShell ja identifica o modulo. Conteudo sobe direto pro topo.
 function RangeComparePageInner() {
   const searchParams = useSearchParams();
   const a = searchParams.get("a");
@@ -15,8 +15,6 @@ function RangeComparePageInner() {
   return (
     <AppShell>
       <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-        <AppHeader insideShell backHref="/ranges" icon={GitCompare} iconColor="var(--color-review)" title="Comparar Ranges" />
-
         <RangeCompare initialA={a} initialB={b} />
       </main>
     </AppShell>
