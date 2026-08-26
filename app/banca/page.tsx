@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Clock, Landmark, Search } from "lucide-react";
+import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, Hash, History, Landmark, Search, LineChart, CalendarDays, TriangleAlert } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, bbHourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
@@ -10,7 +10,6 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENC
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
 import { AppShell } from "@/components/app-shell";
-import { Kpi } from "@/components/time/kpi";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   fetchSessions,
@@ -592,124 +591,140 @@ export default function BankrollPage() {
   return (
     <AppShell>
     <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <div className="flex flex-wrap items-center justify-end gap-2">
-        {isMultiCurrency && (
-          <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
-            <select
-              value={currencyFilter}
-              onChange={(e) => setCurrencyFilter(e.target.value)}
-              title="Moeda — os stats abaixo nunca somam moedas diferentes"
-              className="bg-transparent text-[11px] font-bold uppercase tracking-[0.06em] text-training outline-none"
-            >
-              {currencies.map((c) => (
-                <option key={c} value={c}>
-                  {c}
-                </option>
-              ))}
-            </select>
-          </div>
-        )}
-        <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
-          <Landmark size={13} className="text-muted" />
-          <select
-            value={platformFilter}
-            onChange={(e) => setPlatformFilter(e.target.value)}
-            className="bg-transparent text-[11px] font-semibold uppercase tracking-[0.06em] text-ink outline-none"
-          >
-            <option value="todas">Todas as plataformas</option>
-            {platformNames.map((p) => (
-              <option key={p} value={p}>
-                {p}
-              </option>
-            ))}
-          </select>
-        </div>
-        <button
-          onClick={() => {
-            // Sempre entra em modo "registrar": se o modal foi usado pra
-            // editar antes, os campos preenchidos ficariam ali.
-            if (editingSessionId) resetSessionForm();
-            setSessionModalOpen(true);
-          }}
-          aria-label="Registrar sessao"
-          title="Registrar sessao"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void transition-colors hover:opacity-90"
-        >
-          <Plus size={18} strokeWidth={2.5} />
-        </button>
-        <button
-          onClick={() => setTxModalOpen(true)}
-          aria-label="Deposito / saque"
-          title="Deposito / saque"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-        >
-          <Wallet size={17} />
-        </button>
-      </div>
-
       {err && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
 
-      <section className="mt-4 grid grid-cols-2 gap-3 lg:grid-cols-4">
-        <Kpi
-          icon={Wallet}
-          label="Banca atual"
-          value={fmt(currentBankroll)}
-          tom={currentBankroll < 0 ? "negativo" : undefined}
-          hint={`${fmtSigned(agg.profit)} de resultado`}
-          destaque
+      {/* Faixa herói — mesmo padrão da Performance (Player Evolution):
+          nada de card por metrica, os numeros vivem soltos dentro de um
+          unico container, separados por divisor. */}
+      <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
+          <p className="text-sm text-muted">Sua banca, sessão a sessão</p>
+          <div className="flex items-center gap-2">
+            {isMultiCurrency && (
+              <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
+                <select
+                  value={currencyFilter}
+                  onChange={(e) => setCurrencyFilter(e.target.value)}
+                  title="Moeda — os stats abaixo nunca somam moedas diferentes"
+                  className="bg-transparent text-[11px] font-bold uppercase tracking-[0.06em] text-training outline-none"
+                >
+                  {currencies.map((c) => (
+                    <option key={c} value={c}>
+                      {c}
+                    </option>
+                  ))}
+                </select>
+              </div>
+            )}
+            <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
+              <Landmark size={13} className="text-muted" />
+              <select
+                value={platformFilter}
+                onChange={(e) => setPlatformFilter(e.target.value)}
+                className="bg-transparent text-[11px] font-semibold uppercase tracking-[0.06em] text-ink outline-none"
+              >
+                <option value="todas">Todas as plataformas</option>
+                {platformNames.map((p) => (
+                  <option key={p} value={p}>
+                    {p}
+                  </option>
+                ))}
+              </select>
+            </div>
+            <button
+              onClick={() => {
+                // Sempre entra em modo "registrar": se o modal foi usado pra
+                // editar antes, os campos preenchidos ficariam ali.
+                if (editingSessionId) resetSessionForm();
+                setSessionModalOpen(true);
+              }}
+              aria-label="Registrar sessao"
+              title="Registrar sessao"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void transition-colors hover:opacity-90"
+            >
+              <Plus size={18} strokeWidth={2.5} />
+            </button>
+            <button
+              onClick={() => setTxModalOpen(true)}
+              aria-label="Deposito / saque"
+              title="Deposito / saque"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
+            >
+              <Wallet size={17} />
+            </button>
+          </div>
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full opacity-[0.13] blur-3xl"
+          style={{ background: currentBankroll < 0 ? "#e0555a" : "#2FB89A" }}
         />
-        <Kpi
-          icon={TrendingUp}
-          label="ROI"
-          value={fmtPct(agg.roi)}
-          hint={comparison.previous.n > 0 ? `${fmtPct(roiDelta)} vs mês passado` : undefined}
-        />
-        <Kpi
-          icon={Clock}
-          label="R$/hora"
-          value={rate ? fmt(rate.value) : "—"}
-          tom={rate ? (rate.value >= 0 ? "positivo" : "negativo") : undefined}
-          hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
-        />
-        <Kpi
-          icon={Hash}
-          label="bb/hora"
-          value={bbRate ? bbRate.value.toFixed(1) : "—"}
-          tom={bbRate ? (bbRate.value >= 0 ? "positivo" : "negativo") : undefined}
-          hint={
-            bbRate
-              ? bbRate.n >= 2
-                ? `IC 95%: ${bbRate.ciLow.toFixed(1)} a ${bbRate.ciHigh.toFixed(1)} (${bbRate.n} sessões)`
-                : "Amostra pequena — registre mais sessões de cash com bb."
-              : "Só cash, precisa de horas e bb registrados."
-          }
-        />
+
+        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-4 sm:divide-y-0">
+          <HeroMetric
+            label="Banca atual"
+            value={fmt(currentBankroll)}
+            tone={currentBankroll < 0 ? "ruim" : "bom"}
+            hint={`${fmtSigned(agg.profit)} de resultado`}
+            destaque
+          />
+          <HeroMetric
+            label="ROI"
+            value={fmtPct(agg.roi)}
+            tone={agg.roi >= 0 ? "bom" : "ruim"}
+            hint={comparison.previous.n > 0 ? `${fmtPct(roiDelta)} vs mês passado` : undefined}
+          />
+          <HeroMetric
+            label="R$/hora"
+            value={rate ? fmt(rate.value) : "—"}
+            tone={!rate ? "neutro" : rate.value >= 0 ? "bom" : "ruim"}
+            hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
+          />
+          <HeroMetric
+            label="bb/hora"
+            value={bbRate ? bbRate.value.toFixed(1) : "—"}
+            tone={!bbRate ? "neutro" : bbRate.value >= 0 ? "bom" : "ruim"}
+            hint={
+              bbRate
+                ? bbRate.n >= 2
+                  ? `IC 95%: ${bbRate.ciLow.toFixed(1)} a ${bbRate.ciHigh.toFixed(1)} (${bbRate.n} sessões)`
+                  : "Amostra pequena"
+                : "Só cash, precisa de horas e bb"
+            }
+          />
+        </div>
       </section>
 
-      <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-        <Kpi icon={Target} label="ITM" value={`${agg.itm.toFixed(1)}%`} />
-        <Kpi icon={Hash} label="Sessões" value={String(agg.n)} />
-        <Kpi icon={Wallet} label="Buy-in médio" value={fmt(agg.avgBuyIn)} />
-        <Kpi
-          icon={History}
-          label="Drawdown atual"
-          value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
-          tom={currentDrawdown >= 15 ? "negativo" : undefined}
-        />
-        {agg.totalRake > 0 && <Kpi icon={Landmark} label="Rake pago" value={fmt(agg.totalRake)} tom="negativo" />}
-        {agg.totalRakeback > 0 && (
-          <Kpi icon={Landmark} label="Rakeback" value={fmt(agg.totalRakeback)} tom="positivo" />
-        )}
-        {nw.withdrawn > 0 && <Kpi icon={Wallet} label="Sacado" value={fmt(nw.withdrawn)} />}
-        {nw.caixinha > 0 && <Kpi icon={PiggyBank} label="Guardado (caixinha)" value={fmt(nw.caixinha)} />}
-      </section>
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Painel titulo="Resultado" icone={<Wallet size={14} className="text-training" />}>
+          <Linha label="ITM" valor={`${agg.itm.toFixed(1)}%`} />
+          <Linha label="Buy-in médio" valor={fmt(agg.avgBuyIn)} />
+          {agg.totalRake > 0 && <Linha label="Rake pago" valor={fmt(agg.totalRake)} tom="ruim" />}
+          {agg.totalRakeback > 0 && <Linha label="Rakeback" valor={fmt(agg.totalRakeback)} tom="bom" />}
+        </Painel>
 
-      <div className="mt-6 grid grid-cols-1 gap-5 lg:grid-cols-2">
-        <section className="flex h-full flex-col rounded-xl border border-hairline bg-surface p-6">
-          <div className="flex flex-wrap items-center justify-between gap-2">
-            <h2 className="text-base font-semibold">Evolução da banca</h2>
+        <Painel titulo="Risco e volume" icone={<ShieldAlert size={14} className="text-negative" />}>
+          <div className="rounded-lg border border-hairline bg-elevated p-4">
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Drawdown atual</p>
+            <p className={`mt-1 text-3xl font-bold tabular-nums ${currentDrawdown >= 15 ? "text-negative" : "text-ink"}`}>
+              {currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+            </p>
+          </div>
+          <Linha label="Sessões" valor={String(agg.n)} icone={<Hash size={13} />} />
+          {nw.withdrawn > 0 && <Linha label="Sacado" valor={fmt(nw.withdrawn)} />}
+          {nw.caixinha > 0 && <Linha label="Guardado (caixinha)" valor={fmt(nw.caixinha)} icone={<PiggyBank size={13} />} />}
+        </Painel>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Painel
+          titulo="Evolução da banca"
+          icone={<LineChart size={14} className="text-evolution" />}
+          className="flex h-full flex-col"
+          acao={
             <div className="flex flex-wrap items-center gap-2">
               <SegmentedControl value={range} onChange={setRange} options={RANGES} />
               <button
@@ -736,8 +751,9 @@ export default function BankrollPage() {
                 <Download size={13} />
               </button>
             </div>
-          </div>
-          <div className="mt-4 flex-1">
+          }
+        >
+          <div className="flex-1">
             <EvolutionChart series={filteredSeries} annotations={annotations} currency={currencyFilter} />
           </div>
 
@@ -769,23 +785,24 @@ export default function BankrollPage() {
               </div>
             </div>
           )}
-        </section>
+        </Painel>
 
-        <section className="flex h-full flex-col rounded-xl border border-hairline bg-surface p-6">
-          <h2 className="text-base font-semibold">Consistência de volume</h2>
-          <p className="mt-1 text-sm text-muted">Sessões jogadas por dia, no formato de calendário.</p>
-          <div className="mt-4 flex flex-1 items-center">
+        <Painel
+          titulo="Consistência de volume"
+          icone={<CalendarDays size={14} className="text-evolution" />}
+          className="flex h-full flex-col"
+        >
+          <div className="flex flex-1 items-center">
             <VolumeHeatmap activity={activity} currency={currencyFilter} />
           </div>
-        </section>
+        </Painel>
       </div>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <div>
-            <h2 className="text-base font-semibold">Painel de leaks</h2>
-            <p className="mt-1 text-sm text-muted">Onde o seu resultado mais vaza.</p>
-          </div>
+      <Painel
+        titulo="Painel de leaks"
+        icone={<TriangleAlert size={14} className="text-evolution" />}
+        className="mt-6"
+        acao={
           <SegmentedControl
             value={leakDimension}
             onChange={setLeakDimension}
@@ -795,7 +812,8 @@ export default function BankrollPage() {
               { value: "time" as const, label: "Horario" },
             ]}
           />
-        </div>
+        }
+      >
 
         {leakStats.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
@@ -1031,7 +1049,7 @@ export default function BankrollPage() {
             )}
           </button>
         </div>
-      </section>
+      </Painel>
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1386,11 +1404,11 @@ export default function BankrollPage() {
         </button>
       </Modal>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="text-base font-semibold">
-            {historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
-          </h2>
+      <Painel
+        titulo={historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
+        icone={<History size={14} className="text-training" />}
+        className="mt-6"
+        acao={
           <div className="flex items-center gap-2">
             {historyOpen && (
               <>
@@ -1439,7 +1457,8 @@ export default function BankrollPage() {
               </button>
             )}
           </div>
-        </div>
+        }
+      >
         {recent.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
         ) : (
@@ -1495,7 +1514,7 @@ export default function BankrollPage() {
               })}
             </div>
           )}
-        </section>
+      </Painel>
 
       <Modal open={txModalOpen} onClose={() => setTxModalOpen(false)} title="Deposito / saque / caixinha">
         <p className="text-xs text-muted">
@@ -1572,8 +1591,7 @@ export default function BankrollPage() {
         </button>
       </Modal>
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
-        <h2 className="text-base font-semibold">Historico de transacoes</h2>
+      <Painel titulo="Historico de transacoes" icone={<Wallet size={14} className="text-training" />} className="mt-6">
         {recentTx.length === 0 ? (
           <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
         ) : (
@@ -1610,9 +1628,93 @@ export default function BankrollPage() {
             ))}
           </div>
         )}
-      </section>
+      </Painel>
     </main>
     </AppShell>
+  );
+}
+
+// Mesmo padrao visual da Performance (Player Evolution): metrica solta
+// dentro de um container comum, sem virar card proprio.
+function HeroMetric({
+  label,
+  value,
+  hint,
+  tone,
+  destaque = false,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone: "bom" | "ruim" | "neutro";
+  destaque?: boolean;
+}) {
+  const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
+  return (
+    <div className="px-6 py-6">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
+      <p
+        className={`mt-2 font-bold leading-none tracking-tight tabular-nums ${
+          destaque ? "text-[2.25rem]" : "text-[1.75rem]"
+        } ${cor}`}
+      >
+        {value}
+      </p>
+      {hint && <p className="mt-2.5 text-[11.5px] text-muted">{hint}</p>}
+    </div>
+  );
+}
+
+// Mesmo componente "Painel" da Performance: titulo pequeno em caixa alta
+// + icone, sem o peso visual de um h2 grande por secao.
+function Painel({
+  titulo,
+  icone,
+  acao,
+  className,
+  children,
+}: {
+  titulo: string;
+  icone: React.ReactNode;
+  acao?: React.ReactNode;
+  className?: string;
+  children: React.ReactNode;
+}) {
+  return (
+    <section className={`rounded-xl border border-hairline bg-surface p-5 ${className ?? ""}`}>
+      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-center gap-1.5">
+          {icone}
+          <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">{titulo}</h2>
+        </div>
+        {acao}
+      </div>
+      {children}
+    </section>
+  );
+}
+
+// Linha densa label/valor — substitui o card por metrica dentro de um Painel.
+function Linha({
+  label,
+  valor,
+  tom,
+  icone,
+}: {
+  label: string;
+  valor: string;
+  tom?: "bom" | "ruim";
+  icone?: React.ReactNode;
+}) {
+  const cor = tom === "bom" ? "text-positive" : tom === "ruim" ? "text-negative" : "text-ink";
+  return (
+    <div className="flex items-baseline justify-between gap-3 border-b border-hairline py-2.5 last:border-b-0">
+      <p className="flex items-center gap-1.5 text-[13px] text-muted">
+        {icone}
+        {label}
+      </p>
+      <span className={`shrink-0 text-sm font-semibold tabular-nums ${cor}`}>{valor}</span>
+    </div>
   );
 }
 
