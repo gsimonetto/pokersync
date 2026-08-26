@@ -3,6 +3,7 @@ import { fmtMoney, fmtPct } from "./format";
 import type { Session, BrmThreshold } from "./types";
 
 const MIN_SAMPLE = 12;
+const MIN_SAMPLE_DIM = 8;
 const DD_WARN = 10;
 const DD_ACTION = 20;
 const LOW_VOLUME = 20;
@@ -77,6 +78,53 @@ export function buildCoachTips(
       text: `ROI de ${fmtPct(worst.roi)} em ${worst.n} sessoes. Reduza volume ou revise a estrategia.`,
     });
   }
+
+  // Melhor/pior dia da semana e melhor/pior periodo do dia -- mesma logica
+  // do melhor/pior formato acima, so trocando a dimensao de agrupamento.
+  // Amostra minima menor (MIN_SAMPLE_DIM) porque o volume total se espalha
+  // por mais grupos (7 dias, 4 periodos) do que os poucos formatos jogados.
+  const perWeekday = groupStats(sessions, "weekday");
+  const eligibleWeekday = perWeekday.filter((g) => g.n >= MIN_SAMPLE_DIM);
+  const bestWeekday = [...eligibleWeekday].sort((x, y) => y.roi - x.roi)[0];
+  const worstWeekday = [...eligibleWeekday].sort((x, y) => x.roi - y.roi)[0];
+  if (bestWeekday && bestWeekday.roi > 0) {
+    tips.push({
+      id: "best-weekday",
+      level: "good",
+      title: `${bestWeekday.key} e seu melhor dia`,
+      text: `ROI de ${fmtPct(bestWeekday.roi)} em ${bestWeekday.n} sessoes nesse dia. Se der pra escolher, concentre volume aqui.`,
+    });
+  }
+  if (worstWeekday && worstWeekday.roi < 0 && (!bestWeekday || worstWeekday.key !== bestWeekday.key)) {
+    tips.push({
+      id: "worst-weekday",
+      level: "warn",
+      title: `${worstWeekday.key} costuma pesar no resultado`,
+      text: `ROI de ${fmtPct(worstWeekday.roi)} em ${worstWeekday.n} sessoes. Vale observar o que muda nesse dia — cansaco, rotina, adversarios mais fortes.`,
+    });
+  }
+
+  const perTime = groupStats(sessions, "time");
+  const eligibleTime = perTime.filter((g) => g.n >= MIN_SAMPLE_DIM);
+  const bestTime = [...eligibleTime].sort((x, y) => y.roi - x.roi)[0];
+  const worstTime = [...eligibleTime].sort((x, y) => x.roi - y.roi)[0];
+  if (bestTime && bestTime.roi > 0) {
+    tips.push({
+      id: "best-time",
+      level: "good",
+      title: `${bestTime.key} e seu melhor periodo`,
+      text: `ROI de ${fmtPct(bestTime.roi)} em ${bestTime.n} sessoes jogando de ${bestTime.key.toLowerCase()}.`,
+    });
+  }
+  if (worstTime && worstTime.roi < 0 && (!bestTime || worstTime.key !== bestTime.key)) {
+    tips.push({
+      id: "worst-time",
+      level: "warn",
+      title: `${worstTime.key} e seu periodo mais fraco`,
+      text: `ROI de ${fmtPct(worstTime.roi)} em ${worstTime.n} sessoes. Se possivel, evite sessoes importantes nesse horario ate entender o motivo.`,
+    });
+  }
+
   if (opts.bankroll) {
     const reading = brmReading(sessions, opts.bankroll, opts.brmThresholds || []);
     if (reading) {
