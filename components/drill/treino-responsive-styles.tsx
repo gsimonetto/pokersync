@@ -17,11 +17,18 @@ export function TreinoResponsiveStyles() {
 
       /* O aside de filtros sempre teve overflow-y:auto (mais filtros
          cabem do que a coluna de 240px tem altura) -- a barra de rolagem
-         nativa do navegador (larga, cinza-clara) destoava do resto do
-         produto e parecia bug visual. Fina e no tom escuro do painel. */
-      .ps-tr-filters-scroll {
-        scrollbar-width: thin;
-        scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+         nativa do navegador (larga, cinza-clara, com botões de seta no
+         Chrome/Edge do Windows) destoava do resto do produto. scrollbar-
+         width (padrão) e ::-webkit-scrollbar-* (legado) não podem
+         conviver no mesmo elemento nesses navegadores -- juntos, o
+         Chrome ignora o customizado e os botões de seta voltam. O
+         @supports not selector(...) abaixo restringe o padrão ao
+         Firefox, que nao entende ::-webkit-scrollbar. */
+      @supports not selector(::-webkit-scrollbar) {
+        .ps-tr-filters-scroll {
+          scrollbar-width: thin;
+          scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+        }
       }
       .ps-tr-filters-scroll::-webkit-scrollbar { width: 6px; }
       .ps-tr-filters-scroll::-webkit-scrollbar-track { background: transparent; }

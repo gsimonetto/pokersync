@@ -49,10 +49,21 @@ select option {
 /* `color-scheme: dark` acima faz o Chrome/Edge no Windows desenhar a
    barra de rolagem classica (nao-overlay) com botoes de seta ▲▼ nas
    pontas — sobra destacada e sem função clara numa interface flat como
-   essa. Troca por uma trilha fina sem os botões, no mesmo tom do tema. */
-* {
-  scrollbar-width: thin;
-  scrollbar-color: var(--color-hairline) transparent;
+   essa. Troca por uma trilha fina sem os botões, no mesmo tom do tema.
+   `scrollbar-width`/`scrollbar-color` (padrão) e `::-webkit-scrollbar-*`
+   (legado) não podem conviver no mesmo elemento no Chrome/Edge modernos
+   -- quando os dois existem juntos, o navegador usa só o modelo padrão
+   e ignora o `::-webkit-scrollbar-button{display:none}` abaixo, entao
+   os botoes de seta voltavam a aparecer (bug reportado com print). O
+   `@supports not selector(...)` restringe o padrão ao Firefox, que não
+   entende `::-webkit-scrollbar` e por isso não tem outro jeito de
+   estilizar a barra; Chrome/Edge/Safari usam só o caminho legado, que
+   remove os botões de verdade. */
+@supports not selector(::-webkit-scrollbar) {
+  * {
+    scrollbar-width: thin;
+    scrollbar-color: var(--color-hairline) transparent;
+  }
 }
 
 ::-webkit-scrollbar {
