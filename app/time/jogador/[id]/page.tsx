@@ -136,7 +136,9 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
               ]
                 .filter(Boolean)
                 .join(" · ")
-            : "Carregando…"
+            : loading
+            ? "Carregando…"
+            : "Jogador não encontrado"
         }
         right={
           <div className="flex items-center gap-2 print:hidden">
