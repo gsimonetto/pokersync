@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
+import { RankChip } from "@/components/ui/rank-chip";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
 import {
   assignCoach,
@@ -190,9 +191,7 @@ export function TabJogadores({
                       <Link href={`/time/jogador/${j.userId}`} className="truncate text-sm font-medium hover:underline">
                         {j.nome}
                       </Link>
-                      <span className="shrink-0 rounded-md bg-elevated px-1.5 py-px text-[10px] font-bold tracking-wide text-muted">
-                        NÍVEL {j.level ?? 1}
-                      </span>
+                      <RankChip level={j.level ?? 1} />
                       {j.labelName && j.labelColor && (
                         <Chip color={j.labelColor} size="sm">{j.labelName}</Chip>
                       )}

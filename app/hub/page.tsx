@@ -5,17 +5,17 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { RankChip } from "@/components/ui/rank-chip";
 import {
   Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
-  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Users, Gift, Crown,
+  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Gift, Crown, Sparkles, Layers, X,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, MAX_LEVEL,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
   type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank, type Season,
 } from "@/lib/services/xp-service";
-import { fetchMyMembership, type MyMembership } from "@/lib/services/team-service";
 import { createClient } from "@/lib/supabase/client";
 
 const ACCENT = "#E0B24C";
@@ -82,6 +82,15 @@ const DIFFICULTY_META: Record<string, { label: string; color: string }> = {
   expert: { label: "Expert", color: "#e0555a" },
 };
 
+const DIFFICULTY_ORDER = ["facil", "media", "dificil", "expert"];
+
+// Dificuldade desconhecida vai pro fim, nao pro topo -- nao faz sentido
+// uma missao sem selo furar a fila das faceis.
+function difficultyRank(m?: AnyMission) {
+  const idx = DIFFICULTY_ORDER.indexOf(m?.difficulty);
+  return idx === -1 ? DIFFICULTY_ORDER.length : idx;
+}
+
 type MissionTab = "daily" | "weekly" | "monthly" | "challenge";
 
 export default function HubPage() {
@@ -91,25 +100,21 @@ export default function HubPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [tab, setTab] = useState<MissionTab>("daily");
+  const [tiersOpen, setTiersOpen] = useState(false);
 
   // Hub agora tem 2 vistas de verdade (pedido explicito: ranking "em
   // outra aba dentro do hub que mostrasse so isso"), nao missoes+ranking
   // empilhados na mesma tela infinita.
   const [view, setView] = useState<"missoes" | "ranking">("missoes");
 
-  const [rankingPeriod, setRankingPeriod] = useState<LeaderboardPeriod>("week");
+  const rankingPeriod: LeaderboardPeriod = "season";
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [myRank, setMyRank] = useState<MyRank | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [season, setSeason] = useState<Season | null>(null);
 
-  // Time -- acesso rapido ao modulo, sem bloquear o carregamento
-  // principal nem quebrar a tela se o usuario nao tiver time (caso normal).
-  const [membership, setMembership] = useState<MyMembership | null>(null);
-
   useEffect(() => {
-    fetchMyMembership().then(setMembership).catch(() => {});
     fetchActiveSeason().then(setSeason).catch(() => {});
   }, []);
 
@@ -181,13 +186,20 @@ export default function HubPage() {
   const level = progress.level;
   const isMaxLevel = level >= MAX_LEVEL;
   const badgeColor = levelColor(level);
+  const badgeMaterial = levelMaterial(level);
+  const badgeSubTier = levelSubTier(level);
   const xpNeeded = isMaxLevel ? 0 : xpForNextLevel(level);
   const xpCurrent = progress.xp_current;
   const pct = isMaxLevel ? 100 : Math.min(100, (xpCurrent / xpNeeded) * 100);
 
   const showingCatalog = missions.length === 0;
+  // Mais facil primeiro dentro de cada aba (pedido explicito) -- deixa a
+  // vitoria rapida no topo e a mais dificil por ultimo, em vez de ordem
+  // arbitraria do banco.
   const grp = (kind: string) =>
-    showingCatalog ? catalog.filter((m) => m.kind === kind) : missions.filter((m) => m.missions?.kind === kind);
+    (showingCatalog ? catalog.filter((m) => m.kind === kind) : missions.filter((m) => m.missions?.kind === kind))
+      .slice()
+      .sort((a, b) => difficultyRank(showingCatalog ? a : a.missions) - difficultyRank(showingCatalog ? b : b.missions));
   const dailyMissions = grp("daily");
   const weeklyMissions = grp("weekly");
   const monthlyMissions = grp("monthly");
@@ -241,20 +253,37 @@ export default function HubPage() {
           to   { transform: rotate(360deg); }
         }
         @keyframes hubBadgeBreathe {
-          0%, 100% { box-shadow: 0 0 0 4px ${badgeColor}18, 0 0 14px -2px ${badgeColor}70; }
-          50%      { box-shadow: 0 0 0 6px ${badgeColor}26, 0 0 26px 2px ${badgeColor}aa; }
+          0%, 100% { box-shadow: 0 0 0 5px ${badgeColor}22, 0 0 22px 0px ${badgeColor}90, 0 0 46px 4px ${badgeColor}40; }
+          50%      { box-shadow: 0 0 0 8px ${badgeColor}34, 0 0 38px 4px ${badgeColor}c0, 0 0 64px 10px ${badgeColor}60; }
         }
         @keyframes hubBadgeNumberGlow {
-          0%, 100% { text-shadow: 0 0 6px ${badgeColor}55; }
-          50%      { text-shadow: 0 0 16px ${badgeColor}cc; }
+          0%, 100% { text-shadow: 0 0 8px ${badgeColor}66, 0 0 2px ${badgeColor}; }
+          50%      { text-shadow: 0 0 22px ${badgeColor}ee, 0 0 4px ${badgeColor}; }
+        }
+        @keyframes hubBadgeHaloPulse {
+          0%, 100% { opacity: .55; transform: scale(1); }
+          50%      { opacity: 1; transform: scale(1.12); }
+        }
+        @keyframes hubBadgeOrbitSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes hubBadgeSheenSweep {
+          0%   { transform: translateX(-140%) skewX(-18deg); }
+          55%  { transform: translateX(220%) skewX(-18deg); }
+          100% { transform: translateX(220%) skewX(-18deg); }
         }
         @keyframes hubXpShimmer {
           0%   { transform: translateX(-100%); }
           100% { transform: translateX(300%); }
         }
         .hub-badge-ring { animation: hubBadgeRotate 6s linear infinite; }
+        .hub-badge-ring-thin { animation: hubBadgeRotate 10s linear infinite reverse; }
         .hub-badge-box { animation: hubBadgeBreathe 2.4s ease-in-out infinite; }
         .hub-badge-number { animation: hubBadgeNumberGlow 2.4s ease-in-out infinite; }
+        .hub-badge-halo { animation: hubBadgeHaloPulse 2.4s ease-in-out infinite; }
+        .hub-badge-orbit { animation: hubBadgeOrbitSpin 5s linear infinite; }
+        .hub-badge-sheen { animation: hubBadgeSheenSweep 3.2s ease-in-out infinite; }
         .hub-xp-shimmer { animation: hubXpShimmer 2.2s ease-in-out infinite; }
         .hub-level-card { transition: box-shadow .3s ease, border-color .3s ease; }
         .hub-level-card:hover { border-color: rgba(224,178,76,0.4); box-shadow: 0 0 30px -10px rgba(224,178,76,0.25); }
@@ -263,8 +292,36 @@ export default function HubPage() {
         .hub-trophy-btn { transition: all .2s ease; }
         .hub-trophy-btn:hover { transform: scale(1.08) rotate(-4deg); box-shadow: 0 0 16px -4px rgba(224,178,76,.5); }
         .hub-lb-row { animation: hubFadeInUp .25s ease-out both; transition: background-color .15s ease; }
+        @keyframes rkRiseIn {
+          from { opacity: 0; transform: translateY(18px) scale(.94); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes rkCrownGlow {
+          0%, 100% { opacity: .3; transform: scale(1); }
+          50%      { opacity: .6; transform: scale(1.35); }
+        }
+        @keyframes rkSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes rkGiftBob {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50%      { transform: translateY(-2px) rotate(-4deg); }
+        }
+        @keyframes rkCountdownPulse {
+          0%, 100% { opacity: 1; }
+          50%      { opacity: .55; }
+        }
+        .rk-riser { animation: rkRiseIn .45s cubic-bezier(.22,1,.36,1) both; }
+        .rk-pillar { transition: filter .2s ease; }
+        .rk-riser:hover .rk-pillar { filter: brightness(1.15); }
+        .rk-crown-glow { animation: rkCrownGlow 2.2s ease-in-out infinite; }
+        .rk-loading-spin { animation: rkSpin 1.1s linear infinite; }
+        .rk-gift-icon { animation: rkGiftBob 2.6s ease-in-out infinite; }
+        .rk-countdown { animation: rkCountdownPulse 2.4s ease-in-out infinite; }
+        .rk-banner { animation: hubFadeInUp .3s ease-out both; }
         @media (prefers-reduced-motion: reduce) {
-          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-box, .hub-badge-number, .hub-xp-shimmer { animation: none !important; transition: none !important; }
+          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-ring-thin, .hub-badge-box, .hub-badge-number, .hub-badge-halo, .hub-badge-orbit, .hub-badge-sheen, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner { animation: none !important; transition: none !important; }
         }
       `}</style>
 
@@ -278,14 +335,6 @@ export default function HubPage() {
       <div className="hub-level-card relative overflow-hidden rounded-xl border border-hairline bg-surface p-6">
         <div className="relative mb-4 flex flex-wrap items-center justify-between gap-2">
           <ViewToggle view={view} setView={setView} />
-          {membership && (
-            <Link
-              href="/time"
-              className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-            >
-              <Users size={10} /> {membership.teamName}
-            </Link>
-          )}
         </div>
         <div
           className="pointer-events-none absolute inset-0"
@@ -299,31 +348,37 @@ export default function HubPage() {
         />
 
         <div className="relative grid grid-cols-[auto_1fr_auto] items-center gap-5">
-          <div className="relative h-20 w-20">
-            {/* Anel giratorio atras do badge — conic-gradient na cor da
-                faixa, sempre girando (pedido explicito: "mais animacoes
-                no nivel"). */}
-            <div
-              className="hub-badge-ring pointer-events-none absolute -inset-1.5 rounded-full opacity-70 blur-[2px]"
-              style={{ background: `conic-gradient(from 0deg, transparent, ${badgeColor}, transparent 55%)` }}
-            />
-            <div
-              className="hub-badge-box relative grid h-20 w-20 place-items-center rounded-2xl bg-void text-3xl font-extrabold"
-              style={{ border: `2px solid ${badgeColor}`, color: badgeColor }}
-            >
-              <span className="hub-badge-number">{level}</span>
-            </div>
-          </div>
+          <LevelBadge level={level} />
 
           <div className="min-w-0">
-            {/* Nome de patente em ingles (Micro Stakes I etc) removido
-                (pedido explicito) — so o numero do nivel, sem rotulo por
-                baixo. Cor do nivel muda a cada 10 (pedido explicito). */}
+            {/* Rotulo de patente (Bronze/Prata/Ouro...) volta como chip
+                colorido -- pedido explicito: "detalhes que remetam o
+                nivel igual as patentes de jogos". Numeral romano imita a
+                subdivisao dentro do tier (Ouro III etc). Cor do nivel
+                muda a cada 10 (pedido explicito, ja existia). Botao ao
+                lado abre a galeria com todas as patentes animadas
+                (pedido explicito: "icone de niveis... mostre ao jogador,
+                com as animacoes de cada uma"). */}
             <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px]"
+                style={{ color: badgeColor, background: `${badgeColor}22`, border: `1px solid ${badgeColor}55` }}
+              >
+                {badgeMaterial} {badgeSubTier}
+              </span>
               <span>
                 Nível {level}
                 <span className="text-muted/70">/{MAX_LEVEL}</span>
               </span>
+              <button
+                type="button"
+                onClick={() => setTiersOpen(true)}
+                className="hub-trophy-btn grid h-5 w-5 place-items-center rounded-full border border-hairline text-muted hover:border-white/30 hover:text-ink"
+                aria-label="Ver todas as patentes"
+                title="Ver todas as patentes"
+              >
+                <Layers size={11} />
+              </button>
               {isMaxLevel && <span style={{ color: badgeColor }}>· MÁXIMO</span>}
               {progress.prestige_count > 0 && (
                 <span
@@ -428,8 +483,6 @@ export default function HubPage() {
           entries={leaderboard}
           loading={leaderboardLoading}
           meId={meId}
-          period={rankingPeriod}
-          onPeriodChange={setRankingPeriod}
           myRank={myRank}
           season={season}
           view={view}
@@ -437,7 +490,135 @@ export default function HubPage() {
         />
       )}
     </main>
+    {tiersOpen && <LevelTiersModal currentLevel={level} onClose={() => setTiersOpen(false)} />}
     </AppShell>
+  );
+}
+
+// Badge de nivel reutilizavel -- extraido do hero pra tambem alimentar a
+// galeria de patentes (LevelTiersModal). `size` em px controla o
+// tamanho, todo o resto (halo, aneis, particulas, sheen) escala junto
+// pra caber em telas menores (grid da galeria) sem perder o efeito.
+function LevelBadge({ level, size = 80 }: { level: number; size?: number }) {
+  const badgeColor = levelColor(level);
+  const badgeBandIdx = Math.min(9, Math.max(0, Math.ceil(level / 10) - 1));
+  const badgeEpic = badgeBandIdx >= 7;
+  const s = size / 80;
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      {/* Halo ambiente atras de tudo -- camada extra de glow, maior e
+          mais dispersa que o brilho do proprio badge (pedido explicito:
+          "mais brilho, mais glow"). Escala com o tier. */}
+      <div
+        className="hub-badge-halo pointer-events-none absolute rounded-full blur-2xl"
+        style={{ inset: -20 * s, background: `radial-gradient(circle, ${badgeColor}${badgeEpic ? "66" : "40"} 0%, transparent 70%)` }}
+      />
+      {/* Particulas orbitando -- so' nas faixas de prestigio alto
+          (Platina+), pra patente alta parecer mais "epica" sem poluir
+          os niveis iniciais. */}
+      {badgeEpic && (
+        <div className="hub-badge-orbit pointer-events-none absolute inset-0">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="absolute left-1/2 top-1/2 rounded-full"
+              style={{
+                width: 4 * s,
+                height: 4 * s,
+                background: badgeColor,
+                boxShadow: `0 0 ${6 * s}px 1px ${badgeColor}`,
+                transform: `rotate(${i * 120}deg) translateX(${46 * s}px)`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {/* Anel giratorio atras do badge — conic-gradient na cor da
+          faixa, sempre girando (pedido explicito: "mais animacoes no
+          nivel"), agora mais espesso e com halo proprio. */}
+      <div
+        className="hub-badge-ring pointer-events-none absolute rounded-full opacity-90 blur-[1.5px]"
+        style={{ inset: -8 * s, background: `conic-gradient(from 0deg, transparent, ${badgeColor}, ${badgeColor}, transparent 55%)` }}
+      />
+      <div className="hub-badge-ring-thin pointer-events-none absolute rounded-full border" style={{ inset: -2 * s, borderColor: `${badgeColor}55` }} />
+      <div
+        className="hub-badge-box relative grid place-items-center overflow-hidden rounded-2xl bg-void font-extrabold"
+        style={{ width: size, height: size, border: `2px solid ${badgeColor}`, color: badgeColor, fontSize: 28 * s }}
+      >
+        {/* Sheen -- faixa de luz varrendo o badge (efeito "carta
+            premium"), reforca o brilho sem precisar de mais cor. */}
+        <span
+          className="hub-badge-sheen pointer-events-none absolute inset-y-0 left-0 w-1/2"
+          style={{ background: "linear-gradient(115deg, transparent, rgba(255,255,255,.5), transparent)" }}
+        />
+        <span className="hub-badge-number relative">{level}</span>
+      </div>
+    </div>
+  );
+}
+
+// Galeria com as 10 patentes -- pedido explicito: "icone de niveis e
+// mostre ao jogador, com as animacoes de cada uma". Um nivel
+// representativo por faixa (o mais alto dela, pra mostrar o numeral
+// romano "I" que fecha o tier); a faixa do jogador ganha destaque.
+const TIER_PREVIEW_LEVELS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 99];
+
+function LevelTiersModal({ currentLevel, onClose }: { currentLevel: number; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const currentBand = Math.min(9, Math.max(0, Math.ceil(currentLevel / 10) - 1));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-2xl rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+            <Layers size={16} style={{ color: ACCENT }} /> Patentes
+          </h2>
+          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted hover:text-ink" aria-label="Fechar">
+            <X size={16} />
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted">A cor do seu nível sobe de patente a cada 10 níveis, até o 99.</p>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {TIER_PREVIEW_LEVELS.map((lvl, idx) => {
+            const color = levelColor(lvl);
+            const isCurrent = idx === currentBand;
+            return (
+              <div
+                key={lvl}
+                className="flex flex-col items-center gap-2 rounded-lg border p-3"
+                style={isCurrent ? { borderColor: `${color}70`, background: `${color}0F` } : { borderColor: "transparent" }}
+              >
+                <LevelBadge level={lvl} size={60} />
+                <span className="text-center text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
+                  {levelMaterial(lvl)}
+                </span>
+                <span className="text-[10px] text-muted">
+                  {/* Ultima faixa (Lendario) tem so' 9 niveis (91-99), nao 10
+                      como as demais -- MAX_LEVEL fecha em 99, nao 100. */}
+                  Nível {idx === 9 ? 91 : lvl - 9}–{lvl}
+                </span>
+                {isCurrent && (
+                  <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ color, background: `${color}22` }}>
+                    você está aqui
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -622,27 +803,19 @@ function ViewToggle({
   );
 }
 
-const BASE_RANKING_PERIODS: { value: LeaderboardPeriod; label: string }[] = [
-  { value: "week", label: "Semana" },
-  { value: "month", label: "Mês" },
-  { value: "all", label: "Geral" },
-];
-
 function fmtDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-// Ranking global -- vista propria do Hub (pedido explicito: "em outra
-// aba dentro do hub que mostrasse so isso, com podium"). Periodo Semana/
-// Mes/Geral + Temporada (3 em 3 meses, com premio configuravel via
-// leaderboard_seasons) -- Temporada so aparece na troca quando existe
-// uma configurada, pra nao virar aba morta.
+// Ranking global -- vista propria do Hub, so' por Temporada (pedido
+// explicito: "so quero o filtro de temporada"). Sem tabs Semana/Mes/Geral
+// -- a vista inteira gira em torno do ciclo trimestral com premio
+// (leaderboard_seasons). Sem temporada configurada, mostra estado vazio
+// proprio em vez de cair silenciosamente no ranking vitalicio.
 function RankingSection({
   entries,
   loading,
   meId,
-  period,
-  onPeriodChange,
   myRank,
   season,
   view,
@@ -651,84 +824,80 @@ function RankingSection({
   entries: LeaderboardEntry[] | null;
   loading: boolean;
   meId: string | null;
-  period: LeaderboardPeriod;
-  onPeriodChange: (p: LeaderboardPeriod) => void;
   myRank: MyRank | null;
   season: Season | null;
   view: "missoes" | "ranking";
   setView: (v: "missoes" | "ranking") => void;
 }) {
   const meInList = entries?.some((e) => e.userId === meId) ?? false;
-  const periods = season
-    ? [...BASE_RANKING_PERIODS.slice(0, 2), { value: "season" as const, label: "Temporada" }, ...BASE_RANKING_PERIODS.slice(2)]
-    : BASE_RANKING_PERIODS;
   const podium = entries?.slice(0, 3) ?? [];
   const rest = entries?.slice(3) ?? [];
+  const leaderXp = entries?.[0]?.xpTotal || 1;
 
   return (
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <ViewToggle view={view} setView={setView} />
-        <p className="text-xs text-muted">Ranking de todos os membros PokerSync.</p>
       </div>
 
-      {season && (
-        <div
-          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border p-4"
-          style={{ borderColor: `${ACCENT}40`, background: `${ACCENT}0D` }}
-        >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg" style={{ background: `${ACCENT}22`, color: ACCENT }}>
+      <div
+        className="rk-banner relative mb-4 overflow-hidden rounded-xl border p-4"
+        style={{ borderColor: `${ACCENT}40`, background: `linear-gradient(120deg, ${ACCENT}14, transparent 65%)` }}
+      >
+        <Sparkles size={110} strokeWidth={1} className="pointer-events-none absolute -right-4 -top-6 opacity-[0.08]" style={{ color: ACCENT }} />
+        <div className="relative flex flex-wrap items-center gap-3">
+          <div className="rk-gift-icon grid h-10 w-10 shrink-0 place-items-center rounded-lg" style={{ background: `${ACCENT}22`, color: ACCENT }}>
             <Gift size={18} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-ink">{season.rewardTitle || "Temporada em andamento"}</p>
-            {season.rewardDescription && <p className="mt-0.5 text-xs text-muted">{season.rewardDescription}</p>}
-          </div>
-          <div className="text-right text-xs text-muted">
-            <p>{fmtDate(season.startsAt)} — {fmtDate(season.endsAt)}</p>
-            <p className="font-semibold" style={{ color: ACCENT }}>
-              {season.daysRemaining === 0 ? "Termina hoje" : `${season.daysRemaining} dias restantes`}
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: ACCENT }}>
+              <Trophy size={11} /> Temporada
             </p>
+            <p className="mt-0.5 text-sm font-bold text-ink">
+              {season ? season.rewardTitle || "Temporada em andamento" : "Nenhuma temporada ativa"}
+            </p>
+            {season?.rewardDescription && <p className="mt-0.5 text-xs text-muted">{season.rewardDescription}</p>}
           </div>
+          {season && (
+            <div className="text-right text-xs text-muted">
+              <p>{fmtDate(season.startsAt)} — {fmtDate(season.endsAt)}</p>
+              <p className="rk-countdown font-semibold" style={{ color: ACCENT }}>
+                {season.daysRemaining === 0 ? "Termina hoje" : `${season.daysRemaining} dias restantes`}
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <div className="rounded-xl border border-hairline bg-surface p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
-            <Trophy size={16} /> Ranking PokerSync
-          </h2>
-          <SegmentedControl
-            value={period}
-            onChange={onPeriodChange}
-            options={periods.map((p) => ({ value: p.value, label: <span className="uppercase">{p.label}</span> }))}
-          />
-        </div>
+        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
+          <Trophy size={16} /> Ranking da temporada
+        </h2>
 
         <div className="mt-4">
           {loading ? (
-            <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
+            <div className="flex flex-col items-center gap-2 p-10 text-sm text-muted">
+              <Trophy size={22} className="rk-loading-spin" style={{ color: ACCENT }} />
+              Carregando ranking…
+            </div>
           ) : !entries || entries.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">
-              {period === "season" && !season
-                ? "Nenhuma temporada ativa no momento."
-                : period === "all"
-                  ? "Ninguém no ranking ainda."
-                  : "Ninguém ganhou XP nesse período ainda."}
-            </p>
+            <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted">
+              <Trophy size={28} strokeWidth={1.3} className="opacity-30" />
+              {!season ? "Nenhuma temporada ativa no momento." : "Ninguém ganhou XP nessa temporada ainda."}
+            </div>
           ) : (
             <>
               {podium.length === 3 && <Podium entries={podium} meId={meId} />}
               <div className="flex flex-col gap-1.5">
-                {(podium.length === 3 ? rest : entries).map((e) => (
-                  <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} />
+                {(podium.length === 3 ? rest : entries).map((e, idx) => (
+                  <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} idx={idx} leaderXp={leaderXp} />
                 ))}
                 {myRank && !meInList && (
                   <>
                     <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
                       <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
                     </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
+                    <div className="hub-lb-row flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
                       <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
                       <p className="min-w-0 flex-1 text-sm font-semibold">
                         Sua posição <span className="text-[10px] text-review">(você)</span>
@@ -749,12 +918,14 @@ function RankingSection({
 }
 
 const PODIUM_META = [
-  { rank: 2, order: "order-1", height: "h-20", medal: "#C0C6CC" },
-  { rank: 1, order: "order-2", height: "h-28", medal: "#F5D48C" },
-  { rank: 3, order: "order-3", height: "h-14", medal: "#CD7F32" },
+  { rank: 2, order: "order-1", height: "h-20", medal: "#C0C6CC", delay: "0s" },
+  { rank: 1, order: "order-2", height: "h-28", medal: "#F5D48C", delay: ".08s" },
+  { rank: 3, order: "order-3", height: "h-14", medal: "#CD7F32", delay: ".16s" },
 ] as const;
 
 // Pódio dos top 3 -- 1o lugar no centro e mais alto, estilo classico.
+// Colunas sobem com stagger (rk-riser) e o 1o lugar ganha uma coroa com
+// brilho pulsante -- reforca hierarquia visual sem precisar de texto extra.
 function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string | null }) {
   const byRank = (r: number) => entries.find((e) => e.rank === r);
   return (
@@ -764,23 +935,31 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
         if (!e) return null;
         const isMe = e.userId === meId;
         return (
-          <div key={meta.rank} className={`flex w-28 flex-col items-center ${meta.order}`}>
-            <Crown
-              size={meta.rank === 1 ? 20 : 14}
-              style={{ color: meta.medal, opacity: meta.rank === 1 ? 1 : 0.7 }}
-              fill={meta.rank === 1 ? meta.medal : "none"}
-            />
+          <div
+            key={meta.rank}
+            className={`rk-riser flex w-28 flex-col items-center ${meta.order}`}
+            style={{ animationDelay: meta.delay }}
+          >
+            <span className="relative grid place-items-center">
+              {meta.rank === 1 && (
+                <span className="rk-crown-glow absolute inset-0 rounded-full blur-md" style={{ background: meta.medal, opacity: 0.4 }} />
+              )}
+              <Crown
+                size={meta.rank === 1 ? 22 : 14}
+                className="relative"
+                style={{ color: meta.medal, opacity: meta.rank === 1 ? 1 : 0.7 }}
+                fill={meta.rank === 1 ? meta.medal : "none"}
+              />
+            </span>
             <p className="mt-1 w-full truncate text-center text-xs font-bold text-ink">
               {e.name} {isMe && <span className="text-[9px] text-review">(você)</span>}
             </p>
-            <p className="text-[10px]" style={{ color: levelColor(e.level) }}>
-              Nível {e.level}
-            </p>
+            <RankChip level={e.level} className="mt-0.5" />
             <p className="mt-0.5 text-[11px] font-bold" style={{ color: ACCENT }}>
               {e.xpTotal.toLocaleString("pt-BR")} XP
             </p>
             <div
-              className={`mt-2 flex w-full items-start justify-center rounded-t-lg pt-1.5 ${meta.height}`}
+              className={`rk-pillar mt-2 flex w-full items-start justify-center rounded-t-lg pt-1.5 ${meta.height}`}
               style={{ background: `${meta.medal}1A`, border: `1px solid ${meta.medal}55` }}
             >
               <span className="text-lg font-extrabold" style={{ color: meta.medal }}>
@@ -794,29 +973,52 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
   );
 }
 
-function RankingRow({ entry: e, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+function RankingRow({
+  entry: e,
+  isMe,
+  idx,
+  leaderXp,
+}: {
+  entry: LeaderboardEntry;
+  isMe: boolean;
+  idx: number;
+  leaderXp: number;
+}) {
   const medalColor = e.rank === 1 ? "#F5D48C" : e.rank === 2 ? "#C0C6CC" : e.rank === 3 ? "#CD7F32" : null;
+  const share = Math.max(4, Math.min(100, (e.xpTotal / leaderXp) * 100));
   return (
     <div
-      className={`hub-lb-row flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+      className={`hub-lb-row group relative overflow-hidden rounded-lg border px-3 py-2.5 ${
         isMe ? "border-review/50 bg-review/[0.08]" : "border-hairline bg-void/40 hover:bg-elevated"
       }`}
-      style={{ animationDelay: `${Math.min(e.rank, 20) * 0.02}s` }}
+      style={{ animationDelay: `${Math.min(idx, 20) * 0.02}s` }}
     >
-      <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
-        {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">
-          {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
-        </p>
-        <p className="text-[11px] text-muted">
-          <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span> · {e.streakDays} dias de streak
-        </p>
+      {/* Barra de XP relativa ao lider -- da' densidade visual sem novo numero. */}
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 transition-all duration-700"
+        style={{ width: `${share}%`, background: `linear-gradient(90deg, ${ACCENT}14, transparent)` }}
+      />
+      <div className="relative flex items-center gap-3">
+        <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
+          {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+            <RankChip level={e.level} />
+            {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
+          </p>
+          <p className="text-[11px] text-muted">
+            {e.streakDays > 0 && (
+              <span className="inline-flex items-center gap-0.5">
+                <Flame size={10} className="text-orange-400" /> {e.streakDays} dias de streak
+              </span>
+            )}
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+          {e.xpTotal.toLocaleString("pt-BR")} XP
+        </span>
       </div>
-      <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
-        {e.xpTotal.toLocaleString("pt-BR")} XP
-      </span>
     </div>
   );
 }

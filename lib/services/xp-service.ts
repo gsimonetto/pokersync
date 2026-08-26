@@ -38,9 +38,35 @@ const LEVEL_BAND_COLORS = [
   "#F5D48C", // 91-99 lendario
 ];
 
-export function levelColor(level: number): string {
+// Nome do "material" de cada faixa -- pedido explicito: "detalhes que
+// remetam o nivel igual as patentes de jogos" (Bronze/Prata/Ouro etc,
+// no estilo League/Valorant/CS). Paralelo posicional a LEVEL_BAND_COLORS.
+const LEVEL_BAND_MATERIALS = [
+  "Bronze", "Prata", "Ouro", "Esmeralda", "Safira",
+  "Ametista", "Rubi", "Platina", "Diamante", "Lendário",
+];
+
+function bandIndex(level: number): number {
   const band = Math.min(Math.ceil(level / 10), LEVEL_BAND_COLORS.length);
-  return LEVEL_BAND_COLORS[Math.max(0, band - 1)];
+  return Math.max(0, band - 1);
+}
+
+export function levelColor(level: number): string {
+  return LEVEL_BAND_COLORS[bandIndex(level)];
+}
+
+export function levelMaterial(level: number): string {
+  return LEVEL_BAND_MATERIALS[bandIndex(level)];
+}
+
+// Subdivisao dentro da faixa (estilo "Ouro III"), do 4 (acabou de entrar
+// na faixa) ao 1 (prestes a subir de material) -- mesma logica de
+// divisoes que jogos de ranking usam pra dar sensacao de progresso
+// dentro do proprio tier, nao so entre tiers.
+export function levelSubTier(level: number): string {
+  const posInBand = ((level - 1) % 10) + 1; // 1..10
+  const tier = posInBand <= 2 ? 4 : posInBand <= 5 ? 3 : posInBand <= 8 ? 2 : 1;
+  return ["", "I", "II", "III", "IV"][tier];
 }
 
 // Legado — nao usado mais na UI (nome de patente em ingles removido a
