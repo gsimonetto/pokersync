@@ -27,8 +27,3 @@ yarn-error.log*
 
 # vercel
 .vercel
-
-# agent-desktop (Rust/Tauri)
-/agent-desktop/target/
-/agent-desktop/**/target/
-/agent-desktop/src-tauri/gen/

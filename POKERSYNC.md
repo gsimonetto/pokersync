@@ -76,13 +76,14 @@ e não como:
 
 ## 4. Arquitetura real
 
-Três repositórios e um banco. Isso não estava documentado em lugar
+Quatro repositórios e um banco. Isso não estava documentado em lugar
 nenhum e é o contexto que mais falta a quem (ou o que) chega no projeto.
 
 | Onde | O que é | Stack |
 | --- | --- | --- |
 | [`gsimonetto/pokersync`](https://github.com/gsimonetto/pokersync) | **O produto.** Todas as telas e serviços. | Next.js (App Router) + Supabase |
 | [`gsimonetto/pokersync-solver`](https://github.com/gsimonetto/pokersync-solver) | **Motor GTO próprio.** CFR + ICM, jobs em lote, API de disparo. | Python, FastAPI, Railway |
+| [`gsimonetto/pokersync-agent`](https://github.com/gsimonetto/pokersync-agent) | **Agente desktop.** Varre hand history no computador do jogador e sincroniza via `/api/agent/*` (neste repo). | Rust + Tauri |
 | [`gsimonetto/pokersync-road-map`](https://github.com/gsimonetto/pokersync-road-map) | Roadmap editável (board visual). | TanStack Start / Lovable |
 | Supabase `PokerSync` | Banco, RLS, ~65 tabelas e ~90 RPCs. Fonte de verdade de tudo. | Postgres 17 |
 
@@ -263,7 +264,7 @@ biblioteca de time, journal de decisões.
 | Alertas | ✅ | `team_alerts` + `run_team_alerts()` |
 | Score de evolução | 🟡 | existe XP/nível e leaks por jogador; não existe um "score" único consolidado |
 | JSON padronizado / sincronização | 🟡 | o schema existe (`hand_sync_devices`, `hand_sync_batches`, `agent_version`, `raw_payload`) |
-| **Agente desktop** | 🟡 | scaffold em `agent-desktop/` (Tauri + Rust): varredura de HH no disco, `/api/agent/{ping,sync}` gravando em `hand_sync_devices`/`hand_sync_batches`/`hand_reviews`. Falta validar contra instalações reais e extrair pra repo próprio — ver `agent-desktop/README.md` |
+| **Agente desktop** | 🟡 | scaffold em [`pokersync-agent`](https://github.com/gsimonetto/pokersync-agent) (Tauri + Rust): varredura de HH no disco, `/api/agent/{ping,sync}` (neste repo) gravando em `hand_sync_devices`/`hand_sync_batches`/`hand_reviews`. Falta validar contra instalações reais |
 
 ### 6.7 Hub de Evolução — `/hub`
 
@@ -282,7 +283,7 @@ de verdade hoje.
 | 1 | Pipeline de pós-flop ponta a ponta (job → contrato → UI) | Treino ↔ Review | **subiu pro topo**: os 5 leaks reais da base são todos pós-flop, então é o único item que faz o loop leak → treino funcionar de verdade hoje |
 | 2 | Gerar estoque pré-flop: push/fold ICM e stacks 10/20/30/50bb | Treino | motor, job e endpoint já existem — falta disparar (escreve em produção) |
 | 3 | Score de evolução consolidado do jogador | Times / Hub | há matéria-prima (XP, leaks, aderência, ROI) |
-| 4 | Agente desktop | Times | 🟡 iniciado (`agent-desktop/`) — falta validar varredura/parsing contra instalações reais de cada sala e extrair pra repo próprio (decisão 009) |
+| 4 | Agente desktop | Times | 🟡 iniciado, já em repo próprio ([`pokersync-agent`](https://github.com/gsimonetto/pokersync-agent), decisão 009) — falta validar varredura/parsing contra instalações reais de cada sala |
 | 5 | Decidir o catálogo de formatos | Banca | o formulário oferece MTT/Cash/SNG/Spin, mas 61 das 73 sessões gravadas dizem `"Torneio"`; ou o catálogo muda, ou as sessões antigas migram |
 | 6 | Sincronizar o board do roadmap com a realidade | Roadmap | todos os itens estão marcados "Planejado", inclusive os 7 módulos no ar |
 
@@ -326,6 +327,15 @@ inteira tem **8 linhas**, todas RFI/Jam de pré-flop.
   e sem leitura do formato novo no frontend.
 
 ## 9. Changelog
+
+### 2026-08-26 — Agente desktop extraído para repo próprio
+- Código do agente (antes em `agent-desktop/` neste repo) movido para
+  [`gsimonetto/pokersync-agent`](https://github.com/gsimonetto/pokersync-agent)
+  via `git subtree split`, preservando o histórico. Fecha a pendência
+  registrada abaixo — decisão 009 (motor/agente fora do repo do produto)
+  agora vale também pro agente. Só `app/api/agent/{ping,sync}` e
+  `lib/services/agent-sync-service.ts` continuam aqui, por serem parte do
+  produto (consomem `lib/poker/hand-parser.ts`).
 
 ### 2026-08-26 — Início do agente desktop
 - Scaffold do agente em `agent-desktop/` (Tauri + Rust): crate `scanner`
