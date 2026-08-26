@@ -27,7 +27,7 @@ import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
 // id === "novo" -> cria um range vazio (nao existe ainda no banco, so
 // e' persistido no primeiro Salvar). Qualquer outro valor e' um uuid
 // real, carregado do Supabase.
-export function RangeEditor({ id }: { id: string }) {
+export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }) {
   const router = useRouter();
   const confirm = useConfirm();
   const isNew = id === "novo";
@@ -169,6 +169,7 @@ export function RangeEditor({ id }: { id: string }) {
           sem nada amarrando visualmente que aquilo e' uma unica tela,
           diferente do Treino/Banca (que sempre tiveram um card unico). */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
       {/* Barra compacta: nome + tags + acoes, tudo numa linha so — o
           Salvar fica sempre visivel sem precisar rolar a pagina. */}
       <div className="mb-3 flex flex-wrap items-center gap-2">

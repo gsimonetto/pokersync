@@ -9,6 +9,7 @@ import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
+import { FilterChip as SharedFilterChip } from "@/components/ui/filter-chip";
 import {
   ALL_POSITIONS,
   getRfiJamSpot,
@@ -136,31 +137,21 @@ interface Round {
   gap: number;
 }
 
+// Mesmo FilterChip usado em Revisor e Biblioteca de Ranges (pedido
+// explicito: "os filtros formem um padrão" -- antes era uma caixinha
+// quadrada com fundo branco no ativo, so' aqui no Treino).
 function FilterChip({
   label, active, disabled, onClick, disabledReason,
 }: { label: string; active: boolean; disabled?: boolean; onClick: () => void; disabledReason?: string }) {
   return (
-    <button
-      onClick={disabled ? undefined : onClick}
+    <SharedFilterChip
+      label={label}
+      active={active}
       disabled={disabled}
-      title={disabled ? disabledReason ?? "Sem mãos geradas para essa combinação ainda" : undefined}
-      style={{
-        fontFamily: F,
-        padding: "6px 12px",
-        borderRadius: 8,
-        fontSize: 12,
-        fontWeight: 500,
-        cursor: disabled ? "not-allowed" : "pointer",
-        border: active ? "1px solid rgba(255,255,255,0.9)" : disabled ? "1px dashed rgba(255,255,255,0.07)" : "1px solid rgba(255,255,255,0.10)",
-        background: active ? "#FFFFFF" : "rgba(255,255,255,0.02)",
-        color: active ? "#111111" : disabled ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.55)",
-        textDecoration: disabled ? "line-through" : "none",
-        transition: "all 160ms ease",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </button>
+      disabledReason={disabledReason ?? "Sem mãos geradas para essa combinação ainda"}
+      onClick={onClick}
+      style={{ fontFamily: F }}
+    />
   );
 }
 

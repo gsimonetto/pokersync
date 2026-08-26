@@ -71,7 +71,15 @@ function diffRanges(a: RangeHands, b: RangeHands): DiffSummary {
   return { onlyA, onlyB, common, differentWeight };
 }
 
-export function RangeCompare({ initialA, initialB }: { initialA: string | null; initialB: string | null }) {
+export function RangeCompare({
+  initialA,
+  initialB,
+  tabs,
+}: {
+  initialA: string | null;
+  initialB: string | null;
+  tabs?: React.ReactNode;
+}) {
   const router = useRouter();
   const [options, setOptions] = useState<RangeListItem[]>([]);
   const [idA, setIdA] = useState(initialA ?? "");
@@ -122,6 +130,7 @@ export function RangeCompare({ initialA, initialB }: { initialA: string | null; 
           padrao do Treino/Banca (uma tela, um card), em vez de cada
           pedaco flutuando solto contra o void. */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <select
           value={idA}

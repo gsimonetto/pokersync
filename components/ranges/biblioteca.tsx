@@ -6,6 +6,7 @@ import { Layers, GitBranch, Search } from "lucide-react";
 import { listRanges, type RangeHands, type RangeListItem } from "@/lib/services/range-service";
 import { listTrees, type TreeListItem } from "@/lib/services/strategy-tree-service";
 import { RangeGridPreview } from "@/components/ranges/range-grid-preview";
+import { FilterChip } from "@/components/ui/filter-chip";
 
 // Temas sugeridos como atalho — aparecem mesmo com 0 itens, pra sinalizar
 // que sao categorias validas do produto (o usuario so precisa comecar a
@@ -93,24 +94,9 @@ export function Biblioteca() {
       </div>
 
       <div className="mb-6 flex flex-wrap gap-2">
-        <button
-          onClick={() => setActiveTag(null)}
-          className={`rounded-full border px-3 py-1 text-xs ${
-            activeTag === null ? "border-ink bg-ink text-void" : "border-hairline bg-surface text-muted"
-          }`}
-        >
-          Tudo ({items.length})
-        </button>
+        <FilterChip label={`Tudo (${items.length})`} active={activeTag === null} onClick={() => setActiveTag(null)} />
         {themes.map(([tag, count]) => (
-          <button
-            key={tag}
-            onClick={() => setActiveTag(tag)}
-            className={`rounded-full border px-3 py-1 text-xs ${
-              activeTag === tag ? "border-ink bg-ink text-void" : "border-hairline bg-surface text-muted"
-            }`}
-          >
-            {tag} ({count})
-          </button>
+          <FilterChip key={tag} label={`${tag} (${count})`} active={activeTag === tag} onClick={() => setActiveTag(tag)} />
         ))}
       </div>
 
