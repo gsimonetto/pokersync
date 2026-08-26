@@ -81,6 +81,15 @@ const DIFFICULTY_META: Record<string, { label: string; color: string }> = {
   expert: { label: "Expert", color: "#e0555a" },
 };
 
+const DIFFICULTY_ORDER = ["facil", "media", "dificil", "expert"];
+
+// Dificuldade desconhecida vai pro fim, nao pro topo -- nao faz sentido
+// uma missao sem selo furar a fila das faceis.
+function difficultyRank(m?: AnyMission) {
+  const idx = DIFFICULTY_ORDER.indexOf(m?.difficulty);
+  return idx === -1 ? DIFFICULTY_ORDER.length : idx;
+}
+
 type MissionTab = "daily" | "weekly" | "monthly" | "challenge";
 
 export default function HubPage() {
@@ -180,8 +189,13 @@ export default function HubPage() {
   const pct = isMaxLevel ? 100 : Math.min(100, (xpCurrent / xpNeeded) * 100);
 
   const showingCatalog = missions.length === 0;
+  // Mais facil primeiro dentro de cada aba (pedido explicito) -- deixa a
+  // vitoria rapida no topo e a mais dificil por ultimo, em vez de ordem
+  // arbitraria do banco.
   const grp = (kind: string) =>
-    showingCatalog ? catalog.filter((m) => m.kind === kind) : missions.filter((m) => m.missions?.kind === kind);
+    (showingCatalog ? catalog.filter((m) => m.kind === kind) : missions.filter((m) => m.missions?.kind === kind))
+      .slice()
+      .sort((a, b) => difficultyRank(showingCatalog ? a : a.missions) - difficultyRank(showingCatalog ? b : b.missions));
   const dailyMissions = grp("daily");
   const weeklyMissions = grp("weekly");
   const monthlyMissions = grp("monthly");
