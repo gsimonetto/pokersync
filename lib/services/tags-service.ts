@@ -20,12 +20,8 @@ export interface ProductTag {
   color: string;
 }
 
-// Toda conta nova comeca com esse conjunto — os mesmos temas ja
-// sugeridos na Biblioteca antes dessa tabela existir. So' e' inserido
-// se o usuario ainda nao tem NENHUMA tag (nao reinsere se ele ja
-// apagou/customizou).
-const DEFAULT_TAGS = ["3-bet pots", "C-bet", "Blind vs Blind", "ICM", "Mystery Bounty", "Push/Fold", "Defesa de BB"];
-
+// Sem seed automatico de proposito: o jogador comeca sem nenhuma tag e
+// so' aparece aqui o que ele mesmo criar em createProductTag.
 export async function listProductTags(): Promise<ProductTag[]> {
   const supabase = createClient();
   const {
@@ -38,20 +34,7 @@ export async function listProductTags(): Promise<ProductTag[]> {
     .select("id, label, color")
     .order("label", { ascending: true });
   if (error) throw error;
-
-  if ((data ?? []).length > 0) return data as ProductTag[];
-
-  const seeded = DEFAULT_TAGS.map((label, i) => ({
-    user_id: user.id,
-    label,
-    color: TAG_PALETTE[i % TAG_PALETTE.length],
-  }));
-  const { data: inserted, error: insertError } = await supabase
-    .from("product_tags")
-    .insert(seeded)
-    .select("id, label, color");
-  if (insertError) throw insertError;
-  return (inserted as ProductTag[]).sort((a, b) => a.label.localeCompare(b.label));
+  return data as ProductTag[];
 }
 
 export async function createProductTag(label: string, color: string): Promise<ProductTag> {

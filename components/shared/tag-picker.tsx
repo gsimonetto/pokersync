@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Plus, X, Tag as TagIcon, Check } from "lucide-react";
-import { listProductTags, createProductTag, TAG_PALETTE, type ProductTag } from "@/lib/services/tags-service";
+import { Plus, X, Tag as TagIcon, Check, Trash2 } from "lucide-react";
+import { listProductTags, createProductTag, deleteProductTag, TAG_PALETTE, type ProductTag } from "@/lib/services/tags-service";
 
 // Usado em qualquer lugar do produto que precise de tags (Ranges,
 // Arvores, e futuramente outros modulos) — a lista de tags disponiveis
@@ -38,6 +38,16 @@ export function TagPicker({ value, onChange }: { value: string[]; onChange: (lab
   function toggle(label: string) {
     if (value.includes(label)) onChange(value.filter((l) => l !== label));
     else onChange([...value, label]);
+  }
+
+  async function handleDelete(tag: ProductTag) {
+    try {
+      await deleteProductTag(tag.id);
+      setAllTags((prev) => prev.filter((t) => t.id !== tag.id));
+      if (value.includes(tag.label)) onChange(value.filter((l) => l !== tag.label));
+    } catch {
+      // silencioso: pior caso a tag continua na lista, usuario tenta de novo
+    }
   }
 
   async function handleCreate() {
@@ -97,19 +107,27 @@ export function TagPicker({ value, onChange }: { value: string[]; onChange: (lab
             {allTags.map((t) => {
               const selected = value.includes(t.label);
               return (
-                <button
-                  key={t.id}
-                  type="button"
-                  onClick={() => toggle(t.label)}
-                  className="flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm hover:bg-elevated"
-                >
-                  <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: t.color }} />
-                  <span className="flex-1 truncate">{t.label}</span>
-                  {selected && <Check size={14} className="text-positive" />}
-                </button>
+                <div key={t.id} className="group flex w-full items-center gap-2 rounded-lg px-2 py-1.5 hover:bg-elevated">
+                  <button type="button" onClick={() => toggle(t.label)} className="flex flex-1 items-center gap-2 overflow-hidden text-left text-sm">
+                    <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: t.color }} />
+                    <span className="flex-1 truncate">{t.label}</span>
+                  </button>
+                  {selected && <Check size={14} className="shrink-0 text-positive" />}
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleDelete(t);
+                    }}
+                    title="Excluir esta tag"
+                    className="shrink-0 text-muted opacity-0 hover:text-negative group-hover:opacity-100"
+                  >
+                    <Trash2 size={13} />
+                  </button>
+                </div>
               );
             })}
-            {allTags.length === 0 && <p className="px-2 py-1.5 text-xs text-muted">Nenhuma tag ainda.</p>}
+            {allTags.length === 0 && <p className="px-2 py-1.5 text-xs text-muted">Nenhuma tag ainda — crie a primeira abaixo.</p>}
           </div>
 
           <div className="mt-2 border-t border-hairline pt-2">
