@@ -12,7 +12,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 export default function RangesPage() {
   return (
     <AppShell>
-      <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
+      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
         <AppHeader insideShell right={<RangesTabs active="ranges" />} />
 
         <RangeEditor id="novo" />

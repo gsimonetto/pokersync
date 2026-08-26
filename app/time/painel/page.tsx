@@ -70,7 +70,7 @@ export default function PainelPage() {
     <Suspense
       fallback={
         <AppShell>
-          <main className="mx-auto max-w-[1280px] px-6 py-10 text-sm text-muted">Carregando…</main>
+          <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-sm text-muted">Carregando…</main>
         </AppShell>
       }
     >
@@ -202,7 +202,7 @@ function PainelConteudo() {
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
+      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
         {/* Banner so' na Visao Geral (primeira tela) — nas outras abas ele
             so' empurrava conteudo pra baixo sem servir de navegacao real.
             Ali o banner substitui o header: leva o voltar embutido no

@@ -79,7 +79,7 @@ export default function TimePage() {
 
   return (
     <AppShell>
-      <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
+      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
         {erro && (
           <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
         )}

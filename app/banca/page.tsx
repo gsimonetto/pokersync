@@ -589,7 +589,7 @@ export default function BankrollPage() {
 
   return (
     <AppShell>
-    <main className="mx-auto max-w-[1280px] px-4 py-10 md:px-6">
+    <main className="w-full mx-auto max-w-[1280px] px-4 py-10 md:px-6">
       {err && (
         <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
