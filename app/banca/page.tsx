@@ -677,6 +677,101 @@ export default function BankrollPage() {
       </section>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        <Painel
+          titulo="Evolução da banca"
+          icone={<LineChart size={14} className="text-evolution" />}
+          className="flex h-full flex-col"
+          acao={
+            <div className="flex flex-wrap items-center gap-2">
+              <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
+                <Landmark size={12} className="text-muted" />
+                <select
+                  value={platformFilter}
+                  onChange={(e) => setPlatformFilter(e.target.value)}
+                  title="Filtrar por plataforma"
+                  className="bg-transparent text-[11px] font-semibold text-ink outline-none"
+                >
+                  <option value="todas">Todas as plataformas</option>
+                  {platformNames.map((p) => (
+                    <option key={p} value={p}>
+                      {p}
+                    </option>
+                  ))}
+                </select>
+              </div>
+              <SegmentedControl value={range} onChange={setRange} options={RANGES} />
+              <button
+                onClick={() => setAnnoModalOpen(true)}
+                title="Anotar evento na timeline"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-review/50 hover:text-review"
+              >
+                <StickyNote size={13} />
+              </button>
+              <button
+                onClick={() => setCompareOpen((v) => !v)}
+                title="Comparar meses"
+                className={`grid h-7 w-7 place-items-center rounded-md border transition-colors ${
+                  compareOpen ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
+                }`}
+              >
+                <GitCompare size={13} />
+              </button>
+              <button
+                onClick={handleExportCSV}
+                title="Exportar CSV do periodo"
+                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-positive/50 hover:text-positive"
+              >
+                <Download size={13} />
+              </button>
+            </div>
+          }
+        >
+          <div className="flex-1">
+            <EvolutionChart series={filteredSeries} annotations={annotations} currency={currencyFilter} />
+          </div>
+
+          {compareOpen && (
+            <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
+              <p className="text-xs font-semibold text-muted">
+                {comparison.currentLabel} vs {comparison.previousLabel}
+              </p>
+              <div className="mt-2 grid grid-cols-3 gap-3 text-center">
+                <div />
+                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.currentLabel.split(" ")[0]}</p>
+                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.previousLabel.split(" ")[0]}</p>
+
+                <p className="text-left text-[11px] text-muted">Resultado</p>
+                <p className={`text-sm font-bold ${comparison.current.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSigned(comparison.current.profit)}
+                </p>
+                <p className={`text-sm font-bold ${comparison.previous.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                  {fmtSigned(comparison.previous.profit)}
+                </p>
+
+                <p className="text-left text-[11px] text-muted">ROI</p>
+                <p className="text-sm font-bold text-training">{fmtPct(comparison.current.roi)}</p>
+                <p className="text-sm font-bold text-training">{fmtPct(comparison.previous.roi)}</p>
+
+                <p className="text-left text-[11px] text-muted">Sessões</p>
+                <p className="text-sm font-bold text-ink">{comparison.current.n}</p>
+                <p className="text-sm font-bold text-ink">{comparison.previous.n}</p>
+              </div>
+            </div>
+          )}
+        </Painel>
+
+        <Painel
+          titulo="Consistência de volume"
+          icone={<CalendarDays size={14} className="text-evolution" />}
+          className="flex h-full flex-col"
+        >
+          <div className="flex flex-1 items-center">
+            <VolumeHeatmap activity={activity} currency={currencyFilter} />
+          </div>
+        </Painel>
+      </div>
+
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Painel titulo="Risco" icone={<ShieldAlert size={14} className="text-negative" />}>
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
             <div className="rounded-lg border border-hairline bg-elevated p-4">
@@ -1015,101 +1110,6 @@ export default function BankrollPage() {
                 })}
               </div>
             )}
-        </Painel>
-      </div>
-
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Painel
-          titulo="Evolução da banca"
-          icone={<LineChart size={14} className="text-evolution" />}
-          className="flex h-full flex-col"
-          acao={
-            <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
-                <Landmark size={12} className="text-muted" />
-                <select
-                  value={platformFilter}
-                  onChange={(e) => setPlatformFilter(e.target.value)}
-                  title="Filtrar por plataforma"
-                  className="bg-transparent text-[11px] font-semibold text-ink outline-none"
-                >
-                  <option value="todas">Todas as plataformas</option>
-                  {platformNames.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
-              <SegmentedControl value={range} onChange={setRange} options={RANGES} />
-              <button
-                onClick={() => setAnnoModalOpen(true)}
-                title="Anotar evento na timeline"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-review/50 hover:text-review"
-              >
-                <StickyNote size={13} />
-              </button>
-              <button
-                onClick={() => setCompareOpen((v) => !v)}
-                title="Comparar meses"
-                className={`grid h-7 w-7 place-items-center rounded-md border transition-colors ${
-                  compareOpen ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
-                }`}
-              >
-                <GitCompare size={13} />
-              </button>
-              <button
-                onClick={handleExportCSV}
-                title="Exportar CSV do periodo"
-                className="grid h-7 w-7 place-items-center rounded-md border border-hairline text-muted transition-colors hover:border-positive/50 hover:text-positive"
-              >
-                <Download size={13} />
-              </button>
-            </div>
-          }
-        >
-          <div className="flex-1">
-            <EvolutionChart series={filteredSeries} annotations={annotations} currency={currencyFilter} />
-          </div>
-
-          {compareOpen && (
-            <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-              <p className="text-xs font-semibold text-muted">
-                {comparison.currentLabel} vs {comparison.previousLabel}
-              </p>
-              <div className="mt-2 grid grid-cols-3 gap-3 text-center">
-                <div />
-                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.currentLabel.split(" ")[0]}</p>
-                <p className="text-[10px] font-semibold uppercase text-muted">{comparison.previousLabel.split(" ")[0]}</p>
-
-                <p className="text-left text-[11px] text-muted">Resultado</p>
-                <p className={`text-sm font-bold ${comparison.current.profit >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtSigned(comparison.current.profit)}
-                </p>
-                <p className={`text-sm font-bold ${comparison.previous.profit >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtSigned(comparison.previous.profit)}
-                </p>
-
-                <p className="text-left text-[11px] text-muted">ROI</p>
-                <p className="text-sm font-bold text-training">{fmtPct(comparison.current.roi)}</p>
-                <p className="text-sm font-bold text-training">{fmtPct(comparison.previous.roi)}</p>
-
-                <p className="text-left text-[11px] text-muted">Sessões</p>
-                <p className="text-sm font-bold text-ink">{comparison.current.n}</p>
-                <p className="text-sm font-bold text-ink">{comparison.previous.n}</p>
-              </div>
-            </div>
-          )}
-        </Painel>
-
-        <Painel
-          titulo="Consistência de volume"
-          icone={<CalendarDays size={14} className="text-evolution" />}
-          className="flex h-full flex-col"
-        >
-          <div className="flex flex-1 items-center">
-            <VolumeHeatmap activity={activity} currency={currencyFilter} />
-          </div>
         </Painel>
       </div>
 
