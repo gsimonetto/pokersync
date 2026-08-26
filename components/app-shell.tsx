@@ -9,6 +9,7 @@ import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { HelpMenu } from "@/components/help-menu";
 import { ProfileMenu } from "@/components/profile-menu";
+import { RankChip } from "@/components/ui/rank-chip";
 import { ChatCenter } from "@/components/chat/chat-center";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
@@ -342,7 +343,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className="ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-elevated py-1 pl-1 pr-3 transition-colors hover:border-white/20"
               >
                 <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={28} />
-                {level != null && <span className="text-xs font-semibold text-ink">Nv. {level}</span>}
+                {level != null && <RankChip level={level} />}
               </button>
               {openMenu === "profile" && profile && (
                 <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />

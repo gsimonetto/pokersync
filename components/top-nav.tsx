@@ -10,6 +10,7 @@ import { Avatar } from "./avatar";
 import { ProfileMenu } from "./profile-menu";
 import { NotificationsMenu } from "./notifications-menu";
 import { HelpMenu } from "./help-menu";
+import { RankChip } from "./ui/rank-chip";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
@@ -167,12 +168,7 @@ export function TopNav() {
               aria-label="Perfil"
             >
               <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={34} />
-              {level != null && (
-                <span className="flex items-center gap-1 text-xs font-bold text-ink">
-                  <span className="text-[10px] font-medium uppercase tracking-wide text-muted">Nv</span>
-                  {level}
-                </span>
-              )}
+              {level != null && <RankChip level={level} />}
             </button>
             {openMenu === "profile" && profile && (
               <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />

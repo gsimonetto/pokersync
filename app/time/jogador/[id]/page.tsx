@@ -18,6 +18,7 @@ import { Avatar } from "@/components/avatar";
 import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
+import { RankChip } from "@/components/ui/rank-chip";
 import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { MetasCard } from "@/components/time/metas-card";
@@ -124,21 +125,25 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
         iconNode={p ? <Avatar id={p.avatarId} url={p.avatarUrl} size={38} /> : undefined}
         title={p?.nome ?? "Jogador"}
         subtitle={
-          p
-            ? [
-                p.level != null ? `Nível ${p.level}` : null,
-                p.coachNome ? `coach: ${p.coachNome}` : "sem coach atribuído",
-                semAtividade === null
-                  ? "sem atividade registrada"
-                  : semAtividade === 0
-                  ? "ativo hoje"
-                  : `última atividade há ${semAtividade}d`,
-              ]
-                .filter(Boolean)
-                .join(" · ")
-            : loading
-            ? "Carregando…"
-            : "Jogador não encontrado"
+          p ? (
+            <>
+              {p.level != null && <RankChip level={p.level} />}
+              <span>
+                {[
+                  p.coachNome ? `coach: ${p.coachNome}` : "sem coach atribuído",
+                  semAtividade === null
+                    ? "sem atividade registrada"
+                    : semAtividade === 0
+                    ? "ativo hoje"
+                    : `última atividade há ${semAtividade}d`,
+                ].join(" · ")}
+              </span>
+            </>
+          ) : loading ? (
+            "Carregando…"
+          ) : (
+            "Jogador não encontrado"
+          )
         }
         right={
           <div className="flex items-center gap-2 print:hidden">

@@ -5,10 +5,11 @@ import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { RankChip } from "@/components/ui/rank-chip";
 import {
   Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
-  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Gift, Crown, Sparkles,
+  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Gift, Crown, Sparkles, Layers, X,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
@@ -99,6 +100,7 @@ export default function HubPage() {
   const [loading, setLoading] = useState(true);
   const [err, setErr] = useState("");
   const [tab, setTab] = useState<MissionTab>("daily");
+  const [tiersOpen, setTiersOpen] = useState(false);
 
   // Hub agora tem 2 vistas de verdade (pedido explicito: ranking "em
   // outra aba dentro do hub que mostrasse so isso"), nao missoes+ranking
@@ -186,11 +188,6 @@ export default function HubPage() {
   const badgeColor = levelColor(level);
   const badgeMaterial = levelMaterial(level);
   const badgeSubTier = levelSubTier(level);
-  // Faixas altas (Platina em diante) ganham mais ornamento -- brilho e
-  // particulas escalam com o "prestigio" do material, igual patente de
-  // jogo fica mais chamativa perto do topo.
-  const badgeBandIdx = Math.min(9, Math.max(0, Math.ceil(level / 10) - 1));
-  const badgeEpic = badgeBandIdx >= 7;
   const xpNeeded = isMaxLevel ? 0 : xpForNextLevel(level);
   const xpCurrent = progress.xp_current;
   const pct = isMaxLevel ? 100 : Math.min(100, (xpCurrent / xpNeeded) * 100);
@@ -351,60 +348,17 @@ export default function HubPage() {
         />
 
         <div className="relative grid grid-cols-[auto_1fr_auto] items-center gap-5">
-          <div className="relative h-20 w-20">
-            {/* Halo ambiente atras de tudo -- camada extra de glow, maior e
-                mais dispersa que o brilho do proprio badge (pedido
-                explicito: "mais brilho, mais glow"). Escala com o tier. */}
-            <div
-              className="hub-badge-halo pointer-events-none absolute -inset-5 rounded-full blur-2xl"
-              style={{ background: `radial-gradient(circle, ${badgeColor}${badgeEpic ? "66" : "40"} 0%, transparent 70%)` }}
-            />
-            {/* Particulas orbitando -- so' nas faixas de prestigio alto
-                (Platina+), pra patente alta parecer mais "epica" sem
-                poluir os niveis iniciais. */}
-            {badgeEpic && (
-              <div className="hub-badge-orbit pointer-events-none absolute inset-0">
-                {[0, 1, 2].map((i) => (
-                  <span
-                    key={i}
-                    className="absolute left-1/2 top-1/2 h-1 w-1 rounded-full"
-                    style={{
-                      background: badgeColor,
-                      boxShadow: `0 0 6px 1px ${badgeColor}`,
-                      transform: `rotate(${i * 120}deg) translateX(46px)`,
-                    }}
-                  />
-                ))}
-              </div>
-            )}
-            {/* Anel giratorio atras do badge — conic-gradient na cor da
-                faixa, sempre girando (pedido explicito: "mais animacoes
-                no nivel"), agora mais espesso e com halo proprio. */}
-            <div
-              className="hub-badge-ring pointer-events-none absolute -inset-2 rounded-full opacity-90 blur-[1.5px]"
-              style={{ background: `conic-gradient(from 0deg, transparent, ${badgeColor}, ${badgeColor}, transparent 55%)` }}
-            />
-            <div className="hub-badge-ring-thin pointer-events-none absolute -inset-0.5 rounded-full border" style={{ borderColor: `${badgeColor}55` }} />
-            <div
-              className="hub-badge-box relative grid h-20 w-20 place-items-center overflow-hidden rounded-2xl bg-void text-3xl font-extrabold"
-              style={{ border: `2px solid ${badgeColor}`, color: badgeColor }}
-            >
-              {/* Sheen -- faixa de luz varrendo o badge (efeito "carta
-                  premium"), reforca o brilho sem precisar de mais cor. */}
-              <span
-                className="hub-badge-sheen pointer-events-none absolute inset-y-0 left-0 w-1/2"
-                style={{ background: "linear-gradient(115deg, transparent, rgba(255,255,255,.5), transparent)" }}
-              />
-              <span className="hub-badge-number relative">{level}</span>
-            </div>
-          </div>
+          <LevelBadge level={level} />
 
           <div className="min-w-0">
             {/* Rotulo de patente (Bronze/Prata/Ouro...) volta como chip
                 colorido -- pedido explicito: "detalhes que remetam o
                 nivel igual as patentes de jogos". Numeral romano imita a
                 subdivisao dentro do tier (Ouro III etc). Cor do nivel
-                muda a cada 10 (pedido explicito, ja existia). */}
+                muda a cada 10 (pedido explicito, ja existia). Botao ao
+                lado abre a galeria com todas as patentes animadas
+                (pedido explicito: "icone de niveis... mostre ao jogador,
+                com as animacoes de cada uma"). */}
             <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
               <span
                 className="rounded px-1.5 py-0.5 text-[10px]"
@@ -416,6 +370,15 @@ export default function HubPage() {
                 Nível {level}
                 <span className="text-muted/70">/{MAX_LEVEL}</span>
               </span>
+              <button
+                type="button"
+                onClick={() => setTiersOpen(true)}
+                className="hub-trophy-btn grid h-5 w-5 place-items-center rounded-full border border-hairline text-muted hover:border-white/30 hover:text-ink"
+                aria-label="Ver todas as patentes"
+                title="Ver todas as patentes"
+              >
+                <Layers size={11} />
+              </button>
               {isMaxLevel && <span style={{ color: badgeColor }}>· MÁXIMO</span>}
               {progress.prestige_count > 0 && (
                 <span
@@ -527,7 +490,135 @@ export default function HubPage() {
         />
       )}
     </main>
+    {tiersOpen && <LevelTiersModal currentLevel={level} onClose={() => setTiersOpen(false)} />}
     </AppShell>
+  );
+}
+
+// Badge de nivel reutilizavel -- extraido do hero pra tambem alimentar a
+// galeria de patentes (LevelTiersModal). `size` em px controla o
+// tamanho, todo o resto (halo, aneis, particulas, sheen) escala junto
+// pra caber em telas menores (grid da galeria) sem perder o efeito.
+function LevelBadge({ level, size = 80 }: { level: number; size?: number }) {
+  const badgeColor = levelColor(level);
+  const badgeBandIdx = Math.min(9, Math.max(0, Math.ceil(level / 10) - 1));
+  const badgeEpic = badgeBandIdx >= 7;
+  const s = size / 80;
+
+  return (
+    <div className="relative" style={{ width: size, height: size }}>
+      {/* Halo ambiente atras de tudo -- camada extra de glow, maior e
+          mais dispersa que o brilho do proprio badge (pedido explicito:
+          "mais brilho, mais glow"). Escala com o tier. */}
+      <div
+        className="hub-badge-halo pointer-events-none absolute rounded-full blur-2xl"
+        style={{ inset: -20 * s, background: `radial-gradient(circle, ${badgeColor}${badgeEpic ? "66" : "40"} 0%, transparent 70%)` }}
+      />
+      {/* Particulas orbitando -- so' nas faixas de prestigio alto
+          (Platina+), pra patente alta parecer mais "epica" sem poluir
+          os niveis iniciais. */}
+      {badgeEpic && (
+        <div className="hub-badge-orbit pointer-events-none absolute inset-0">
+          {[0, 1, 2].map((i) => (
+            <span
+              key={i}
+              className="absolute left-1/2 top-1/2 rounded-full"
+              style={{
+                width: 4 * s,
+                height: 4 * s,
+                background: badgeColor,
+                boxShadow: `0 0 ${6 * s}px 1px ${badgeColor}`,
+                transform: `rotate(${i * 120}deg) translateX(${46 * s}px)`,
+              }}
+            />
+          ))}
+        </div>
+      )}
+      {/* Anel giratorio atras do badge — conic-gradient na cor da
+          faixa, sempre girando (pedido explicito: "mais animacoes no
+          nivel"), agora mais espesso e com halo proprio. */}
+      <div
+        className="hub-badge-ring pointer-events-none absolute rounded-full opacity-90 blur-[1.5px]"
+        style={{ inset: -8 * s, background: `conic-gradient(from 0deg, transparent, ${badgeColor}, ${badgeColor}, transparent 55%)` }}
+      />
+      <div className="hub-badge-ring-thin pointer-events-none absolute rounded-full border" style={{ inset: -2 * s, borderColor: `${badgeColor}55` }} />
+      <div
+        className="hub-badge-box relative grid place-items-center overflow-hidden rounded-2xl bg-void font-extrabold"
+        style={{ width: size, height: size, border: `2px solid ${badgeColor}`, color: badgeColor, fontSize: 28 * s }}
+      >
+        {/* Sheen -- faixa de luz varrendo o badge (efeito "carta
+            premium"), reforca o brilho sem precisar de mais cor. */}
+        <span
+          className="hub-badge-sheen pointer-events-none absolute inset-y-0 left-0 w-1/2"
+          style={{ background: "linear-gradient(115deg, transparent, rgba(255,255,255,.5), transparent)" }}
+        />
+        <span className="hub-badge-number relative">{level}</span>
+      </div>
+    </div>
+  );
+}
+
+// Galeria com as 10 patentes -- pedido explicito: "icone de niveis e
+// mostre ao jogador, com as animacoes de cada uma". Um nivel
+// representativo por faixa (o mais alto dela, pra mostrar o numeral
+// romano "I" que fecha o tier); a faixa do jogador ganha destaque.
+const TIER_PREVIEW_LEVELS = [10, 20, 30, 40, 50, 60, 70, 80, 90, 99];
+
+function LevelTiersModal({ currentLevel, onClose }: { currentLevel: number; onClose: () => void }) {
+  useEffect(() => {
+    function onKey(e: KeyboardEvent) {
+      if (e.key === "Escape") onClose();
+    }
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [onClose]);
+
+  const currentBand = Math.min(9, Math.max(0, Math.ceil(currentLevel / 10) - 1));
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
+      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
+      <div className="relative w-full max-w-2xl rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
+        <div className="flex items-center justify-between">
+          <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
+            <Layers size={16} style={{ color: ACCENT }} /> Patentes
+          </h2>
+          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted hover:text-ink" aria-label="Fechar">
+            <X size={16} />
+          </button>
+        </div>
+        <p className="mt-1 text-xs text-muted">A cor do seu nível sobe de patente a cada 10 níveis, até o 99.</p>
+
+        <div className="mt-5 grid grid-cols-2 gap-3 sm:grid-cols-5">
+          {TIER_PREVIEW_LEVELS.map((lvl, idx) => {
+            const color = levelColor(lvl);
+            const isCurrent = idx === currentBand;
+            return (
+              <div
+                key={lvl}
+                className="flex flex-col items-center gap-2 rounded-lg border p-3"
+                style={isCurrent ? { borderColor: `${color}70`, background: `${color}0F` } : { borderColor: "transparent" }}
+              >
+                <LevelBadge level={lvl} size={60} />
+                <span className="text-center text-[10px] font-bold uppercase tracking-wide" style={{ color }}>
+                  {levelMaterial(lvl)}
+                </span>
+                <span className="text-[10px] text-muted">
+                  {/* Ultima faixa (Lendario) tem so' 9 niveis (91-99), nao 10
+                      como as demais -- MAX_LEVEL fecha em 99, nao 100. */}
+                  Nível {idx === 9 ? 91 : lvl - 9}–{lvl}
+                </span>
+                {isCurrent && (
+                  <span className="rounded-full px-1.5 py-0.5 text-[9px] font-bold uppercase" style={{ color, background: `${color}22` }}>
+                    você está aqui
+                  </span>
+                )}
+              </div>
+            );
+          })}
+        </div>
+      </div>
+    </div>
   );
 }
 
@@ -863,9 +954,7 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
             <p className="mt-1 w-full truncate text-center text-xs font-bold text-ink">
               {e.name} {isMe && <span className="text-[9px] text-review">(você)</span>}
             </p>
-            <p className="text-[10px]" style={{ color: levelColor(e.level) }}>
-              Nível {e.level}
-            </p>
+            <RankChip level={e.level} className="mt-0.5" />
             <p className="mt-0.5 text-[11px] font-bold" style={{ color: ACCENT }}>
               {e.xpTotal.toLocaleString("pt-BR")} XP
             </p>
@@ -914,14 +1003,14 @@ function RankingRow({
           {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
         </span>
         <div className="min-w-0 flex-1">
-          <p className="truncate text-sm font-semibold">
+          <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
+            <RankChip level={e.level} />
             {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
           </p>
           <p className="text-[11px] text-muted">
-            <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span>
             {e.streakDays > 0 && (
               <span className="inline-flex items-center gap-0.5">
-                {" "}· <Flame size={10} className="text-orange-400" /> {e.streakDays}
+                <Flame size={10} className="text-orange-400" /> {e.streakDays} dias de streak
               </span>
             )}
           </p>
