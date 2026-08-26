@@ -10,6 +10,8 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENC
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
 import { AppShell } from "@/components/app-shell";
+import { AppHeader } from "@/components/app-header";
+import { Kpi } from "@/components/time/kpi";
 import {
   fetchSessions,
   fetchSettings,
@@ -582,22 +584,28 @@ export default function BankrollPage() {
   if (loading) {
     return (
       <AppShell>
-        <main className="p-10 text-center text-sm text-muted">Carregando sua banca...</main>
+        <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-center text-sm text-muted">Carregando sua banca...</main>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-4 py-10 md:px-6">
-      {err && (
-        <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
-      )}
-
-      <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
-          <div className="flex items-center gap-2.5">
+    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+      <AppHeader
+        insideShell
+        icon={TrendingUp}
+        iconColor="#5AA6E0"
+        title="Gestor de Banca"
+        subtitle={[
+          `${agg.n} ${agg.n === 1 ? "sessão registrada" : "sessões registradas"}`,
+          isPlatformFiltered ? platformFilter : null,
+          isMultiCurrency ? currencyFilter : null,
+        ]
+          .filter(Boolean)
+          .join(" · ")}
+        right={
+          <div className="flex items-center gap-2">
             {isMultiCurrency && (
               <div className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5">
                 <select
@@ -651,88 +659,73 @@ export default function BankrollPage() {
               <Wallet size={17} className="transition-transform duration-200 group-hover:-rotate-12" />
             </button>
           </div>
-        </div>
-        <div className="mt-3.5 grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-4">
-          {/* Banca atual + Resultado mesclados num card so' — eram duas
-              informacoes sobrepostas (saldo atual e o quanto rendeu),
-              antes cada uma com seu proprio card grande. */}
-          <StatCard
-            size="lg"
-            label="Banca atual"
-            value={fmt(currentBankroll)}
-            tone={currentBankroll < 0 ? "negative" : undefined}
-            accent={currentBankroll < 0 ? "#e0555a" : "#22c55e"}
-            delta={{ text: `${fmtSigned(agg.profit)} de resultado`, positive: agg.profit >= 0 }}
-          />
-          <StatCard
-            size="lg"
-            label="ROI"
-            value={fmtPct(agg.roi)}
-            accent="#22d3ee"
-            delta={
-              comparison.previous.n > 0
-                ? { text: `${fmtPct(roiDelta)} vs mês passado`, positive: roiDelta >= 0 }
-                : undefined
-            }
-          />
-          <StatCard
-            size="lg"
-            label="R$/hora"
-            value={rate ? fmt(rate.value) : "—"}
-            tone={rate ? (rate.value >= 0 ? "positive" : "negative") : undefined}
-            icon={<Clock size={12} />}
-            accent={rate ? (rate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
-            hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
-          />
-          <StatCard
-            size="lg"
-            label="bb/hora"
-            value={bbRate ? bbRate.value.toFixed(1) : "—"}
-            tone={bbRate ? (bbRate.value >= 0 ? "positive" : "negative") : undefined}
-            icon={<Hash size={12} />}
-            accent={bbRate ? (bbRate.value >= 0 ? "#22c55e" : "#e0555a") : "#6b7280"}
-            hint={
-              bbRate
-                ? bbRate.n >= 2
-                  ? `IC 95%: ${bbRate.ciLow.toFixed(1)} a ${bbRate.ciHigh.toFixed(1)} (${bbRate.n} sessões)`
-                  : "Amostra pequena — registre mais sessões de cash com bb."
-                : "Só cash, precisa de horas e bb registrados."
-            }
-          />
-        </div>
+        }
+      />
 
-        <p className="mt-5 border-t border-hairline pt-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-          Atividade &amp; risco
-        </p>
-        <div className="mt-2.5 flex flex-col gap-4 lg:flex-row lg:items-start">
-          <div className="grid flex-1 grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-            <StatCard label="ITM" value={`${agg.itm.toFixed(1)}%`} accent="#f59e0b" />
-            <StatCard label="Sessões" value={String(agg.n)} icon={<Hash size={11} />} accent="#14b8a6" />
-            <StatCard label="Buy-in médio" value={fmt(agg.avgBuyIn)} icon={<Wallet size={11} />} accent="#6366f1" />
-            <StatCard
-              label="Drawdown atual"
-              value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
-              tone={currentDrawdown >= 15 ? "negative" : undefined}
-              icon={<History size={11} />}
-              accent={currentDrawdown >= 15 ? "#e0555a" : currentDrawdown >= 8 ? "#f59e0b" : "#22c55e"}
-            />
-            {agg.totalRake > 0 && (
-              <StatCard label="Rake pago" value={fmt(agg.totalRake)} icon={<Landmark size={11} />} accent="#e0555a" />
-            )}
-            {agg.totalRakeback > 0 && (
-              <StatCard label="Rakeback" value={fmt(agg.totalRakeback)} icon={<Landmark size={11} />} accent="#22c55e" />
-            )}
-            {nw.withdrawn > 0 && (
-              <StatCard label="Sacado" value={fmt(nw.withdrawn)} icon={<Wallet size={11} />} accent="#e0555a" />
-            )}
-            {nw.caixinha > 0 && (
-              <StatCard label="Guardado (caixinha)" value={fmt(nw.caixinha)} icon={<PiggyBank size={11} />} accent="#ec4899" />
-            )}
-          </div>
-          <div className="shrink-0 rounded-lg border border-hairline bg-elevated p-3 lg:w-[300px]">
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Consistência de volume</p>
-            <VolumeHeatmap activity={activity} currency={currencyFilter} />
-          </div>
+      {err && (
+        <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
+      )}
+
+      <section className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+        <Kpi
+          icon={Wallet}
+          label="Banca atual"
+          value={fmt(currentBankroll)}
+          tom={currentBankroll < 0 ? "negativo" : undefined}
+          hint={`${fmtSigned(agg.profit)} de resultado`}
+          destaque
+        />
+        <Kpi
+          icon={TrendingUp}
+          label="ROI"
+          value={fmtPct(agg.roi)}
+          hint={comparison.previous.n > 0 ? `${fmtPct(roiDelta)} vs mês passado` : undefined}
+        />
+        <Kpi
+          icon={Clock}
+          label="R$/hora"
+          value={rate ? fmt(rate.value) : "—"}
+          tom={rate ? (rate.value >= 0 ? "positivo" : "negativo") : undefined}
+          hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
+        />
+        <Kpi
+          icon={Hash}
+          label="bb/hora"
+          value={bbRate ? bbRate.value.toFixed(1) : "—"}
+          tom={bbRate ? (bbRate.value >= 0 ? "positivo" : "negativo") : undefined}
+          hint={
+            bbRate
+              ? bbRate.n >= 2
+                ? `IC 95%: ${bbRate.ciLow.toFixed(1)} a ${bbRate.ciHigh.toFixed(1)} (${bbRate.n} sessões)`
+                : "Amostra pequena — registre mais sessões de cash com bb."
+              : "Só cash, precisa de horas e bb registrados."
+          }
+        />
+      </section>
+
+      <section className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
+        <Kpi icon={Target} label="ITM" value={`${agg.itm.toFixed(1)}%`} />
+        <Kpi icon={Hash} label="Sessões" value={String(agg.n)} />
+        <Kpi icon={Wallet} label="Buy-in médio" value={fmt(agg.avgBuyIn)} />
+        <Kpi
+          icon={History}
+          label="Drawdown atual"
+          value={currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+          tom={currentDrawdown >= 15 ? "negativo" : undefined}
+        />
+        {agg.totalRake > 0 && <Kpi icon={Landmark} label="Rake pago" value={fmt(agg.totalRake)} tom="negativo" />}
+        {agg.totalRakeback > 0 && (
+          <Kpi icon={Landmark} label="Rakeback" value={fmt(agg.totalRakeback)} tom="positivo" />
+        )}
+        {nw.withdrawn > 0 && <Kpi icon={Wallet} label="Sacado" value={fmt(nw.withdrawn)} />}
+        {nw.caixinha > 0 && <Kpi icon={PiggyBank} label="Guardado (caixinha)" value={fmt(nw.caixinha)} />}
+      </section>
+
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-6">
+        <h2 className="text-base font-semibold">Consistência de volume</h2>
+        <p className="mt-1 text-sm text-muted">Sessões jogadas por dia, no formato de calendário.</p>
+        <div className="mt-4">
+          <VolumeHeatmap activity={activity} currency={currencyFilter} />
         </div>
       </section>
 
@@ -1654,57 +1647,6 @@ export default function BankrollPage() {
 
     </main>
     </AppShell>
-  );
-}
-
-function StatCard({
-  label,
-  value,
-  tone,
-  icon,
-  accent,
-  delta,
-  size = "sm",
-  hint,
-}: {
-  label: string;
-  value: string;
-  tone?: "positive" | "negative" | "training" | "evolution";
-  icon?: React.ReactNode;
-  accent: string;
-  delta?: { text: string; positive: boolean };
-  size?: "sm" | "lg";
-  hint?: string;
-}) {
-  const color =
-    tone === "positive"
-      ? "text-positive"
-      : tone === "negative"
-        ? "text-negative"
-        : tone === "training"
-          ? "text-training"
-          : tone === "evolution"
-            ? "text-evolution"
-            : "text-ink";
-  const lg = size === "lg";
-  return (
-    <div
-      style={{ "--acc": accent } as React.CSSProperties}
-      className={`acc-card acc-lift group relative cursor-pointer overflow-hidden rounded-xl border border-hairline bg-surface ${lg ? "p-4" : "p-3.5"}`}
-    >
-      <div aria-hidden="true" className={`acc-glow pointer-events-none absolute -right-6 -top-6 rounded-full blur-2xl ${lg ? "size-24" : "size-20"}`} />
-      <p className={`relative flex items-center gap-1.5 font-bold uppercase tracking-[0.12em] text-muted ${lg ? "text-[10.5px]" : "text-[10px]"}`}>
-        {icon}
-        {label}
-      </p>
-      <p className={`relative mt-1 font-bold tabular-nums ${color} ${lg ? "text-3xl" : "text-2xl"}`}>{value}</p>
-      {delta && (
-        <p className={`relative mt-1 text-[11px] font-semibold tabular-nums ${delta.positive ? "text-positive" : "text-negative"}`}>
-          {delta.positive ? "▲" : "▼"} {delta.text}
-        </p>
-      )}
-      {hint && !delta && <p className="relative mt-1 text-[10.5px] text-muted">{hint}</p>}
-    </div>
   );
 }
 
