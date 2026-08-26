@@ -90,7 +90,7 @@ export default function BankrollPage() {
   const [date, setDate] = useState(todayISO());
   const [time, setTime] = useState("");
   const [buyIn, setBuyIn] = useState("");
-  const [reentries, setReentries] = useState("0");
+  const [reentries, setReentries] = useState("");
   const [cashout, setCashout] = useState("");
   const [stake, setStake] = useState("");
   const [venue, setVenue] = useState<string>(PLATFORMS[0]);
@@ -350,7 +350,7 @@ export default function BankrollPage() {
     setTime("");
     setCurrency("BRL");
     setNotes("");
-    setReentries("0");
+    setReentries("");
     setMood("");
     setTilt("");
     setDiaryNote("");
@@ -1246,7 +1246,7 @@ export default function BankrollPage() {
       </Modal>
 
       <Modal open={sessionModalOpen} onClose={closeSessionModal} title={editingSessionId ? "Editar sessao" : "Registrar sessao"}>
-        <div className="grid grid-cols-2 gap-3">
+        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
           <select
             value={format}
             onChange={(e) => setFormat(e.target.value)}
@@ -1470,7 +1470,7 @@ export default function BankrollPage() {
         <p className="text-xs text-muted">
           Nao entra no resultado de jogo — so move dinheiro entre banca de jogo e patrimonio guardado.
         </p>
-        <div className="mt-4 grid grid-cols-2 gap-3">
+        <div className="mt-4 grid grid-cols-1 gap-3 sm:grid-cols-2">
           <select
             value={txType}
             onChange={(e) => setTxType(e.target.value as TransactionType)}
