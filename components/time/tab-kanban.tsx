@@ -6,6 +6,7 @@ import { AlertTriangle, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarPlus, 
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
+import { EmojiPickerButton } from "@/components/emoji-picker";
 import {
   addCardComment,
   addChecklistItem,
@@ -1079,6 +1080,10 @@ function ComposerInteracao({
         </div>
       )}
       <div className="flex gap-2">
+        <EmojiPickerButton
+          onPick={(emoji) => setTexto((t) => t + emoji)}
+          className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
+        />
         <input
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
