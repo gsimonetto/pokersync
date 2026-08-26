@@ -1,7 +1,7 @@
 // app/login/login-form.tsx
 "use client";
 
-import React, { useState, useRef, type ComponentType } from "react";
+import React, { useState, useRef, useEffect, type ComponentType } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -98,11 +98,25 @@ function formatWhatsapp(raw: string) {
 export default function LoginForm() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const redirectTo = searchParams.get("redirectTo") || "/modulos";
-  const expirado = searchParams.get("expirado") === "1";
-  const senhaRedefinida = searchParams.get("senha_redefinida") === "1";
-  const emailConfirmado = searchParams.get("email_confirmado") === "1";
-  const erroConfirmacao = searchParams.get("erro_confirmacao") === "1";
+
+  // Capturados uma unica vez (nao recalculados a cada render): a URL e'
+  // limpa logo abaixo (?expirado=1 etc. some da barra de enderecos
+  // depois de lida), entao ler searchParams.get direto mais adiante
+  // devolveria null e perderia o destino/mensagem.
+  const [redirectTo] = useState(() => searchParams.get("redirectTo") || "/modulos");
+  const [expirado] = useState(() => searchParams.get("expirado") === "1");
+  const [senhaRedefinida] = useState(() => searchParams.get("senha_redefinida") === "1");
+  const [emailConfirmado] = useState(() => searchParams.get("email_confirmado") === "1");
+  const [erroConfirmacao] = useState(() => searchParams.get("erro_confirmacao") === "1");
+
+  // Some da URL assim que lida -- sem isso "?expirado=1" ficava preso
+  // no endereco (dava pra ver no F5 ou copiando o link), e um usuario
+  // relatou nao conseguir logar de novo por essa tela sem antes editar
+  // a URL na mao pra tirar o parametro.
+  useEffect(() => {
+    if (window.location.search) router.replace("/login", { scroll: false });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   const [activeTab, setActiveTab] = useState<Mode>("login");
   const [showPassword, setShowPassword] = useState(false);
@@ -160,7 +174,12 @@ export default function LoginForm() {
       const supabase = createClient();
       const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
       if (error) throw error;
-      router.push(redirectTo);
+      // Hard navigation em vez de router.push: garante que a proxima
+      // pagina carregue com os cookies de sessao recem-gravados
+      // refletidos de verdade, sem depender de cache/estado do router
+      // client-side (era o suspeito da falha "logar de novo" relatada
+      // vindo de /login?expirado=1).
+      window.location.href = redirectTo;
     } catch (e) {
       const message = e instanceof Error ? e.message : "";
       setErr(message || "Não foi possível entrar. Verifique suas credenciais.");

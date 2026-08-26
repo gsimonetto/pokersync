@@ -13,6 +13,7 @@ import { HelpMenu } from "./help-menu";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { createClient } from "@/lib/supabase/client";
+import { useInactivityLogout } from "@/lib/hooks/use-inactivity-logout";
 
 // Icone do atalho "Tarefas" bate com o icone do card "Hub de Evolução"
 // (lib/modules-data.tsx) -- os dois levam pro mesmo /hub, entao usar
@@ -47,6 +48,11 @@ function usaAppShell(pathname: string) {
 
 export function TopNav() {
   const pathname = usePathname();
+  // Montado no layout raiz (renderiza em toda pagina, mesmo devolvendo
+  // null pro proprio nav em rotas com AppShell) -- ponto unico de
+  // cobertura pro watcher de inatividade, sem duplicar o mount dentro
+  // do AppShell tambem.
+  useInactivityLogout();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [level, setLevel] = useState<number | null>(null);
   const [unread, setUnread] = useState(0);
