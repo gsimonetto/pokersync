@@ -2,7 +2,6 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
 import {
   LineChart,
@@ -158,31 +157,6 @@ export default function PerformancePage() {
   return (
     <AppShell>
     <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <AppHeader
-        insideShell
-        subtitle="Banca, jogo e estudo em um só lugar"
-        right={
-          data?.score_geral !== null && data?.score_geral !== undefined ? (
-            <div className="flex items-center gap-2">
-              <span className="hidden text-xs font-medium text-muted sm:inline">{nivelDoScore(Number(data.score_geral))}</span>
-              <div
-                className="grid h-14 w-14 shrink-0 place-items-center rounded-full border-2 text-center"
-                style={{
-                  borderColor:
-                    Number(data.score_geral) >= 70 ? "#2FB89A" : Number(data.score_geral) >= 45 ? "#E0B24C" : "#e0555a",
-                }}
-                title="Score Geral de Evolução"
-              >
-                <div>
-                  <p className="text-base font-bold leading-none tabular-nums">{Math.round(Number(data.score_geral))}</p>
-                  <p className="mt-0.5 text-[8px] uppercase tracking-wide text-muted">/100</p>
-                </div>
-              </div>
-            </div>
-          ) : undefined
-        }
-      />
-
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
       )}
@@ -218,6 +192,32 @@ export default function PerformancePage() {
               contexto, isto aqui é o placar.
              ---------------------------------------------------------- */}
           <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
+            {/* Subtitulo + Score Geral -- antes viviam numa AppHeader
+                sticky separada por cima da tela; agora entram como
+                primeira linha do proprio card herói, mesmo padrão do
+                Treino (controles dentro do container, não numa barra
+                fixa à parte). */}
+            <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
+              <p className="text-sm text-muted">Banca, jogo e estudo em um só lugar</p>
+              {data.score_geral !== null && data.score_geral !== undefined && (
+                <div className="flex items-center gap-2">
+                  <span className="hidden text-xs font-medium text-muted sm:inline">{nivelDoScore(Number(data.score_geral))}</span>
+                  <div
+                    className="grid h-11 w-11 shrink-0 place-items-center rounded-full border-2 text-center"
+                    style={{
+                      borderColor:
+                        Number(data.score_geral) >= 70 ? "#2FB89A" : Number(data.score_geral) >= 45 ? "#E0B24C" : "#e0555a",
+                    }}
+                    title="Score Geral de Evolução"
+                  >
+                    <div>
+                      <p className="text-sm font-bold leading-none tabular-nums">{Math.round(Number(data.score_geral))}</p>
+                    </div>
+                  </div>
+                </div>
+              )}
+            </div>
+
             {/* Halo de acento atras do KPI principal — da profundidade e
                 ancora o olho no canto superior esquerdo, onde a leitura
                 comeca. Cor segue o sinal do ROI. */}

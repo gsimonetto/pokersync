@@ -3,11 +3,8 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight } from "lucide-react";
-import { Chip } from "@/components/chip";
+import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight, IdCard, BarChart3 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { PrintButton } from "@/components/period-selector";
-import { TeamBanner } from "@/components/time/team-banner";
 import {
   fetchFinancialSeries,
   fetchMyTeam,
@@ -36,6 +33,7 @@ import {
   type TeamStaff,
 } from "@/lib/services/team-service";
 import { fetchTeamEvents, type TeamEvent } from "@/lib/services/team-calendar-service";
+import { TabPerfil } from "@/components/time/tab-perfil";
 import { TabVisaoGeral } from "@/components/time/tab-visao-geral";
 import { TabJogadores } from "@/components/time/tab-jogadores";
 import { TabConvites } from "@/components/time/tab-convites";
@@ -55,10 +53,11 @@ const PERIODOS = [
   { label: "90d", days: 90 },
 ];
 
-type Aba = "visao" | "jogadores" | "convites" | "calendario" | "time";
+type Aba = "perfil" | "estatisticas" | "jogadores" | "convites" | "calendario" | "time";
 
 const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
-  { key: "visao", label: "Visão geral", icon: LayoutDashboard },
+  { key: "perfil", label: "Perfil do time", icon: IdCard },
+  { key: "estatisticas", label: "Estatísticas", icon: BarChart3 },
   { key: "jogadores", label: "Jogadores", icon: UserRound },
   { key: "convites", label: "Convites", icon: Mail },
   { key: "calendario", label: "Calendário", icon: CalendarDays },
@@ -83,9 +82,9 @@ function PainelConteudo() {
   const confirm = useConfirm();
   const router = useRouter();
   const params = useSearchParams();
-  const abaUrl = (params.get("tab") as Aba) || "visao";
+  const abaUrl = (params.get("tab") as Aba) || "perfil";
 
-  const [aba, setAba] = useState<Aba>(ABAS.some((a) => a.key === abaUrl) ? abaUrl : "visao");
+  const [aba, setAba] = useState<Aba>(ABAS.some((a) => a.key === abaUrl) ? abaUrl : "perfil");
   const [dias, setDias] = useState(30);
   const [loading, setLoading] = useState(true);
   const [pronto, setPronto] = useState(false);
@@ -161,7 +160,7 @@ function PainelConteudo() {
 
   function trocarAba(nova: Aba) {
     setAba(nova);
-    const url = nova === "visao" ? "/time/painel" : `/time/painel?tab=${nova}`;
+    const url = nova === "perfil" ? "/time/painel" : `/time/painel?tab=${nova}`;
     window.history.replaceState(null, "", url);
   }
 
@@ -203,61 +202,12 @@ function PainelConteudo() {
   return (
     <AppShell>
       <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
-        {/* Banner so' na Visao Geral (primeira tela) — nas outras abas ele
-            so' empurrava conteudo pra baixo sem servir de navegacao real.
-            Ali o banner substitui o header: leva o voltar embutido no
-            canto, sem repetir nome/subtitulo que ele mesmo ja mostra. */}
-        {aba === "visao" ? (
-          info && (
-            <div className="mb-6">
-              {coaches.length > 0 && (
-                <div className="mb-2 flex flex-wrap items-center justify-end gap-1.5 print:hidden">
-                  <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-                    Coach{coaches.length > 1 ? "es" : ""}
-                  </span>
-                  {coaches.map((c) => (
-                    <Chip key={c.userId} color={info.accent} size="sm">{c.nome}</Chip>
-                  ))}
-                </div>
-              )}
-              <TeamBanner
-                name={info.name}
-                description={info.description}
-                accent={info.accent}
-                logoUrl={info.logoUrl}
-                bannerUrl={info.bannerUrl}
-                editable={podeEditarTime}
-                uploading={enviandoBanner}
-                onUploadClick={() => bannerRef.current?.click()}
-                onRemoveClick={removerBanner}
-                right={<PrintButton />}
-              />
-              {podeEditarTime && (
-                <input
-                  ref={bannerRef}
-                  type="file"
-                  accept="image/png,image/jpeg,image/webp"
-                  className="hidden"
-                  onChange={(e) => {
-                    const f = e.target.files?.[0];
-                    if (f) enviarBanner(f);
-                    e.target.value = "";
-                  }}
-                />
-              )}
-            </div>
-          )
-        ) : null}
-
-        {/* Print fica dentro da propria barra de abas (canto direito) nas
-            demais abas — antes vinha num AppHeader vazio (so' esse botao),
-            que virava uma faixa preta sem nada mais em cima da barra. */}
+        {/* Nav sempre na mesma posicao, logo no topo do container -- igual
+            ao Funil (pagina separada, sem esse vaivem). Antes o banner só
+            aparecia acima da nav na aba Visao Geral, fazendo a barra de
+            abas pular de lugar dependendo da aba selecionada; agora o
+            banner mora dentro do conteudo da propria aba Perfil. */}
         <nav className="relative mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline pt-4 print:hidden">
-          {aba !== "visao" && (
-            <div className="absolute right-0 top-1/2 -translate-y-1/2">
-              <PrintButton />
-            </div>
-          )}
           {ABAS.map((a) => {
             const Icon = a.icon;
             const pend = a.key === "convites" ? pendentes.length : 0;
@@ -293,7 +243,26 @@ function PainelConteudo() {
           <p className="text-sm text-muted">Carregando painel…</p>
         ) : (
           <>
-            {aba === "visao" && (
+            {aba === "perfil" && info && (
+              <>
+                <TabPerfil info={info} staff={staff} editable={podeEditarTime} uploading={enviandoBanner}
+                  onUploadClick={() => bannerRef.current?.click()} onRemoveClick={removerBanner} />
+                {podeEditarTime && (
+                  <input
+                    ref={bannerRef}
+                    type="file"
+                    accept="image/png,image/jpeg,image/webp"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) enviarBanner(f);
+                      e.target.value = "";
+                    }}
+                  />
+                )}
+              </>
+            )}
+            {aba === "estatisticas" && (
               <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
                 onAbrirFunil={() => router.push("/time/painel/funil")} />
             )}

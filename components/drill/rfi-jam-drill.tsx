@@ -9,6 +9,7 @@ import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
+import { FilterChip as SharedFilterChip } from "@/components/ui/filter-chip";
 import {
   ALL_POSITIONS,
   getRfiJamSpot,
@@ -136,31 +137,21 @@ interface Round {
   gap: number;
 }
 
+// Mesmo FilterChip usado em Revisor e Biblioteca de Ranges (pedido
+// explicito: "os filtros formem um padrão" -- antes era uma caixinha
+// quadrada com fundo branco no ativo, so' aqui no Treino).
 function FilterChip({
   label, active, disabled, onClick, disabledReason,
 }: { label: string; active: boolean; disabled?: boolean; onClick: () => void; disabledReason?: string }) {
   return (
-    <button
-      onClick={disabled ? undefined : onClick}
+    <SharedFilterChip
+      label={label}
+      active={active}
       disabled={disabled}
-      title={disabled ? disabledReason ?? "Sem mãos geradas para essa combinação ainda" : undefined}
-      style={{
-        fontFamily: F,
-        padding: "6px 12px",
-        borderRadius: 8,
-        fontSize: 12,
-        fontWeight: 500,
-        cursor: disabled ? "not-allowed" : "pointer",
-        border: active ? "1px solid rgba(255,255,255,0.9)" : disabled ? "1px dashed rgba(255,255,255,0.07)" : "1px solid rgba(255,255,255,0.10)",
-        background: active ? "#FFFFFF" : "rgba(255,255,255,0.02)",
-        color: active ? "#111111" : disabled ? "rgba(255,255,255,0.18)" : "rgba(255,255,255,0.55)",
-        textDecoration: disabled ? "line-through" : "none",
-        transition: "all 160ms ease",
-        whiteSpace: "nowrap",
-      }}
-    >
-      {label}
-    </button>
+      disabledReason={disabledReason ?? "Sem mãos geradas para essa combinação ainda"}
+      onClick={onClick}
+      style={{ fontFamily: F }}
+    />
   );
 }
 
@@ -332,14 +323,16 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Desktop comeca com os filtros abertos (igual sempre foi); mobile
-  // comeca fechado (gaveta, evita cobrir a mesa de cara). Sempre inicia
-  // true (igual ao SSR, que nao tem `window`) e corrige depois do mount
-  // -- ler matchMedia direto no useState causava hydration mismatch
-  // (server sempre renderiza aberto, cliente mobile abria fechado).
-  const [filtersOpen, setFiltersOpen] = useState(true);
-  useEffect(() => {
-    if (!window.matchMedia("(min-width: 769px)").matches) setFiltersOpen(false);
-  }, []);
+  // comeca fechado (gaveta, evita cobrir a mesa de cara). matchMedia so'
+  // roda uma vez no mount, no client. Isso gera um warning de hydration
+  // mismatch no console do modo dev (server sem `window` sempre renderiza
+  // aberto), mas e' inofensivo -- tentei "corrigir" via useEffect antes,
+  // mas isso criava um flash real (abre e fecha com animacao) no mobile,
+  // pior que o warning que resolvia.
+  const [filtersOpen, setFiltersOpen] = useState(() => {
+    if (typeof window === "undefined") return true;
+    return window.matchMedia("(min-width: 769px)").matches;
+  });
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<"fold" | "action" | "distractor" | null>(null);
@@ -656,7 +649,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
               embaixo dele na coluna, já que a mesa ao lado é bem mais
               alta. O grid já estica o WRAPPER pra altura toda; faltava
               o aside herdar isso. */}
-          <aside style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
+          <aside className="ps-tr-filters-scroll" style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
                 Filtros

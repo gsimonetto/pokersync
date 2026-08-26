@@ -80,7 +80,7 @@ export function AppHeader({
 
   return (
     <header
-      className={`sticky top-0 ${insideShell ? "" : "sm:top-18"} z-20 mb-6 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding,border-color] duration-300 ease-out print:static print:border-none print:bg-transparent ${
+      className={`sticky top-0 ${insideShell ? "" : "sm:top-18"} z-20 mb-4 flex flex-wrap items-center gap-3 border-b bg-void/95 backdrop-blur-sm transition-[padding,border-color] duration-300 ease-out print:static print:border-none print:bg-transparent ${
         compacto ? "border-hairline py-2.5" : "border-transparent py-4"
       }`}
     >

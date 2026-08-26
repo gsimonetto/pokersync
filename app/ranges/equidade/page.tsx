@@ -2,7 +2,6 @@
 
 import { Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
 import { EquityCalculator } from "@/components/ranges/equity-calculator";
 import { RangesTabs } from "@/components/ranges/ranges-tabs";
@@ -14,9 +13,7 @@ function EquidadePageInner() {
   return (
     <AppShell>
       <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-        <AppHeader insideShell right={<RangesTabs active="equidade" />} />
-
-        <EquityCalculator initialRangeId={rangeId} />
+        <EquityCalculator initialRangeId={rangeId} tabs={<RangesTabs active="equidade" />} />
       </main>
     </AppShell>
   );

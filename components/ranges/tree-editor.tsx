@@ -161,7 +161,7 @@ function NodeEditor({
   );
 }
 
-export function TreeEditor({ id }: { id: string }) {
+export function TreeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }) {
   const router = useRouter();
   const confirm = useConfirm();
   const isNew = id === "nova";
@@ -280,6 +280,11 @@ export function TreeEditor({ id }: { id: string }) {
     <div>
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
 
+      {/* Container unico envolvendo toda a arvore -- mesmo padrao do
+          Treino/Banca (uma tela, um card), em vez de cada pedaco
+          flutuando solto contra o void. */}
+      <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <div>
           <label className="mb-1 block text-xs text-muted">Nome</label>
@@ -375,6 +380,7 @@ export function TreeEditor({ id }: { id: string }) {
             Excluir
           </button>
         )}
+      </div>
       </div>
     </div>
   );

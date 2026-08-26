@@ -1,8 +1,11 @@
 import { Printer } from "lucide-react";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 // Seletor de periodo (7d/30d/90d) reusado nos headers que tem filtro por
 // dias — Painel do time e ficha do jogador usavam a mesma marcacao
-// copiada em cada arquivo.
+// copiada em cada arquivo. Fininho sobre o SegmentedControl padrao do
+// produto (mesmo container/estado ativo de qualquer outra segmentacao
+// de 2-4 opcoes).
 export function PeriodSelector<T extends number>({
   value,
   onChange,
@@ -13,19 +16,14 @@ export function PeriodSelector<T extends number>({
   options: { label: string; days: T }[];
 }) {
   return (
-    <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-      {options.map((op) => (
-        <button
-          key={op.days}
-          onClick={() => onChange(op.days)}
-          className={`rounded-md px-2.5 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
-            value === op.days ? "bg-ink text-void" : "text-muted hover:text-ink"
-          }`}
-        >
-          {op.label}
-        </button>
-      ))}
-    </div>
+    <SegmentedControl
+      value={value}
+      onChange={onChange}
+      options={options.map((op) => ({
+        value: op.days,
+        label: <span className="uppercase tracking-[0.08em]">{op.label}</span>,
+      }))}
+    />
   );
 }
 

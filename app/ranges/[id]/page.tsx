@@ -1,21 +1,20 @@
 "use client";
 
 import { use } from "react";
-import { Layers } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
 import { RangeEditor } from "@/components/ranges/range-editor";
+import { RangesTabs } from "@/components/ranges/ranges-tabs";
 
+// Sem AppHeader (nome do modulo + voltar) de proposito -- o menu lateral
+// do AppShell ja identifica o modulo, e o alvo do "voltar" (/ranges) e' o
+// mesmo pra onde o proprio menu leva. Conteudo sobe direto pro topo.
 export default function RangeEditPage({ params }: { params: Promise<{ id: string }> }) {
   const { id } = use(params);
 
   return (
     <AppShell>
       <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-        <AppHeader insideShell backHref="/ranges" icon={Layers} iconColor="var(--color-review)"
-          title={id === "novo" ? "Novo Range" : "Editar Range"} />
-
-        <RangeEditor id={id} />
+        <RangeEditor id={id} tabs={<RangesTabs active="ranges" />} />
       </main>
     </AppShell>
   );

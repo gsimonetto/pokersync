@@ -48,6 +48,8 @@ import {
 } from "@/lib/services/team-service";
 import { ACCENT } from "@/lib/modules-data";
 import { useConfirm } from "@/components/confirm-dialog";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 // Kanban estilo Trello: arrastar o card entre colunas move de fase (drag
 // nativo HTML5, sem lib extra); o card tambem pode ser aberto pra editar
@@ -222,8 +224,8 @@ export function TabKanban({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-wrap items-center gap-2">
+    <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         {backHref && (
           <Link
             href={backHref}
@@ -234,25 +236,14 @@ export function TabKanban({
           </Link>
         )}
 
-        <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-          <button
-            onClick={() => setModo("board")}
-            className={`rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
-              modo === "board" ? "bg-ink text-void" : "text-muted hover:text-ink"
-            }`}
-          >
-            Board
-          </button>
-          <button
-            onClick={() => setModo("arquivados")}
-            className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[12px] font-semibold transition-all ${
-              modo === "arquivados" ? "bg-ink text-void" : "text-muted hover:text-ink"
-            }`}
-          >
-            <ArchiveRestore size={13} />
-            Arquivados
-          </button>
-        </div>
+        <SegmentedControl
+          value={modo}
+          onChange={setModo}
+          options={[
+            { value: "board", label: "Board" },
+            { value: "arquivados", label: <><ArchiveRestore size={13} /> Arquivados</> },
+          ]}
+        />
 
         {modo === "board" && (
           <>
@@ -280,15 +271,12 @@ export function TabKanban({
               </select>
             )}
 
-            <button
+            <FilterChip
+              label="Com tarefas pendentes"
+              icon={<CheckSquare size={13} />}
+              active={soTarefasPendentes}
               onClick={() => setSoTarefasPendentes((v) => !v)}
-              className={`flex items-center gap-1.5 rounded-lg border px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
-                soTarefasPendentes ? "border-training/50 bg-training/10 text-training" : "border-hairline text-muted hover:text-ink"
-              }`}
-            >
-              <CheckSquare size={13} />
-              Com tarefas pendentes
-            </button>
+            />
           </>
         )}
 
@@ -325,7 +313,18 @@ export function TabKanban({
           onErro={onErro}
         />
       ) : (
-      <div className="flex gap-4 overflow-x-auto pb-2">
+      /* Altura fixa pro board inteiro (mesmo raciocinio do Modo Treino:
+         um bloco de tamanho estavel, nao uma pilha que cresce com a
+         quantidade de cards) -- a barra de rolagem horizontal fica
+         sempre na mesma posicao, no rodape deste bloco, em vez de
+         flutuar dependendo de quantos cards cada fase tem. Cada fase
+         agora e' um bloco com borda propria (pedido explicito: "os
+         funis serem divididos por bordas... parece que esta tudo
+         junto") que ocupa a altura toda -- o alvo de soltar o card
+         (onDrop) e' o bloco inteiro, nao so' a area onde ha cards, entao
+         soltar num espaco vazio da fase funciona igual soltar em cima
+         de um card (igual outros CRMs). */
+      <div className="flex h-[560px] gap-4 overflow-x-auto pb-3">
         {fases.map((fase, faseIdx) => {
           const lista = (cardsPorFase.get(fase.id) ?? []).sort((a, b) => a.movedAt.localeCompare(b.movedAt));
           const recebendoDrop = faseArrastando === fase.id;
@@ -334,7 +333,9 @@ export function TabKanban({
           return (
             <div
               key={fase.id}
-              className="w-72 shrink-0"
+              className={`flex h-full w-72 shrink-0 flex-col rounded-xl border p-2 transition-colors ${
+                recebendoDrop ? "border-ink/40 bg-ink/5 ring-2 ring-ink/20" : "border-hairline bg-elevated/50"
+              }`}
               onDragOver={(e) => {
                 e.preventDefault();
                 setFaseArrastando(fase.id);
@@ -348,17 +349,13 @@ export function TabKanban({
                 if (playerId && faseOrigem !== fase.id) moverParaFase(playerId, fase.id);
               }}
             >
-              <div className="mb-2 flex items-center gap-2 px-1">
+              <div className="mb-2 flex shrink-0 items-center gap-2 px-1">
                 <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: fase.color }} />
                 <h3 className="text-[13px] font-semibold">{fase.name}</h3>
                 <span className="text-xs text-muted">{lista.length}</span>
               </div>
 
-              <div
-                className={`space-y-2 rounded-xl p-1 transition-colors ${
-                  recebendoDrop ? "bg-ink/5 ring-2 ring-ink/20" : ""
-                }`}
-              >
+              <div className="flex-1 space-y-2 overflow-y-auto pr-0.5">
                 {lista.length === 0 ? (
                   <p className="rounded-lg border border-dashed border-hairline p-3 text-center text-xs text-muted">
                     {recebendoDrop ? "Solte aqui" : "Vazio"}

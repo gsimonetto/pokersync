@@ -23,6 +23,30 @@ const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
 // próprio conteúdo/dados; isto aqui é só navegação e identidade (perfil,
 // notificações, ajuda), igual ao TopNav global fazia antes pra essas rotas
 // (que agora ficam escondidas dele, ver components/top-nav.tsx).
+//
+// REGRA DE PADRÃO VISUAL (pedido explícito: "todos seguindo o mesmo
+// padrão do modo treino") -- todo `app/**/page.tsx` que usa <AppShell>
+// segue isto, com /treino como referência:
+//   1. `<main className="w-full mx-auto max-w-[1280px] px-6 py-10 ...">`
+//      (Banca usa `px-4 py-10 md:px-6` -- variação só de margem lateral
+//      no mobile, mesma altura). Nunca outro valor de `py-*`.
+//   2. O PRIMEIRO elemento renderizado dentro do `<main>` (ignorando um
+//      banner de erro condicional) NUNCA leva `mt-*` -- ele encosta
+//      direto no padding do `<main>`, na mesma distância do topbar em
+//      toda tela. Erro condicional usa `mb-*` (não `mt-*`) pra não
+//      empurrar o conteúdo abaixo quando aparece.
+//   3. Prefira UM container único (`rounded-2xl border border-hairline
+//      bg-surface p-4 sm:p-5`) envolvendo toda ferramenta de tela única
+//      (Treino, Construtor de Ranges, Comparar, Equidade, Árvores) --
+//      exceção: telas de galeria/lista (Biblioteca, Time, Journal,
+//      lista de Árvores) usam cards por item, não um envelope único.
+//   4. Uma barra de utilidade fixa (AppHeader com abas/toggle/período --
+//      Hub, Performance, Revisor, abas do Construtor de Ranges) é a
+//      única exceção aceita à distância idêntica ao Treino: ela precisa
+//      ficar sticky pra continuar acessível ao rolar, o que Treino não
+//      tem porque o card dele já é de altura fixa. Mantenha essa barra
+//      enxuta (sem título/ícone/voltar quando o menu lateral já
+//      identifica o módulo -- ver components/app-header.tsx).
 export function AppShell({ children }: { children: React.ReactNode }) {
   const pathname = usePathname();
   const router = useRouter();

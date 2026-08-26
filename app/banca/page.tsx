@@ -591,10 +591,10 @@ export default function BankrollPage() {
     <AppShell>
     <main className="w-full mx-auto max-w-[1280px] px-4 py-10 md:px-6">
       {err && (
-        <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
+        <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}
 
-      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
+      <section className="rounded-xl border border-hairline bg-surface p-5 transition-colors hover:border-ink/20">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho</p>
           <div className="flex items-center gap-2.5">

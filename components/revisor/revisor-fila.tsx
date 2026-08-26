@@ -8,6 +8,8 @@ import { getThumbUrl, deleteReview, fetchReviewSummary, type ReviewListItem, typ
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { LeaksCard } from "./leaks-card";
 import { useConfirm } from "@/components/confirm-dialog";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 
 const FILTERS = [
   { id: "todas", label: "Todas", status: null as string | null },
@@ -228,24 +230,14 @@ export function RevisorFila({
       )}
 
       <div className="mb-3 flex items-center justify-between">
-        <div className="flex gap-1.5">
-          <button
-            onClick={() => setTab("sessoes")}
-            className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-              tab === "sessoes" ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
-            }`}
-          >
-            Torneios e sessões
-          </button>
-          <button
-            onClick={() => setTab("avulsas")}
-            className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-              tab === "avulsas" ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
-            }`}
-          >
-            Mãos avulsas
-          </button>
-        </div>
+        <SegmentedControl
+          value={tab}
+          onChange={setTab}
+          options={[
+            { value: "sessoes", label: "Torneios e sessões" },
+            { value: "avulsas", label: "Mãos avulsas" },
+          ]}
+        />
         <button
           onClick={onNova}
           className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
@@ -258,36 +250,18 @@ export function RevisorFila({
       {tab === "sessoes" && (
         <>
           <div className="mb-3 flex flex-wrap items-center gap-2">
-            <button
+            <FilterChip
+              label="Campeão"
+              icon={<Trophy size={12} />}
+              active={sessionChipFilters.has("campeao")}
               onClick={() => toggleSessionChip("campeao")}
-              className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
-                sessionChipFilters.has("campeao")
-                  ? "border-evolution bg-evolution/15 text-evolution"
-                  : "border-hairline bg-transparent text-muted"
-              }`}
-            >
-              <Trophy size={12} /> Campeão
-            </button>
-            <button
-              onClick={() => toggleSessionChip("pko")}
-              className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
-                sessionChipFilters.has("pko")
-                  ? "border-ink bg-ink text-void"
-                  : "border-hairline bg-transparent text-muted"
-              }`}
-            >
-              PKO
-            </button>
-            <button
+            />
+            <FilterChip label="PKO" active={sessionChipFilters.has("pko")} onClick={() => toggleSessionChip("pko")} />
+            <FilterChip
+              label="Mystery"
+              active={sessionChipFilters.has("mystery")}
               onClick={() => toggleSessionChip("mystery")}
-              className={`rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
-                sessionChipFilters.has("mystery")
-                  ? "border-ink bg-ink text-void"
-                  : "border-hairline bg-transparent text-muted"
-              }`}
-            >
-              Mystery
-            </button>
+            />
 
             <button
               onClick={() => {
@@ -445,20 +419,9 @@ export function RevisorFila({
       {tab === "avulsas" && (
         <>
           <div className="mb-4 flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => {
-              const active = filter === f.id;
-              return (
-                <button
-                  key={f.id}
-                  onClick={() => setFilter(f.id)}
-                  className={`rounded-full border px-3 py-1.5 text-xs transition-colors ${
-                    active ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
-                  }`}
-                >
-                  {f.label}
-                </button>
-              );
-            })}
+            {FILTERS.map((f) => (
+              <FilterChip key={f.id} label={f.label} active={filter === f.id} onClick={() => setFilter(f.id)} />
+            ))}
           </div>
 
           {error && (

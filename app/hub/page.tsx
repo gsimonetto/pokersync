@@ -3,8 +3,8 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
-import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
@@ -268,54 +268,25 @@ export default function HubPage() {
         }
       `}</style>
 
-      <AppHeader
-        insideShell
-        subtitle={
-          <>
-            {/* Nada pra "missoes": o proprio seletor MISSÕES/RANKING ao
-                lado ja' diz em que view voce esta, e o card de nivel
-                logo abaixo mostra o progresso — a frase so' repetia o
-                que a tela ja' mostra. Em "ranking" o texto fica porque
-                carrega informacao nova (o escopo e' TODO o PokerSync,
-                nao so' o seu time). */}
-            {view === "ranking" && "Ranking de todos os membros PokerSync."}
-            {membership && (
-              <Link
-                href="/time"
-                className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-              >
-                <Users size={10} /> {membership.teamName}
-              </Link>
-            )}
-          </>
-        }
-        right={
-          /* Missoes/Ranking viram vistas de verdade (pedido explicito) --
-              antes o ranking era secao fixa la embaixo, agora e' aba propria. */
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            <button
-              onClick={() => setView("missoes")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
-                view === "missoes" ? "bg-ink text-void" : "text-muted hover:text-ink"
-              }`}
-            >
-              <Target size={13} /> Missões
-            </button>
-            <button
-              onClick={() => setView("ranking")}
-              className={`flex items-center gap-1.5 rounded-md px-3 py-1.5 text-[11px] font-bold uppercase tracking-[0.06em] transition-all ${
-                view === "ranking" ? "bg-ink text-void" : "text-muted hover:text-ink"
-              }`}
-            >
-              <Trophy size={13} /> Ranking
-            </button>
-          </div>
-        }
-      />
-
+      {/* Sem AppHeader (barra sticky) -- o alternador Missões/Ranking
+          entra dentro do container principal de cada vista (mesmo padrao
+          do Treino: controles vivem dentro do card, nao numa faixa fixa
+          por cima). Conteudo comeca flush no topo, igual aos demais
+          modulos. */}
       {view === "missoes" && (
       <>
-      <div className="hub-level-card relative mt-6 overflow-hidden rounded-xl border border-hairline bg-surface p-6">
+      <div className="hub-level-card relative overflow-hidden rounded-xl border border-hairline bg-surface p-6">
+        <div className="relative mb-4 flex flex-wrap items-center justify-between gap-2">
+          <ViewToggle view={view} setView={setView} />
+          {membership && (
+            <Link
+              href="/time"
+              className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+            >
+              <Users size={10} /> {membership.teamName}
+            </Link>
+          )}
+        </div>
         <div
           className="pointer-events-none absolute inset-0"
           style={{ background: `radial-gradient(ellipse at 100% 0%, ${ACCENT}12 0%, transparent 60%)` }}
@@ -461,6 +432,8 @@ export default function HubPage() {
           onPeriodChange={setRankingPeriod}
           myRank={myRank}
           season={season}
+          view={view}
+          setView={setView}
         />
       )}
     </main>
@@ -627,6 +600,28 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   );
 }
 
+// Alternador Missões/Ranking -- vive dentro do container de cada vista
+// (mesmo padrão de segmented-control usado no Painel do Time e no
+// Construtor de Ranges), no lugar de uma barra sticky separada.
+function ViewToggle({
+  view,
+  setView,
+}: {
+  view: "missoes" | "ranking";
+  setView: (v: "missoes" | "ranking") => void;
+}) {
+  return (
+    <SegmentedControl
+      value={view}
+      onChange={setView}
+      options={[
+        { value: "missoes", label: <><Target size={13} /> Missões</> },
+        { value: "ranking", label: <><Trophy size={13} /> Ranking</> },
+      ]}
+    />
+  );
+}
+
 const BASE_RANKING_PERIODS: { value: LeaderboardPeriod; label: string }[] = [
   { value: "week", label: "Semana" },
   { value: "month", label: "Mês" },
@@ -650,6 +645,8 @@ function RankingSection({
   onPeriodChange,
   myRank,
   season,
+  view,
+  setView,
 }: {
   entries: LeaderboardEntry[] | null;
   loading: boolean;
@@ -658,6 +655,8 @@ function RankingSection({
   onPeriodChange: (p: LeaderboardPeriod) => void;
   myRank: MyRank | null;
   season: Season | null;
+  view: "missoes" | "ranking";
+  setView: (v: "missoes" | "ranking") => void;
 }) {
   const meInList = entries?.some((e) => e.userId === meId) ?? false;
   const periods = season
@@ -667,7 +666,12 @@ function RankingSection({
   const rest = entries?.slice(3) ?? [];
 
   return (
-    <div className="mt-6">
+    <div>
+      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
+        <ViewToggle view={view} setView={setView} />
+        <p className="text-xs text-muted">Ranking de todos os membros PokerSync.</p>
+      </div>
+
       {season && (
         <div
           className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border p-4"
@@ -694,19 +698,11 @@ function RankingSection({
           <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
             <Trophy size={16} /> Ranking PokerSync
           </h2>
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            {periods.map((p) => (
-              <button
-                key={p.value}
-                onClick={() => onPeriodChange(p.value)}
-                className={`rounded-md px-2.5 py-1 text-[11px] font-semibold uppercase transition-all ${
-                  period === p.value ? "bg-ink text-void" : "text-muted hover:text-ink"
-                }`}
-              >
-                {p.label}
-              </button>
-            ))}
-          </div>
+          <SegmentedControl
+            value={period}
+            onChange={onPeriodChange}
+            options={periods.map((p) => ({ value: p.value, label: <span className="uppercase">{p.label}</span> }))}
+          />
         </div>
 
         <div className="mt-4">
