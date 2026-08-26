@@ -315,12 +315,18 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
               mostrarListaMobile || mostrarAdicionar ? "flex" : "hidden sm:flex"
             }`}
           >
-            <div className="flex items-center gap-2 border-b border-hairline p-4">
-              <MessageCircle size={18} className="text-training" />
-              <h2 className="flex-1 text-sm font-bold text-ink">Conversas</h2>
-              <button onClick={onClose} className="grid size-7 place-items-center rounded-lg text-muted hover:text-ink sm:hidden" aria-label="Fechar">
-                <X size={16} />
-              </button>
+            <div className="border-b border-hairline p-4">
+              <div className="flex items-center gap-2">
+                <MessageCircle size={18} className="text-training" />
+                <h2 className="flex-1 text-sm font-bold text-ink">Conversas</h2>
+                <button onClick={onClose} className="grid size-7 place-items-center rounded-lg text-muted hover:text-ink sm:hidden" aria-label="Fechar">
+                  <X size={16} />
+                </button>
+              </div>
+              {/* Tag propria sempre visivel ao abrir o chat, pra passar
+                  pra um amigo adicionar sem precisar entrar no painel
+                  de "Adicionar amigo". */}
+              <MinhaTag perfil={meuPerfil} />
             </div>
 
             {/* Filtros: Time (so' com time) / Amigos */}
@@ -499,6 +505,39 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
         </div>
       )}
     </ModalPortal>
+  );
+}
+
+// ------------------------------------------------------------
+// Tag propria (@apelido#codigo) compacta, com botao de copiar --
+// mostrada no topo assim que o chat abre (pedido explicito: "quando
+// abrir o chat, mostrar o proprio apelido + id no topo"), sem precisar
+// entrar no painel de Adicionar amigo pra isso.
+// ------------------------------------------------------------
+function MinhaTag({ perfil }: { perfil: Profile | null }) {
+  const [copiado, setCopiado] = useState(false);
+  if (!perfil) return null;
+  const tag = `@${perfil.apelido || perfil.nome}#${perfil.friend_code}`;
+
+  async function copiar() {
+    try {
+      await navigator.clipboard.writeText(tag);
+      setCopiado(true);
+      setTimeout(() => setCopiado(false), 1500);
+    } catch {
+      // sem permissao de clipboard -- a tag ja fica visivel na tela
+    }
+  }
+
+  return (
+    <button
+      onClick={copiar}
+      title="Copiar sua tag"
+      className="mt-2 flex w-full items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-left transition-colors hover:border-ink/40"
+    >
+      <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-ink">{tag}</span>
+      {copiado ? <Check size={12} className="shrink-0 text-positive" /> : <Copy size={12} className="shrink-0 text-muted" />}
+    </button>
   );
 }
 
