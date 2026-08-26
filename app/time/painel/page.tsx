@@ -202,100 +202,111 @@ function PainelConteudo() {
   return (
     <AppShell>
       <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
-        {/* Nav sempre na mesma posicao, logo no topo do container -- igual
-            ao Funil (pagina separada, sem esse vaivem). Antes o banner só
-            aparecia acima da nav na aba Visao Geral, fazendo a barra de
-            abas pular de lugar dependendo da aba selecionada; agora o
-            banner mora dentro do conteudo da propria aba Perfil.
-            justify-start no mobile: com 6 abas + Funil a barra nao cabe
-            (overflow-x-auto) -- centralizada, o scroll comeca sem
-            conseguir mostrar a primeira aba ("Perfil do time" ficava
-            fora de alcance rolando pra esquerda). A partir de sm a barra
-            cabe inteira sem rolar, entao centralizar volta a fazer
-            sentido visualmente. */}
-        <nav className="relative mb-5 flex justify-start gap-1 overflow-x-auto border-b border-hairline pt-4 sm:justify-center print:hidden">
-          {ABAS.map((a) => {
-            const Icon = a.icon;
-            const pend = a.key === "convites" ? pendentes.length : 0;
-            return (
-              <button key={a.key} onClick={() => trocarAba(a.key)}
-                className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-                  aba === a.key ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
-                }`}>
-                <Icon size={15} />
-                {a.label}
-                {pend > 0 && (
-                  <span className="rounded-full bg-evolution px-1.5 text-[10px] font-bold leading-4 text-void">{pend}</span>
-                )}
-              </button>
-            );
-          })}
+        {/* Container por fora envolvendo nav + conteudo da aba, no mesmo
+            padrao do board do Funil (barra de controles + conteudo dentro
+            de UM card so', em vez de soltos na pagina) -- pedido
+            explicito: "container por fora igual ficou no funil no modo
+            time". */}
+        <div className="rounded-2xl border border-hairline bg-surface p-4 print:border-0 print:bg-transparent print:p-0 sm:p-5">
+          {/* Nav sempre na mesma posicao, logo no topo do container -- igual
+              ao Funil (pagina separada, sem esse vaivem). Antes o banner só
+              aparecia acima da nav na aba Visao Geral, fazendo a barra de
+              abas pular de lugar dependendo da aba selecionada; agora o
+              banner mora dentro do conteudo da propria aba Perfil.
+              -mx-4/-mt-4 (e sm:-mx-5/sm:-mt-5): a nav rola horizontal
+              (overflow-x-auto) encostada nas bordas do card, senao o
+              padding do container cortava o scroll bem no meio do ultimo
+              item visivel no celular (pedido explicito: corrigir layout
+              no celular). justify-start no mobile: com 6 abas + Funil a
+              barra nao cabe -- centralizada, o scroll comeca sem
+              conseguir mostrar a primeira aba ("Perfil do time" ficava
+              fora de alcance rolando pra esquerda). A partir de sm a
+              barra cabe inteira sem rolar, entao centralizar volta a
+              fazer sentido visualmente. */}
+          <nav className="relative -mx-4 -mt-4 flex justify-start gap-1 overflow-x-auto border-b border-hairline px-4 pt-4 sm:-mx-5 sm:-mt-5 sm:justify-center sm:px-5 print:hidden">
+            {ABAS.map((a) => {
+              const Icon = a.icon;
+              const pend = a.key === "convites" ? pendentes.length : 0;
+              return (
+                <button key={a.key} onClick={() => trocarAba(a.key)}
+                  className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
+                    aba === a.key ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
+                  }`}>
+                  <Icon size={15} />
+                  {a.label}
+                  {pend > 0 && (
+                    <span className="rounded-full bg-evolution px-1.5 text-[10px] font-bold leading-4 text-void">{pend}</span>
+                  )}
+                </button>
+              );
+            })}
 
-          <Link href="/time/painel/funil"
-            className="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 py-2.5 text-[13px] font-medium text-muted transition-colors hover:text-ink">
-            <Kanban size={15} />
-            Funil
-            <ArrowUpRight size={12} className="text-muted/70" />
-          </Link>
-        </nav>
+            <Link href="/time/painel/funil"
+              className="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 py-2.5 text-[13px] font-medium text-muted transition-colors hover:text-ink">
+              <Kanban size={15} />
+              Funil
+              <ArrowUpRight size={12} className="text-muted/70" />
+            </Link>
+          </nav>
 
-        {erro && (
-          <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative print:hidden">
-            {erro}
-          </p>
-        )}
+          {erro && (
+            <p className="mb-4 mt-5 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative print:hidden">
+              {erro}
+            </p>
+          )}
 
-        {loading ? (
-          <p className="text-sm text-muted">Carregando painel…</p>
-        ) : (
-          <>
-            {aba === "perfil" && info && (
-              <>
-                <TabPerfil info={info} staff={staff} editable={podeEditarTime} uploading={enviandoBanner}
-                  onUploadClick={() => bannerRef.current?.click()} onRemoveClick={removerBanner} />
-                {podeEditarTime && (
-                  <input
-                    ref={bannerRef}
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    className="hidden"
-                    onChange={(e) => {
-                      const f = e.target.files?.[0];
-                      if (f) enviarBanner(f);
-                      e.target.value = "";
-                    }}
-                  />
-                )}
-              </>
-            )}
-            {aba === "estatisticas" && (
-              <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
-                onAbrirFunil={() => router.push("/time/painel/funil")} />
-            )}
-            {aba === "jogadores" && time && (
-              <TabJogadores teamId={time.team.id} jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
-                podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
-                leaks={leaks} dias={dias} onAtribuido={carregar}
-                onChange={carregar} onErro={setErro} />
-            )}
-            {aba === "convites" && time && (
-              <TabConvites pendentes={pendentes} invites={invites} isAdmin={Boolean(isAdmin)} meuPapel={time.role}
-                onChange={carregar} onErro={setErro} />
-            )}
-            {aba === "calendario" && time && (
-              <TabCalendario eventos={eventos} jogadores={linhas} teamId={time.team.id}
-                meuUserId={time.members.find((m) => m.isMe)?.userId ?? ""} meuPapel={time.role}
-                podeCriar={time.role === "admin" || time.role === "coach"}
-                prefillPlayerId={prefillEventoPlayerId}
-                onPrefillConsumido={() => setPrefillEventoPlayerId(null)}
-                onChange={carregar} onErro={setErro} />
-            )}
-            {aba === "time" && info && (
-              <TabTime info={info} staff={staff} labels={labels} podeEditar={time?.role !== "player"}
-                onChange={carregar} onErro={setErro} />
-            )}
-          </>
-        )}
+          {loading ? (
+            <p className="mt-5 text-sm text-muted">Carregando painel…</p>
+          ) : (
+            <div className="mt-5">
+              {aba === "perfil" && info && (
+                <>
+                  <TabPerfil info={info} staff={staff} editable={podeEditarTime} uploading={enviandoBanner}
+                    onUploadClick={() => bannerRef.current?.click()} onRemoveClick={removerBanner} />
+                  {podeEditarTime && (
+                    <input
+                      ref={bannerRef}
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      className="hidden"
+                      onChange={(e) => {
+                        const f = e.target.files?.[0];
+                        if (f) enviarBanner(f);
+                        e.target.value = "";
+                      }}
+                    />
+                  )}
+                </>
+              )}
+              {aba === "estatisticas" && (
+                <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
+                  onAbrirFunil={() => router.push("/time/painel/funil")} />
+              )}
+              {aba === "jogadores" && time && (
+                <TabJogadores teamId={time.team.id} jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
+                  podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
+                  leaks={leaks} dias={dias} onAtribuido={carregar}
+                  onChange={carregar} onErro={setErro} />
+              )}
+              {aba === "convites" && time && (
+                <TabConvites pendentes={pendentes} invites={invites} isAdmin={Boolean(isAdmin)} meuPapel={time.role}
+                  onChange={carregar} onErro={setErro} />
+              )}
+              {aba === "calendario" && time && (
+                <TabCalendario eventos={eventos} jogadores={linhas} teamId={time.team.id}
+                  meuUserId={time.members.find((m) => m.isMe)?.userId ?? ""} meuPapel={time.role}
+                  podeCriar={time.role === "admin" || time.role === "coach"}
+                  prefillPlayerId={prefillEventoPlayerId}
+                  onPrefillConsumido={() => setPrefillEventoPlayerId(null)}
+                  onChange={carregar} onErro={setErro} />
+              )}
+              {aba === "time" && info && (
+                <TabTime info={info} staff={staff} labels={labels} podeEditar={time?.role !== "player"}
+                  onChange={carregar} onErro={setErro} />
+              )}
+            </div>
+          )}
+        </div>
       </main>
 
       <TeamPrintStyles />
