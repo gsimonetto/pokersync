@@ -647,17 +647,17 @@ export default function BankrollPage() {
               }}
               aria-label="Registrar sessao"
               title="Registrar sessao"
-              className="group flex h-9 w-9 items-center justify-center rounded-xl bg-ink text-void shadow-lg shadow-black/30 transition-transform duration-200 hover:scale-110 active:scale-90"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void transition-colors hover:opacity-90"
             >
-              <Plus size={18} strokeWidth={2.5} className="transition-transform duration-200 group-hover:rotate-90" />
+              <Plus size={18} strokeWidth={2.5} />
             </button>
             <button
               onClick={() => setTxModalOpen(true)}
               aria-label="Deposito / saque"
               title="Deposito / saque"
-              className="group flex h-9 w-9 items-center justify-center rounded-xl border border-hairline bg-elevated text-ink shadow-lg shadow-black/20 transition-transform duration-200 hover:scale-110 hover:border-ink/40 active:scale-90"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
             >
-              <Wallet size={17} className="transition-transform duration-200 group-hover:-rotate-12" />
+              <Wallet size={17} />
             </button>
           </div>
         }
@@ -820,7 +820,7 @@ export default function BankrollPage() {
 
         {tiltStats && tiltStats.tiltN > 0 && (
           <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-            <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Sessoes com tilt vs demais</p>
+            <p className="text-xs font-semibold text-muted">Sessoes com tilt vs demais</p>
             <div className="mt-2 grid grid-cols-2 gap-3">
               <div>
                 <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
@@ -876,7 +876,7 @@ export default function BankrollPage() {
 
           {compareOpen && (
             <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-              <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">
+              <p className="text-xs font-semibold text-muted">
                 {comparison.currentLabel} vs {comparison.previousLabel}
               </p>
               <div className="mt-2 grid grid-cols-3 gap-3 text-center">
@@ -1067,7 +1067,7 @@ export default function BankrollPage() {
           />
           <button
             onClick={handleAddGoal}
-            className="col-span-2 rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98] sm:col-span-4"
+            className="col-span-2 rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90 sm:col-span-4"
           >
             Criar meta
           </button>
@@ -1076,7 +1076,7 @@ export default function BankrollPage() {
 
       <Modal open={brmModalOpen} onClose={() => setBrmModalOpen(false)} title="BRM — moveup / movedown">
         <div className="rounded-lg border border-hairline bg-elevated p-3">
-          <p className="text-xs font-bold uppercase tracking-[0.1em] text-muted">Calculadora</p>
+          <p className="text-xs font-semibold text-muted">Calculadora</p>
           <div className="mt-2 grid grid-cols-2 gap-2">
             <select
               value={calcFormat}
@@ -1119,7 +1119,7 @@ export default function BankrollPage() {
           )}
         </div>
 
-        <p className="mt-4 text-xs font-bold uppercase tracking-[0.1em] text-muted">Thresholds por formato</p>
+        <p className="mt-4 text-xs font-semibold text-muted">Thresholds por formato</p>
         <div className="mt-2 flex flex-col gap-2">
           {brmThresholds.map((t) => (
             <BrmThresholdRow key={t.format} threshold={t} onSave={handleSaveBrmThreshold} />
@@ -1128,7 +1128,7 @@ export default function BankrollPage() {
 
         {ruin && (
           <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3">
-            <p className="flex items-center gap-1.5 text-xs font-bold uppercase tracking-[0.1em] text-muted">
+            <p className="flex items-center gap-1.5 text-xs font-semibold text-muted">
               <ShieldAlert size={13} className="text-negative" /> Risco de ruína
             </p>
             <p className="mt-1.5 text-sm text-muted">
@@ -1160,7 +1160,7 @@ export default function BankrollPage() {
         </div>
         <button
           onClick={handleAddAnnotation}
-          className="mt-2 w-full rounded-lg bg-ink py-2 text-xs font-bold uppercase tracking-[0.1em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
+          className="mt-2 w-full rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90"
         >
           Adicionar
         </button>
@@ -1172,7 +1172,7 @@ export default function BankrollPage() {
                 <p className="text-xs text-ink">
                   <span className="text-muted">{a.date}</span> · {a.note}
                 </p>
-                <button onClick={() => handleRemoveAnnotation(a.id)} className="shrink-0 text-muted transition-all duration-150 hover:scale-125 hover:text-negative">
+                <button onClick={() => handleRemoveAnnotation(a.id)} className="shrink-0 text-muted transition-colors hover:text-negative">
                   <Trash2 size={13} />
                 </button>
               </div>
@@ -1186,7 +1186,7 @@ export default function BankrollPage() {
           <select
             value={format}
             onChange={(e) => setFormat(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           >
             {FORMATS.map((f) => (
               <option key={f} value={f}>
@@ -1198,14 +1198,14 @@ export default function BankrollPage() {
             type="date"
             value={date}
             onChange={(e) => setDate(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <input
             type="time"
             value={time}
             onChange={(e) => setTime(e.target.value)}
             title="Horario que a sessao comecou"
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-muted transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-muted outline-none transition-colors focus:border-ink/40"
           />
           <input
             type="number"
@@ -1214,7 +1214,7 @@ export default function BankrollPage() {
             placeholder="Horas jogadas"
             value={hours}
             onChange={(e) => setHours(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           {format === "Cash" && (
             <input
@@ -1225,40 +1225,40 @@ export default function BankrollPage() {
               title="Big blind da mesa — alimenta o bb/hora"
               value={bigBlind}
               onChange={(e) => setBigBlind(e.target.value)}
-              className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
           )}
           <input
             placeholder="Buy-in"
             value={buyIn}
             onChange={(e) => setBuyIn(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <input
             placeholder={REENTRY_LABEL[format] ?? "Reentradas"}
             title={REENTRY_LABEL[format] ?? "Reentradas"}
             value={reentries}
             onChange={(e) => setReentries(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <input
             placeholder="Cashout"
             value={cashout}
             onChange={(e) => setCashout(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <div className="grid grid-cols-[1fr_64px] gap-2">
             <input
               placeholder="Stake"
               value={stake}
               onChange={(e) => setStake(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
               title="Moeda da sessao"
-              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
             >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
@@ -1270,7 +1270,7 @@ export default function BankrollPage() {
           <select
             value={venue}
             onChange={(e) => setVenue(e.target.value)}
-            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30 ${venue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
+            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40 ${venue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
           >
             {PLATFORMS.map((p) => (
               <option key={p} value={p}>
@@ -1284,14 +1284,14 @@ export default function BankrollPage() {
               placeholder="Qual plataforma?"
               value={venueOther}
               onChange={(e) => setVenueOther(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
           )}
           <input
             placeholder="Notas"
             value={notes}
             onChange={(e) => setNotes(e.target.value)}
-            className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="col-span-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
         </div>
 
@@ -1396,7 +1396,7 @@ export default function BankrollPage() {
 
         <button
           onClick={handleSaveSession}
-          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90"
         >
           {editingSessionId ? "Salvar alteracoes" : "Salvar sessao"}
         </button>
@@ -1414,7 +1414,7 @@ export default function BankrollPage() {
                   value={historyFormat}
                   onChange={(e) => setHistoryFormat(e.target.value)}
                   aria-label="Filtrar por formato"
-                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink transition-colors hover:border-ink/30"
+                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
                 >
                   <option value="all">Todos os formatos</option>
                   {historyFormats.map((f) => (
@@ -1427,7 +1427,7 @@ export default function BankrollPage() {
                   value={historyRange}
                   onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
                   aria-label="Filtrar por periodo"
-                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink transition-colors hover:border-ink/30"
+                  className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
                 >
                   {HISTORY_RANGES.map((r) => (
                     <option key={r.value} value={r.value}>
@@ -1521,7 +1521,7 @@ export default function BankrollPage() {
           <select
             value={txType}
             onChange={(e) => setTxType(e.target.value as TransactionType)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           >
             <option value="deposito">Deposito</option>
             <option value="saque">Saque</option>
@@ -1531,20 +1531,20 @@ export default function BankrollPage() {
             type="date"
             value={txDate}
             onChange={(e) => setTxDate(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <div className="grid grid-cols-[1fr_64px] gap-2">
             <input
               placeholder="Valor"
               value={txAmount}
               onChange={(e) => setTxAmount(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
             <select
               value={txCurrency}
               onChange={(e) => setTxCurrency(e.target.value)}
               title="Moeda"
-              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
             >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
@@ -1557,12 +1557,12 @@ export default function BankrollPage() {
             placeholder="Nota (opcional)"
             value={txNote}
             onChange={(e) => setTxNote(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+            className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <select
             value={txVenue}
             onChange={(e) => setTxVenue(e.target.value)}
-            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30 ${txVenue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
+            className={`rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40 ${txVenue === OUTRO_PLATFORM ? "" : "col-span-2"}`}
           >
             {PLATFORMS.map((p) => (
               <option key={p} value={p}>
@@ -1576,13 +1576,13 @@ export default function BankrollPage() {
               placeholder="Qual plataforma?"
               value={txVenueOther}
               onChange={(e) => setTxVenueOther(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm transition-colors hover:border-ink/30"
+              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
           )}
         </div>
         <button
           onClick={handleAddTransaction}
-          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-xs font-bold uppercase tracking-[0.14em] text-void transition-all duration-200 hover:opacity-90 hover:scale-[1.02] hover:shadow-lg hover:shadow-ink/10 active:scale-[0.98]"
+          className="mt-4 w-full rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90"
         >
           Registrar
         </button>
@@ -1756,7 +1756,7 @@ function Modal({
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
       <div className="relative w-full max-w-lg animate-[modalIn_.16s_ease-out] rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
         <div className="flex items-center justify-between">
-          <h2 className="text-sm font-bold uppercase tracking-[0.1em] text-ink">{title}</h2>
+          <h2 className="text-lg font-semibold text-ink">{title}</h2>
           <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink" aria-label="Fechar">
             <X size={16} />
           </button>
