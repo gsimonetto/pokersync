@@ -1,6 +1,7 @@
 "use client";
 
 import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { RangeEditor } from "@/components/ranges/range-editor";
 import { RangesTabs } from "@/components/ranges/ranges-tabs";
 
@@ -10,10 +11,12 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 // proprio construtor (RangeListModal), sem sair da tela.
 export default function RangesPage() {
   return (
-    <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      <AppHeader right={<RangesTabs active="ranges" />} />
+    <AppShell>
+      <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
+        <AppHeader insideShell right={<RangesTabs active="ranges" />} />
 
-      <RangeEditor id="novo" />
-    </main>
+        <RangeEditor id="novo" />
+      </main>
+    </AppShell>
   );
 }

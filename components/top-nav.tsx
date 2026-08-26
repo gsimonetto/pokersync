@@ -24,10 +24,26 @@ const TABS = [
 
 type OpenMenu = "profile" | "notifications" | "help" | null;
 
-// "/modulos" e "/banca" tem sua propria topbar/sidebar (AppShell,
-// redesenho 2026-08) -- mostrar as duas juntas duplicaria navegacao no
-// topo da tela. Conforme mais modulos migrarem pro AppShell, entram aqui.
-const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha", "/modulos", "/banca"];
+const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha"];
+
+// Modulos que ja migraram pro AppShell (sidebar/topbar propria,
+// components/app-shell.tsx) -- mostrar o TopNav global junto duplicaria
+// navegacao no topo da tela. Prefixo, nao rota exata: cobre sub-rotas
+// como /ranges/arvores/[id] ou /time/jogador/[id] sem listar cada uma.
+//
+// "/time/convite" fica de fora de proposito: e' o fluxo de aceitar
+// convite, que nao usa o AppShell (pode rodar sem sessao/time ainda
+// resolvido) -- ali o TopNav global continua sendo a unica navegacao.
+// "/revisor/admin" tambem fica de fora: painel oculto (sem link no fluxo
+// do jogador, acesso direto por URL restrito a um unico e-mail) que
+// nunca foi migrado pro AppShell.
+const APP_SHELL_ROUTE_PREFIXES = ["/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino"];
+const APP_SHELL_EXCLUDED_PREFIXES = ["/time/convite", "/revisor/admin"];
+
+function usaAppShell(pathname: string) {
+  if (APP_SHELL_EXCLUDED_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"))) return false;
+  return APP_SHELL_ROUTE_PREFIXES.some((p) => pathname === p || pathname.startsWith(p + "/"));
+}
 
 export function TopNav() {
   const pathname = usePathname();
@@ -70,7 +86,7 @@ export function TopNav() {
       .catch(() => {});
   }
 
-  if (HIDDEN_ROUTES.includes(pathname)) {
+  if (HIDDEN_ROUTES.includes(pathname) || usaAppShell(pathname)) {
     return null;
   }
 

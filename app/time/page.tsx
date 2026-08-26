@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
 import { Chip } from "@/components/chip";
+import { AppShell } from "@/components/app-shell";
 import { ACCENT } from "@/lib/modules-data";
 import { TeamBanner } from "@/components/time/team-banner";
 import { fetchDrillFacets } from "@/lib/services/drill-service";
@@ -77,23 +78,25 @@ export default function TimePage() {
   }, [carregar]);
 
   return (
-    <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      {erro && (
-        <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
-      )}
+    <AppShell>
+      <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
+        {erro && (
+          <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
+        )}
 
-      {loading ? (
-        <p className="text-sm text-muted">Carregando…</p>
-      ) : membership?.status === "pendente" ? (
-        <AguardandoAprovacao membership={membership} />
-      ) : data ? (
-        <VisaoJogador data={data} />
-      ) : planoPermiteCriarTime(plan) ? (
-        <CriarTimeCard onCriado={carregar} onErro={setErro} />
-      ) : (
-        <SemPlanoCard />
-      )}
-    </main>
+        {loading ? (
+          <p className="text-sm text-muted">Carregando…</p>
+        ) : membership?.status === "pendente" ? (
+          <AguardandoAprovacao membership={membership} />
+        ) : data ? (
+          <VisaoJogador data={data} />
+        ) : planoPermiteCriarTime(plan) ? (
+          <CriarTimeCard onCriado={carregar} onErro={setErro} />
+        ) : (
+          <SemPlanoCard />
+        )}
+      </main>
+    </AppShell>
   );
 }
 

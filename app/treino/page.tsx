@@ -4,6 +4,7 @@ import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { Target, X } from "lucide-react";
 import { RfiJamDrill } from "@/components/drill/rfi-jam-drill";
+import { AppShell } from "@/components/app-shell";
 import { F } from "@/lib/poker/drill-theme";
 import { fetchSuggestionTarget } from "@/lib/services/drill-service";
 import { fetchSessions } from "@/lib/services/bankroll-service";
@@ -137,6 +138,7 @@ function TreinoShell() {
     // Margem padrao do app (max-w-[1280px] px-6 py-10) — antes essa tela
     // era full-bleed de proposito, mas o padrao virou consistencia entre
     // todo modulo, entao entra aqui tambem.
+    <AppShell>
     <main className="mx-auto max-w-[1280px] px-6 py-10">
     <div
       ref={pageRef}
@@ -259,6 +261,7 @@ function TreinoShell() {
       </div>
     </div>
     </main>
+    </AppShell>
   );
 }
 

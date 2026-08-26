@@ -4,6 +4,7 @@ import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
 import { Bookmark } from "lucide-react";
 import { AppHeader } from "@/components/app-header";
+import { AppShell } from "@/components/app-shell";
 import { RevisorFila } from "@/components/revisor/revisor-fila";
 import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
@@ -94,8 +95,10 @@ function RevisorPageInner() {
   }
 
   return (
+    <AppShell>
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader
+        insideShell
         onBack={
           screen === "fila" || screen === "salvos" || screen === "aderencia"
             ? undefined
@@ -142,6 +145,7 @@ function RevisorPageInner() {
         <RevisorDetalhe reviewId={selectedReviewId} onBack={backFromDetalhe} />
       )}
     </main>
+    </AppShell>
   );
 }
 
@@ -149,9 +153,11 @@ export default function RevisorPage() {
   return (
     <Suspense
       fallback={
-        <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
-          <p className="text-sm text-muted">Carregando…</p>
-        </main>
+        <AppShell>
+          <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
+            <p className="text-sm text-muted">Carregando…</p>
+          </main>
+        </AppShell>
       }
     >
       <RevisorPageInner />

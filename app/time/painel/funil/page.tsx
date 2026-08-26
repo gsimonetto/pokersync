@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { TabKanban } from "@/components/time/tab-kanban";
+import { AppShell } from "@/components/app-shell";
 import { ModalNovoEvento } from "@/components/time/tab-calendario";
 import {
   fetchMyTeamCached,
@@ -53,6 +54,7 @@ export default function FunilPage() {
   );
 
   return (
+    <AppShell>
     <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
       {/* Sem AppHeader aqui de proposito — a barra de abas do Painel ja'
           identifica "Funil", e o header sozinho virava uma faixa vazia
@@ -90,5 +92,6 @@ export default function FunilPage() {
         />
       )}
     </main>
+    </AppShell>
   );
 }
