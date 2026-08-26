@@ -57,9 +57,10 @@ export async function updateSession(request: NextRequest) {
 
     if (last && Date.now() - last > INACTIVITY_LIMIT_MS) {
       await supabase.auth.signOut();
-      const redirect = NextResponse.redirect(
-        new URL("/login?expirado=1", request.url)
-      );
+      const loginUrl = new URL("/login", request.url);
+      loginUrl.searchParams.set("expirado", "1");
+      if (pathname !== "/") loginUrl.searchParams.set("redirectTo", pathname);
+      const redirect = NextResponse.redirect(loginUrl);
       // signOut() grava a limpeza dos cookies de sessão em `response`,
       // que seria descartado ao retornar `redirect`. Copiamos aqui.
       response.cookies.getAll().forEach((cookie) => {
