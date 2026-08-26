@@ -12,7 +12,7 @@ import {
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, MAX_LEVEL,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
   type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank, type Season,
 } from "@/lib/services/xp-service";
 import { createClient } from "@/lib/supabase/client";
@@ -184,6 +184,13 @@ export default function HubPage() {
   const level = progress.level;
   const isMaxLevel = level >= MAX_LEVEL;
   const badgeColor = levelColor(level);
+  const badgeMaterial = levelMaterial(level);
+  const badgeSubTier = levelSubTier(level);
+  // Faixas altas (Platina em diante) ganham mais ornamento -- brilho e
+  // particulas escalam com o "prestigio" do material, igual patente de
+  // jogo fica mais chamativa perto do topo.
+  const badgeBandIdx = Math.min(9, Math.max(0, Math.ceil(level / 10) - 1));
+  const badgeEpic = badgeBandIdx >= 7;
   const xpNeeded = isMaxLevel ? 0 : xpForNextLevel(level);
   const xpCurrent = progress.xp_current;
   const pct = isMaxLevel ? 100 : Math.min(100, (xpCurrent / xpNeeded) * 100);
@@ -249,20 +256,37 @@ export default function HubPage() {
           to   { transform: rotate(360deg); }
         }
         @keyframes hubBadgeBreathe {
-          0%, 100% { box-shadow: 0 0 0 4px ${badgeColor}18, 0 0 14px -2px ${badgeColor}70; }
-          50%      { box-shadow: 0 0 0 6px ${badgeColor}26, 0 0 26px 2px ${badgeColor}aa; }
+          0%, 100% { box-shadow: 0 0 0 5px ${badgeColor}22, 0 0 22px 0px ${badgeColor}90, 0 0 46px 4px ${badgeColor}40; }
+          50%      { box-shadow: 0 0 0 8px ${badgeColor}34, 0 0 38px 4px ${badgeColor}c0, 0 0 64px 10px ${badgeColor}60; }
         }
         @keyframes hubBadgeNumberGlow {
-          0%, 100% { text-shadow: 0 0 6px ${badgeColor}55; }
-          50%      { text-shadow: 0 0 16px ${badgeColor}cc; }
+          0%, 100% { text-shadow: 0 0 8px ${badgeColor}66, 0 0 2px ${badgeColor}; }
+          50%      { text-shadow: 0 0 22px ${badgeColor}ee, 0 0 4px ${badgeColor}; }
+        }
+        @keyframes hubBadgeHaloPulse {
+          0%, 100% { opacity: .55; transform: scale(1); }
+          50%      { opacity: 1; transform: scale(1.12); }
+        }
+        @keyframes hubBadgeOrbitSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes hubBadgeSheenSweep {
+          0%   { transform: translateX(-140%) skewX(-18deg); }
+          55%  { transform: translateX(220%) skewX(-18deg); }
+          100% { transform: translateX(220%) skewX(-18deg); }
         }
         @keyframes hubXpShimmer {
           0%   { transform: translateX(-100%); }
           100% { transform: translateX(300%); }
         }
         .hub-badge-ring { animation: hubBadgeRotate 6s linear infinite; }
+        .hub-badge-ring-thin { animation: hubBadgeRotate 10s linear infinite reverse; }
         .hub-badge-box { animation: hubBadgeBreathe 2.4s ease-in-out infinite; }
         .hub-badge-number { animation: hubBadgeNumberGlow 2.4s ease-in-out infinite; }
+        .hub-badge-halo { animation: hubBadgeHaloPulse 2.4s ease-in-out infinite; }
+        .hub-badge-orbit { animation: hubBadgeOrbitSpin 5s linear infinite; }
+        .hub-badge-sheen { animation: hubBadgeSheenSweep 3.2s ease-in-out infinite; }
         .hub-xp-shimmer { animation: hubXpShimmer 2.2s ease-in-out infinite; }
         .hub-level-card { transition: box-shadow .3s ease, border-color .3s ease; }
         .hub-level-card:hover { border-color: rgba(224,178,76,0.4); box-shadow: 0 0 30px -10px rgba(224,178,76,0.25); }
@@ -300,7 +324,7 @@ export default function HubPage() {
         .rk-countdown { animation: rkCountdownPulse 2.4s ease-in-out infinite; }
         .rk-banner { animation: hubFadeInUp .3s ease-out both; }
         @media (prefers-reduced-motion: reduce) {
-          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-box, .hub-badge-number, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner { animation: none !important; transition: none !important; }
+          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-ring-thin, .hub-badge-box, .hub-badge-number, .hub-badge-halo, .hub-badge-orbit, .hub-badge-sheen, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner { animation: none !important; transition: none !important; }
         }
       `}</style>
 
@@ -328,26 +352,66 @@ export default function HubPage() {
 
         <div className="relative grid grid-cols-[auto_1fr_auto] items-center gap-5">
           <div className="relative h-20 w-20">
+            {/* Halo ambiente atras de tudo -- camada extra de glow, maior e
+                mais dispersa que o brilho do proprio badge (pedido
+                explicito: "mais brilho, mais glow"). Escala com o tier. */}
+            <div
+              className="hub-badge-halo pointer-events-none absolute -inset-5 rounded-full blur-2xl"
+              style={{ background: `radial-gradient(circle, ${badgeColor}${badgeEpic ? "66" : "40"} 0%, transparent 70%)` }}
+            />
+            {/* Particulas orbitando -- so' nas faixas de prestigio alto
+                (Platina+), pra patente alta parecer mais "epica" sem
+                poluir os niveis iniciais. */}
+            {badgeEpic && (
+              <div className="hub-badge-orbit pointer-events-none absolute inset-0">
+                {[0, 1, 2].map((i) => (
+                  <span
+                    key={i}
+                    className="absolute left-1/2 top-1/2 h-1 w-1 rounded-full"
+                    style={{
+                      background: badgeColor,
+                      boxShadow: `0 0 6px 1px ${badgeColor}`,
+                      transform: `rotate(${i * 120}deg) translateX(46px)`,
+                    }}
+                  />
+                ))}
+              </div>
+            )}
             {/* Anel giratorio atras do badge — conic-gradient na cor da
                 faixa, sempre girando (pedido explicito: "mais animacoes
-                no nivel"). */}
+                no nivel"), agora mais espesso e com halo proprio. */}
             <div
-              className="hub-badge-ring pointer-events-none absolute -inset-1.5 rounded-full opacity-70 blur-[2px]"
-              style={{ background: `conic-gradient(from 0deg, transparent, ${badgeColor}, transparent 55%)` }}
+              className="hub-badge-ring pointer-events-none absolute -inset-2 rounded-full opacity-90 blur-[1.5px]"
+              style={{ background: `conic-gradient(from 0deg, transparent, ${badgeColor}, ${badgeColor}, transparent 55%)` }}
             />
+            <div className="hub-badge-ring-thin pointer-events-none absolute -inset-0.5 rounded-full border" style={{ borderColor: `${badgeColor}55` }} />
             <div
-              className="hub-badge-box relative grid h-20 w-20 place-items-center rounded-2xl bg-void text-3xl font-extrabold"
+              className="hub-badge-box relative grid h-20 w-20 place-items-center overflow-hidden rounded-2xl bg-void text-3xl font-extrabold"
               style={{ border: `2px solid ${badgeColor}`, color: badgeColor }}
             >
-              <span className="hub-badge-number">{level}</span>
+              {/* Sheen -- faixa de luz varrendo o badge (efeito "carta
+                  premium"), reforca o brilho sem precisar de mais cor. */}
+              <span
+                className="hub-badge-sheen pointer-events-none absolute inset-y-0 left-0 w-1/2"
+                style={{ background: "linear-gradient(115deg, transparent, rgba(255,255,255,.5), transparent)" }}
+              />
+              <span className="hub-badge-number relative">{level}</span>
             </div>
           </div>
 
           <div className="min-w-0">
-            {/* Nome de patente em ingles (Micro Stakes I etc) removido
-                (pedido explicito) — so o numero do nivel, sem rotulo por
-                baixo. Cor do nivel muda a cada 10 (pedido explicito). */}
+            {/* Rotulo de patente (Bronze/Prata/Ouro...) volta como chip
+                colorido -- pedido explicito: "detalhes que remetam o
+                nivel igual as patentes de jogos". Numeral romano imita a
+                subdivisao dentro do tier (Ouro III etc). Cor do nivel
+                muda a cada 10 (pedido explicito, ja existia). */}
             <p className="flex flex-wrap items-center gap-1.5 text-[11px] font-bold uppercase tracking-[0.16em] text-muted">
+              <span
+                className="rounded px-1.5 py-0.5 text-[10px]"
+                style={{ color: badgeColor, background: `${badgeColor}22`, border: `1px solid ${badgeColor}55` }}
+              >
+                {badgeMaterial} {badgeSubTier}
+              </span>
               <span>
                 Nível {level}
                 <span className="text-muted/70">/{MAX_LEVEL}</span>
