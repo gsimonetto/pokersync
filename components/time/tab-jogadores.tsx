@@ -7,6 +7,8 @@ import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertic
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
+import { MessageBubble } from "@/components/chat/message-bubble";
+import { MessageComposer } from "@/components/chat/message-composer";
 import {
   assignCoach,
   assignTeamDrill,
@@ -15,9 +17,11 @@ import {
   fetchTeamThread,
   markThreadRead,
   removeMember,
+  sendTeamAudioMessage,
   sendTeamMessage,
   setMemberLabel,
   traduzErroTime,
+  uploadTeamAudio,
   type TeamDashboardRow,
   type TeamLabel,
   type TeamLeak,
@@ -290,7 +294,7 @@ export function TabJogadores({
       )}
 
       {conversaCom && (
-        <ConversaDrawer jogador={conversaCom} onFechar={() => setConversaCom(null)} onErro={onErro} />
+        <ConversaDrawer teamId={teamId} jogador={conversaCom} onFechar={() => setConversaCom(null)} onErro={onErro} />
       )}
       </section>
     </div>
@@ -474,19 +478,19 @@ function AcoesJogadorModal({
 // send_team_message -> notify_system, categoria "team").
 // ------------------------------------------------------------
 function ConversaDrawer({
+  teamId,
   jogador,
   onFechar,
   onErro,
 }: {
+  teamId: string;
   jogador: TeamDashboardRow;
   onFechar: () => void;
   onErro: (s: string) => void;
 }) {
   const [mensagens, setMensagens] = useState<TeamMessage[]>([]);
   const [meId, setMeId] = useState<string | null>(null);
-  const [texto, setTexto] = useState("");
   const [carregando, setCarregando] = useState(true);
-  const [enviando, setEnviando] = useState(false);
 
   useEffect(() => {
     let ativo = true;
@@ -512,20 +516,24 @@ function ConversaDrawer({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [jogador.userId]);
 
-  async function enviar() {
-    if (!texto.trim()) return;
-    setEnviando(true);
-    const corpo = texto.trim();
-    setTexto("");
+  async function enviarTexto(body: string) {
     try {
-      await sendTeamMessage(jogador.userId, corpo);
+      await sendTeamMessage(jogador.userId, body);
       const thread = await fetchTeamThread(jogador.userId);
       setMensagens(thread);
     } catch (e) {
       onErro(traduzErroTime(e));
-      setTexto(corpo);
-    } finally {
-      setEnviando(false);
+    }
+  }
+
+  async function enviarAudio(blob: Blob, seconds: number) {
+    try {
+      const path = await uploadTeamAudio(teamId, blob);
+      await sendTeamAudioMessage(jogador.userId, path, seconds);
+      const thread = await fetchTeamThread(jogador.userId);
+      setMensagens(thread);
+    } catch (e) {
+      onErro(traduzErroTime(e));
     }
   }
 
@@ -552,43 +560,11 @@ function ConversaDrawer({
           ) : mensagens.length === 0 ? (
             <p className="text-sm text-muted">Nenhuma mensagem ainda. Diga oi.</p>
           ) : (
-            mensagens.map((m) => {
-              const minha = m.senderId === meId;
-              return (
-                <div key={m.id} className={`flex ${minha ? "justify-end" : "justify-start"}`}>
-                  <div
-                    className={`max-w-[80%] rounded-lg px-3 py-2 text-[13px] ${
-                      minha ? "bg-ink text-void" : "border border-hairline bg-elevated text-ink"
-                    }`}
-                  >
-                    <p className="whitespace-pre-wrap break-words">{m.body}</p>
-                    <p className={`mt-1 text-[10px] ${minha ? "text-void/60" : "text-muted"}`}>
-                      {new Date(m.createdAt).toLocaleString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
-                    </p>
-                  </div>
-                </div>
-              );
-            })
+            mensagens.map((m) => <MessageBubble key={m.id} message={m} isMine={m.senderId === meId} />)
           )}
         </div>
 
-        <div className="flex items-center gap-2 border-t border-hairline p-3">
-          <input
-            value={texto}
-            onChange={(e) => setTexto(e.target.value)}
-            onKeyDown={(e) => e.key === "Enter" && !enviando && enviar()}
-            placeholder="Escreva uma mensagem…"
-            className="flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none placeholder:text-muted/50"
-          />
-          <button
-            onClick={enviar}
-            disabled={enviando || !texto.trim()}
-            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-ink text-void disabled:opacity-50"
-            aria-label="Enviar"
-          >
-            <Send size={15} />
-          </button>
-        </div>
+        <MessageComposer onSendText={enviarTexto} onSendAudio={enviarAudio} />
       </div>
     </div>
   );
