@@ -15,9 +15,11 @@ import {
   updateProfileDetails,
   TEMPO_EXPERIENCIA_LABEL,
   HORARIO_TREINO_LABEL,
+  DIA_SEMANA_LABEL,
   type Profile,
   type TempoExperiencia,
   type HorarioTreino,
+  type DiaSemana,
 } from "@/lib/services/profile-service";
 
 export function ProfileMenu({
@@ -50,6 +52,12 @@ export function ProfileMenu({
     } finally {
       setSalvandoDetalhes(false);
     }
+  }
+
+  function toggleDiaSemana(dia: DiaSemana) {
+    const atual = profile.dias_treino_semana ?? [];
+    const novo = atual.includes(dia) ? atual.filter((d) => d !== dia) : [...atual, dia];
+    salvarDetalhe({ diasTreinoSemana: novo.length ? novo : null }, { dias_treino_semana: novo.length ? novo : null });
   }
 
   async function pickIcon(id: number) {
@@ -235,6 +243,51 @@ export function ProfileMenu({
                     ))}
                   </select>
                 </label>
+
+                <label className="flex flex-col gap-1.5">
+                  <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-muted">
+                    <Clock3 size={12} /> Horas de treino por dia
+                  </span>
+                  <input
+                    type="number"
+                    min={0}
+                    max={24}
+                    defaultValue={profile.horas_treino_dia ?? ""}
+                    onBlur={(e) => {
+                      const v = e.target.value ? Number(e.target.value) : null;
+                      salvarDetalhe({ horasTreinoDia: v }, { horas_treino_dia: v });
+                    }}
+                    disabled={salvandoDetalhes}
+                    placeholder="Ex: 2"
+                    className="w-full rounded-lg border border-hairline bg-void px-3 py-2 text-[13px] text-ink outline-none focus:border-ink disabled:opacity-60"
+                  />
+                </label>
+
+                <div className="flex flex-col gap-1.5">
+                  <span className="flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-muted">
+                    <Clock3 size={12} /> Dias da semana disponíveis
+                  </span>
+                  <div className="flex flex-wrap gap-1.5">
+                    {(Object.entries(DIA_SEMANA_LABEL) as [DiaSemana, string][]).map(([v, label]) => {
+                      const selected = (profile.dias_treino_semana ?? []).includes(v);
+                      return (
+                        <button
+                          key={v}
+                          type="button"
+                          disabled={salvandoDetalhes}
+                          onClick={() => toggleDiaSemana(v)}
+                          className={`rounded-md border px-2.5 py-1.5 text-[11px] font-semibold transition-colors disabled:opacity-60 ${
+                            selected
+                              ? "border-ink bg-ink text-void"
+                              : "border-hairline bg-void text-muted hover:text-ink"
+                          }`}
+                        >
+                          {label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                </div>
               </div>
 
               <button

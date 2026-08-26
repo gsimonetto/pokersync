@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 
 export type TempoExperiencia = "menos_1_ano" | "1_2_anos" | "3_5_anos" | "5_mais_anos";
 export type HorarioTreino = "manha" | "tarde" | "noite" | "madrugada";
+export type DiaSemana = "seg" | "ter" | "qua" | "qui" | "sex" | "sab" | "dom";
 
 export const TEMPO_EXPERIENCIA_LABEL: Record<TempoExperiencia, string> = {
   menos_1_ano: "Menos de 1 ano",
@@ -17,6 +18,16 @@ export const HORARIO_TREINO_LABEL: Record<HorarioTreino, string> = {
   madrugada: "Madrugada",
 };
 
+export const DIA_SEMANA_LABEL: Record<DiaSemana, string> = {
+  seg: "Seg",
+  ter: "Ter",
+  qua: "Qua",
+  qui: "Qui",
+  sex: "Sex",
+  sab: "Sáb",
+  dom: "Dom",
+};
+
 export interface Profile {
   id: string;
   nome: string;
@@ -28,6 +39,10 @@ export interface Profile {
   data_nascimento: string | null;
   tempo_experiencia: TempoExperiencia | null;
   horario_treino: HorarioTreino | null;
+  /** Quantas horas por dia o jogador topa treinar e em quais dias --
+      alimenta o card do jogador em /modulos. */
+  horas_treino_dia: number | null;
+  dias_treino_semana: DiaSemana[] | null;
 }
 
 async function getUser() {
@@ -47,7 +62,9 @@ export async function fetchProfile(): Promise<Profile> {
 
   const { data, error } = await supabase
     .from("profiles")
-    .select("id, nome, apelido, avatar_id, avatar_url, data_nascimento, tempo_experiencia, horario_treino")
+    .select(
+      "id, nome, apelido, avatar_id, avatar_url, data_nascimento, tempo_experiencia, horario_treino, horas_treino_dia, dias_treino_semana"
+    )
     .eq("id", user.id)
     .maybeSingle();
   if (error) throw error;
@@ -63,6 +80,8 @@ export async function fetchProfile(): Promise<Profile> {
     data_nascimento: null,
     tempo_experiencia: null,
     horario_treino: null,
+    horas_treino_dia: null,
+    dias_treino_semana: null,
   };
   const { error: eIns } = await supabase.from("profiles").insert(fallback);
   if (eIns) throw eIns;
@@ -120,6 +139,8 @@ export async function updateProfileDetails(patch: {
   dataNascimento?: string | null;
   tempoExperiencia?: TempoExperiencia | null;
   horarioTreino?: HorarioTreino | null;
+  horasTreinoDia?: number | null;
+  diasTreinoSemana?: DiaSemana[] | null;
 }) {
   const supabase = createClient();
   const user = await getUser();
@@ -127,6 +148,8 @@ export async function updateProfileDetails(patch: {
   if (patch.dataNascimento !== undefined) row.data_nascimento = patch.dataNascimento;
   if (patch.tempoExperiencia !== undefined) row.tempo_experiencia = patch.tempoExperiencia;
   if (patch.horarioTreino !== undefined) row.horario_treino = patch.horarioTreino;
+  if (patch.horasTreinoDia !== undefined) row.horas_treino_dia = patch.horasTreinoDia;
+  if (patch.diasTreinoSemana !== undefined) row.dias_treino_semana = patch.diasTreinoSemana;
   const { error } = await supabase.from("profiles").update(row).eq("id", user.id);
   if (error) throw error;
 }

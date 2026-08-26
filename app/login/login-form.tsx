@@ -256,7 +256,7 @@ export default function LoginForm() {
 
         {/* Cabeçalho */}
         <div className="flex flex-col items-center space-y-3 text-center mb-6">
-          <Logo className="h-10 w-auto" />
+          <Logo className="h-14 w-auto" />
         </div>
 
         {/* Seletor de Abas */}
@@ -279,30 +279,6 @@ export default function LoginForm() {
               <span className="relative z-10">{tab === "login" ? "Entrar" : "Criar Conta"}</span>
             </button>
           ))}
-        </div>
-
-        {/* Botão Google */}
-        <button
-          type="button"
-          onClick={handleGoogleLogin}
-          disabled={isGoogleLoading || isLoading}
-          className="w-full mb-4 bg-elevated hover:bg-white/10 border border-hairline text-ink font-medium text-sm py-2.5 px-4 rounded-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
-        >
-          {isGoogleLoading ? (
-            <div className="w-4 h-4 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
-          ) : (
-            <>
-              <GoogleIcon className="w-4 h-4" />
-              <span>Continuar com Google</span>
-            </>
-          )}
-        </button>
-
-        {/* Divisor */}
-        <div className="flex items-center gap-3 mb-4">
-          <div className="h-px flex-1 bg-hairline" />
-          <span className="text-[11px] uppercase tracking-wider text-muted">ou</span>
-          <div className="h-px flex-1 bg-hairline" />
         </div>
 
         {/* Formulário Animado */}
@@ -409,6 +385,34 @@ export default function LoginForm() {
                 </>
               )}
             </motion.button>
+
+            {!isRegister && (
+              <>
+                {/* Divisor */}
+                <div className="flex items-center gap-3 pt-2">
+                  <div className="h-px flex-1 bg-hairline" />
+                  <span className="text-[11px] uppercase tracking-wider text-muted">ou</span>
+                  <div className="h-px flex-1 bg-hairline" />
+                </div>
+
+                {/* Botão Google */}
+                <button
+                  type="button"
+                  onClick={handleGoogleLogin}
+                  disabled={isGoogleLoading || isLoading}
+                  className="w-full bg-elevated hover:bg-white/10 border border-hairline text-ink font-medium text-sm py-2.5 px-4 rounded-lg flex items-center justify-center gap-2.5 transition-all cursor-pointer disabled:opacity-50 disabled:cursor-not-allowed"
+                >
+                  {isGoogleLoading ? (
+                    <div className="w-4 h-4 border-2 border-ink/30 border-t-ink rounded-full animate-spin" />
+                  ) : (
+                    <>
+                      <GoogleIcon className="w-4 h-4" />
+                      <span>Entrar com Google</span>
+                    </>
+                  )}
+                </button>
+              </>
+            )}
           </motion.form>
         </AnimatePresence>
       </motion.div>

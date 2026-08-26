@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Settings, LogOut, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
+import { Bell, CircleHelp, Home, LogOut, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -160,16 +160,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const footer = (
     <>
       <button
-        onClick={() => toggleMenu("profile")}
-        title={collapsed ? "Configurações" : undefined}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.04] hover:text-ink ${
-          collapsed ? "justify-center" : ""
-        }`}
-      >
-        <Settings size={18} strokeWidth={1.75} className="shrink-0" />
-        {!collapsed && "Configurações"}
-      </button>
-      <button
         onClick={handleLogout}
         title={collapsed ? "Sair" : undefined}
         className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-negative/[0.08] hover:text-negative ${
@@ -197,7 +187,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         >
           {!collapsed && (
             <Link href="/modulos" aria-label="Ir para Módulos">
-              <Logo className="h-7 w-auto" />
+              <Logo className="h-10 w-auto" />
             </Link>
           )}
           <button
@@ -225,7 +215,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="relative flex h-full w-[264px] flex-col border-r border-hairline bg-surface">
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-hairline px-5">
               <Link href="/modulos" aria-label="Ir para Módulos" onClick={() => setMobileOpen(false)}>
-                <Logo className="h-7 w-auto" />
+                <Logo className="h-10 w-auto" />
               </Link>
               <button
                 onClick={() => setMobileOpen(false)}
@@ -255,6 +245,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <Menu className="size-[18px]" />
           </button>
           <div className="flex items-center gap-1.5">
+            <Link
+              href="/modulos"
+              className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
+                pathname === "/modulos" ? "text-ink" : "text-muted"
+              }`}
+              aria-label="Início"
+              title="Início"
+            >
+              <Home className="size-[18px]" />
+            </Link>
             <div className="relative">
               <button
                 onClick={() => toggleMenu("notifications")}
