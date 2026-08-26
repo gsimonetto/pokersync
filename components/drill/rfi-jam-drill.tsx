@@ -658,7 +658,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
               embaixo dele na coluna, já que a mesa ao lado é bem mais
               alta. O grid já estica o WRAPPER pra altura toda; faltava
               o aside herdar isso. */}
-          <aside style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
+          <aside className="ps-tr-filters-scroll" style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
                 Filtros

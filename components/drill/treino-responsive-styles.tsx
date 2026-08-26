@@ -15,6 +15,21 @@ export function TreinoResponsiveStyles() {
       .ps-tr-filters-toggle { display: flex; }
       .ps-tr-filters-backdrop { display: none; }
 
+      /* O aside de filtros sempre teve overflow-y:auto (mais filtros
+         cabem do que a coluna de 240px tem altura) -- a barra de rolagem
+         nativa do navegador (larga, cinza-clara) destoava do resto do
+         produto e parecia bug visual. Fina e no tom escuro do painel. */
+      .ps-tr-filters-scroll {
+        scrollbar-width: thin;
+        scrollbar-color: rgba(255, 255, 255, 0.18) transparent;
+      }
+      .ps-tr-filters-scroll::-webkit-scrollbar { width: 6px; }
+      .ps-tr-filters-scroll::-webkit-scrollbar-track { background: transparent; }
+      .ps-tr-filters-scroll::-webkit-scrollbar-thumb {
+        background: rgba(255, 255, 255, 0.18);
+        border-radius: 3px;
+      }
+
       @media (max-width: 768px) {
         /* Tela travada em 100dvh com overflow hidden: o jogador não
            deve precisar rolar pra achar os botões de aposta (bug
