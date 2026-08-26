@@ -63,18 +63,26 @@ export default function FunilPage() {
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
       )}
 
-      {loading || !time ? (
+      {loading ? (
         <p className="text-sm text-muted">Carregando funil…</p>
       ) : (
-        <TabKanban
-          teamId={time.team.id}
-          jogadores={jogadores}
-          coaches={coaches}
-          isAdmin={time.role === "admin"}
-          backHref="/time/painel"
-          onErro={setErro}
-          onAgendarConversa={setAgendarPlayerId}
-        />
+        // Sem `time` aqui so' acontece apos erro (esgotado o "!t" ->
+        // router.replace("/time")) -- a mensagem ja aparece acima; sem
+        // esse `time &&`, a tela ficava presa em "Carregando funil..."
+        // pra sempre mesmo com o carregamento ja' terminado (loading
+        // false), so' porque o guard antigo tratava "sem time" e "ainda
+        // carregando" como a mesma coisa.
+        time && (
+          <TabKanban
+            teamId={time.team.id}
+            jogadores={jogadores}
+            coaches={coaches}
+            isAdmin={time.role === "admin"}
+            backHref="/time/painel"
+            onErro={setErro}
+            onAgendarConversa={setAgendarPlayerId}
+          />
+        )
       )}
 
       {/* Agenda sem sair do funil — navegar pra /time/painel perdia todo o

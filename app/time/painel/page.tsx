@@ -206,8 +206,14 @@ function PainelConteudo() {
             ao Funil (pagina separada, sem esse vaivem). Antes o banner só
             aparecia acima da nav na aba Visao Geral, fazendo a barra de
             abas pular de lugar dependendo da aba selecionada; agora o
-            banner mora dentro do conteudo da propria aba Perfil. */}
-        <nav className="relative mb-5 flex justify-center gap-1 overflow-x-auto border-b border-hairline pt-4 print:hidden">
+            banner mora dentro do conteudo da propria aba Perfil.
+            justify-start no mobile: com 6 abas + Funil a barra nao cabe
+            (overflow-x-auto) -- centralizada, o scroll comeca sem
+            conseguir mostrar a primeira aba ("Perfil do time" ficava
+            fora de alcance rolando pra esquerda). A partir de sm a barra
+            cabe inteira sem rolar, entao centralizar volta a fazer
+            sentido visualmente. */}
+        <nav className="relative mb-5 flex justify-start gap-1 overflow-x-auto border-b border-hairline pt-4 sm:justify-center print:hidden">
           {ABAS.map((a) => {
             const Icon = a.icon;
             const pend = a.key === "convites" ? pendentes.length : 0;

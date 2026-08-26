@@ -52,6 +52,12 @@ export default function NotificacoesPage() {
       ]);
       setItems(lista);
       setNaoLidas(contagem);
+    } catch {
+      // createClient() (dentro de fetchNotifications) lanca sincrono se
+      // as envs do Supabase nao estiverem configuradas -- sem o catch
+      // isso escapava como rejeicao nao tratada (o `finally` sozinho
+      // nao capturava a excecao, so' garantia o setLoading(false)).
+      setItems([]);
     } finally {
       setLoading(false);
     }

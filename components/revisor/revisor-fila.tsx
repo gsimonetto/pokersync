@@ -76,9 +76,27 @@ export function RevisorFila({
 
   useEffect(() => {
     (async () => {
-      const supabase = createClient();
-      const { data } = await supabase.auth.getUser();
-      if (data.user) setUserId(data.user.id);
+      try {
+        const supabase = createClient();
+        const { data } = await supabase.auth.getUser();
+        if (data.user) setUserId(data.user.id);
+        else {
+          // Sem usuario autenticado: sai do "Carregando..." em vez de
+          // travar pra sempre (as duas listas so' carregam quando
+          // userId existe).
+          setSessionsLoading(false);
+          setLoading(false);
+        }
+      } catch {
+        // createClient() lanca sincrono se as envs do Supabase nao
+        // estiverem configuradas -- sem o catch a excecao escapava do
+        // useEffect e o userId nunca era setado, deixando as duas
+        // listas presas em "Carregando..." pra sempre (mesmo bug ja
+        // corrigido em app/modulos, app/hub e components/top-nav.tsx).
+        setSessionsError("Erro ao carregar torneios/sessões.");
+        setSessionsLoading(false);
+        setLoading(false);
+      }
     })();
   }, []);
 

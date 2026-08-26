@@ -108,11 +108,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }
 
   async function handleLogout() {
-    const supabase = createClient();
     try {
+      const supabase = createClient();
       await supabase.auth.signOut();
     } catch {
-      // segue o logout mesmo se a chamada falhar
+      // segue o logout mesmo se a chamada falhar (inclusive se
+      // createClient() lancar por env do Supabase ausente)
     }
     router.push("/login");
     router.refresh();
@@ -291,6 +292,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             <div className="relative">
               <button
                 onClick={() => toggleMenu("profile")}
+                aria-label="Perfil"
                 className="ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-elevated py-1 pl-1 pr-3 transition-colors hover:border-white/20"
               >
                 <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={28} />
