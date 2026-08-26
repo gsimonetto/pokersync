@@ -79,7 +79,6 @@ export default function BankrollPage() {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [studyLogs, setStudyLogs] = useState<StudyLog[]>([]);
   const [brmThresholds, setBrmThresholds] = useState<BrmThreshold[]>([]);
-  const [leakDimension, setLeakDimension] = useState<"format" | "weekday" | "time">("format");
   const [bankroll, setBankroll] = useState(0);
   const [range, setRange] = useState<RangeOption>("all");
   const [loading, setLoading] = useState(true);
@@ -130,8 +129,6 @@ export default function BankrollPage() {
   const [goalType, setGoalType] = useState<GoalType>("volume");
   const [goalPeriod, setGoalPeriod] = useState<GoalPeriod>("semanal");
   const [goalTarget, setGoalTarget] = useState("");
-
-  const [coachExpanded, setCoachExpanded] = useState(false);
 
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   // id da sessao sendo editada (null = o modal esta em modo "registrar")
@@ -258,11 +255,20 @@ export default function BankrollPage() {
     () => buildCoachTips(sessions, { bankroll: nw.playingBankroll, brmThresholds }),
     [sessions, nw.playingBankroll, brmThresholds]
   );
+  // Dica some sozinha 24h depois de aparecer pela 1a vez (ou na hora, se
+  // dispensada) -- mesma memoria do Assistente do coach (Time > Jogadores):
+  // sem isso a mesma dica ficaria fixa pra sempre, mesmo already vista.
+  const { registrarVistas: registrarVistasCoach, dispensar: dispensarCoachTip, visivel: coachTipVisivel } = useCoachTipMemoria();
+  useEffect(() => {
+    registrarVistasCoach(tips.map((t) => t.id));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tips]);
+  const tipsVisiveis = tips.filter((t) => coachTipVisivel(t.id));
   const currentBrm = useMemo(
     () => brmReading(sessions, nw.playingBankroll, brmThresholds),
     [sessions, nw.playingBankroll, brmThresholds]
   );
-  const leakStats = useMemo(() => groupStats(platformSessions, leakDimension), [platformSessions, leakDimension]);
+  const leakStats = useMemo(() => groupStats(platformSessions, "format"), [platformSessions]);
   const tiltStats = useMemo(() => tiltImpact(platformSessions), [platformSessions]);
   const rate = useMemo(() => hourlyRate(platformSessions), [platformSessions]);
   const activity = useMemo(() => dailyActivity(platformSessions), [platformSessions]);
@@ -671,12 +677,126 @@ export default function BankrollPage() {
       </section>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Painel titulo="Movimentações" icone={<Wallet size={14} className="text-training" />}>
-          <Linha label="Sessões" valor={String(agg.n)} icone={<Hash size={13} />} />
-          {agg.totalRake > 0 && <Linha label="Rake pago" valor={fmt(agg.totalRake)} tom="ruim" />}
-          {agg.totalRakeback > 0 && <Linha label="Rakeback" valor={fmt(agg.totalRakeback)} tom="bom" />}
-          {nw.withdrawn > 0 && <Linha label="Sacado" valor={fmt(nw.withdrawn)} />}
-          {nw.caixinha > 0 && <Linha label="Guardado (caixinha)" valor={fmt(nw.caixinha)} icone={<PiggyBank size={13} />} />}
+        <Painel titulo="Risco" icone={<ShieldAlert size={14} className="text-negative" />}>
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+            <div className="rounded-lg border border-hairline bg-elevated p-4">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Drawdown atual</p>
+              <p className={`mt-1 text-3xl font-bold tabular-nums ${currentDrawdown >= 15 ? "text-negative" : "text-ink"}`}>
+                {currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+              </p>
+            </div>
+
+            <button
+              onClick={() => setBrmModalOpen(true)}
+              className="rounded-lg border border-hairline bg-elevated p-4 text-left transition-colors hover:border-training/40"
+              title="Clique pra ajustar os limites de BRM"
+            >
+              <div className="flex items-center gap-1.5">
+                <Gauge size={12} className="text-training" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">BRM</p>
+              </div>
+              {currentBrm ? (
+                <>
+                  <span
+                    className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.06em] ${
+                      currentBrm.status === "moveup"
+                        ? "bg-positive/15 text-positive"
+                        : currentBrm.status === "movedown"
+                          ? "bg-negative/15 text-negative"
+                          : "bg-void/40 text-muted"
+                    }`}
+                  >
+                    {currentBrm.status === "moveup" ? "Pode subir" : currentBrm.status === "movedown" ? "Desça de stake" : "Mantenha"}
+                  </span>
+                  <p className="mt-1.5 text-[11px] text-muted">
+                    <span className="font-semibold text-ink">{currentBrm.format}</span> · cobre{" "}
+                    <span className="font-semibold text-ink">{currentBrm.buyInsCovered}</span> buy-ins
+                  </p>
+                </>
+              ) : (
+                <p className="mt-1.5 text-[11px] text-muted">Registre sessões pra ver sua leitura de BRM.</p>
+              )}
+            </button>
+          </div>
+
+          <div className="mt-5 border-t border-hairline pt-4">
+            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Leaks recorrentes por formato</p>
+
+            {leakStats.length === 0 ? (
+              <p className="mt-3 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
+            ) : (
+              <div className="mt-3 flex flex-col gap-1.5">
+                {leakStats.map((g: GroupStat) => {
+                  const negative = g.net < 0;
+                  const lowSample = g.n < 5;
+                  return (
+                    <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
+                      <div className="min-w-0">
+                        <p className="truncate text-sm font-semibold">{g.key}</p>
+                        <p className="text-[10.5px] text-muted">
+                          {g.n} {g.n === 1 ? "sessao" : "sessoes"} · ROI {fmtPct(g.roi)}
+                          {lowSample && <span className="ml-1 text-evolution">· amostra pequena</span>}
+                        </p>
+                      </div>
+                      <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
+                        {fmtSigned(g.net)}
+                      </span>
+                      {/* Acoes rapidas: so' em fatia que esta perdendo -- num grupo
+                          positivo elas seriam ruido. "Treinar" so' aparece onde o
+                          estoque de spots casa com a fatia (motor e' ICM de
+                          torneio), senao levaria a um treino sem relacao com o
+                          leak. "Registrar mao" vale pra qualquer fatia: e' o
+                          primeiro passo de investigar o proprio erro. */}
+                      <div className="flex items-center gap-1">
+                        {negative && TOURNEY_FORMATS.has(g.key) && (
+                          <Link
+                            href={`/treino?stack=${LEAK_SHORT_STACK_BB}`}
+                            title={`Treinar stack curto (${LEAK_SHORT_STACK_BB}bb) — onde esse leak costuma doer`}
+                            aria-label={`Treinar ${g.key}`}
+                            className="flex items-center gap-1 rounded-lg border border-training/40 px-2 py-1 text-[10.5px] font-semibold text-training transition-colors hover:bg-training/10"
+                          >
+                            <PlayCircle size={13} />
+                            Treinar
+                          </Link>
+                        )}
+                        {negative && (
+                          <Link
+                            href="/revisor?nova=1"
+                            title="Registrar uma mao desse leak pra revisar"
+                            aria-label={`Registrar mao de ${g.key}`}
+                            className="flex items-center gap-1 rounded-lg border border-review/40 px-2 py-1 text-[10.5px] font-semibold text-review transition-colors hover:bg-review/10"
+                          >
+                            <NotebookPen size={13} />
+                            Registrar mao
+                          </Link>
+                        )}
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+
+            {tiltStats && tiltStats.tiltN > 0 && (
+              <div className="mt-3 rounded-lg border border-hairline bg-elevated p-3">
+                <p className="text-xs font-semibold text-muted">Sessoes com tilt vs demais</p>
+                <div className="mt-2 grid grid-cols-2 gap-3">
+                  <div>
+                    <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
+                    <p className={`text-sm font-bold ${tiltStats.tiltNet >= 0 ? "text-positive" : "text-negative"}`}>
+                      {fmtSigned(tiltStats.tiltNet)} · ROI {fmtPct(tiltStats.tiltRoi)}
+                    </p>
+                  </div>
+                  <div>
+                    <p className="text-[11px] text-muted">Demais ({tiltStats.otherN})</p>
+                    <p className={`text-sm font-bold ${tiltStats.otherNet >= 0 ? "text-positive" : "text-negative"}`}>
+                      {fmtSigned(tiltStats.otherNet)} · ROI {fmtPct(tiltStats.otherRoi)}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            )}
+          </div>
         </Painel>
 
         <Painel
@@ -834,183 +954,51 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Painel titulo="Risco" icone={<ShieldAlert size={14} className="text-negative" />}>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-hairline bg-elevated p-4">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Drawdown atual</p>
-              <p className={`mt-1 text-3xl font-bold tabular-nums ${currentDrawdown >= 15 ? "text-negative" : "text-ink"}`}>
-                {currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
-              </p>
-            </div>
+      <section className="mt-6 rounded-xl border border-hairline bg-surface p-5">
+        <div className="flex items-center gap-2 text-[15px] font-semibold">
+          <Sparkles size={16} className="text-evolution" />
+          AI Coach
+          <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
+        </div>
 
-            <button
-              onClick={() => setBrmModalOpen(true)}
-              className="rounded-lg border border-hairline bg-elevated p-4 text-left transition-colors hover:border-training/40"
-              title="Clique pra ajustar os limites de BRM"
-            >
-              <div className="flex items-center gap-1.5">
-                <Gauge size={12} className="text-training" />
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">BRM</p>
-              </div>
-              {currentBrm ? (
-                <>
-                  <span
-                    className={`mt-1.5 inline-block rounded-full px-2 py-0.5 text-[9.5px] font-bold uppercase tracking-[0.06em] ${
-                      currentBrm.status === "moveup"
-                        ? "bg-positive/15 text-positive"
-                        : currentBrm.status === "movedown"
-                          ? "bg-negative/15 text-negative"
-                          : "bg-void/40 text-muted"
-                    }`}
-                  >
-                    {currentBrm.status === "moveup" ? "Pode subir" : currentBrm.status === "movedown" ? "Desça de stake" : "Mantenha"}
-                  </span>
-                  <p className="mt-1.5 text-[11px] text-muted">
-                    <span className="font-semibold text-ink">{currentBrm.format}</span> · cobre{" "}
-                    <span className="font-semibold text-ink">{currentBrm.buyInsCovered}</span> buy-ins
+        <div className="mt-3 grid gap-3 sm:grid-cols-2">
+          {tipsVisiveis.length === 0 ? (
+            <p className="text-sm text-muted sm:col-span-2">
+              Sem novidades por enquanto — volte amanhã ou registre mais sessões pra o coach analisar.
+            </p>
+          ) : (
+            COACH_LEVELS.map((level) => {
+              const items = tipsVisiveis.filter((t) => t.level === level);
+              if (items.length === 0) return null;
+              const meta = COACH_LEVEL_META[level];
+              return (
+                <div key={level} className={`rounded-lg border p-3 ${toneClasses(level)}`}>
+                  <p className={`flex items-center gap-1.5 text-[12px] font-semibold ${meta.text}`}>
+                    <meta.Icon size={13} /> {meta.label}
                   </p>
-                </>
-              ) : (
-                <p className="mt-1.5 text-[11px] text-muted">Registre sessões pra ver sua leitura de BRM.</p>
-              )}
-            </button>
-          </div>
-
-          <div className="mt-5 border-t border-hairline pt-4">
-            <div className="flex flex-wrap items-center justify-between gap-2">
-              <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Leaks recorrentes</p>
-              <SegmentedControl
-                value={leakDimension}
-                onChange={setLeakDimension}
-                options={[
-                  { value: "format" as const, label: "Formato" },
-                  { value: "weekday" as const, label: "Dia" },
-                  { value: "time" as const, label: "Horario" },
-                ]}
-              />
-            </div>
-
-            {leakStats.length === 0 ? (
-              <p className="mt-3 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
-            ) : (
-              <div className="mt-3 flex flex-col gap-1.5">
-                {leakStats.map((g: GroupStat) => {
-                  const negative = g.net < 0;
-                  const lowSample = g.n < 5;
-                  return (
-                    <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{g.key}</p>
-                        <p className="text-[10.5px] text-muted">
-                          {g.n} {g.n === 1 ? "sessao" : "sessoes"} · ROI {fmtPct(g.roi)}
-                          {lowSample && <span className="ml-1 text-evolution">· amostra pequena</span>}
-                        </p>
-                      </div>
-                      <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
-                        {fmtSigned(g.net)}
-                      </span>
-                      {/* Acoes rapidas: so' em fatia que esta perdendo -- num grupo
-                          positivo elas seriam ruido. "Treinar" so' aparece onde o
-                          estoque de spots casa com a fatia (motor e' ICM de
-                          torneio), senao levaria a um treino sem relacao com o
-                          leak. "Registrar mao" vale pra qualquer fatia: e' o
-                          primeiro passo de investigar o proprio erro. */}
-                      <div className="flex items-center gap-1">
-                        {negative && leakDimension === "format" && TOURNEY_FORMATS.has(g.key) && (
-                          <Link
-                            href={`/treino?stack=${LEAK_SHORT_STACK_BB}`}
-                            title={`Treinar stack curto (${LEAK_SHORT_STACK_BB}bb) — onde esse leak costuma doer`}
-                            aria-label={`Treinar ${g.key}`}
-                            className="flex items-center gap-1 rounded-lg border border-training/40 px-2 py-1 text-[10.5px] font-semibold text-training transition-colors hover:bg-training/10"
-                          >
-                            <PlayCircle size={13} />
-                            Treinar
-                          </Link>
-                        )}
-                        {negative && (
-                          <Link
-                            href="/revisor?nova=1"
-                            title="Registrar uma mao desse leak pra revisar"
-                            aria-label={`Registrar mao de ${g.key}`}
-                            className="flex items-center gap-1 rounded-lg border border-review/40 px-2 py-1 text-[10.5px] font-semibold text-review transition-colors hover:bg-review/10"
-                          >
-                            <NotebookPen size={13} />
-                            Registrar mao
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {tiltStats && tiltStats.tiltN > 0 && (
-              <div className="mt-3 rounded-lg border border-hairline bg-elevated p-3">
-                <p className="text-xs font-semibold text-muted">Sessoes com tilt vs demais</p>
-                <div className="mt-2 grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
-                    <p className={`text-sm font-bold ${tiltStats.tiltNet >= 0 ? "text-positive" : "text-negative"}`}>
-                      {fmtSigned(tiltStats.tiltNet)} · ROI {fmtPct(tiltStats.tiltRoi)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted">Demais ({tiltStats.otherN})</p>
-                    <p className={`text-sm font-bold ${tiltStats.otherNet >= 0 ? "text-positive" : "text-negative"}`}>
-                      {fmtSigned(tiltStats.otherNet)} · ROI {fmtPct(tiltStats.otherRoi)}
-                    </p>
-                  </div>
+                  <ul className="mt-2 space-y-2">
+                    {items.map((tip) => (
+                      <li key={tip.id} className="flex items-start justify-between gap-2 text-[13px]">
+                        <div className="min-w-0">
+                          <p className="font-medium text-ink">{tip.title}</p>
+                          <p className="text-[11.5px] leading-snug text-muted">{tip.text}</p>
+                        </div>
+                        <button
+                          onClick={() => dispensarCoachTip(tip.id)}
+                          aria-label="Dispensar"
+                          className="shrink-0 text-muted/60 transition-colors hover:text-muted"
+                        >
+                          <X size={12} />
+                        </button>
+                      </li>
+                    ))}
+                  </ul>
                 </div>
-              </div>
-            )}
-          </div>
-        </Painel>
-
-        <section className="rounded-xl border border-hairline bg-surface p-5">
-          <button
-            onClick={() => setCoachExpanded((v) => !v)}
-            className="flex w-full items-center gap-2 text-left text-[15px] font-semibold"
-          >
-            <Sparkles size={16} className="text-evolution" />
-            AI Coach
-            <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tips.length}</span>
-            <ChevronDown size={16} className={`ml-auto text-muted transition-transform ${coachExpanded ? "rotate-180" : ""}`} />
-          </button>
-
-          {coachExpanded && (
-            <div className="mt-3 grid gap-3 sm:grid-cols-2">
-              {tips.length === 0 ? (
-                <p className="text-sm text-muted sm:col-span-2">
-                  Sem dicas no momento — registre mais sessões pra o coach ter o que analisar.
-                </p>
-              ) : (
-                COACH_LEVELS.map((level) => {
-                  const items = tips.filter((t) => t.level === level);
-                  if (items.length === 0) return null;
-                  const meta = COACH_LEVEL_META[level];
-                  return (
-                    <div key={level} className={`rounded-lg border p-3 ${toneClasses(level)}`}>
-                      <p className={`flex items-center gap-1.5 text-[12px] font-semibold ${meta.text}`}>
-                        <meta.Icon size={13} /> {meta.label}
-                      </p>
-                      <ul className="mt-2 space-y-2">
-                        {items.map((tip) => (
-                          <li key={tip.id} className="text-[13px]">
-                            <p className="font-medium text-ink">{tip.title}</p>
-                            <p className="text-[11.5px] leading-snug text-muted">{tip.text}</p>
-                          </li>
-                        ))}
-                      </ul>
-                    </div>
-                  );
-                })
-              )}
-            </div>
+              );
+            })
           )}
-        </section>
-      </div>
+        </div>
+      </section>
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
@@ -1364,6 +1352,14 @@ export default function BankrollPage() {
           {editingSessionId ? "Salvar alteracoes" : "Salvar sessao"}
         </button>
       </Modal>
+
+      <Painel titulo="Movimentações" icone={<Wallet size={14} className="text-training" />} className="mt-6">
+        <Linha label="Sessões" valor={String(agg.n)} icone={<Hash size={13} />} />
+        {agg.totalRake > 0 && <Linha label="Rake pago" valor={fmt(agg.totalRake)} tom="ruim" />}
+        {agg.totalRakeback > 0 && <Linha label="Rakeback" valor={fmt(agg.totalRakeback)} tom="bom" />}
+        {nw.withdrawn > 0 && <Linha label="Sacado" valor={fmt(nw.withdrawn)} />}
+        {nw.caixinha > 0 && <Linha label="Guardado (caixinha)" valor={fmt(nw.caixinha)} icone={<PiggyBank size={13} />} />}
+      </Painel>
 
       <Painel
         titulo={historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
@@ -1740,6 +1736,59 @@ const COACH_LEVEL_META: Record<CoachTip["level"], { label: string; text: string;
   good: { label: "Indo bem", text: "text-positive", Icon: CheckCircle2 },
   info: { label: "Pra saber", text: "text-muted", Icon: Info },
 };
+
+// Mesma memoria do Assistente do coach (Time > Jogadores): guardada no
+// navegador, nao no banco -- e' so' preferencia de leitura. Cada dica some
+// sozinha 24h depois de aparecer pela 1a vez, ou na hora se dispensada,
+// liberando espaco pra proxima leva de analise.
+const COACH_MEMORIA_KEY = "pokersync_banca_coach_memoria";
+const COACH_EXPIRA_MS = 24 * 60 * 60 * 1000;
+
+function useCoachTipMemoria() {
+  const [memoria, setMemoria] = useState<Record<string, { primeiraVezEm: number; dispensadoEm?: number }>>({});
+
+  useEffect(() => {
+    try {
+      setMemoria(JSON.parse(localStorage.getItem(COACH_MEMORIA_KEY) ?? "{}"));
+    } catch {
+      setMemoria({});
+    }
+  }, []);
+
+  function persistir(next: typeof memoria) {
+    setMemoria(next);
+    try {
+      localStorage.setItem(COACH_MEMORIA_KEY, JSON.stringify(next));
+    } catch {
+      // localStorage indisponivel (modo privado etc.) — degrada pra "sempre visivel", sem quebrar a tela.
+    }
+  }
+
+  function registrarVistas(chaves: string[]) {
+    let mudou = false;
+    const next = { ...memoria };
+    for (const k of chaves) {
+      if (!next[k]) {
+        next[k] = { primeiraVezEm: Date.now() };
+        mudou = true;
+      }
+    }
+    if (mudou) persistir(next);
+  }
+
+  function dispensar(chave: string) {
+    persistir({ ...memoria, [chave]: { primeiraVezEm: memoria[chave]?.primeiraVezEm ?? Date.now(), dispensadoEm: Date.now() } });
+  }
+
+  function visivel(chave: string): boolean {
+    const m = memoria[chave];
+    if (!m) return true;
+    if (m.dispensadoEm) return false;
+    return Date.now() - m.primeiraVezEm < COACH_EXPIRA_MS;
+  }
+
+  return { registrarVistas, dispensar, visivel };
+}
 
 function Modal({
   open,
