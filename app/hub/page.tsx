@@ -683,7 +683,6 @@ function RankingSection({
     <div>
       <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
         <ViewToggle view={view} setView={setView} />
-        <p className="text-xs text-muted">Ranking de todos os membros PokerSync.</p>
       </div>
 
       <div
