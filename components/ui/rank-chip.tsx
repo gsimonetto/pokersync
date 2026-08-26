@@ -11,8 +11,8 @@ export function RankChip({ level, className = "" }: { level: number; className?:
   const color = levelColor(level);
   return (
     <span
-      className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[9px] font-extrabold tabular-nums ${className}`}
-      style={{ color, background: `${color}22`, border: `1px solid ${color}55` }}
+      className={`inline-flex h-[18px] w-[18px] shrink-0 items-center justify-center rounded-full text-[9px] font-black tabular-nums ${className}`}
+      style={{ color, background: `${color}22`, border: `2px solid ${color}` }}
     >
       {level}
     </span>
