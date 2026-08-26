@@ -8,14 +8,13 @@ import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
   Trophy, Flame, Zap, Target, TrendingUp,
   CheckCircle2, Calendar, Shield, Circle, Notebook, ClipboardList,
-  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Users, Gift, Crown,
+  Clock, Spade, BookOpen, HelpCircle, Scale, Medal, Star, Gift, Crown, Sparkles,
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
   fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, MAX_LEVEL,
   type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank, type Season,
 } from "@/lib/services/xp-service";
-import { fetchMyMembership, type MyMembership } from "@/lib/services/team-service";
 import { createClient } from "@/lib/supabase/client";
 
 const ACCENT = "#E0B24C";
@@ -97,19 +96,14 @@ export default function HubPage() {
   // empilhados na mesma tela infinita.
   const [view, setView] = useState<"missoes" | "ranking">("missoes");
 
-  const [rankingPeriod, setRankingPeriod] = useState<LeaderboardPeriod>("week");
+  const rankingPeriod: LeaderboardPeriod = "season";
   const [leaderboard, setLeaderboard] = useState<LeaderboardEntry[] | null>(null);
   const [leaderboardLoading, setLeaderboardLoading] = useState(false);
   const [myRank, setMyRank] = useState<MyRank | null>(null);
   const [meId, setMeId] = useState<string | null>(null);
   const [season, setSeason] = useState<Season | null>(null);
 
-  // Time -- acesso rapido ao modulo, sem bloquear o carregamento
-  // principal nem quebrar a tela se o usuario nao tiver time (caso normal).
-  const [membership, setMembership] = useState<MyMembership | null>(null);
-
   useEffect(() => {
-    fetchMyMembership().then(setMembership).catch(() => {});
     fetchActiveSeason().then(setSeason).catch(() => {});
   }, []);
 
@@ -263,8 +257,36 @@ export default function HubPage() {
         .hub-trophy-btn { transition: all .2s ease; }
         .hub-trophy-btn:hover { transform: scale(1.08) rotate(-4deg); box-shadow: 0 0 16px -4px rgba(224,178,76,.5); }
         .hub-lb-row { animation: hubFadeInUp .25s ease-out both; transition: background-color .15s ease; }
+        @keyframes rkRiseIn {
+          from { opacity: 0; transform: translateY(18px) scale(.94); }
+          to   { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes rkCrownGlow {
+          0%, 100% { opacity: .3; transform: scale(1); }
+          50%      { opacity: .6; transform: scale(1.35); }
+        }
+        @keyframes rkSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        @keyframes rkGiftBob {
+          0%, 100% { transform: translateY(0) rotate(0deg); }
+          50%      { transform: translateY(-2px) rotate(-4deg); }
+        }
+        @keyframes rkCountdownPulse {
+          0%, 100% { opacity: 1; }
+          50%      { opacity: .55; }
+        }
+        .rk-riser { animation: rkRiseIn .45s cubic-bezier(.22,1,.36,1) both; }
+        .rk-pillar { transition: filter .2s ease; }
+        .rk-riser:hover .rk-pillar { filter: brightness(1.15); }
+        .rk-crown-glow { animation: rkCrownGlow 2.2s ease-in-out infinite; }
+        .rk-loading-spin { animation: rkSpin 1.1s linear infinite; }
+        .rk-gift-icon { animation: rkGiftBob 2.6s ease-in-out infinite; }
+        .rk-countdown { animation: rkCountdownPulse 2.4s ease-in-out infinite; }
+        .rk-banner { animation: hubFadeInUp .3s ease-out both; }
         @media (prefers-reduced-motion: reduce) {
-          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-box, .hub-badge-number, .hub-xp-shimmer { animation: none !important; transition: none !important; }
+          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-box, .hub-badge-number, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner { animation: none !important; transition: none !important; }
         }
       `}</style>
 
@@ -278,14 +300,6 @@ export default function HubPage() {
       <div className="hub-level-card relative overflow-hidden rounded-xl border border-hairline bg-surface p-6">
         <div className="relative mb-4 flex flex-wrap items-center justify-between gap-2">
           <ViewToggle view={view} setView={setView} />
-          {membership && (
-            <Link
-              href="/time"
-              className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-            >
-              <Users size={10} /> {membership.teamName}
-            </Link>
-          )}
         </div>
         <div
           className="pointer-events-none absolute inset-0"
@@ -428,8 +442,6 @@ export default function HubPage() {
           entries={leaderboard}
           loading={leaderboardLoading}
           meId={meId}
-          period={rankingPeriod}
-          onPeriodChange={setRankingPeriod}
           myRank={myRank}
           season={season}
           view={view}
@@ -622,27 +634,19 @@ function ViewToggle({
   );
 }
 
-const BASE_RANKING_PERIODS: { value: LeaderboardPeriod; label: string }[] = [
-  { value: "week", label: "Semana" },
-  { value: "month", label: "Mês" },
-  { value: "all", label: "Geral" },
-];
-
 function fmtDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }
 
-// Ranking global -- vista propria do Hub (pedido explicito: "em outra
-// aba dentro do hub que mostrasse so isso, com podium"). Periodo Semana/
-// Mes/Geral + Temporada (3 em 3 meses, com premio configuravel via
-// leaderboard_seasons) -- Temporada so aparece na troca quando existe
-// uma configurada, pra nao virar aba morta.
+// Ranking global -- vista propria do Hub, so' por Temporada (pedido
+// explicito: "so quero o filtro de temporada"). Sem tabs Semana/Mes/Geral
+// -- a vista inteira gira em torno do ciclo trimestral com premio
+// (leaderboard_seasons). Sem temporada configurada, mostra estado vazio
+// proprio em vez de cair silenciosamente no ranking vitalicio.
 function RankingSection({
   entries,
   loading,
   meId,
-  period,
-  onPeriodChange,
   myRank,
   season,
   view,
@@ -651,19 +655,15 @@ function RankingSection({
   entries: LeaderboardEntry[] | null;
   loading: boolean;
   meId: string | null;
-  period: LeaderboardPeriod;
-  onPeriodChange: (p: LeaderboardPeriod) => void;
   myRank: MyRank | null;
   season: Season | null;
   view: "missoes" | "ranking";
   setView: (v: "missoes" | "ranking") => void;
 }) {
   const meInList = entries?.some((e) => e.userId === meId) ?? false;
-  const periods = season
-    ? [...BASE_RANKING_PERIODS.slice(0, 2), { value: "season" as const, label: "Temporada" }, ...BASE_RANKING_PERIODS.slice(2)]
-    : BASE_RANKING_PERIODS;
   const podium = entries?.slice(0, 3) ?? [];
   const rest = entries?.slice(3) ?? [];
+  const leaderXp = entries?.[0]?.xpTotal || 1;
 
   return (
     <div>
@@ -672,63 +672,64 @@ function RankingSection({
         <p className="text-xs text-muted">Ranking de todos os membros PokerSync.</p>
       </div>
 
-      {season && (
-        <div
-          className="mb-4 flex flex-wrap items-center gap-3 rounded-xl border p-4"
-          style={{ borderColor: `${ACCENT}40`, background: `${ACCENT}0D` }}
-        >
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-lg" style={{ background: `${ACCENT}22`, color: ACCENT }}>
+      <div
+        className="rk-banner relative mb-4 overflow-hidden rounded-xl border p-4"
+        style={{ borderColor: `${ACCENT}40`, background: `linear-gradient(120deg, ${ACCENT}14, transparent 65%)` }}
+      >
+        <Sparkles size={110} strokeWidth={1} className="pointer-events-none absolute -right-4 -top-6 opacity-[0.08]" style={{ color: ACCENT }} />
+        <div className="relative flex flex-wrap items-center gap-3">
+          <div className="rk-gift-icon grid h-10 w-10 shrink-0 place-items-center rounded-lg" style={{ background: `${ACCENT}22`, color: ACCENT }}>
             <Gift size={18} />
           </div>
           <div className="min-w-0 flex-1">
-            <p className="text-sm font-bold text-ink">{season.rewardTitle || "Temporada em andamento"}</p>
-            {season.rewardDescription && <p className="mt-0.5 text-xs text-muted">{season.rewardDescription}</p>}
-          </div>
-          <div className="text-right text-xs text-muted">
-            <p>{fmtDate(season.startsAt)} — {fmtDate(season.endsAt)}</p>
-            <p className="font-semibold" style={{ color: ACCENT }}>
-              {season.daysRemaining === 0 ? "Termina hoje" : `${season.daysRemaining} dias restantes`}
+            <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: ACCENT }}>
+              <Trophy size={11} /> Temporada
             </p>
+            <p className="mt-0.5 text-sm font-bold text-ink">
+              {season ? season.rewardTitle || "Temporada em andamento" : "Nenhuma temporada ativa"}
+            </p>
+            {season?.rewardDescription && <p className="mt-0.5 text-xs text-muted">{season.rewardDescription}</p>}
           </div>
+          {season && (
+            <div className="text-right text-xs text-muted">
+              <p>{fmtDate(season.startsAt)} — {fmtDate(season.endsAt)}</p>
+              <p className="rk-countdown font-semibold" style={{ color: ACCENT }}>
+                {season.daysRemaining === 0 ? "Termina hoje" : `${season.daysRemaining} dias restantes`}
+              </p>
+            </div>
+          )}
         </div>
-      )}
+      </div>
 
       <div className="rounded-xl border border-hairline bg-surface p-5">
-        <div className="flex flex-wrap items-center justify-between gap-2">
-          <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
-            <Trophy size={16} /> Ranking PokerSync
-          </h2>
-          <SegmentedControl
-            value={period}
-            onChange={onPeriodChange}
-            options={periods.map((p) => ({ value: p.value, label: <span className="uppercase">{p.label}</span> }))}
-          />
-        </div>
+        <h2 className="flex items-center gap-2 text-sm font-bold uppercase tracking-[0.1em]" style={{ color: ACCENT }}>
+          <Trophy size={16} /> Ranking da temporada
+        </h2>
 
         <div className="mt-4">
           {loading ? (
-            <p className="p-6 text-center text-sm text-muted">Carregando ranking…</p>
+            <div className="flex flex-col items-center gap-2 p-10 text-sm text-muted">
+              <Trophy size={22} className="rk-loading-spin" style={{ color: ACCENT }} />
+              Carregando ranking…
+            </div>
           ) : !entries || entries.length === 0 ? (
-            <p className="p-6 text-center text-sm text-muted">
-              {period === "season" && !season
-                ? "Nenhuma temporada ativa no momento."
-                : period === "all"
-                  ? "Ninguém no ranking ainda."
-                  : "Ninguém ganhou XP nesse período ainda."}
-            </p>
+            <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted">
+              <Trophy size={28} strokeWidth={1.3} className="opacity-30" />
+              {!season ? "Nenhuma temporada ativa no momento." : "Ninguém ganhou XP nessa temporada ainda."}
+            </div>
           ) : (
             <>
               {podium.length === 3 && <Podium entries={podium} meId={meId} />}
               <div className="flex flex-col gap-1.5">
-                {(podium.length === 3 ? rest : entries).map((e) => (
-                  <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} />
+                {(podium.length === 3 ? rest : entries).map((e, idx) => (
+                  <RankingRow key={e.userId} entry={e} isMe={e.userId === meId} idx={idx} leaderXp={leaderXp} />
                 ))}
                 {myRank && !meInList && (
                   <>
                     <div className="my-1 flex items-center gap-2 text-[10px] uppercase tracking-[0.1em] text-muted">
                       <span className="h-px flex-1 bg-hairline" /> você <span className="h-px flex-1 bg-hairline" />
                     </div>
-                    <div className="flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
+                    <div className="hub-lb-row flex items-center gap-3 rounded-lg border border-review/50 bg-review/[0.08] px-3 py-2.5">
                       <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">{myRank.rank}</span>
                       <p className="min-w-0 flex-1 text-sm font-semibold">
                         Sua posição <span className="text-[10px] text-review">(você)</span>
@@ -749,12 +750,14 @@ function RankingSection({
 }
 
 const PODIUM_META = [
-  { rank: 2, order: "order-1", height: "h-20", medal: "#C0C6CC" },
-  { rank: 1, order: "order-2", height: "h-28", medal: "#F5D48C" },
-  { rank: 3, order: "order-3", height: "h-14", medal: "#CD7F32" },
+  { rank: 2, order: "order-1", height: "h-20", medal: "#C0C6CC", delay: "0s" },
+  { rank: 1, order: "order-2", height: "h-28", medal: "#F5D48C", delay: ".08s" },
+  { rank: 3, order: "order-3", height: "h-14", medal: "#CD7F32", delay: ".16s" },
 ] as const;
 
 // Pódio dos top 3 -- 1o lugar no centro e mais alto, estilo classico.
+// Colunas sobem com stagger (rk-riser) e o 1o lugar ganha uma coroa com
+// brilho pulsante -- reforca hierarquia visual sem precisar de texto extra.
 function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string | null }) {
   const byRank = (r: number) => entries.find((e) => e.rank === r);
   return (
@@ -764,12 +767,22 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
         if (!e) return null;
         const isMe = e.userId === meId;
         return (
-          <div key={meta.rank} className={`flex w-28 flex-col items-center ${meta.order}`}>
-            <Crown
-              size={meta.rank === 1 ? 20 : 14}
-              style={{ color: meta.medal, opacity: meta.rank === 1 ? 1 : 0.7 }}
-              fill={meta.rank === 1 ? meta.medal : "none"}
-            />
+          <div
+            key={meta.rank}
+            className={`rk-riser flex w-28 flex-col items-center ${meta.order}`}
+            style={{ animationDelay: meta.delay }}
+          >
+            <span className="relative grid place-items-center">
+              {meta.rank === 1 && (
+                <span className="rk-crown-glow absolute inset-0 rounded-full blur-md" style={{ background: meta.medal, opacity: 0.4 }} />
+              )}
+              <Crown
+                size={meta.rank === 1 ? 22 : 14}
+                className="relative"
+                style={{ color: meta.medal, opacity: meta.rank === 1 ? 1 : 0.7 }}
+                fill={meta.rank === 1 ? meta.medal : "none"}
+              />
+            </span>
             <p className="mt-1 w-full truncate text-center text-xs font-bold text-ink">
               {e.name} {isMe && <span className="text-[9px] text-review">(você)</span>}
             </p>
@@ -780,7 +793,7 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
               {e.xpTotal.toLocaleString("pt-BR")} XP
             </p>
             <div
-              className={`mt-2 flex w-full items-start justify-center rounded-t-lg pt-1.5 ${meta.height}`}
+              className={`rk-pillar mt-2 flex w-full items-start justify-center rounded-t-lg pt-1.5 ${meta.height}`}
               style={{ background: `${meta.medal}1A`, border: `1px solid ${meta.medal}55` }}
             >
               <span className="text-lg font-extrabold" style={{ color: meta.medal }}>
@@ -794,29 +807,52 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
   );
 }
 
-function RankingRow({ entry: e, isMe }: { entry: LeaderboardEntry; isMe: boolean }) {
+function RankingRow({
+  entry: e,
+  isMe,
+  idx,
+  leaderXp,
+}: {
+  entry: LeaderboardEntry;
+  isMe: boolean;
+  idx: number;
+  leaderXp: number;
+}) {
   const medalColor = e.rank === 1 ? "#F5D48C" : e.rank === 2 ? "#C0C6CC" : e.rank === 3 ? "#CD7F32" : null;
+  const share = Math.max(4, Math.min(100, (e.xpTotal / leaderXp) * 100));
   return (
     <div
-      className={`hub-lb-row flex items-center gap-3 rounded-lg border px-3 py-2.5 ${
+      className={`hub-lb-row group relative overflow-hidden rounded-lg border px-3 py-2.5 ${
         isMe ? "border-review/50 bg-review/[0.08]" : "border-hairline bg-void/40 hover:bg-elevated"
       }`}
-      style={{ animationDelay: `${Math.min(e.rank, 20) * 0.02}s` }}
+      style={{ animationDelay: `${Math.min(idx, 20) * 0.02}s` }}
     >
-      <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
-        {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
-      </span>
-      <div className="min-w-0 flex-1">
-        <p className="truncate text-sm font-semibold">
-          {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
-        </p>
-        <p className="text-[11px] text-muted">
-          <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span> · {e.streakDays} dias de streak
-        </p>
+      {/* Barra de XP relativa ao lider -- da' densidade visual sem novo numero. */}
+      <div
+        className="pointer-events-none absolute inset-y-0 left-0 transition-all duration-700"
+        style={{ width: `${share}%`, background: `linear-gradient(90deg, ${ACCENT}14, transparent)` }}
+      />
+      <div className="relative flex items-center gap-3">
+        <span className="grid h-6 w-6 shrink-0 place-items-center text-xs font-bold text-muted">
+          {medalColor ? <Medal size={16} style={{ color: medalColor }} /> : e.rank}
+        </span>
+        <div className="min-w-0 flex-1">
+          <p className="truncate text-sm font-semibold">
+            {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
+          </p>
+          <p className="text-[11px] text-muted">
+            <span style={{ color: levelColor(e.level) }}>Nível {e.level}</span>
+            {e.streakDays > 0 && (
+              <span className="inline-flex items-center gap-0.5">
+                {" "}· <Flame size={10} className="text-orange-400" /> {e.streakDays}
+              </span>
+            )}
+          </p>
+        </div>
+        <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
+          {e.xpTotal.toLocaleString("pt-BR")} XP
+        </span>
       </div>
-      <span className="shrink-0 text-sm font-bold" style={{ color: ACCENT }}>
-        {e.xpTotal.toLocaleString("pt-BR")} XP
-      </span>
     </div>
   );
 }
