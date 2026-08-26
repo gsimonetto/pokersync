@@ -117,7 +117,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
 
   return (
     <AppShell>
-    <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
+    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
       <AppHeader
         insideShell
         backHref="/time/painel?tab=jogadores"

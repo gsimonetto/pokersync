@@ -148,7 +148,7 @@ export default function PerformancePage() {
   if (loading) {
     return (
       <AppShell>
-        <main className="mx-auto max-w-[1280px] px-6 py-10">
+        <main className="w-full mx-auto max-w-[1280px] px-6 py-10">
           <p className="text-sm text-muted">Carregando sua performance…</p>
         </main>
       </AppShell>
@@ -157,7 +157,7 @@ export default function PerformancePage() {
 
   return (
     <AppShell>
-    <main className="mx-auto max-w-[1280px] px-6 py-10 text-ink">
+    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
       <AppHeader
         insideShell
         subtitle="Banca, jogo e estudo em um só lugar"

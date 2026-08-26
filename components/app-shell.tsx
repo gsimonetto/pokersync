@@ -33,6 +33,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
+  const [hoverKey, setHoverKey] = useState<string | null>(null);
 
   useEffect(() => {
     try {
@@ -98,21 +99,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       {modules.map((m) => {
         const Icon = m.icon;
         const active = pathname === m.href;
+        // Hover usa a cor do proprio modulo (m.accent) com o mesmo
+        // tratamento do Chip (fundo translucido + glow) em vez de um
+        // hover cinza generico -- pedido explicito pra ficar "nitido",
+        // igual ao resto do produto ja associa cor a cada modulo.
+        const hovered = hoverKey === m.key;
         return (
           <Link
             key={m.key}
             href={m.href ?? "#"}
             title={collapsed ? m.title : undefined}
             onClick={() => setMobileOpen(false)}
-            className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors ${
+            onMouseEnter={() => setHoverKey(m.key)}
+            onMouseLeave={() => setHoverKey((k) => (k === m.key ? null : k))}
+            className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
               collapsed ? "justify-center" : ""
-            } ${active ? "bg-white/[0.06] text-ink" : "text-muted hover:bg-white/[0.04] hover:text-ink"}`}
+            } ${active || hovered ? "text-ink" : "text-muted"}`}
+            style={{
+              background: hovered ? `${m.accent}1A` : active ? "rgba(255,255,255,0.06)" : undefined,
+              boxShadow: hovered ? `0 0 14px ${m.accent}55, 0 0 2px ${m.accent}` : undefined,
+            }}
           >
             <span
               className="absolute inset-y-1.5 left-0 w-[3px] rounded-full transition-opacity"
-              style={{ background: m.accent, opacity: active ? 1 : 0 }}
+              style={{ background: m.accent, opacity: active || hovered ? 1 : 0 }}
             />
-            <Icon size={18} strokeWidth={1.75} className="shrink-0" style={{ color: active ? m.accent : undefined }} />
+            <Icon size={18} strokeWidth={1.75} className="shrink-0" style={{ color: active || hovered ? m.accent : undefined }} />
             {!collapsed && m.title}
           </Link>
         );
