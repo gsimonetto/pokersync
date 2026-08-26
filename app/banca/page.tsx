@@ -1114,12 +1114,12 @@ export default function BankrollPage() {
       </div>
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
-        <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
-          <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm">
+        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
+          <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm outline-none transition-colors focus:border-ink/40 sm:col-span-2">
             <option value="volume">Volume (sessoes)</option>
             <option value="estudo">Estudo (horas)</option>
           </select>
-          <select value={goalPeriod} onChange={(e) => setGoalPeriod(e.target.value as GoalPeriod)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm">
+          <select value={goalPeriod} onChange={(e) => setGoalPeriod(e.target.value as GoalPeriod)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm outline-none transition-colors focus:border-ink/40">
             <option value="semanal">Semanal</option>
             <option value="mensal">Mensal</option>
           </select>
@@ -1127,11 +1127,11 @@ export default function BankrollPage() {
             placeholder="Meta (numero)"
             value={goalTarget}
             onChange={(e) => setGoalTarget(e.target.value)}
-            className="col-span-2 rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm sm:col-span-1"
+            className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm outline-none transition-colors focus:border-ink/40"
           />
           <button
             onClick={handleAddGoal}
-            className="col-span-2 rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90 sm:col-span-4"
+            className="rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90 sm:col-span-4"
           >
             Criar meta
           </button>
