@@ -1,32 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { createClient } from "@/lib/supabase/client";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
-import { MessageBubble } from "@/components/chat/message-bubble";
-import { MessageComposer } from "@/components/chat/message-composer";
 import {
   assignCoach,
   assignTeamDrill,
   diasSemAtividade,
   fetchTeamLeakPlayers,
-  fetchTeamThread,
-  markThreadRead,
   removeMember,
-  sendTeamAudioMessage,
-  sendTeamMessage,
   setMemberLabel,
   traduzErroTime,
-  uploadTeamAudio,
   type TeamDashboardRow,
   type TeamLabel,
   type TeamLeak,
   type TeamLeakPlayer,
-  type TeamMessage,
 } from "@/lib/services/team-service";
 import { BRL } from "@/lib/format";
 
@@ -79,12 +71,20 @@ export function TabJogadores({
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
+  const router = useRouter();
   const [filtroLabel, setFiltroLabel] = useState<string>("todas");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("nome");
   const [acaoAberta, setAcaoAberta] = useState<TeamDashboardRow | null>(null);
-  const [conversaCom, setConversaCom] = useState<TeamDashboardRow | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+
+  // Conversar nunca abre um chat solto -- sempre manda pra Central de
+  // Conversas (topbar, components/chat/chat-center.tsx), que ja sabe
+  // ler ?chat=<userId> e abrir a thread certa (mesmo mecanismo do
+  // deep-link da notificacao).
+  function abrirConversa(userId: string) {
+    router.push(`/modulos?chat=${userId}`);
+  }
 
   function alternarExpandido(userId: string) {
     setExpandidos((prev) => {
@@ -232,7 +232,7 @@ export function TabJogadores({
 
                   {podeConversar ? (
                     <button
-                      onClick={() => setConversaCom(j)}
+                      onClick={() => abrirConversa(j.userId)}
                       className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
                       aria-label={`Conversar com ${j.nome}`}
                     >
@@ -285,16 +285,12 @@ export function TabJogadores({
           isAdmin={isAdmin}
           onFechar={() => setAcaoAberta(null)}
           onAbrirConversa={() => {
-            setConversaCom(acaoAberta);
+            abrirConversa(acaoAberta.userId);
             setAcaoAberta(null);
           }}
           onChange={onChange}
           onErro={onErro}
         />
-      )}
-
-      {conversaCom && (
-        <ConversaDrawer teamId={teamId} jogador={conversaCom} onFechar={() => setConversaCom(null)} onErro={onErro} />
       )}
       </section>
     </div>
@@ -465,106 +461,6 @@ function AcoesJogadorModal({
             </div>
           )}
         </div>
-      </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------
-// Drawer de conversa 1:1 com o jogador. Fica reservado (nao vive
-// dentro do modal de Acoes) pra nao competir com os controles rapidos
-// de etiqueta/coach — o coach abre so quando de fato vai conversar.
-// O envio ja dispara a notificacao de sino pro jogador (via RPC
-// send_team_message -> notify_system, categoria "team").
-// ------------------------------------------------------------
-function ConversaDrawer({
-  teamId,
-  jogador,
-  onFechar,
-  onErro,
-}: {
-  teamId: string;
-  jogador: TeamDashboardRow;
-  onFechar: () => void;
-  onErro: (s: string) => void;
-}) {
-  const [mensagens, setMensagens] = useState<TeamMessage[]>([]);
-  const [meId, setMeId] = useState<string | null>(null);
-  const [carregando, setCarregando] = useState(true);
-
-  useEffect(() => {
-    let ativo = true;
-    (async () => {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
-        if (!ativo) return;
-        setMeId(data.user?.id ?? null);
-        const thread = await fetchTeamThread(jogador.userId);
-        if (!ativo) return;
-        setMensagens(thread);
-        await markThreadRead(jogador.userId).catch(() => {});
-      } catch (e) {
-        if (ativo) onErro(traduzErroTime(e));
-      } finally {
-        if (ativo) setCarregando(false);
-      }
-    })();
-    return () => {
-      ativo = false;
-    };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [jogador.userId]);
-
-  async function enviarTexto(body: string) {
-    try {
-      await sendTeamMessage(jogador.userId, body);
-      const thread = await fetchTeamThread(jogador.userId);
-      setMensagens(thread);
-    } catch (e) {
-      onErro(traduzErroTime(e));
-    }
-  }
-
-  async function enviarAudio(blob: Blob, seconds: number) {
-    try {
-      const path = await uploadTeamAudio(teamId, blob);
-      await sendTeamAudioMessage(jogador.userId, path, seconds);
-      const thread = await fetchTeamThread(jogador.userId);
-      setMensagens(thread);
-    } catch (e) {
-      onErro(traduzErroTime(e));
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 flex justify-end bg-void/70" onClick={onFechar}>
-      <div
-        className="flex h-full w-full max-w-sm flex-col border-l border-hairline bg-surface"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-3 border-b border-hairline p-4">
-          <Avatar id={jogador.avatarId} url={jogador.avatarUrl} size={34} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{jogador.nome}</p>
-            <p className="text-xs text-muted">Conversa</p>
-          </div>
-          <button onClick={onFechar} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="flex-1 space-y-2 overflow-y-auto p-4">
-          {carregando ? (
-            <p className="text-sm text-muted">Carregando…</p>
-          ) : mensagens.length === 0 ? (
-            <p className="text-sm text-muted">Nenhuma mensagem ainda. Diga oi.</p>
-          ) : (
-            mensagens.map((m) => <MessageBubble key={m.id} message={m} isMine={m.senderId === meId} />)
-          )}
-        </div>
-
-        <MessageComposer onSendText={enviarTexto} onSendAudio={enviarAudio} />
       </div>
     </div>
   );
