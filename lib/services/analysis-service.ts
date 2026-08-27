@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { fetchSessions } from "@/lib/services/bankroll-service";
 import type { Session as BankrollSession } from "@/lib/bankroll/types";
 import type { FinancialDay } from "@/lib/services/team-service";
+import type { HandSession } from "@/lib/services/hand-session-service";
 import {
   type AnalysisFilters,
   type AnalysisHandRow,
@@ -458,6 +459,21 @@ export async function fetchTournamentMetrics(): Promise<TournamentMetrics> {
     cev_per_game: null,
     ev_roi_pct: null,
   };
+}
+
+// Sessões de torneio (hand_sessions, mesmo agrupador do Revisor) — é onde
+// a estrutura de premiação se ancora (por tournament_id_ps), pra aparecer
+// junto do torneio que o jogador já reconhece, não como tela separada.
+export async function fetchTournamentSessions(): Promise<HandSession[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("hand_sessions")
+    .select("*")
+    .eq("kind", "tournament")
+    .not("tournament_id_ps", "is", null)
+    .order("updated_at", { ascending: false });
+  if (error) throw error;
+  return (data ?? []) as HandSession[];
 }
 
 // ============================================================

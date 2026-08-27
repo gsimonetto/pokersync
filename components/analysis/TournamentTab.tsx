@@ -1,8 +1,11 @@
 "use client";
 
-import { Trophy, Layers } from "lucide-react";
+import { Trophy, Layers, Award } from "lucide-react";
 import { Painel, MetricGrid, Bloqueado } from "@/components/analysis/shared";
+import { TournamentPayoutsPanel } from "@/components/analysis/TournamentPayoutsPanel";
 import type { TournamentMetrics } from "@/types/analysis";
+import type { HandSession } from "@/lib/services/hand-session-service";
+import type { TournamentPayout } from "@/lib/services/tournament-payout-service";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -14,7 +17,17 @@ function fmtMoney(v: number | null): string | null {
   return v === null ? null : `${v >= 0 ? "+" : ""}${BRL.format(v)}`;
 }
 
-export function TournamentTab({ metrics }: { metrics: TournamentMetrics }) {
+export function TournamentTab({
+  metrics,
+  tournamentSessions,
+  payouts,
+  onPayoutsChanged,
+}: {
+  metrics: TournamentMetrics;
+  tournamentSessions: HandSession[];
+  payouts: TournamentPayout[];
+  onPayoutsChanged: () => void;
+}) {
   return (
     <div className="space-y-4">
       <Painel titulo="Resultado em torneios" icone={<Trophy size={14} className="text-evolution" />}>
@@ -31,6 +44,15 @@ export function TournamentTab({ metrics }: { metrics: TournamentMetrics }) {
             Nenhuma sessão de torneio registrada na Gestão de Banca ainda — ROI/ITM/lucro vêm de lá (buy-in, re-entries e cashout).
           </p>
         )}
+      </Painel>
+
+      <Painel titulo="Estrutura de premiação" icone={<Award size={14} className="text-training" />}>
+        <p className="mb-3 text-xs leading-relaxed text-muted">
+          Pré-requisito pro cálculo de cEV/ICM abaixo — sem saber quanto cada colocação pagou, não dá pra calcular quanto sua
+          decisão "deveria" valer em $. Hoje é só manual; quando o agente desktop buscar isso sozinho, aparece aqui do mesmo jeito
+          (mesmo torneio, sem tela nova).
+        </p>
+        <TournamentPayoutsPanel sessions={tournamentSessions} payouts={payouts} onChanged={onPayoutsChanged} />
       </Painel>
 
       <Painel titulo="cEV & ICM" icone={<Layers size={14} className="text-review" />}>
