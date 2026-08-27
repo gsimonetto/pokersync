@@ -55,13 +55,16 @@ const PERIODOS = [
 
 type Aba = "perfil" | "estatisticas" | "jogadores" | "convites" | "calendario" | "time";
 
+// Convites por ultimo: e' a aba menos relevante no dia a dia (pedido
+// pendente/gerar link e' acao esporadica) -- o resto e' o que o coach
+// acompanha toda vez que abre o painel.
 const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
   { key: "perfil", label: "Perfil do time", icon: IdCard },
   { key: "estatisticas", label: "Estatísticas", icon: BarChart3 },
   { key: "jogadores", label: "Jogadores", icon: UserRound },
-  { key: "convites", label: "Convites", icon: Mail },
   { key: "calendario", label: "Calendário", icon: CalendarDays },
   { key: "time", label: "Time", icon: Settings2 },
+  { key: "convites", label: "Convites", icon: Mail },
 ];
 
 export default function PainelPage() {
@@ -268,14 +271,16 @@ function PainelConteudo() {
                 )}
               </>
             )}
-            {aba === "estatisticas" && (
-              <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
-                onAbrirFunil={() => router.push("/time/painel/funil")} />
+            {aba === "estatisticas" && time && (
+              <TabVisaoGeral teamId={time.team.id} jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
+                onAbrirFunil={() => router.push("/time/painel/funil")} onErro={setErro} />
             )}
             {aba === "jogadores" && time && (
               <TabJogadores teamId={time.team.id} jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
                 podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
-                leaks={leaks} dias={dias} onAtribuido={carregar}
+                leaks={leaks} dias={dias}
+                meuUserId={time.members.find((m) => m.isMe)?.userId ?? null} meuPapel={time.role}
+                onAtribuido={carregar}
                 onChange={carregar} onErro={setErro} />
             )}
             {aba === "convites" && time && (

@@ -106,10 +106,13 @@ export function AssistenteCoach({
   teamId,
   jogadores,
   onErro,
+  onAbrirFicha,
 }: {
   teamId: string;
   jogadores: TeamDashboardRow[];
   onErro: (s: string) => void;
+  /** Quando informado (ex: aba Jogadores), abre a ficha em modal em vez de navegar pra fora da tela. */
+  onAbrirFicha?: (playerId: string) => void;
 }) {
   const router = useRouter();
   const [aberto, setAberto] = useState(false);
@@ -186,7 +189,8 @@ export function AssistenteCoach({
   if (!carregado || total === 0) return null;
 
   function abrirFicha(playerId: string) {
-    router.push(`/time/jogador/${playerId}`);
+    if (onAbrirFicha) onAbrirFicha(playerId);
+    else router.push(`/time/jogador/${playerId}`);
   }
 
   return (

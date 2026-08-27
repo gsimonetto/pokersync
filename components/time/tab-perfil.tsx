@@ -55,13 +55,15 @@ export function TabPerfil({
             <Users size={16} className="text-muted" />
             Coaches e administração
           </h2>
-          <ul className="mt-4 flex flex-wrap gap-5">
+          {/* Cartela estilo "elenco de time": foto grande, nome e funcao
+              embaixo, lado a lado — em vez da linha foto+texto anterior. */}
+          <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
             {equipe.map((s) => (
-              <li key={s.userId} className="flex items-center gap-3">
-                <Avatar id={s.avatarId} url={s.avatarUrl} size={44} />
+              <li key={s.userId} className="flex flex-col items-center gap-2.5 rounded-lg border border-hairline bg-elevated px-3 py-4 text-center">
+                <Avatar id={s.avatarId} url={s.avatarUrl} size={72} />
                 <div className="min-w-0">
-                  <p className="truncate text-sm font-medium">{s.nome}</p>
-                  <p className="text-xs text-muted">
+                  <p className="truncate text-sm font-semibold">{s.nome}</p>
+                  <p className="mt-1 inline-block rounded-full border border-hairline px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
                     {s.role === "admin" ? PAPEL_CURTO.admin : PAPEL_CURTO.coach}
                   </p>
                 </div>

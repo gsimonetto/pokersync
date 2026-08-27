@@ -8,6 +8,7 @@ import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { RankChip } from "@/components/ui/rank-chip";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
+import { PlayerDetailModal } from "@/components/time/player-detail-modal";
 import {
   assignCoach,
   assignTeamDrill,
@@ -55,6 +56,8 @@ export function TabJogadores({
   coaches,
   leaks,
   dias,
+  meuUserId,
+  meuPapel,
   onAtribuido,
   onChange,
   onErro,
@@ -68,6 +71,8 @@ export function TabJogadores({
   coaches: { userId: string; nome: string }[];
   leaks: TeamLeak[];
   dias: number;
+  meuUserId?: string | null;
+  meuPapel?: string | null;
   onAtribuido: () => void;
   onChange: () => void;
   onErro: (s: string) => void;
@@ -78,6 +83,9 @@ export function TabJogadores({
   const [ordem, setOrdem] = useState<Ordem>("nome");
   const [acaoAberta, setAcaoAberta] = useState<TeamDashboardRow | null>(null);
   const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
+  // Ficha cadastral abre em modal em vez de navegar pra fora da lista --
+  // preserva filtro, busca e linhas expandidas ao fechar.
+  const [fichaAberta, setFichaAberta] = useState<string | null>(null);
 
   // Conversar nunca abre um chat solto -- sempre manda pra Central de
   // Conversas (topbar, components/chat/chat-center.tsx), que ja sabe
@@ -116,7 +124,7 @@ export function TabJogadores({
 
   return (
     <div className="space-y-4">
-      <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} />
+      <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} onAbrirFicha={setFichaAberta} />
       <LeaksSection leaks={leaks} dias={dias} onAtribuido={onAtribuido} />
 
       <section className="rounded-xl border border-hairline bg-surface p-5">
@@ -188,9 +196,9 @@ export function TabJogadores({
 
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
-                      <Link href={`/time/jogador/${j.userId}`} className="truncate text-sm font-medium hover:underline">
+                      <button onClick={() => setFichaAberta(j.userId)} className="truncate text-sm font-medium hover:underline">
                         {j.nome}
-                      </Link>
+                      </button>
                       <RankChip level={j.level ?? 1} />
                       {j.labelName && j.labelColor && (
                         <Chip color={j.labelColor} size="sm">{j.labelName}</Chip>
@@ -259,15 +267,19 @@ export function TabJogadores({
                 </div>
 
                 {aberto && (
-                  <div className="mt-2.5 ml-[26px] flex flex-wrap items-center gap-x-5 gap-y-2 rounded-lg border border-hairline bg-elevated px-3.5 py-3 sm:ml-[64px]">
-                    <Metrica label="Treinos" valor={String(j.treinos)} />
-                    <Metrica label="GTO" valor={pct === null ? "—" : `${pct}%`} />
-                    <Metrica label="Revisadas" valor={String(j.maosRevisadas)} />
-                    <Metrica label="Jogos" valor={String(j.jogosNoTime)} />
-                    <Link href={`/time/jogador/${j.userId}`}
-                      className="ml-auto flex items-center gap-1 text-[12px] font-medium text-ink hover:underline">
+                  <div className="mt-2.5 ml-[26px] rounded-lg border border-hairline bg-elevated px-3.5 py-3 sm:ml-[64px]">
+                    <div className="grid grid-cols-4 gap-3 sm:max-w-xs">
+                      <Metrica label="Treinos" valor={String(j.treinos)} />
+                      <Metrica label="GTO" valor={pct === null ? "—" : `${pct}%`} />
+                      <Metrica label="Revisadas" valor={String(j.maosRevisadas)} />
+                      <Metrica label="Jogos" valor={String(j.jogosNoTime)} />
+                    </div>
+                    <button
+                      onClick={() => setFichaAberta(j.userId)}
+                      className="mt-2.5 flex items-center gap-1 border-t border-hairline pt-2.5 text-[12px] font-medium text-ink hover:underline"
+                    >
                       Ver ficha completa <ChevronRight size={13} />
-                    </Link>
+                    </button>
                   </div>
                 )}
               </li>
@@ -292,6 +304,15 @@ export function TabJogadores({
         />
       )}
       </section>
+
+      {fichaAberta && (
+        <PlayerDetailModal
+          playerId={fichaAberta}
+          meuUserId={meuUserId ?? null}
+          meuPapel={meuPapel ?? null}
+          onFechar={() => setFichaAberta(null)}
+        />
+      )}
     </div>
   );
 }
@@ -465,11 +486,11 @@ function AcoesJogadorModal({
   );
 }
 
-function Metrica({ label, valor, tom, largo }: { label: string; valor: string; tom?: "positivo" | "negativo"; largo?: boolean }) {
+function Metrica({ label, valor, tom }: { label: string; valor: string; tom?: "positivo" | "negativo" }) {
   const cor = tom === "positivo" ? "text-positive" : tom === "negativo" ? "text-negative" : "text-ink/90";
   return (
-    <div className={largo ? "w-24 shrink-0 text-right" : "w-16 shrink-0 text-right"}>
-      <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">{label}</p>
+    <div className="min-w-0">
+      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">{label}</p>
       <p className={`text-[13px] font-medium tnum ${cor}`}>{valor}</p>
     </div>
   );

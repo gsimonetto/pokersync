@@ -19,10 +19,13 @@ export function GraficoFinanceiro({
   dados,
   pronto,
   titulo = "Resultado no período",
+  acao,
 }: {
   dados: FinancialDay[];
   pronto: boolean;
   titulo?: string;
+  /** Controles extras no header do card (ex: filtro de período) — mesmo padrão do Painel do Gestor de Banca. */
+  acao?: React.ReactNode;
 }) {
   const temDados = dados.some((d) => d.resultado !== 0);
   const acumFinal = dados.length ? dados[dados.length - 1].acumulado : 0;
@@ -66,11 +69,14 @@ export function GraficoFinanceiro({
         pronto ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
       }`}
     >
-      <div className="flex items-baseline justify-between gap-3">
-        <h2 className="text-[15px] font-semibold">{titulo}</h2>
-        <span className={`text-sm font-semibold tnum ${acumFinal > 0 ? "text-positive" : acumFinal < 0 ? "text-negative" : "text-muted"}`}>
-          {BRL.format(acumFinal)}
-        </span>
+      <div className="flex flex-wrap items-center justify-between gap-2">
+        <div className="flex items-baseline gap-3">
+          <h2 className="text-[15px] font-semibold">{titulo}</h2>
+          <span className={`text-sm font-semibold tnum ${acumFinal > 0 ? "text-positive" : acumFinal < 0 ? "text-negative" : "text-muted"}`}>
+            {BRL.format(acumFinal)}
+          </span>
+        </div>
+        {acao}
       </div>
 
       {!temDados ? (
