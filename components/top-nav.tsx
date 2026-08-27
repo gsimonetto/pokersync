@@ -27,7 +27,7 @@ const TABS = [
 
 type OpenMenu = "profile" | "notifications" | "help" | null;
 
-const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha"];
+const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha", "/agent-login"];
 
 // Modulos que ja migraram pro AppShell (sidebar/topbar propria,
 // components/app-shell.tsx) -- mostrar o TopNav global junto duplicaria

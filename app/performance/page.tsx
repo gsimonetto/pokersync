@@ -455,7 +455,7 @@ function AbaJogo({
                 ))}
               </ul>
             )}
-            <div className="overflow-hidden rounded-lg border border-hairline">
+            <div className="overflow-x-auto rounded-lg border border-hairline">
               <table className="w-full text-xs">
                 <thead>
                   <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
@@ -510,7 +510,7 @@ function AbaJogo({
             Ainda sem matchups heads-up suficientes para listar.
           </p>
         ) : (
-          <div className="overflow-hidden rounded-lg border border-hairline">
+          <div className="overflow-x-auto rounded-lg border border-hairline">
             <table className="w-full text-xs">
               <thead>
                 <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
