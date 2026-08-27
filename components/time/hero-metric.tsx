@@ -21,13 +21,18 @@ export function HeroMetric({
   return (
     <div className="min-w-0 px-4 py-6 sm:px-6">
       <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
+      {/* overflow-hidden + ellipsis: rede de seguranca -- se algum dia o
+          valor nao couber (moeda com muitos digitos numa coluna estreita),
+          trunca com "…" em vez de vazar visualmente por cima da coluna
+          vizinha, como acontecia antes com so' whitespace-nowrap. */}
       <p
-        className={`mt-2 whitespace-nowrap font-bold leading-none tracking-tight tabular-nums ${cor}`}
-        style={{ fontSize: destaque ? "clamp(1.375rem, 2.4vw, 2.25rem)" : "clamp(1.125rem, 1.8vw, 1.75rem)" }}
+        className={`mt-2 overflow-hidden text-ellipsis whitespace-nowrap font-bold leading-none tracking-tight tabular-nums ${
+          destaque ? "text-[1.75rem] sm:text-[2.25rem]" : "text-[1.375rem] sm:text-[1.75rem]"
+        } ${cor}`}
       >
         {value}
       </p>
-      {hint && <p className="mt-2.5 text-[11.5px] leading-snug text-muted">{hint}</p>}
+      {hint && <p className="mt-2.5 truncate text-[11.5px] leading-snug text-muted">{hint}</p>}
     </div>
   );
 }

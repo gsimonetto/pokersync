@@ -65,9 +65,10 @@ export function PlayerDetailBody({
 
   return (
     <div className="space-y-6">
-      {/* Faixa herói — mesmo padrão do Gestor de Banca e da Performance
-          (e da aba Estatísticas do time): números lado a lado dentro de
-          um único container, separados por divisor. */}
+      {/* Faixa herói — mesmo padrão e MESMA contagem de colunas (5, a
+          partir de lg) do Gestor de Banca, da Performance e da aba
+          Estatísticas do time: 6 colunas espremia demais o valor em R$.
+          "Jogos" virou hint do "Resultado no time" em vez de coluna própria. */}
       <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <p className="text-sm text-muted">Desempenho no time</p>
@@ -79,15 +80,14 @@ export function PlayerDetailBody({
           style={{ background: p.lucroNoTime < 0 ? "#e0555a" : "#2FB89A" }}
         />
 
-        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
+        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0">
           <HeroMetric
             label="Resultado no time"
             value={p.jogosNoTime > 0 ? BRL.format(p.lucroNoTime) : "—"}
             tone={p.lucroNoTime > 0 ? "bom" : p.lucroNoTime < 0 ? "ruim" : "neutro"}
-            hint={staking.length > 0 ? "líquido — já descontado o staking" : "desde que entrou"}
+            hint={`${p.jogosNoTime} jogo${p.jogosNoTime === 1 ? "" : "s"}${staking.length > 0 ? " · líquido, já descontado o staking" : " desde que entrou"}`}
             destaque
           />
-          <HeroMetric label="Jogos" value={String(p.jogosNoTime)} tone="neutro" hint="desde que entrou" />
           <HeroMetric
             label="Treinos"
             value={String(p.treinos)}

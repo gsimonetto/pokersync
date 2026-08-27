@@ -97,7 +97,7 @@ export function PlayerDetailModal({
     <ModalPortal>
       <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
         <div
-          className="flex max-h-[90vh] w-full max-w-3xl flex-col overflow-hidden rounded-xl border border-hairline bg-surface"
+          className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-hairline bg-surface"
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-hairline px-5 py-4">

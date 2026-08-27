@@ -306,7 +306,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
         <div
-          className="flex h-[min(680px,88vh)] w-full max-w-3xl overflow-hidden rounded-2xl border border-hairline bg-surface shadow-2xl shadow-black/60"
+          className="flex h-[min(760px,90vh)] w-full max-w-4xl overflow-hidden rounded-2xl border border-hairline bg-surface shadow-2xl shadow-black/60"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Coluna de conversas */}
