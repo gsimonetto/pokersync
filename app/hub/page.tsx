@@ -346,30 +346,48 @@ export default function HubPage() {
         .rk-riser-1:hover { transform: translateY(-8px) scale(1.05); }
         .rk-halo-1 { animation: rkHaloSpin 7s linear infinite; }
 
-        /* Fogos de artificio atras do podio -- particulas subindo e
-           estourando em pontos fixos (sem Math.random pra nao gerar
-           mismatch de SSR/CSR), em loop continuo e discreto. */
-        @keyframes rkFireworkRise {
-          0%   { transform: translateY(0) scale(0.4); opacity: 0; }
-          12%  { opacity: 1; }
-          55%  { transform: translateY(var(--rise, -70px)) scale(1); opacity: 1; }
-          56%  { opacity: 0; }
+        /* Fogos de artificio atras do podio -- foguete sobe (trilha),
+           estoura num flash e espalha faiscas radiais com leve queda por
+           "gravidade", em pontos fixos (sem Math.random pra nao gerar
+           mismatch de SSR/CSR), em loop continuo. */
+        @keyframes rkFwRise {
+          0%   { transform: translateY(0); }
+          55%  { transform: translateY(var(--rise, -70px)); }
+          100% { transform: translateY(var(--rise, -70px)); }
+        }
+        @keyframes rkFwTrail {
+          0%   { opacity: 0; transform: scaleY(.5); }
+          8%   { opacity: 1; transform: scaleY(1); }
+          52%  { opacity: 1; }
+          58%  { opacity: 0; }
           100% { opacity: 0; }
         }
-        @keyframes rkFireworkBurst {
-          0%, 55%   { transform: translateY(var(--rise, -70px)) scale(0); opacity: 0; }
-          62%       { transform: translateY(var(--rise, -70px)) scale(1); opacity: 1; }
-          85%       { transform: translateY(calc(var(--rise, -70px) - 14px)) scale(1.3); opacity: .0; }
-          100%      { opacity: 0; }
+        @keyframes rkFwFlash {
+          0%, 53% { opacity: 0; transform: scale(.2); }
+          58%     { opacity: 1; transform: scale(1.8); }
+          78%     { opacity: 0; transform: scale(2.6); }
+          100%    { opacity: 0; }
         }
-        .rk-firework { position: absolute; bottom: 0; width: 3px; height: 3px; border-radius: 999px; animation: rkFireworkRise var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s); }
-        .rk-firework::after {
-          content: ""; position: absolute; inset: -7px; border-radius: 999px;
-          background: radial-gradient(circle, currentColor 0%, transparent 70%);
-          animation: rkFireworkBurst var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s);
+        @keyframes rkFwParticle {
+          0%, 53% { opacity: 0; transform: translate(0, 0) scale(1); }
+          60%     { opacity: 1; transform: translate(calc(var(--dx, 0px) * .35), calc(var(--dy, 0px) * .35)) scale(1); }
+          100%    { opacity: 0; transform: translate(var(--dx, 0px), calc(var(--dy, 0px) + 16px)) scale(.3); }
+        }
+        .rk-fw { position: absolute; bottom: 0; width: 0; height: 0; animation: rkFwRise var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s); }
+        .rk-fw-trail {
+          position: absolute; left: -1px; bottom: 0; width: 2px; height: 10px; border-radius: 999px; transform-origin: bottom;
+          animation: rkFwTrail var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s);
+        }
+        .rk-fw-flash {
+          position: absolute; left: -6px; bottom: -6px; width: 12px; height: 12px; border-radius: 999px; filter: blur(1px);
+          animation: rkFwFlash var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s);
+        }
+        .rk-fw-particle {
+          position: absolute; left: -1.5px; bottom: -1.5px; width: 3px; height: 3px; border-radius: 999px;
+          animation: rkFwParticle var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s);
         }
         @media (prefers-reduced-motion: reduce) {
-          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-ring-thin, .hub-badge-box, .hub-badge-number, .hub-badge-halo, .hub-badge-orbit, .hub-badge-sheen, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner, .rk-trophy-1, .rk-halo-1, .rk-firework, .rk-firework::after { animation: none !important; transition: none !important; }
+          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-ring-thin, .hub-badge-box, .hub-badge-number, .hub-badge-halo, .hub-badge-orbit, .hub-badge-sheen, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner, .rk-trophy-1, .rk-halo-1, .rk-fw, .rk-fw-trail, .rk-fw-flash, .rk-fw-particle { animation: none !important; transition: none !important; }
         }
       `}</style>
 
@@ -972,37 +990,62 @@ function RankingSection({
   );
 }
 
-// Posicoes/cores/atrasos fixos (nao Math.random -- evita mismatch entre
-// o HTML renderizado no servidor e a primeira renderizacao no cliente).
+// Posicoes/cores/atrasos/raio fixos (nao Math.random -- evita mismatch
+// entre o HTML renderizado no servidor e a primeira renderizacao no
+// cliente). Angulos das faiscas tambem fixos, calculados com seno/cosseno
+// (deterministico) em vez de sorteados.
 const FIREWORKS = [
-  { left: "10%", color: "#F5D48C", rise: -78, dur: 2.8, delay: 0 },
-  { left: "22%", color: "#5AA6E0", rise: -60, dur: 2.3, delay: 0.6 },
-  { left: "35%", color: "#E0555A", rise: -85, dur: 3.1, delay: 1.3 },
-  { left: "50%", color: "#F5D48C", rise: -70, dur: 2.5, delay: 0.2 },
-  { left: "65%", color: "#8B7FD6", rise: -65, dur: 2.9, delay: 1.7 },
-  { left: "78%", color: "#2FB89A", rise: -80, dur: 2.4, delay: 0.9 },
-  { left: "90%", color: "#F5D48C", rise: -55, dur: 3.2, delay: 1.1 },
+  { left: "10%", color: "#F5D48C", rise: -78, dur: 2.8, delay: 0, radius: 26 },
+  { left: "22%", color: "#5AA6E0", rise: -60, dur: 2.3, delay: 0.6, radius: 21 },
+  { left: "35%", color: "#E0555A", rise: -85, dur: 3.1, delay: 1.3, radius: 28 },
+  { left: "50%", color: "#F5D48C", rise: -70, dur: 2.5, delay: 0.2, radius: 24 },
+  { left: "65%", color: "#8B7FD6", rise: -65, dur: 2.9, delay: 1.7, radius: 23 },
+  { left: "78%", color: "#2FB89A", rise: -80, dur: 2.4, delay: 0.9, radius: 27 },
+  { left: "90%", color: "#F5D48C", rise: -55, dur: 3.2, delay: 1.1, radius: 20 },
 ] as const;
 
-// Fogos de artificio discretos atras do podio -- pedido explicito ("algo
-// mais chamativo... fogos de artificio atras"). aria-hidden porque e'
-// so decoracao, sem informacao nova.
+const BURST_ANGLES = [0, 45, 90, 135, 180, 225, 270, 315];
+
+function burstOffsets(radius: number) {
+  return BURST_ANGLES.map((deg) => {
+    const rad = (deg * Math.PI) / 180;
+    return { dx: Math.round(Math.cos(rad) * radius), dy: Math.round(Math.sin(rad) * radius) };
+  });
+}
+
+// Fogos de artificio atras do podio -- pedido explicito ("algo mais
+// chamativo... fogos de artificio atras"): foguete sobe, estoura num
+// flash e espalha 8 faiscas radiais que caem por "gravidade". aria-hidden
+// porque e' so decoracao, sem informacao nova.
 function Fireworks() {
   return (
     <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
       {FIREWORKS.map((f, i) => (
-        <span
+        <div
           key={i}
-          className="rk-firework"
+          className="rk-fw"
           style={{
             left: f.left,
-            color: f.color,
-            background: f.color,
             ["--rise" as string]: `${f.rise}px`,
             ["--dur" as string]: `${f.dur}s`,
             ["--delay" as string]: `${f.delay}s`,
           }}
-        />
+        >
+          <span className="rk-fw-trail" style={{ background: f.color, boxShadow: `0 0 6px ${f.color}` }} />
+          <span className="rk-fw-flash" style={{ background: f.color }} />
+          {burstOffsets(f.radius).map((p, j) => (
+            <span
+              key={j}
+              className="rk-fw-particle"
+              style={{
+                background: f.color,
+                boxShadow: `0 0 3px ${f.color}`,
+                ["--dx" as string]: `${p.dx}px`,
+                ["--dy" as string]: `${p.dy}px`,
+              }}
+            />
+          ))}
+        </div>
       ))}
     </div>
   );
