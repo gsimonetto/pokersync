@@ -250,7 +250,7 @@ export function AderenciaRange() {
                 Mostrar só as marcadas para revisão
               </label>
 
-              <div className="overflow-hidden rounded-xl border border-hairline">
+              <div className="overflow-x-auto rounded-xl border border-hairline">
                 <table className="w-full text-sm">
                   <thead>
                     <tr className="border-b border-hairline bg-surface text-xs text-muted">
