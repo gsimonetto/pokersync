@@ -171,6 +171,25 @@ ChipEV puro.
 houver demanda de cash — e exige mudar o cálculo de utilidade terminal
 do motor, não é um flag.
 
+### 013 — Resolução sob demanda, só pra cEV/ICM de mão jogada (2026-08-27)
+**Decisão:** a exceção prevista na decisão 010 ("só será reconsiderada
+quando o Hand Replayer precisar") aconteceu — `POST
+/hands/compute_cev` no `pokersync-solver` resolve sob demanda, mas só
+o $EV analítico (equity real via Monte Carlo + ICM Malmuth-Harville)
+de UMA mão específica que já foi jogada, all-in heads-up com as duas
+mãos mostradas no showdown. Não é solve de spot (não treina CFR,
+responde em <1s) — decisão 010 continua valendo pra geração de range
+(`drills`), que segue 100% em lote.
+**Motivo:** cEV/ICM por mão exige o resultado de UM confronto
+específico (cartas e stacks reais daquela mão), não uma tabela de
+range genérica — não dá pra pré-computar em lote sem saber de
+antemão quais mãos vão ser jogadas.
+**Pendência:** decisão 011 (todo dado do motor carrega
+`engine_version`/`exploitability`) não foi aplicada em
+`hand_ev_results` ainda — cálculo analítico não tem "convergência" no
+sentido de CFR, mas `engine_version` (pra rastrear se a fórmula mudou)
+deveria existir mesmo assim. Registrado no backlog (§7).
+
 ## 6. Estado real dos módulos
 
 Legenda: **✅ no ar** · **🟡 parcial** · **⬜ não iniciado** ·
@@ -249,7 +268,29 @@ biblioteca de time, journal de decisões.
 | Evolução temporal | ✅ (`get_player_timeline`) |
 | Tendências | ✅ (`get_period_comparison`) |
 | Insights acionáveis | ✅ (`get_player_insights`, `get_skill_breakdown`) |
-| Banco de dados unificado de performance | ✅ (`player_stats`, `player_preflop_stats`, `player_postflop_stats`) |
+| Banco de dados unificado de performance | ✅ (`player_stats`, `player_preflop_stats`, `player_postflop_stats` — **⚠ estas duas últimas estão paradas**, sem trigger vivo desde a última vez que alguém rodou o script de backfill manualmente; `hand_tags` é a fonte viva hoje, ver módulo de Análise abaixo) |
+
+#### Módulo de Análise — `/performance/analise` (2026-08-27)
+
+Rota dedicada dentro do Player Evolution (não modal, não nova aba):
+filtros globais combináveis + 5 abas (Visão Geral, Preflop & Matriz
+13×13, Postflop & Tendências, Torneios, Leak Finder & Replayer). Tudo
+calculado no cliente a partir de `hand_tags`/`hand_reviews`
+(`lib/services/analysis-service.ts`), sem RPC nova.
+
+| Item | Estado |
+| --- | :-: |
+| VPIP/PFR/3-Bet/Fold-to-3Bet/4-Bet/Steal/Squeeze, por posição | ✅ |
+| C-Bet flop/turn/river, Fold-to-C-Bet por rua, Check-Raise por rua | ✅ (migração estendeu `hand_tags` — antes só flop existia) |
+| Aggression Factor / Aggression Frequency, WSD%/W$SD% | ✅ |
+| Matriz 13×13 com heatmap | ✅ — mas o "range ideal" mostrado é referência simplificada, não o motor GTO (preflop_ranges nunca foi ligado a isto) |
+| Leak Finder → Replayer | ✅ — reaproveita o Replayer do Revisor (`/revisor?shared=<id>`), não duplica UI |
+| Importação manual de hand history | ✅ — embutida na barra de filtros, mesmo motor do Revisor (`hand_import_batches`) |
+| Importação automática (agente desktop) | ✅ do lado do servidor — `/api/agent/sync` grava na mesma `hand_reviews`, o mesmo trigger computa `hand_tags`. Sem caminho novo de código quando o agente enviar de verdade |
+| Estrutura de premiação de torneio | ✅ (`tournament_payouts`, linkada por `tournament_id_ps`) — manual hoje, schema já aceita `source: 'agent'` pra quando o agente buscar sozinho |
+| cEV/ICM por mão | 🟡 pipeline pronto ponta a ponta (`pokersync-solver` `POST /hands/compute_cev` + `hand_ev_results` + botão "Calcular cEV") — **bloqueado só no deploy**: `pokersync-solver` nunca foi publicado (Railway) e `SOLVER_API_URL`/`SOLVER_API_KEY` não existem em nenhum ambiente. Escopo: só all-in heads-up preflop com as duas mãos mostradas (5 mãos qualificam na base real hoje) |
+| Estatísticas de oponente (perfil por jogador, não só herói) | ⏳ não iniciado — parser é 100% hero-centric por design; HM3/PT4 têm isso, é o maior gap real de paridade |
+| HUD em tempo real | ⏳ não iniciado — categoria de produto diferente (scraping de mesa ao vivo), vive no agente desktop, que ainda não faz isso |
 
 ### 6.6 Plataforma para Times — `/time`
 
@@ -280,17 +321,26 @@ de verdade hoje.
 
 | # | Item | Módulo | Nota |
 | :-: | --- | --- | --- |
-| 1 | Pipeline de pós-flop ponta a ponta (job → contrato → UI) | Treino ↔ Review | **subiu pro topo**: os 5 leaks reais da base são todos pós-flop, então é o único item que faz o loop leak → treino funcionar de verdade hoje |
-| 2 | Gerar estoque pré-flop: push/fold ICM e stacks 10/20/30/50bb | Treino | motor, job e endpoint já existem — falta disparar (escreve em produção) |
-| 3 | Score de evolução consolidado do jogador | Times / Hub | há matéria-prima (XP, leaks, aderência, ROI) |
-| 4 | Agente desktop | Times | 🟡 iniciado, já em repo próprio ([`pokersync-agent`](https://github.com/gsimonetto/pokersync-agent), decisão 009) — falta validar varredura/parsing contra instalações reais de cada sala |
-| 5 | Decidir o catálogo de formatos | Banca | o formulário oferece MTT/Cash/SNG/Spin, mas 61 das 73 sessões gravadas dizem `"Torneio"`; ou o catálogo muda, ou as sessões antigas migram |
-| 6 | Sincronizar o board do roadmap com a realidade | Roadmap | todos os itens estão marcados "Planejado", inclusive os 7 módulos no ar |
+| 1 | Publicar `pokersync-solver` no Railway + configurar `SOLVER_API_URL`/`SOLVER_API_KEY` | Análise | **só isso destrava o cEV/ICM** — código pronto e mergeado dos dois lados (PRs #86 no produto, #13 no motor), zero linha a mais pra escrever, só deploy |
+| 2 | Pipeline de pós-flop ponta a ponta (job → contrato → UI) | Treino ↔ Review | os 5 leaks reais da base são todos pós-flop, então é o item que faz o loop leak → treino funcionar de verdade |
+| 3 | Estatísticas de oponente (perfil por jogador) | Análise | parser é 100% hero-centric hoje — maior gap de paridade com HM3/PT4, mudança estrutural (parser + schema novo por jogador) |
+| 4 | Gerar estoque pré-flop: push/fold ICM e stacks 10/20/30/50bb | Treino | motor, job e endpoint já existem — falta disparar (escreve em produção) |
+| 5 | Score de evolução consolidado do jogador | Times / Hub | há matéria-prima (XP, leaks, aderência, ROI) |
+| 6 | Agente desktop | Times | 🟡 iniciado, já em repo próprio ([`pokersync-agent`](https://github.com/gsimonetto/pokersync-agent), decisão 009) — falta validar varredura/parsing contra instalações reais de cada sala |
+| 7 | Decidir o catálogo de formatos | Banca | o formulário oferece MTT/Cash/SNG/Spin, mas 61 das 73 sessões gravadas dizem `"Torneio"`; ou o catálogo muda, ou as sessões antigas migram |
+| 8 | `engine_version` em `hand_ev_results` | Análise | decisão 011 pede isso em todo dado do motor — cálculo analítico (sem CFR) não tem exploitability, mas versão da fórmula deveria ser rastreada mesmo assim |
+| 9 | Sincronizar o board do roadmap com a realidade | Roadmap | todos os itens estão marcados "Planejado", inclusive os módulos no ar |
 
 **Concluídos desde a consolidação (2026-08-21):** handoff leak → treino
 (PR #35); os três itens de Banca — edição de sessão, filtros do
 histórico e formulário por formato (PR #36); ações rápidas nos leaks
-(PR #37).
+(PR #37); módulo de Análise completo com preflop/postflop real, matriz
+13×13, leak finder, import manual+agente (PR #84); estrutura de
+premiação de torneio (PR #85); pipeline de cEV/ICM ponta a ponta,
+faltando só deploy (PR #86, `pokersync-solver` PR #13); bug de
+denominador corrigido em Fold-to-3Bet%/Fold-to-Steal%/etc (flags de
+oportunidade estavam sendo filtradas por `!== null` em vez de
+`=== true`).
 
 **Ideias futuras** (mantidas dos documentos originais): integrações
 externas de dados; integrações opcionais com solvers de terceiros —
@@ -309,6 +359,13 @@ inteira tem **8 linhas**, todas RFI/Jam de pré-flop.
 
 - **Push/Fold ICM**: motor, job e endpoint prontos e conectados; nunca
   disparado. A sugestão de leak de maior prioridade não tem drill.
+- **cEV/ICM por mão jogada (novo endpoint, 2026-08-27)**: diferente do
+  item acima (gera range offline), `POST /hands/compute_cev` resolve
+  sob demanda o $EV de uma mão específica — decisão 013. Pipeline
+  ponta a ponta pronto e mergeado dos dois lados; só falta o deploy do
+  `pokersync-solver` (nunca foi publicado) e configurar
+  `SOLVER_API_URL`/`SOLVER_API_KEY` no ambiente do produto — o
+  `pokersync` nunca chamou o motor por HTTP antes disso.
 - **Pós-flop river/turn**: motor validado (0,39% de exploitability no
   river), sem job, sem endpoint, sem UI. Dois ativos prontos e órfãos no
   banco: `flop_subsets` (184 flops ponderados) e `preflop_ranges` (29
@@ -327,6 +384,39 @@ inteira tem **8 linhas**, todas RFI/Jam de pré-flop.
   e sem leitura do formato novo no frontend.
 
 ## 9. Changelog
+
+### 2026-08-27 — Módulo de Análise + pipeline de cEV/ICM
+- Nova rota `/performance/analise` (PR #84): filtros globais
+  combináveis, 5 abas (Visão Geral, Preflop & Matriz 13×13, Postflop,
+  Torneios, Leak Finder & Replayer), importação manual embutida.
+  Métricas calculadas no cliente a partir de `hand_tags`.
+- Migração no Supabase estendeu `hand_tags` com detalhe pós-flop por
+  rua (river c-bet, check-raise por rua, fold-to-cbet turn/river,
+  contagem bet/raise/call/fold pra Aggression Factor, showdown) — tudo
+  calculado direto de `parsed_data->streets` em SQL, mesmo padrão de
+  `compute_pot_type`/`compute_stack_bucket`. Backfill nas mãos já
+  importadas.
+- Corrigido bug real: `hero_faced_3bet`/`hero_faced_4bet`/
+  `blind_defense_opportunity`/`steal_opportunity` são flags de
+  oportunidade sempre `true`/`false` (nunca `null` com herói
+  identificado) — o cálculo de Fold-to-3Bet%/Fold-to-4Bet%/Fold-to-Steal%
+  filtrava por `!== null`, o que incluía TODAS as mãos no denominador
+  em vez de só as que tiveram a situação de verdade.
+- Estrutura de premiação de torneio (PR #85): tabela
+  `tournament_payouts`, linkada por `tournament_id_ps` — a mesma chave
+  que já une `hand_reviews`/`hand_sessions` de torneio. Suporta
+  `source: 'agent' | 'manual'` desde o início.
+- Pipeline de cEV/ICM por mão jogada (decisão 013): novo endpoint
+  síncrono `POST /hands/compute_cev` no `pokersync-solver` (PR #13,
+  cálculo analítico — equity real + ICM Malmuth-Harville, sem treinar
+  CFR, responde em <1s) + `app/api/hand-ev/compute` no produto (PR
+  #86) que detecta mãos elegíveis (all-in heads-up preflop, ambas
+  mostradas no showdown), chama o motor e grava em `hand_ev_results`.
+  Pronto dos dois lados, mas nunca testado ponta a ponta em produção —
+  falta publicar o `pokersync-solver` (nunca foi feito deploy) e
+  configurar `SOLVER_API_URL`/`SOLVER_API_KEY`.
+- Fix: link "Análise avançada" em `/performance` só aparecia em telas
+  ≥640px e nem existia no estado "ainda sem dados" (PR #87).
 
 ### 2026-08-27 — Login com Google no agente desktop
 - Nova página `app/agent-login/` — o agente desktop (`pokersync-agent`)
