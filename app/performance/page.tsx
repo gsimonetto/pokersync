@@ -39,6 +39,7 @@ import {
   type PeriodComparisonRow,
   type PreflopSituation,
 } from "@/lib/services/performance-service";
+import { fetchPlayerCards, STAT_METRIC_LABEL, type PlayerCard } from "@/lib/services/team-funnel-service";
 
 // ------------------------------------------------------------
 // Formatadores locais — a tela e' so leitura, nao reusa o form de banca.
@@ -84,6 +85,7 @@ export default function PerformancePage() {
   const [periods, setPeriods] = useState<PeriodComparisonRow[]>([]);
   const [insights, setInsights] = useState<string[]>([]);
   const [preflopSit, setPreflopSit] = useState<PreflopSituation[]>([]);
+  const [metaCoach, setMetaCoach] = useState<PlayerCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("financeiro");
@@ -92,7 +94,7 @@ export default function PerformancePage() {
     let alive = true;
     (async () => {
       try {
-        const [d, ps, tl, ms, io, sk, pc, ins, pfs] = await Promise.all([
+        const [d, ps, tl, ms, io, sk, pc, ins, pfs, cards] = await Promise.all([
           fetchPlayerPerformance(),
           fetchPositionStats(),
           fetchPlayerTimeline(),
@@ -102,6 +104,10 @@ export default function PerformancePage() {
           fetchPeriodComparison(),
           fetchPlayerInsights(),
           fetchPreflopSituations(),
+          // So' quem tem time atribui essa meta -- sem time, a RPC volta
+          // vazia (nao e' erro), entao o card "Meta do coach" so' aparece
+          // pra quem de fato tem um coach acompanhando.
+          fetchPlayerCards().catch(() => []),
         ]);
         if (alive) {
           setData(d);
@@ -113,6 +119,7 @@ export default function PerformancePage() {
           setPeriods(pc);
           setInsights(ins);
           setPreflopSit(pfs);
+          setMetaCoach(cards[0] ?? null);
         }
       } catch (e) {
         if (alive) setErro(e instanceof Error ? e.message : "Falha ao carregar sua performance.");
@@ -306,7 +313,7 @@ export default function PerformancePage() {
             {tab === "jogo" && (
               <AbaJogo data={data} posStats={posStats} matchupStats={matchupStats} ipOop={ipOop} preflopSit={preflopSit} />
             )}
-            {tab === "estudo" && <AbaEstudo data={data} />}
+            {tab === "estudo" && <AbaEstudo data={data} metaCoach={metaCoach} />}
             {tab === "evolucao" && (
               <AbaEvolucao data={data} timeline={timeline} skills={skills} periods={periods} insights={insights} />
             )}
@@ -549,12 +556,14 @@ function AbaJogo({
   );
 }
 
-function AbaEstudo({ data }: { data: PlayerPerformance }) {
+function AbaEstudo({ data, metaCoach }: { data: PlayerPerformance; metaCoach: PlayerCard | null }) {
   const leaks = data.top_leaks ?? [];
   const maxLeak = leaks.length ? Math.max(...leaks.map((l) => l.ocorrencias)) : 1;
 
   return (
     <div className="grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {metaCoach && <MetaDoCoach card={metaCoach} />}
+
       <Painel titulo="Consistência" icone={<Flame size={14} className="text-evolution" />}>
         <div className="grid grid-cols-2 gap-3">
           <MiniCard label="Streak atual" valor={fmtNum(data.streak_atual) ?? "0"} accent="#E0B24C" icone={<Flame size={12} />} />
@@ -608,6 +617,83 @@ function AbaEstudo({ data }: { data: PlayerPerformance }) {
           </div>
         )}
       </Painel>
+    </div>
+  );
+}
+
+// Meta atribuida pelo coach no Funil (Time > Painel > Estatísticas >
+// Jogadores) -- mesmos numeros (drillsDone/reviewsDone/statValue) que
+// aparecem no card do Kanban pro coach, so' que do lado do jogador.
+// Nao e' um snapshot: cada vez que o jogador treina ou revisa uma mao,
+// o proximo carregamento desta tela (e do card no Funil) reflete o
+// progresso novo, porque os dois leem a mesma RPC (team_funnel_cards)
+// em cima das mesmas tabelas -- nada fica dessincronizado entre as
+// duas telas.
+function MetaDoCoach({ card }: { card: PlayerCard }) {
+  return (
+    <Painel titulo="Meta do coach" icone={<Target size={14} className="text-training" />}>
+      <p className="-mt-1 text-xs text-muted">
+        Fase atual: <span className="font-medium text-ink/85">{card.phaseName}</span>
+      </p>
+
+      <BarraMeta
+        label="Drills treinados"
+        done={card.drillsDone}
+        target={card.drillsTarget}
+        cor="var(--color-training)"
+        cta={{ texto: "Treinar", href: "/treino" }}
+      />
+      <BarraMeta
+        label="Mãos revisadas"
+        done={card.reviewsDone}
+        target={card.reviewsTarget}
+        cor="var(--color-review)"
+        cta={{ texto: "Revisar", href: "/revisor" }}
+      />
+
+      {card.statMetric && (
+        <div className="flex items-center justify-between border-t border-hairline pt-2.5 text-sm">
+          <span className="text-muted">{STAT_METRIC_LABEL[card.statMetric]} atual</span>
+          <span className="font-semibold tnum">
+            {card.statValue ?? "—"}%{card.statTarget != null && <span className="text-muted"> · meta {card.statTarget}%</span>}
+          </span>
+        </div>
+      )}
+    </Painel>
+  );
+}
+
+function BarraMeta({
+  label,
+  done,
+  target,
+  cor,
+  cta,
+}: {
+  label: string;
+  done: number;
+  target: number;
+  cor: string;
+  cta: { texto: string; href: string };
+}) {
+  const pct = target > 0 ? Math.min(100, Math.round((done / target) * 100)) : 100;
+  const completo = target > 0 && done >= target;
+  return (
+    <div>
+      <div className="flex items-baseline justify-between gap-3">
+        <p className="text-sm font-medium">{label}</p>
+        <span className="shrink-0 text-xs font-bold tabular-nums text-ink/85">
+          {done}/{target}
+        </span>
+      </div>
+      <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-void/40">
+        <div className="h-full rounded-full transition-[width] duration-500 ease-out" style={{ width: `${pct}%`, background: cor }} />
+      </div>
+      {!completo && (
+        <Link href={cta.href} className="mt-1.5 inline-block text-[11px] font-semibold text-muted hover:text-ink">
+          {cta.texto} →
+        </Link>
+      )}
     </div>
   );
 }
