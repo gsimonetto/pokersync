@@ -1,9 +1,14 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Kanban, CheckCircle2, AlertTriangle, ArrowRight } from "lucide-react";
+import Link from "next/link";
+import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, Trophy, ChevronRight } from "lucide-react";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
+import { TeamHeatmap } from "@/components/time/team-heatmap";
+import { PainelCard } from "@/components/time/painel-card";
+import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { Kpi } from "@/components/time/kpi";
+import { Avatar } from "@/components/avatar";
 import { PeriodSelector } from "@/components/period-selector";
 import {
   diasSemAtividade,
@@ -15,18 +20,20 @@ import {
 import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-service";
 import { BRL, variacao } from "@/lib/format";
 
-// Visao geral do time. Hierarquia visual proposital:
-// 1. KPIs (leitura de 2s) -> 2. graficos lado a lado (dinheiro e estudo,
-// a relacao que o coach precisa enxergar). Ranking e leaks moraram aqui
-// antes, mas empurravam demais o conteudo pra baixo — agora vivem na
-// aba Jogadores (ranking virou opcao de ordenacao, leaks virou secao
-// recolhivel), deixando a Visao Geral só com os resultados do time.
-// Dinheiro vem primeiro da esquerda porque e' a metrica de resultado;
-// estudo a direita porque e' a metrica de causa.
+// Estatisticas do time. Hierarquia visual:
+// 1. KPIs agrupados por assunto (Financeiro / Treinos / Alertas) -- antes
+//    era uma grade unica misturando dinheiro, estudo e risco no mesmo
+//    nivel, sem hierarquia de leitura;
+// 2. Resultado por periodo + heatmap de consistencia lado a lado (mesmo
+//    par "Evolucao da banca" + "Consistencia de volume" do Gestor de
+//    Banca), com o filtro de dias vivendo dentro do proprio card;
+// 3. Assistente do coach como card entre os demais, no mesmo layout do
+//    "AI Coach" da banca -- nao mais so' escondido na aba Jogadores.
 
 const INATIVO_DIAS = 7;
 
 export function TabVisaoGeral({
+  teamId,
   jogadores,
   atividade,
   financeiro,
@@ -36,7 +43,9 @@ export function TabVisaoGeral({
   periodos,
   onDiasChange,
   onAbrirFunil,
+  onErro,
 }: {
+  teamId: string;
   jogadores: TeamDashboardRow[];
   atividade: TeamActivityDay[];
   financeiro: FinancialDay[];
@@ -46,6 +55,7 @@ export function TabVisaoGeral({
   periodos: { label: string; days: number }[];
   onDiasChange: (dias: number) => void;
   onAbrirFunil: () => void;
+  onErro: (s: string) => void;
 }) {
   const treinos = jogadores.reduce((a, j) => a + j.treinos, 0);
   const acertos = jogadores.reduce((a, j) => a + j.acertosGto, 0);
@@ -69,31 +79,57 @@ export function TabVisaoGeral({
 
   return (
     <div className="space-y-5">
-      <div className="flex items-center justify-between">
-        <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho do time</p>
-        <div className="print:hidden">
-          <PeriodSelector value={dias} onChange={onDiasChange} options={periodos} />
-        </div>
-      </div>
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho do time</p>
 
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3 print:grid-cols-3">
-        <Kpi d={0} pronto={pronto} icon={Wallet} label="Resultado no time" value={BRL.format(lucro)}
-          hint="desde a entrada de cada um" tom={lucro > 0 ? "positivo" : lucro < 0 ? "negativo" : undefined} destaque />
-        <Kpi d={40} pronto={pronto} icon={Gamepad2} label="Jogos" value={String(jogos)} hint="desde a entrada" />
-        <Kpi d={80} pronto={pronto} icon={Target} label="Treinos no período" value={String(treinos)} tendencia={varTreinos} />
-        <Kpi d={120} pronto={pronto} icon={Flame} label="Acerto GTO" value={acertoPct === null ? "—" : `${acertoPct}%`}
-          hint={acertoPct === null ? "sem treinos" : undefined} tendencia={varAcerto} tendenciaSufixo="pp" />
-        <Kpi d={160} pronto={pronto} icon={BookOpen} label="Mãos revisadas" value={String(revisadas)} tendencia={varRevisadas} />
-        <Kpi d={200} pronto={pronto} icon={TriangleAlert} label="Precisam de atenção" value={String(inativos)}
-          hint={`${jogadores.length - inativos} ativos`} tom={inativos > 0 ? "negativo" : undefined} />
+      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
+        <PainelCard titulo="Financeiro" icone={<Wallet size={13} className="text-positive" />}>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Kpi d={0} pronto={pronto} icon={Wallet} label="Resultado no time" value={BRL.format(lucro)}
+              hint="desde a entrada de cada um" tom={lucro > 0 ? "positivo" : lucro < 0 ? "negativo" : undefined} destaque />
+            <Kpi d={40} pronto={pronto} icon={Gamepad2} label="Jogos" value={String(jogos)} hint="desde a entrada" />
+          </div>
+        </PainelCard>
+
+        <PainelCard titulo="Treinos" icone={<Target size={13} className="text-training" />}>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Kpi d={80} pronto={pronto} icon={Target} label="Treinos no período" value={String(treinos)} tendencia={varTreinos} />
+            <Kpi d={120} pronto={pronto} icon={Flame} label="Acerto GTO" value={acertoPct === null ? "—" : `${acertoPct}%`}
+              hint={acertoPct === null ? "sem treinos" : undefined} tendencia={varAcerto} tendenciaSufixo="pp" />
+            <Kpi d={160} pronto={pronto} icon={BookOpen} label="Mãos revisadas" value={String(revisadas)} tendencia={varRevisadas} />
+          </div>
+        </PainelCard>
+
+        <PainelCard titulo="Alertas" icone={<TriangleAlert size={13} className="text-negative" />}>
+          <div className="grid grid-cols-1 gap-2.5">
+            <Kpi d={200} pronto={pronto} icon={TriangleAlert} label="Precisam de atenção" value={String(inativos)}
+              hint={`${jogadores.length - inativos} ativos`} tom={inativos > 0 ? "negativo" : undefined} />
+          </div>
+        </PainelCard>
       </section>
 
       <ResumoFunilMini onAbrirFunil={onAbrirFunil} />
 
-      <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
-        <GraficoFinanceiro dados={financeiro} pronto={pronto} />
-        <GraficoEstudo dados={atividade} pronto={pronto} />
+      <section className="grid gap-4 lg:grid-cols-2">
+        <GraficoFinanceiro
+          dados={financeiro}
+          pronto={pronto}
+          titulo="Resultado por período"
+          acao={<div className="print:hidden"><PeriodSelector value={dias} onChange={onDiasChange} options={periodos} /></div>}
+        />
+
+        <PainelCard titulo="Consistência do time" icone={<CalendarDays size={13} className="text-evolution" />} className="flex flex-col">
+          <div className="flex flex-1 items-center">
+            <TeamHeatmap dados={financeiro} />
+          </div>
+        </PainelCard>
       </section>
+
+      <section className="grid gap-4 lg:grid-cols-2">
+        <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} />
+        <TopDoPeriodo jogadores={jogadores} />
+      </section>
+
+      <GraficoEstudo dados={atividade} pronto={pronto} />
     </div>
   );
 }
@@ -138,6 +174,40 @@ function ResumoFunilMini({ onAbrirFunil }: { onAbrirFunil: () => void }) {
       )}
       <ArrowRight size={14} className="ml-auto shrink-0 text-muted" />
     </button>
+  );
+}
+
+// ------------------------------------------------------------
+// Ranking curto por XP no periodo — mesma metrica ja usada na ordenacao
+// da aba Jogadores, aqui como vitrine rapida (top 5) dentro da grade de
+// cards da Estatisticas, ao lado do Assistente do coach.
+// ------------------------------------------------------------
+function TopDoPeriodo({ jogadores }: { jogadores: TeamDashboardRow[] }) {
+  const top = [...jogadores].sort((a, b) => b.xpPeriodo - a.xpPeriodo).slice(0, 5);
+
+  return (
+    <PainelCard titulo="Top do período" icone={<Trophy size={13} className="text-evolution" />}>
+      {top.length === 0 ? (
+        <p className="text-sm text-muted">Sem jogadores no período.</p>
+      ) : (
+        <ul className="flex flex-col gap-1.5">
+          {top.map((j, i) => (
+            <li key={j.userId}>
+              <Link
+                href={`/time/jogador/${j.userId}`}
+                className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-elevated"
+              >
+                <span className={`w-4 shrink-0 text-center text-[12px] font-bold tnum ${i === 0 ? "text-evolution" : "text-muted"}`}>{i + 1}</span>
+                <Avatar id={j.avatarId} url={j.avatarUrl} size={28} />
+                <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{j.nome}</span>
+                <span className="shrink-0 text-[12px] font-semibold tnum text-evolution">{j.xpPeriodo} XP</span>
+                <ChevronRight size={13} className="shrink-0 text-muted" />
+              </Link>
+            </li>
+          ))}
+        </ul>
+      )}
+    </PainelCard>
   );
 }
 
