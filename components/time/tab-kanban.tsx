@@ -718,7 +718,7 @@ function ModalCard({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
-      <div className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <Avatar id={jogador?.avatarId ?? 1} url={jogador?.avatarUrl} size={36} />
           <div className="min-w-0 flex-1">

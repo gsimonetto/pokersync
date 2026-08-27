@@ -94,7 +94,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
     <ModalPortal>
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-16" onClick={onClose}>
       <div
-        className="w-full max-w-sm overflow-hidden rounded-2xl border border-hairline bg-surface/[0.98] shadow-2xl shadow-black/60 backdrop-blur-xl"
+        className="w-full max-w-md overflow-hidden rounded-2xl border border-hairline bg-surface/[0.98] shadow-2xl shadow-black/60 backdrop-blur-xl"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
@@ -111,7 +111,7 @@ export function NotificationsMenu({ onClose }: { onClose: () => void }) {
           </div>
         </div>
 
-        <div className="max-h-[400px] overflow-y-auto">
+        <div className="max-h-[460px] overflow-y-auto">
         {loading && items.length === 0 ? (
           <p className="p-5 text-center text-[13px] text-muted">Carregando…</p>
         ) : items.length === 0 ? (

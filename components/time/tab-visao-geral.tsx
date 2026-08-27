@@ -87,10 +87,11 @@ export function TabVisaoGeral({
 
   return (
     <div className="space-y-5">
-      {/* Faixa herói — mesmo padrão do Gestor de Banca e da Performance:
-          um unico container com os numeros lado a lado, separados por
-          divisor, em vez de cada metrica dentro do proprio card (o que
-          empilhava borda dentro de borda e ficava pesado). */}
+      {/* Faixa herói — mesmo padrão e MESMA contagem de colunas (5, a
+          partir de lg) do Gestor de Banca e da Performance: 6 colunas
+          espremia demais o valor em R$ (mais largo que qualquer outra
+          métrica) e o texto vazava por cima da coluna vizinha. "Jogos"
+          virou hint do "Resultado no time" em vez de coluna própria. */}
       <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
         <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
           <p className="text-sm text-muted">Desempenho do time</p>
@@ -102,15 +103,14 @@ export function TabVisaoGeral({
           style={{ background: lucro < 0 ? "#e0555a" : "#2FB89A" }}
         />
 
-        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
+        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 lg:grid-cols-5 lg:divide-y-0">
           <HeroMetric
             label="Resultado no time"
             value={BRL.format(lucro)}
             tone={lucro > 0 ? "bom" : lucro < 0 ? "ruim" : "neutro"}
-            hint="desde a entrada de cada um"
+            hint={`${jogos} jogo${jogos === 1 ? "" : "s"} desde a entrada de cada um`}
             destaque
           />
-          <HeroMetric label="Jogos" value={String(jogos)} tone="neutro" hint="desde a entrada" />
           <HeroMetric
             label="Treinos no período"
             value={String(treinos)}
