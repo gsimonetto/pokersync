@@ -19,7 +19,7 @@ export function RangesTabs({ active }: { active: TabKey }) {
   ];
 
   return (
-    <nav className="relative flex flex-1 flex-wrap gap-1 overflow-x-auto border-b border-hairline">
+    <nav className="relative flex flex-1 flex-wrap justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center">
       {tabs.map((t) => {
         const Icon = t.icon;
         const isActive = active === t.key;
