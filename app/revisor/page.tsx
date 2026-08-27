@@ -2,9 +2,9 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useSearchParams } from "next/navigation";
-import { ArrowLeft, Bookmark } from "lucide-react";
+import { ArrowLeft, Bookmark, ListChecks, PieChart } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { TabNav } from "@/components/ui/tab-nav";
 import { RevisorFila } from "@/components/revisor/revisor-fila";
 import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
@@ -103,17 +103,16 @@ function RevisorPageInner() {
           contra o fundo. Sem AppHeader (barra sticky) de proposito. */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
         {(screen === "fila" || screen === "salvos" || screen === "aderencia") && (
-          <div className="mb-4">
-            <SegmentedControl
-              value={screen}
-              onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : setScreen("aderencia"))}
-              options={[
-                { value: "fila", label: "Fila" },
-                { value: "salvos", label: <><Bookmark size={12} /> Salvos</> },
-                { value: "aderencia", label: "Aderência a Range" },
-              ]}
-            />
-          </div>
+          <TabNav
+            className="mb-4"
+            value={screen}
+            onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : setScreen("aderencia"))}
+            options={[
+              { value: "fila", label: "Fila", icon: ListChecks },
+              { value: "salvos", label: "Salvos", icon: Bookmark },
+              { value: "aderencia", label: "Aderência a Range", icon: PieChart },
+            ]}
+          />
         )}
         {(screen === "nova" || screen === "sessao" || screen === "detalhe") && (
           <button

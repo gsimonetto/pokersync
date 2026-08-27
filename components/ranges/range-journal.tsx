@@ -25,7 +25,7 @@ export function RangeJournal({ tabs }: { tabs?: React.ReactNode }) {
 
   return (
     <div className="space-y-6 rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      {tabs && <div className="flex justify-end">{tabs}</div>}
+      {tabs}
       {data.streakDays > 0 && (
         <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-4 py-3">
           <Flame size={18} className="text-evolution" />

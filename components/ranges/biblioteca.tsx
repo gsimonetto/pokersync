@@ -85,7 +85,7 @@ export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
     // Funil e do construtor de ranges (RangeEditor), em vez do filtro
     // boiar solto acima dos cards.
     <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+      {tabs && <div className="mb-4">{tabs}</div>}
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
 
       {/* Chips + busca na mesma linha (busca vira botao que abre um

@@ -81,7 +81,7 @@ export function TreeList({ tabs }: { tabs?: React.ReactNode }) {
 
   return (
     <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+      {tabs && <div className="mb-4">{tabs}</div>}
       <div className="mb-4 flex items-center justify-between">
         <p className="text-sm text-muted">
           {loading ? "Carregando…" : `${items.length} árvore${items.length === 1 ? "" : "s"}`}
