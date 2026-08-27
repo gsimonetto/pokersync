@@ -139,6 +139,7 @@ export interface PostflopMetrics {
   fold_to_cbet_river_pct: number | null;
   check_raise_flop_pct: number | null;
   check_raise_turn_pct: number | null;
+  check_raise_river_pct: number | null;
   donk_bet_pct: number | null;
   aggression_factor: number | null; // (bet+raise) / call
   aggression_frequency_pct: number | null; // (bet+raise) / (bet+raise+call+fold)
@@ -261,12 +262,25 @@ export interface AnalysisHandRow {
   isPreflopAggressor: boolean | null;
   cbetFlop: boolean | null;
   cbetTurn: boolean | null;
+  cbetRiver: boolean | null;
   doubleBarrel: boolean | null;
   tripleBarrel: boolean | null;
   donkBetFlop: boolean | null;
   checkRaise: boolean | null;
+  checkRaiseFlop: boolean | null;
+  checkRaiseTurn: boolean | null;
+  checkRaiseRiver: boolean | null;
   foldToCbetFlop: boolean | null;
+  foldToCbetTurn: boolean | null;
+  foldToCbetRiver: boolean | null;
+  postflopBetCount: number | null;
+  postflopRaiseCount: number | null;
+  postflopCallCount: number | null;
+  postflopFoldCount: number | null;
+  wentToShowdown: boolean | null;
+  wonShowdown: boolean | null;
   heroOpenRaise: boolean | null;
+  stealOpportunity: boolean | null;
   stealAttempt: boolean | null;
   stealSuccess: boolean | null;
   facedThreeBet: boolean | null;

@@ -62,12 +62,25 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
     isPreflopAggressor: r.is_preflop_aggressor,
     cbetFlop: r.cbet_flop,
     cbetTurn: r.cbet_turn,
+    cbetRiver: r.cbet_river,
     doubleBarrel: r.double_barrel,
     tripleBarrel: r.triple_barrel,
     donkBetFlop: r.donk_bet_flop,
     checkRaise: r.check_raise,
+    checkRaiseFlop: r.check_raise_flop,
+    checkRaiseTurn: r.check_raise_turn,
+    checkRaiseRiver: r.check_raise_river,
     foldToCbetFlop: r.fold_to_cbet_flop,
+    foldToCbetTurn: r.fold_to_cbet_turn,
+    foldToCbetRiver: r.fold_to_cbet_river,
+    postflopBetCount: r.postflop_bet_count,
+    postflopRaiseCount: r.postflop_raise_count,
+    postflopCallCount: r.postflop_call_count,
+    postflopFoldCount: r.postflop_fold_count,
+    wentToShowdown: r.went_to_showdown,
+    wonShowdown: r.won_showdown,
     heroOpenRaise: r.hero_open_raise,
+    stealOpportunity: r.steal_opportunity,
     stealAttempt: r.steal_attempt,
     stealSuccess: r.steal_success,
     facedThreeBet: r.hero_faced_3bet,
@@ -92,8 +105,12 @@ export async function fetchAnalysisHandRows(): Promise<AnalysisHandRow[]> {
     .from("hand_tags")
     .select(
       "hand_review_id, pot_type, hero_position, stack_depth_bucket, matchup, vpip, pfr, three_bet, computed_at, " +
-        "in_position, is_preflop_aggressor, cbet_flop, cbet_turn, double_barrel, triple_barrel, donk_bet_flop, " +
-        "check_raise, fold_to_cbet_flop, hero_open_raise, steal_attempt, steal_success, hero_faced_3bet, " +
+        "in_position, is_preflop_aggressor, cbet_flop, cbet_turn, cbet_river, double_barrel, triple_barrel, donk_bet_flop, " +
+        "check_raise, check_raise_flop, check_raise_turn, check_raise_river, " +
+        "fold_to_cbet_flop, fold_to_cbet_turn, fold_to_cbet_river, " +
+        "postflop_bet_count, postflop_raise_count, postflop_call_count, postflop_fold_count, " +
+        "went_to_showdown, won_showdown, " +
+        "hero_open_raise, steal_opportunity, steal_attempt, steal_success, hero_faced_3bet, " +
         "hero_fold_to_3bet, hero_call_3bet, hero_made_4bet, hero_faced_4bet, hero_fold_to_4bet, " +
         "blind_defense_opportunity, blind_defended, re_steal, squeeze, " +
         "hand_reviews!inner(created_at, parsed_data)"
@@ -133,19 +150,22 @@ function countIf<T>(rows: T[], pred: (r: T) => boolean | null | undefined): numb
 
 export function computePreflopMetrics(rows: AnalysisHandRow[]): PreflopMetrics {
   const hands = rows.length;
-  // steal_attempt só vem preenchido (true/false) quando a mão de fato era
-  // uma chance de steal (CO/BTN/SB com a ação fechando nele) — null nas
-  // demais, então "!== null" já é a oportunidade, sem checar posição de novo.
-  const stealOpp = rows.filter((r) => r.stealAttempt !== null);
+  // faced_3bet/faced_4bet/blind_defense_opportunity/steal_opportunity são
+  // flags de OPORTUNIDADE — sempre true/false quando o herói foi
+  // identificado na mão (null só nas ~poucas mãos sem herói reconhecido).
+  // O gate certo é "=== true", não "!== null": filtrar por "!== null"
+  // incluiria também as oportunidades que deram false, inflando o
+  // denominador com mãos onde a situação nunca aconteceu.
+  const stealOpp = rows.filter((r) => r.stealOpportunity === true);
   const stealAttempts = countIf(rows, (r) => r.stealAttempt);
-  const facedThreeBet = rows.filter((r) => r.facedThreeBet !== null);
-  const facedFourBet = rows.filter((r) => r.facedFourBet !== null);
+  const facedThreeBet = rows.filter((r) => r.facedThreeBet === true);
+  const facedFourBet = rows.filter((r) => r.facedFourBet === true);
   // matchup só vem preenchido em pots heads-up até o flop ("SB_vs_BTN"),
   // então dá pra isolar o vilão real do steal em vez de aproximar por
   // blind_defense_opportunity genérico (que não distingue quem abriu).
-  const stealVsSbBtn = rows.filter((r) => r.heroPosition === "SB" && r.matchup === "SB_vs_BTN" && r.blindDefenseOpportunity !== null);
-  const stealVsBbBtn = rows.filter((r) => r.heroPosition === "BB" && r.matchup === "BB_vs_BTN" && r.blindDefenseOpportunity !== null);
-  const stealVsBbSb = rows.filter((r) => r.heroPosition === "BB" && r.matchup === "BB_vs_SB" && r.blindDefenseOpportunity !== null);
+  const stealVsSbBtn = rows.filter((r) => r.heroPosition === "SB" && r.matchup === "SB_vs_BTN" && r.blindDefenseOpportunity === true);
+  const stealVsBbBtn = rows.filter((r) => r.heroPosition === "BB" && r.matchup === "BB_vs_BTN" && r.blindDefenseOpportunity === true);
+  const stealVsBbSb = rows.filter((r) => r.heroPosition === "BB" && r.matchup === "BB_vs_SB" && r.blindDefenseOpportunity === true);
   return {
     hands,
     vpip_pct: pct(countIf(rows, (r) => r.vpip), hands),
@@ -182,25 +202,43 @@ export function computePreflopByPosition(rows: AnalysisHandRow[]): PreflopMetric
 export function computePostflopMetrics(rows: AnalysisHandRow[]): PostflopMetrics {
   const pfaHands = rows.filter((r) => r.isPreflopAggressor === true);
   const nonPfaHands = rows.filter((r) => r.isPreflopAggressor === false);
+  // fold_to_cbet_* já é nullable de verdade (null = não enfrentou c-bet
+  // naquela rua) — "!== null" aqui é o gate certo, ao contrário dos
+  // campos de oportunidade do preflop (ver computePreflopMetrics).
   const facedCbetFlop = rows.filter((r) => r.foldToCbetFlop !== null);
+  const facedCbetTurn = rows.filter((r) => r.foldToCbetTurn !== null);
+  const facedCbetRiver = rows.filter((r) => r.foldToCbetRiver !== null);
+
+  const betRaise = rows.reduce((acc, r) => acc + (r.postflopBetCount ?? 0) + (r.postflopRaiseCount ?? 0), 0);
+  const calls = rows.reduce((acc, r) => acc + (r.postflopCallCount ?? 0), 0);
+  const folds = rows.reduce((acc, r) => acc + (r.postflopFoldCount ?? 0), 0);
+
+  // W$SD% usa como base as mãos que REALMENTE chegaram a showdown
+  // (wentToShowdown === true) — WSD% em si usa todas as mãos jogadas
+  // como base, convenção padrão de mercado (não é "oportunidade", é taxa
+  // sobre o volume total).
+  const reachedShowdown = rows.filter((r) => r.wentToShowdown === true);
 
   return {
     hands: rows.length,
     cbet_flop_pct: pct(countIf(pfaHands, (r) => r.cbetFlop), pfaHands.length),
     cbet_turn_pct: pct(countIf(pfaHands, (r) => r.cbetTurn), pfaHands.length),
-    cbet_river_pct: null, // hand_tags não rastreia c-bet de river (motor pós-flop ainda não roda essa rua)
+    cbet_river_pct: pct(countIf(pfaHands, (r) => r.cbetRiver), pfaHands.length),
     fold_to_cbet_flop_pct: pct(countIf(facedCbetFlop, (r) => r.foldToCbetFlop), facedCbetFlop.length),
-    fold_to_cbet_turn_pct: null,
-    fold_to_cbet_river_pct: null,
-    // check_raise é uma flag única (qualquer rua) — não dá pra separar
-    // flop/turn sem inventar um dado que a base não guarda.
-    check_raise_flop_pct: pct(countIf(nonPfaHands, (r) => r.checkRaise), nonPfaHands.length),
-    check_raise_turn_pct: null,
+    fold_to_cbet_turn_pct: pct(countIf(facedCbetTurn, (r) => r.foldToCbetTurn), facedCbetTurn.length),
+    fold_to_cbet_river_pct: pct(countIf(facedCbetRiver, (r) => r.foldToCbetRiver), facedCbetRiver.length),
+    check_raise_flop_pct: pct(countIf(nonPfaHands, (r) => r.checkRaiseFlop), nonPfaHands.length),
+    check_raise_turn_pct: pct(countIf(nonPfaHands, (r) => r.checkRaiseTurn), nonPfaHands.length),
+    check_raise_river_pct: pct(countIf(nonPfaHands, (r) => r.checkRaiseRiver), nonPfaHands.length),
     donk_bet_pct: pct(countIf(nonPfaHands, (r) => r.donkBetFlop), nonPfaHands.length),
-    aggression_factor: null, // exige contagem de bet/raise/call por rua — não gravado por hand_tags
-    aggression_frequency_pct: null,
-    wsd_pct: null, // showdown não é sinalizado como coluna própria ainda
-    wsd_won_pct: null,
+    // AF = (bet+raise) / call. Com 0 calls o AF tradicionalmente não tem
+    // teto definido — fica null em vez de Infinity/0 fabricado.
+    aggression_factor: calls > 0 ? Math.round((betRaise / calls) * 100) / 100 : null,
+    // AFq = (bet+raise) / (bet+raise+call+fold) — convenção HM3/PT4,
+    // checks ficam fora do denominador (não são decisão de apostar).
+    aggression_frequency_pct: pct(betRaise, betRaise + calls + folds),
+    wsd_pct: pct(reachedShowdown.length, rows.length),
+    wsd_won_pct: pct(countIf(reachedShowdown, (r) => r.wonShowdown), reachedShowdown.length),
   };
 }
 
