@@ -57,6 +57,7 @@ import { ACCENT } from "@/lib/modules-data";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { MobileFiltersMenu } from "@/components/ui/mobile-filters-menu";
 
 // Kanban estilo Trello: arrastar o card entre colunas move de fase (drag
 // nativo HTML5, sem lib extra); o card tambem pode ser aberto pra editar
@@ -267,71 +268,133 @@ export function TabKanban({
 
         {modo === "board" && (
           <>
-            {/* Lupa: busca por texto (nome, anotacao, etiqueta) que
-                combina com os demais filtros abaixo -- pedido explicito
-                pra achar qualquer jogador quando a lista crescer, e
-                mesclar com "metas concluidas", coach, etc. */}
-            <button
-              type="button"
-              onClick={() => {
-                setBuscaAberta((v) => !v);
-                if (buscaAberta) setBusca("");
-              }}
-              aria-label={buscaAberta ? "Fechar busca" : "Buscar jogador"}
-              title="Buscar jogador"
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors ${
-                buscaAberta || busca ? "border-ink/40 bg-elevated text-ink" : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
-              }`}
-            >
-              <Search size={15} />
-            </button>
-            {buscaAberta && (
-              <input
-                autoFocus
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && (setBuscaAberta(false), setBusca(""))}
-                placeholder="Nome, anotação, etiqueta…"
-                className="w-44 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-muted/50"
-              />
-            )}
+            {/* Busca + selects + toggles: no desktop ficam soltos na
+                fileira, igual sempre foi (`sm:contents` faz esse bloco
+                nao criar caixa propria, os filhos entram direto no flex
+                do pai). No mobile essa fileira nao cabia (5 controles
+                lado a lado) e amontoava -- ali entram atras do icone de
+                menu (sanduiche), so' pra telas pequenas. */}
+            <div className="hidden sm:contents">
+              <button
+                type="button"
+                onClick={() => {
+                  setBuscaAberta((v) => !v);
+                  if (buscaAberta) setBusca("");
+                }}
+                aria-label={buscaAberta ? "Fechar busca" : "Buscar jogador"}
+                title="Buscar jogador"
+                className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors ${
+                  buscaAberta || busca ? "border-ink/40 bg-elevated text-ink" : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
+                }`}
+              >
+                <Search size={15} />
+              </button>
+              {buscaAberta && (
+                <input
+                  autoFocus
+                  value={busca}
+                  onChange={(e) => setBusca(e.target.value)}
+                  onKeyDown={(e) => e.key === "Escape" && (setBuscaAberta(false), setBusca(""))}
+                  placeholder="Nome, anotação, etiqueta…"
+                  className="w-44 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-muted/50"
+                />
+              )}
 
-            <select
-              value={filtroLabel}
-              onChange={(e) => setFiltroLabel(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
-            >
-              <option value="todas">Todas as etiquetas</option>
-              {labelsDoTime.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
-
-            {coaches.length > 0 && (
               <select
-                value={filtroCoach}
-                onChange={(e) => setFiltroCoach(e.target.value)}
+                value={filtroLabel}
+                onChange={(e) => setFiltroLabel(e.target.value)}
                 className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
               >
-                <option value="todos">Todos os coaches</option>
-                {coaches.map((c) => (
-                  <option key={c.userId} value={c.userId}>{c.nome}</option>
+                <option value="todas">Todas as etiquetas</option>
+                {labelsDoTime.map((l) => (
+                  <option key={l.id} value={l.id}>{l.name}</option>
                 ))}
               </select>
-            )}
 
-            <FilterChip
-              label="Com tarefas pendentes"
-              icon={<CheckSquare size={13} />}
-              active={soTarefasPendentes}
-              onClick={() => setSoTarefasPendentes((v) => !v)}
-            />
-            <FilterChip
-              label="Metas concluídas"
-              icon={<CheckCircle2 size={13} />}
-              active={soMetasConcluidas}
-              onClick={() => setSoMetasConcluidas((v) => !v)}
-            />
+              {coaches.length > 0 && (
+                <select
+                  value={filtroCoach}
+                  onChange={(e) => setFiltroCoach(e.target.value)}
+                  className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
+                >
+                  <option value="todos">Todos os coaches</option>
+                  {coaches.map((c) => (
+                    <option key={c.userId} value={c.userId}>{c.nome}</option>
+                  ))}
+                </select>
+              )}
+
+              <FilterChip
+                label="Com tarefas pendentes"
+                icon={<CheckSquare size={13} />}
+                active={soTarefasPendentes}
+                onClick={() => setSoTarefasPendentes((v) => !v)}
+              />
+              <FilterChip
+                label="Metas concluídas"
+                icon={<CheckCircle2 size={13} />}
+                active={soMetasConcluidas}
+                onClick={() => setSoMetasConcluidas((v) => !v)}
+              />
+            </div>
+
+            <div className="sm:hidden">
+              <MobileFiltersMenu
+                title="Filtros"
+                active={busca !== "" || filtroLabel !== "todas" || filtroCoach !== "todos" || soTarefasPendentes || soMetasConcluidas}
+              >
+                <div className="flex flex-col gap-3">
+                  <div className="relative">
+                    <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+                    <input
+                      value={busca}
+                      onChange={(e) => setBusca(e.target.value)}
+                      placeholder="Nome, anotação, etiqueta…"
+                      className="w-full rounded-lg border border-hairline bg-elevated py-2 pl-8 pr-3 text-[13px] text-ink outline-none placeholder:text-muted/50"
+                    />
+                  </div>
+
+                  <select
+                    value={filtroLabel}
+                    onChange={(e) => setFiltroLabel(e.target.value)}
+                    className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-[13px] text-ink outline-none"
+                  >
+                    <option value="todas">Todas as etiquetas</option>
+                    {labelsDoTime.map((l) => (
+                      <option key={l.id} value={l.id}>{l.name}</option>
+                    ))}
+                  </select>
+
+                  {coaches.length > 0 && (
+                    <select
+                      value={filtroCoach}
+                      onChange={(e) => setFiltroCoach(e.target.value)}
+                      className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-[13px] text-ink outline-none"
+                    >
+                      <option value="todos">Todos os coaches</option>
+                      {coaches.map((c) => (
+                        <option key={c.userId} value={c.userId}>{c.nome}</option>
+                      ))}
+                    </select>
+                  )}
+
+                  <div className="flex flex-wrap gap-2">
+                    <FilterChip
+                      label="Com tarefas pendentes"
+                      icon={<CheckSquare size={13} />}
+                      active={soTarefasPendentes}
+                      onClick={() => setSoTarefasPendentes((v) => !v)}
+                    />
+                    <FilterChip
+                      label="Metas concluídas"
+                      icon={<CheckCircle2 size={13} />}
+                      active={soMetasConcluidas}
+                      onClick={() => setSoMetasConcluidas((v) => !v)}
+                    />
+                  </div>
+                </div>
+              </MobileFiltersMenu>
+            </div>
           </>
         )}
 
