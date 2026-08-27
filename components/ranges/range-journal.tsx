@@ -20,8 +20,22 @@ export function RangeJournal({ tabs }: { tabs?: React.ReactNode }) {
       .catch(() => setError("Erro ao carregar o journal."));
   }, []);
 
-  if (error) return <p className="text-sm text-negative">{error}</p>;
-  if (!data) return <p className="text-sm text-muted">Carregando…</p>;
+  if (error) {
+    return (
+      <div className="space-y-6">
+        {tabs}
+        <p className="text-sm text-negative">{error}</p>
+      </div>
+    );
+  }
+  if (!data) {
+    return (
+      <div className="space-y-6">
+        {tabs}
+        <p className="text-sm text-muted">Carregando…</p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-6 rounded-2xl border border-hairline bg-surface p-4 sm:p-5">

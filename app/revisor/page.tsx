@@ -96,7 +96,7 @@ function RevisorPageInner() {
 
   return (
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+    <main className="w-full px-6 py-10 text-ink">
       {/* Container externo unico, igual ao Funil e ao Painel do Time:
           nav (alternador Fila/Salvos/Aderencia ou botao de voltar) e
           conteudo moram dentro da MESMA caixa, em vez de boiar soltos
@@ -147,7 +147,7 @@ export default function RevisorPage() {
     <Suspense
       fallback={
         <AppShell>
-          <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+          <main className="w-full px-6 py-10 text-ink">
             <p className="text-sm text-muted">Carregando…</p>
           </main>
         </AppShell>

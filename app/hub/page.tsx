@@ -220,7 +220,7 @@ export default function HubPage() {
 
   return (
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-6 py-10">
+    <main className="w-full px-6 py-10">
       {/* Animacoes escopadas neste arquivo: nao depende do globals.css do restante do projeto. */}
       <style>{`
         @keyframes hubFlameFlicker {

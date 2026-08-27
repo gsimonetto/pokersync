@@ -72,7 +72,7 @@ export default function PainelPage() {
     <Suspense
       fallback={
         <AppShell>
-          <main className="w-full mx-auto max-w-[1280px] px-6 py-10 sm:px-8 text-sm text-muted">Carregando…</main>
+          <main className="w-full px-6 py-10 sm:px-8 text-sm text-muted">Carregando…</main>
         </AppShell>
       }
     >
@@ -204,7 +204,7 @@ function PainelConteudo() {
 
   return (
     <AppShell>
-      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 sm:px-8 text-ink print:max-w-full print:p-0">
+      <main className="w-full px-6 py-10 sm:px-8 text-ink print:p-0">
         {erro && (
           <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative print:hidden">
             {erro}

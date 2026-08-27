@@ -135,11 +135,10 @@ function TreinoShell() {
   }, []);
 
   return (
-    // Margem padrao do app (max-w-[1280px] px-6 py-10) — antes essa tela
-    // era full-bleed de proposito, mas o padrao virou consistencia entre
+    // Margem padrao do app (px-6 py-10, full-width) — consistencia entre
     // todo modulo, entao entra aqui tambem.
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-6 py-10">
+    <main className="w-full px-6 py-10">
     <div
       ref={pageRef}
       className="ps-treino-page"

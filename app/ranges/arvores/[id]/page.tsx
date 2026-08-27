@@ -12,7 +12,7 @@ export default function TreeEditPage({ params }: { params: Promise<{ id: string 
 
   return (
     <AppShell>
-      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+      <main className="w-full px-6 py-10 text-ink">
         <TreeEditor id={id} tabs={<RangesTabs active="arvores" />} />
       </main>
     </AppShell>

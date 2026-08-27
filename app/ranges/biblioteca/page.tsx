@@ -9,7 +9,7 @@ import { RangesTabs } from "@/components/ranges/ranges-tabs";
 export default function BibliotecaPage() {
   return (
     <AppShell>
-      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+      <main className="w-full px-6 py-10 text-ink">
         <Biblioteca tabs={<RangesTabs active="biblioteca" />} />
       </main>
     </AppShell>
