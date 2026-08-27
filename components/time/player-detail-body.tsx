@@ -2,15 +2,10 @@
 
 import Link from "next/link";
 import {
-  Flame,
-  Target,
-  BookOpen,
   TriangleAlert,
   MessageSquare,
   Eye,
   ChevronRight,
-  Wallet,
-  Gamepad2,
   Handshake,
   CalendarDays,
 } from "lucide-react";
@@ -19,7 +14,7 @@ import { EvolutionChart } from "@/components/time/evolution-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
 import { MetasCard } from "@/components/time/metas-card";
-import { Kpi } from "@/components/time/kpi";
+import { HeroMetric } from "@/components/time/hero-metric";
 import { BRL, variacao } from "@/lib/format";
 import {
   ALERTA_LABEL,
@@ -63,50 +58,61 @@ export function PlayerDetailBody({
   const acertoPct = p.treinos === 0 ? null : Math.round((p.acertosGto / p.treinos) * 100);
   const maxDia = Math.max(1, ...atividade.map((d) => d.treinos + d.revisoes));
 
+  const varTreinos = variacao(p.treinos, p.treinosPeriodoAnterior);
+  const acertoAnteriorPct =
+    p.treinosPeriodoAnterior > 0 ? Math.round((100 * (p.acertosGtoPeriodoAnterior ?? 0)) / p.treinosPeriodoAnterior) : null;
+  const varAcerto = acertoPct !== null && acertoAnteriorPct !== null ? acertoPct - acertoAnteriorPct : null;
+
   return (
     <div className="space-y-6">
-      <section className="grid grid-cols-2 gap-3 lg:grid-cols-3">
-        <Kpi
-          icon={Wallet}
-          label="Resultado no time"
-          value={p.jogosNoTime > 0 ? BRL.format(p.lucroNoTime) : "—"}
-          hint={staking.length > 0 ? "líquido — já descontado o staking" : "desde que entrou"}
-          tom={p.lucroNoTime > 0 ? "positivo" : p.lucroNoTime < 0 ? "negativo" : undefined}
-          destaque
+      {/* Faixa herói — mesmo padrão do Gestor de Banca e da Performance
+          (e da aba Estatísticas do time): números lado a lado dentro de
+          um único container, separados por divisor. */}
+      <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
+          <p className="text-sm text-muted">Desempenho no time</p>
+        </div>
+
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full opacity-[0.13] blur-3xl"
+          style={{ background: p.lucroNoTime < 0 ? "#e0555a" : "#2FB89A" }}
         />
-        <Kpi icon={Gamepad2} label="Jogos" value={String(p.jogosNoTime)} hint="desde que entrou" />
-        <Kpi
-          icon={Target}
-          label="Treinos"
-          value={String(p.treinos)}
-          hint={`${p.xpPeriodo} XP no período`}
-          tendencia={variacao(p.treinos, p.treinosPeriodoAnterior)}
-        />
-        <Kpi
-          icon={Flame}
-          label="Acerto GTO"
-          value={acertoPct === null ? "—" : `${acertoPct}%`}
-          hint={p.errosGraves > 0 ? `${p.errosGraves} erro(s) grave(s)` : undefined}
-          tendencia={variacao(
-            p.treinos > 0 ? Math.round((100 * (p.acertosGto ?? 0)) / p.treinos) : null,
-            p.treinosPeriodoAnterior > 0
-              ? Math.round((100 * (p.acertosGtoPeriodoAnterior ?? 0)) / p.treinosPeriodoAnterior)
-              : null
-          )}
-          tendenciaSufixo="pp"
-        />
-        <Kpi
-          icon={BookOpen}
-          label="Mãos revisadas"
-          value={String(p.maosRevisadas)}
-          hint={p.maosPendentes > 0 ? `${p.maosPendentes} na fila` : undefined}
-        />
-        <Kpi
-          icon={Flame}
-          label="Ofensiva"
-          value={p.streakDays ? `${p.streakDays}d` : "—"}
-          hint={p.streakBest ? `recorde ${p.streakBest}d` : undefined}
-        />
+
+        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
+          <HeroMetric
+            label="Resultado no time"
+            value={p.jogosNoTime > 0 ? BRL.format(p.lucroNoTime) : "—"}
+            tone={p.lucroNoTime > 0 ? "bom" : p.lucroNoTime < 0 ? "ruim" : "neutro"}
+            hint={staking.length > 0 ? "líquido — já descontado o staking" : "desde que entrou"}
+            destaque
+          />
+          <HeroMetric label="Jogos" value={String(p.jogosNoTime)} tone="neutro" hint="desde que entrou" />
+          <HeroMetric
+            label="Treinos"
+            value={String(p.treinos)}
+            tone="neutro"
+            hint={`${p.xpPeriodo} XP · ${varTreinos != null ? `${varTreinos > 0 ? "+" : ""}${varTreinos}% vs período anterior` : "sem comparação"}`}
+          />
+          <HeroMetric
+            label="Acerto GTO"
+            value={acertoPct === null ? "—" : `${acertoPct}%`}
+            tone={acertoPct === null ? "neutro" : acertoPct >= 50 ? "bom" : "ruim"}
+            hint={p.errosGraves > 0 ? `${p.errosGraves} erro(s) grave(s)` : varAcerto != null ? `${varAcerto > 0 ? "+" : ""}${varAcerto}pp vs período anterior` : undefined}
+          />
+          <HeroMetric
+            label="Mãos revisadas"
+            value={String(p.maosRevisadas)}
+            tone="neutro"
+            hint={p.maosPendentes > 0 ? `${p.maosPendentes} na fila` : undefined}
+          />
+          <HeroMetric
+            label="Ofensiva"
+            value={p.streakDays ? `${p.streakDays}d` : "—"}
+            tone={p.streakDays ? "bom" : "neutro"}
+            hint={p.streakBest ? `recorde ${p.streakBest}d` : undefined}
+          />
+        </div>
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">

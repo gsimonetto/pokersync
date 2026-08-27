@@ -8,6 +8,7 @@ import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { Kpi } from "@/components/time/kpi";
+import { HeroMetric } from "@/components/time/hero-metric";
 import { PeriodSelector } from "@/components/period-selector";
 import {
   diasSemAtividade,
@@ -160,36 +161,6 @@ export function TabVisaoGeral({
       </section>
 
       <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} />
-    </div>
-  );
-}
-
-// Mesmo HeroMetric do Gestor de Banca e da Performance: numero solto
-// dentro da faixa herói, sem card proprio por metrica.
-function HeroMetric({
-  label,
-  value,
-  hint,
-  tone,
-  destaque = false,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone: "bom" | "ruim" | "neutro";
-  destaque?: boolean;
-}) {
-  const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
-  return (
-    <div className="min-w-0 px-4 py-6 sm:px-6">
-      <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
-      <p
-        className={`mt-2 whitespace-nowrap font-bold leading-none tracking-tight tabular-nums ${cor}`}
-        style={{ fontSize: destaque ? "clamp(1.375rem, 2.4vw, 2.25rem)" : "clamp(1.125rem, 1.8vw, 1.75rem)" }}
-      >
-        {value}
-      </p>
-      {hint && <p className="mt-2.5 text-[11.5px] leading-snug text-muted">{hint}</p>}
     </div>
   );
 }
