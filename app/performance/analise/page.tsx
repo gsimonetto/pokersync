@@ -20,9 +20,12 @@ import {
   computeLeaks,
   fetchTournamentMetrics,
   fetchFinancialDaySeries,
+  fetchTournamentSessions,
 } from "@/lib/services/analysis-service";
 import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
 import type { FinancialDay } from "@/lib/services/team-service";
+import type { HandSession } from "@/lib/services/hand-session-service";
+import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import {
   EMPTY_ANALYSIS_FILTERS,
   type AnalysisFilters as Filters,
@@ -48,6 +51,8 @@ export default function AnalysisPage() {
   const [performance, setPerformance] = useState<PlayerPerformance | null>(null);
   const [financialDays, setFinancialDays] = useState<FinancialDay[]>([]);
   const [tournament, setTournament] = useState<TournamentMetrics | null>(null);
+  const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
+  const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("overview");
@@ -56,20 +61,32 @@ export default function AnalysisPage() {
   async function loadAll() {
     setErro("");
     try {
-      const [r, perf, fin, tourn] = await Promise.all([
+      const [r, perf, fin, tourn, sessions, po] = await Promise.all([
         fetchAnalysisHandRows(),
         fetchPlayerPerformance(),
         fetchFinancialDaySeries(),
         fetchTournamentMetrics(),
+        fetchTournamentSessions(),
+        fetchTournamentPayouts(),
       ]);
       setRows(r);
       setPerformance(perf);
       setFinancialDays(fin);
       setTournament(tourn);
+      setTournamentSessions(sessions);
+      setPayouts(po);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar a análise.");
     } finally {
       setLoading(false);
+    }
+  }
+
+  async function reloadPayouts() {
+    try {
+      setPayouts(await fetchTournamentPayouts());
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao recarregar premiação.");
     }
   }
 
@@ -141,7 +158,14 @@ export default function AnalysisPage() {
                   )}
                   {tab === "preflop" && <PreflopTab rows={filteredRows} metrics={preflop} byPosition={byPosition} />}
                   {tab === "postflop" && <PostflopTab metrics={postflop} />}
-                  {tab === "tournament" && tournament && <TournamentTab metrics={tournament} />}
+                  {tab === "tournament" && tournament && (
+                    <TournamentTab
+                      metrics={tournament}
+                      tournamentSessions={tournamentSessions}
+                      payouts={payouts}
+                      onPayoutsChanged={reloadPayouts}
+                    />
+                  )}
                   {tab === "leaks" && <LeakFinderTab rows={filteredRows} leaks={leaks} />}
                 </>
               )}
