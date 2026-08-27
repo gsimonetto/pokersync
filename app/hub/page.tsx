@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, settleExpiredSeasons, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
   type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank, type Season,
 } from "@/lib/services/xp-service";
 import { createClient } from "@/lib/supabase/client";
@@ -122,6 +122,10 @@ export default function HubPage() {
     if (view !== "ranking") return;
     let alive = true;
     setLeaderboardLoading(true);
+    // Liquida qualquer temporada ja encerrada (idempotente, sem cron) antes
+    // de buscar o ranking -- e' o que faz o campeao ganhar o icone assim
+    // que alguem abre esta tela apos o fim da temporada.
+    settleExpiredSeasons().catch(() => {});
     Promise.all([
       fetchLeaderboardPeriod(rankingPeriod, 50).catch(() => []),
       fetchMyLeaderboardRank(rankingPeriod).catch(() => null),
@@ -312,16 +316,60 @@ export default function HubPage() {
           0%, 100% { opacity: 1; }
           50%      { opacity: .55; }
         }
-        .rk-riser { animation: rkRiseIn .45s cubic-bezier(.22,1,.36,1) both; }
-        .rk-pillar { transition: filter .2s ease; }
+        .rk-riser { animation: rkRiseIn .45s cubic-bezier(.22,1,.36,1) both; transition: transform .25s ease; perspective: 600px; }
+        .rk-riser:hover { transform: translateY(-4px); }
+        .rk-pillar { transition: filter .2s ease, box-shadow .25s ease; }
         .rk-riser:hover .rk-pillar { filter: brightness(1.15); }
         .rk-crown-glow { animation: rkCrownGlow 2.2s ease-in-out infinite; }
         .rk-loading-spin { animation: rkSpin 1.1s linear infinite; }
         .rk-gift-icon { animation: rkGiftBob 2.6s ease-in-out infinite; }
         .rk-countdown { animation: rkCountdownPulse 2.4s ease-in-out infinite; }
         .rk-banner { animation: hubFadeInUp .3s ease-out both; }
+
+        /* Pódio do 1o lugar: trofeu grande balancando + glow pulsante +
+           tilt 3D leve no hover (pedido explicito: "algo mais bonito...
+           glow, hover... 3d"). */
+        @keyframes rkTrophySway {
+          0%, 100% { transform: rotate(-4deg) scale(1); }
+          50%      { transform: rotate(4deg) scale(1.04); }
+        }
+        @keyframes rkTrophyGlow {
+          0%, 100% { filter: drop-shadow(0 0 10px var(--trophy-glow, #F5D48C)) drop-shadow(0 0 2px var(--trophy-glow, #F5D48C)); }
+          50%      { filter: drop-shadow(0 0 22px var(--trophy-glow, #F5D48C)) drop-shadow(0 0 6px var(--trophy-glow, #F5D48C)); }
+        }
+        @keyframes rkHaloSpin {
+          from { transform: rotate(0deg); }
+          to   { transform: rotate(360deg); }
+        }
+        .rk-trophy-1 { animation: rkTrophySway 3s ease-in-out infinite, rkTrophyGlow 2.4s ease-in-out infinite; transform-style: preserve-3d; }
+        .rk-riser-1:hover .rk-trophy-1 { animation-duration: 1.1s, 1.2s; }
+        .rk-riser-1:hover { transform: translateY(-8px) scale(1.05); }
+        .rk-halo-1 { animation: rkHaloSpin 7s linear infinite; }
+
+        /* Fogos de artificio atras do podio -- particulas subindo e
+           estourando em pontos fixos (sem Math.random pra nao gerar
+           mismatch de SSR/CSR), em loop continuo e discreto. */
+        @keyframes rkFireworkRise {
+          0%   { transform: translateY(0) scale(0.4); opacity: 0; }
+          12%  { opacity: 1; }
+          55%  { transform: translateY(var(--rise, -70px)) scale(1); opacity: 1; }
+          56%  { opacity: 0; }
+          100% { opacity: 0; }
+        }
+        @keyframes rkFireworkBurst {
+          0%, 55%   { transform: translateY(var(--rise, -70px)) scale(0); opacity: 0; }
+          62%       { transform: translateY(var(--rise, -70px)) scale(1); opacity: 1; }
+          85%       { transform: translateY(calc(var(--rise, -70px) - 14px)) scale(1.3); opacity: .0; }
+          100%      { opacity: 0; }
+        }
+        .rk-firework { position: absolute; bottom: 0; width: 3px; height: 3px; border-radius: 999px; animation: rkFireworkRise var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s); }
+        .rk-firework::after {
+          content: ""; position: absolute; inset: -7px; border-radius: 999px;
+          background: radial-gradient(circle, currentColor 0%, transparent 70%);
+          animation: rkFireworkBurst var(--dur, 2.6s) ease-out infinite; animation-delay: var(--delay, 0s);
+        }
         @media (prefers-reduced-motion: reduce) {
-          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-ring-thin, .hub-badge-box, .hub-badge-number, .hub-badge-halo, .hub-badge-orbit, .hub-badge-sheen, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner { animation: none !important; transition: none !important; }
+          .hub-flame-icon, .hub-flame-glow, .hub-xp-chip, .hub-ember, .hub-mission-card, .hub-level-card, .hub-ministat, .hub-trophy-btn, .hub-badge-ring, .hub-badge-ring-thin, .hub-badge-box, .hub-badge-number, .hub-badge-halo, .hub-badge-orbit, .hub-badge-sheen, .hub-xp-shimmer, .rk-riser, .rk-crown-glow, .rk-loading-spin, .rk-gift-icon, .rk-countdown, .rk-banner, .rk-trophy-1, .rk-halo-1, .rk-firework, .rk-firework::after { animation: none !important; transition: none !important; }
         }
       `}</style>
 
@@ -330,10 +378,26 @@ export default function HubPage() {
           do Treino: controles vivem dentro do card, nao numa faixa fixa
           por cima). Conteudo comeca flush no topo, igual aos demais
           modulos. */}
+      {/* Container externo unico, igual aos demais modulos: o alternador
+          Missões/Ranking mora no topo da caixa, centralizado, e o
+          conteudo de QUALQUER uma das duas vistas fica dentro dela --
+          antes o alternador vivia dentro do card de nivel (so' na vista
+          de Missoes) e a vista de Ranking tinha seu proprio container
+          separado. */}
+      <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+        <TabNav
+          className="mb-4"
+          value={view}
+          onChange={setView}
+          options={[
+            { value: "missoes", label: "Missões", icon: Target },
+            { value: "ranking", label: "Ranking", icon: Trophy },
+          ]}
+        />
+
       {view === "missoes" && (
       <>
       <div className="hub-level-card relative overflow-hidden rounded-xl border border-hairline bg-surface p-6">
-        <ViewToggle view={view} setView={setView} className="relative mb-4" />
         <div
           className="pointer-events-none absolute inset-0"
           style={{ background: `radial-gradient(ellipse at 100% 0%, ${ACCENT}12 0%, transparent 60%)` }}
@@ -436,8 +500,12 @@ export default function HubPage() {
 
       {/* Abas Diario/Semanal/Mensal/Desafios (pedido explicito: "separar
           por diario, semanal e mensal") — Mensal ainda nao tem missoes
-          cadastradas no catalogo, aparece vazia ate existirem. */}
-      <div className="mt-6 flex flex-wrap gap-2">
+          cadastradas no catalogo, aparece vazia ate existirem.
+          Centralizado + preto/branco (ativa = bg-ink text-void, mesmo
+          padrao do FilterChip usado no resto do produto) em vez do
+          preenchimento na cor de acento do time -- contador continua em
+          amarelo (bg-evolution), igual o badge de pendencias do sistema. */}
+      <div className="mt-6 flex flex-wrap justify-center gap-2">
         {TABS.map((t) => {
           const Icon = t.icon;
           const active = tab === t.key;
@@ -446,15 +514,14 @@ export default function HubPage() {
               key={t.key}
               onClick={() => setTab(t.key)}
               className={`hub-tab-btn flex items-center gap-2 rounded-lg border px-3.5 py-2 text-xs font-bold uppercase tracking-[0.08em] ${
-                active ? "is-active border-transparent text-void" : "border-hairline bg-elevated text-muted hover:text-ink"
+                active ? "is-active border-transparent bg-ink text-void" : "border-hairline bg-elevated text-muted hover:text-ink"
               }`}
-              style={active ? { background: ACCENT } : undefined}
             >
               <Icon size={13} />
               {t.label}
-              <span className={`rounded-full px-1.5 py-0.5 text-[10px] ${active ? "bg-void/20" : "bg-white/[0.06]"}`}>
-                {t.items.length}
-              </span>
+              {t.items.length > 0 && (
+                <span className="rounded-full bg-evolution px-1.5 py-0.5 text-[10px] font-bold text-void">{t.items.length}</span>
+              )}
             </button>
           );
         })}
@@ -477,16 +544,9 @@ export default function HubPage() {
       )}
 
       {view === "ranking" && (
-        <RankingSection
-          entries={leaderboard}
-          loading={leaderboardLoading}
-          meId={meId}
-          myRank={myRank}
-          season={season}
-          view={view}
-          setView={setView}
-        />
+        <RankingSection entries={leaderboard} loading={leaderboardLoading} meId={meId} myRank={myRank} season={season} />
       )}
+      </div>
     </main>
     {tiersOpen && <LevelTiersModal currentLevel={level} onClose={() => setTiersOpen(false)} />}
     </AppShell>
@@ -819,16 +879,12 @@ function RankingSection({
   meId,
   myRank,
   season,
-  view,
-  setView,
 }: {
   entries: LeaderboardEntry[] | null;
   loading: boolean;
   meId: string | null;
   myRank: MyRank | null;
   season: Season | null;
-  view: "missoes" | "ranking";
-  setView: (v: "missoes" | "ranking") => void;
 }) {
   const meInList = entries?.some((e) => e.userId === meId) ?? false;
   const podium = entries?.slice(0, 3) ?? [];
@@ -836,12 +892,9 @@ function RankingSection({
   const leaderXp = entries?.[0]?.xpTotal || 1;
 
   return (
-    // Container externo unico, igual ao Painel do Time -- o alternador
-    // e o conteudo da vista de Ranking moram dentro da MESMA caixa (a
-    // vista de Missoes ja tinha isso, via o hub-level-card).
-    <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      <ViewToggle view={view} setView={setView} className="mb-4" />
-
+    // Sem container proprio -- a vista de Ranking mora dentro do mesmo
+    // container externo que a de Missoes, montado uma vez no componente pai.
+    <>
       <div
         className="rk-banner relative mb-4 overflow-hidden rounded-xl border p-4"
         style={{ borderColor: `${ACCENT}40`, background: `linear-gradient(120deg, ${ACCENT}14, transparent 65%)` }}
@@ -853,7 +906,7 @@ function RankingSection({
           </div>
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: ACCENT }}>
-              <Trophy size={11} /> Temporada
+              <Trophy size={11} /> {season ? `Temporada #${season.seasonNumber}` : "Temporada"}
             </p>
             <p className="mt-0.5 text-sm font-bold text-ink">
               {season ? season.rewardTitle || "Temporada em andamento" : "Nenhuma temporada ativa"}
@@ -915,6 +968,42 @@ function RankingSection({
           )}
         </div>
       </div>
+    </>
+  );
+}
+
+// Posicoes/cores/atrasos fixos (nao Math.random -- evita mismatch entre
+// o HTML renderizado no servidor e a primeira renderizacao no cliente).
+const FIREWORKS = [
+  { left: "10%", color: "#F5D48C", rise: -78, dur: 2.8, delay: 0 },
+  { left: "22%", color: "#5AA6E0", rise: -60, dur: 2.3, delay: 0.6 },
+  { left: "35%", color: "#E0555A", rise: -85, dur: 3.1, delay: 1.3 },
+  { left: "50%", color: "#F5D48C", rise: -70, dur: 2.5, delay: 0.2 },
+  { left: "65%", color: "#8B7FD6", rise: -65, dur: 2.9, delay: 1.7 },
+  { left: "78%", color: "#2FB89A", rise: -80, dur: 2.4, delay: 0.9 },
+  { left: "90%", color: "#F5D48C", rise: -55, dur: 3.2, delay: 1.1 },
+] as const;
+
+// Fogos de artificio discretos atras do podio -- pedido explicito ("algo
+// mais chamativo... fogos de artificio atras"). aria-hidden porque e'
+// so decoracao, sem informacao nova.
+function Fireworks() {
+  return (
+    <div aria-hidden="true" className="pointer-events-none absolute inset-0 overflow-hidden">
+      {FIREWORKS.map((f, i) => (
+        <span
+          key={i}
+          className="rk-firework"
+          style={{
+            left: f.left,
+            color: f.color,
+            background: f.color,
+            ["--rise" as string]: `${f.rise}px`,
+            ["--dur" as string]: `${f.dur}s`,
+            ["--delay" as string]: `${f.delay}s`,
+          }}
+        />
+      ))}
     </div>
   );
 }
@@ -928,49 +1017,84 @@ const PODIUM_META = [
 // Pódio dos top 3 -- 1o lugar no centro e mais alto, estilo classico.
 // Colunas sobem com stagger (rk-riser) e o 1o lugar ganha uma coroa com
 // brilho pulsante -- reforca hierarquia visual sem precisar de texto extra.
+// Selo de campeao -- pedido explicito: "quem ganhar vai ganhar o icone
+// daquela temporada". So aparece pra quem ja venceu ao menos uma vez;
+// tooltip lista todas (jogador pode ter mais de um titulo).
+function ChampionBadge({ seasons }: { seasons: number[] }) {
+  if (seasons.length === 0) return null;
+  return (
+    <span
+      title={`Campeão da Temporada ${seasons.map((n) => `#${n}`).join(", ")}`}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-1 py-px"
+      style={{ color: "#F5D48C" }}
+    >
+      <Trophy size={11} fill="#F5D48C" />
+      {seasons.length > 1 && <span className="text-[9px] font-bold">x{seasons.length}</span>}
+    </span>
+  );
+}
+
 function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string | null }) {
   const byRank = (r: number) => entries.find((e) => e.rank === r);
   return (
-    <div className="mb-5 flex items-end justify-center gap-3">
-      {PODIUM_META.map((meta) => {
-        const e = byRank(meta.rank);
-        if (!e) return null;
-        const isMe = e.userId === meId;
-        return (
-          <div
-            key={meta.rank}
-            className={`rk-riser flex w-28 flex-col items-center ${meta.order}`}
-            style={{ animationDelay: meta.delay }}
-          >
-            <span className="relative grid place-items-center">
-              {meta.rank === 1 && (
-                <span className="rk-crown-glow absolute inset-0 rounded-full blur-md" style={{ background: meta.medal, opacity: 0.4 }} />
-              )}
-              <Crown
-                size={meta.rank === 1 ? 22 : 14}
-                className="relative"
-                style={{ color: meta.medal, opacity: meta.rank === 1 ? 1 : 0.7 }}
-                fill={meta.rank === 1 ? meta.medal : "none"}
-              />
-            </span>
-            <p className="mt-1 w-full truncate text-center text-xs font-bold text-ink">
-              {e.name} {isMe && <span className="text-[9px] text-review">(você)</span>}
-            </p>
-            <RankChip level={e.level} className="mt-0.5" />
-            <p className="mt-0.5 text-[11px] font-bold" style={{ color: ACCENT }}>
-              {e.xpTotal.toLocaleString("pt-BR")} XP
-            </p>
+    <div className="relative mb-5 overflow-hidden rounded-xl">
+      <Fireworks />
+      <div className="relative flex items-end justify-center gap-3 pt-3">
+        {PODIUM_META.map((meta) => {
+          const e = byRank(meta.rank);
+          if (!e) return null;
+          const isMe = e.userId === meId;
+          const champion = meta.rank === 1;
+          return (
             <div
-              className={`rk-pillar mt-2 flex w-full items-start justify-center rounded-t-lg pt-1.5 ${meta.height}`}
-              style={{ background: `${meta.medal}1A`, border: `1px solid ${meta.medal}55` }}
+              key={meta.rank}
+              className={`rk-riser flex w-28 flex-col items-center ${meta.order} ${champion ? "rk-riser-1" : ""}`}
+              style={{ animationDelay: meta.delay }}
             >
-              <span className="text-lg font-extrabold" style={{ color: meta.medal }}>
-                {meta.rank}
+              <span className="relative grid place-items-center" style={{ height: champion ? 44 : 26 }}>
+                {champion ? (
+                  <>
+                    {/* Halo girando + brilho pulsante atras do trofeu --
+                        pedido explicito: "trofeu... glow... 3d". */}
+                    <span className="rk-halo-1 absolute inset-[-10px] rounded-full" style={{ background: `conic-gradient(from 0deg, ${meta.medal}00, ${meta.medal}66, ${meta.medal}00 60%)` }} />
+                    <span className="rk-crown-glow absolute inset-0 rounded-full blur-lg" style={{ background: meta.medal, opacity: 0.5 }} />
+                    <Trophy
+                      size={34}
+                      className="rk-trophy-1 relative"
+                      style={{ color: meta.medal, ["--trophy-glow" as string]: meta.medal }}
+                      fill={meta.medal}
+                      strokeWidth={1.5}
+                    />
+                  </>
+                ) : (
+                  <Crown size={14} className="relative" style={{ color: meta.medal, opacity: 0.7 }} />
+                )}
               </span>
+              <p className={`mt-1 flex w-full items-center justify-center gap-1 truncate text-center font-bold text-ink ${champion ? "text-sm" : "text-xs"}`}>
+                <span className="truncate">{e.name}</span>
+                <ChampionBadge seasons={e.championSeasons} />
+                {isMe && <span className="text-[9px] text-review">(você)</span>}
+              </p>
+              <RankChip level={e.level} className="mt-0.5" />
+              <p className={`mt-0.5 font-bold ${champion ? "text-[13px]" : "text-[11px]"}`} style={{ color: ACCENT }}>
+                {e.xpTotal.toLocaleString("pt-BR")} XP
+              </p>
+              <div
+                className={`rk-pillar mt-2 flex w-full items-start justify-center rounded-t-lg pt-1.5 ${meta.height}`}
+                style={{
+                  background: `${meta.medal}1A`,
+                  border: `1px solid ${meta.medal}55`,
+                  boxShadow: champion ? `0 0 24px -6px ${meta.medal}90` : undefined,
+                }}
+              >
+                <span className="text-lg font-extrabold" style={{ color: meta.medal }}>
+                  {meta.rank}
+                </span>
+              </div>
             </div>
-          </div>
-        );
-      })}
+          );
+        })}
+      </div>
     </div>
   );
 }
@@ -1007,7 +1131,9 @@ function RankingRow({
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
             <RankChip level={e.level} />
-            {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
+            {e.name}
+            <ChampionBadge seasons={e.championSeasons} />
+            {isMe && <span className="text-[10px] text-review">(você)</span>}
           </p>
           <p className="text-[11px] text-muted">
             {e.streakDays > 0 && (
