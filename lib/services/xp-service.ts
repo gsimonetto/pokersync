@@ -188,6 +188,8 @@ export interface LeaderboardEntry {
   xpTotal: number;
   streakDays: number;
   rank: number;
+  /** Numeros das temporadas que esse jogador ja venceu (Temporada #N) -- [] se nenhuma. */
+  championSeasons: number[];
 }
 
 export async function fetchLeaderboard(limit = 100): Promise<LeaderboardEntry[]> {
@@ -202,6 +204,7 @@ export async function fetchLeaderboard(limit = 100): Promise<LeaderboardEntry[]>
     xpTotal: r.xp_total,
     streakDays: r.streak_days,
     rank: Number(r.rank),
+    championSeasons: (r.champion_seasons ?? []).map(Number),
   }));
 }
 
@@ -221,6 +224,7 @@ export async function fetchLeaderboardPeriod(period: LeaderboardPeriod, limit = 
     xpTotal: r.xp_period,
     streakDays: r.streak_days,
     rank: Number(r.rank),
+    championSeasons: (r.champion_seasons ?? []).map(Number),
   }));
 }
 
@@ -244,6 +248,8 @@ export async function fetchMyLeaderboardRank(period: LeaderboardPeriod): Promise
 // --- Temporada de ranking (3 em 3 meses, premio configuravel) -------------
 export interface Season {
   id: string;
+  /** Numero sequencial da temporada (Temporada #N), calculado por ordem de inicio. */
+  seasonNumber: number;
   startsAt: string;
   endsAt: string;
   rewardTitle: string | null;
@@ -261,10 +267,21 @@ export async function fetchActiveSeason(): Promise<Season | null> {
   if (!r) return null;
   return {
     id: r.id,
+    seasonNumber: Number(r.season_number),
     startsAt: r.starts_at,
     endsAt: r.ends_at,
     rewardTitle: r.reward_title || null,
     rewardDescription: r.reward_description || null,
     daysRemaining: Number(r.days_remaining),
   };
+}
+
+// Apura o campeao de qualquer temporada ja encerrada que ainda nao tem
+// vencedor registrado (idempotente) -- chamada de leve ao abrir a vista
+// de Ranking, sem depender de cron: a temporada "liquida" na proxima vez
+// que alguem visita a tela apos o fim dela.
+export async function settleExpiredSeasons(): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("settle_expired_seasons");
+  if (error) throw error;
 }

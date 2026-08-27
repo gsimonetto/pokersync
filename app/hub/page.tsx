@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, settleExpiredSeasons, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
   type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank, type Season,
 } from "@/lib/services/xp-service";
 import { createClient } from "@/lib/supabase/client";
@@ -122,6 +122,10 @@ export default function HubPage() {
     if (view !== "ranking") return;
     let alive = true;
     setLeaderboardLoading(true);
+    // Liquida qualquer temporada ja encerrada (idempotente, sem cron) antes
+    // de buscar o ranking -- e' o que faz o campeao ganhar o icone assim
+    // que alguem abre esta tela apos o fim da temporada.
+    settleExpiredSeasons().catch(() => {});
     Promise.all([
       fetchLeaderboardPeriod(rankingPeriod, 50).catch(() => []),
       fetchMyLeaderboardRank(rankingPeriod).catch(() => null),
@@ -902,7 +906,7 @@ function RankingSection({
           </div>
           <div className="min-w-0 flex-1">
             <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em]" style={{ color: ACCENT }}>
-              <Trophy size={11} /> Temporada
+              <Trophy size={11} /> {season ? `Temporada #${season.seasonNumber}` : "Temporada"}
             </p>
             <p className="mt-0.5 text-sm font-bold text-ink">
               {season ? season.rewardTitle || "Temporada em andamento" : "Nenhuma temporada ativa"}
@@ -1013,6 +1017,23 @@ const PODIUM_META = [
 // Pódio dos top 3 -- 1o lugar no centro e mais alto, estilo classico.
 // Colunas sobem com stagger (rk-riser) e o 1o lugar ganha uma coroa com
 // brilho pulsante -- reforca hierarquia visual sem precisar de texto extra.
+// Selo de campeao -- pedido explicito: "quem ganhar vai ganhar o icone
+// daquela temporada". So aparece pra quem ja venceu ao menos uma vez;
+// tooltip lista todas (jogador pode ter mais de um titulo).
+function ChampionBadge({ seasons }: { seasons: number[] }) {
+  if (seasons.length === 0) return null;
+  return (
+    <span
+      title={`Campeão da Temporada ${seasons.map((n) => `#${n}`).join(", ")}`}
+      className="inline-flex shrink-0 items-center gap-0.5 rounded-full px-1 py-px"
+      style={{ color: "#F5D48C" }}
+    >
+      <Trophy size={11} fill="#F5D48C" />
+      {seasons.length > 1 && <span className="text-[9px] font-bold">x{seasons.length}</span>}
+    </span>
+  );
+}
+
 function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string | null }) {
   const byRank = (r: number) => entries.find((e) => e.rank === r);
   return (
@@ -1049,8 +1070,10 @@ function Podium({ entries, meId }: { entries: LeaderboardEntry[]; meId: string |
                   <Crown size={14} className="relative" style={{ color: meta.medal, opacity: 0.7 }} />
                 )}
               </span>
-              <p className={`mt-1 w-full truncate text-center font-bold text-ink ${champion ? "text-sm" : "text-xs"}`}>
-                {e.name} {isMe && <span className="text-[9px] text-review">(você)</span>}
+              <p className={`mt-1 flex w-full items-center justify-center gap-1 truncate text-center font-bold text-ink ${champion ? "text-sm" : "text-xs"}`}>
+                <span className="truncate">{e.name}</span>
+                <ChampionBadge seasons={e.championSeasons} />
+                {isMe && <span className="text-[9px] text-review">(você)</span>}
               </p>
               <RankChip level={e.level} className="mt-0.5" />
               <p className={`mt-0.5 font-bold ${champion ? "text-[13px]" : "text-[11px]"}`} style={{ color: ACCENT }}>
@@ -1108,7 +1131,9 @@ function RankingRow({
         <div className="min-w-0 flex-1">
           <p className="flex items-center gap-1.5 truncate text-sm font-semibold">
             <RankChip level={e.level} />
-            {e.name} {isMe && <span className="text-[10px] text-review">(você)</span>}
+            {e.name}
+            <ChampionBadge seasons={e.championSeasons} />
+            {isMe && <span className="text-[10px] text-review">(você)</span>}
           </p>
           <p className="text-[11px] text-muted">
             {e.streakDays > 0 && (
