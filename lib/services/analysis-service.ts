@@ -3,6 +3,7 @@ import { fetchSessions } from "@/lib/services/bankroll-service";
 import type { Session as BankrollSession } from "@/lib/bankroll/types";
 import type { FinancialDay } from "@/lib/services/team-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
+import { fetchHandEvResults } from "@/lib/services/hand-ev-service";
 import {
   type AnalysisFilters,
   type AnalysisHandRow,
@@ -444,20 +445,29 @@ function isTournamentSession(s: BankrollSession): boolean {
 }
 
 export async function fetchTournamentMetrics(): Promise<TournamentMetrics> {
-  const sessions = (await fetchSessions()).filter(isTournamentSession);
+  const [sessionsAll, evResults] = await Promise.all([fetchSessions(), fetchHandEvResults()]);
+  const sessions = sessionsAll.filter(isTournamentSession);
   const invested = sessions.reduce((acc, s) => acc + s.buyIn * (1 + (s.reentries || 0)), 0);
   const returned = sessions.reduce((acc, s) => acc + s.cashout, 0);
   const itmCount = sessions.filter((s) => s.cashout > 0).length;
+
+  // cEV/$EV só cobre as mãos que passaram por hand_ev_results (all-in
+  // heads-up preflop, ambas mostradas, com premiação cadastrada — ver
+  // app/api/hand-ev/compute). Amostra pequena de propósito: é só o que
+  // dá pra provar com o motor validado hoje, não uma estimativa pro
+  // torneio inteiro.
+  const chipEvTotal = evResults.reduce((acc, r) => acc + (r.heroExpectedChipDelta ?? 0), 0);
+  const netEvProfit = evResults.reduce((acc, r) => acc + (r.heroExpectedIcmDeltaDollars ?? 0), 0);
 
   return {
     total_games: sessions.length,
     roi_pct: invested > 0 ? Math.round(((returned - invested) / invested) * 1000) / 10 : null,
     itm_pct: sessions.length > 0 ? pct(itmCount, sessions.length) : null,
     total_profit: sessions.length > 0 ? Math.round((returned - invested) * 100) / 100 : null,
-    net_ev_profit: null,
-    chip_ev_total: null,
-    cev_per_game: null,
-    ev_roi_pct: null,
+    net_ev_profit: evResults.length > 0 ? Math.round(netEvProfit * 100) / 100 : null,
+    chip_ev_total: evResults.length > 0 ? Math.round(chipEvTotal * 100) / 100 : null,
+    cev_per_game: evResults.length > 0 && sessions.length > 0 ? Math.round((chipEvTotal / sessions.length) * 100) / 100 : null,
+    ev_roi_pct: evResults.length > 0 && invested > 0 ? Math.round((netEvProfit / invested) * 1000) / 10 : null,
   };
 }
 
