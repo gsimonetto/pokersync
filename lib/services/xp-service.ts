@@ -285,3 +285,12 @@ export async function settleExpiredSeasons(): Promise<void> {
   const { error } = await supabase.rpc("settle_expired_seasons");
   if (error) throw error;
 }
+
+// Dispara os avisos globais de temporada (1 semana / 1 dia pro fim, e
+// campeao anunciado apos apurada) — idempotente no banco, so' cria
+// notificacao na primeira chamada apos cruzar cada limiar.
+export async function checkSeasonNotifications(): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("check_season_notifications");
+  if (error) throw error;
+}
