@@ -203,7 +203,7 @@ export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }
           sem nada amarrando visualmente que aquilo e' uma unica tela,
           diferente do Treino/Banca (que sempre tiveram um card unico). */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+      {tabs && <div className="mb-4">{tabs}</div>}
 
       {/* Breadcrumb: onde eu estou, sem depender do menu lateral pra
           saber (ele so' diz o modulo, nao "estou dentro de um range"). */}

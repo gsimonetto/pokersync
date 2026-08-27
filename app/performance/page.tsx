@@ -17,7 +17,9 @@ import {
   TrendingUp,
   TrendingDown,
   Sparkles,
+  Spade,
 } from "lucide-react";
+import { TabNav } from "@/components/ui/tab-nav";
 import {
   fetchPlayerPerformance,
   fetchPositionStats,
@@ -68,11 +70,11 @@ function fmtNum(v: number | null | undefined, suffix = ""): string | null {
 
 type TabKey = "financeiro" | "jogo" | "estudo" | "evolucao";
 
-const TABS: { key: TabKey; label: string }[] = [
-  { key: "financeiro", label: "Financeiro" },
-  { key: "jogo", label: "Jogo" },
-  { key: "estudo", label: "Estudo" },
-  { key: "evolucao", label: "Evolução" },
+const TABS: { value: TabKey; label: string; icon: typeof Wallet }[] = [
+  { value: "financeiro", label: "Financeiro", icon: Wallet },
+  { value: "jogo", label: "Jogo", icon: Spade },
+  { value: "estudo", label: "Estudo", icon: BookOpen },
+  { value: "evolucao", label: "Evolução", icon: TrendingUp },
 ];
 
 export default function PerformancePage() {
@@ -293,20 +295,8 @@ export default function PerformancePage() {
             )}
           </section>
 
-          {/* Abas — mesmo segmented control já usado no resto do produto. */}
-          <div className="mt-6 flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
-            {TABS.map((t) => (
-              <button
-                key={t.key}
-                onClick={() => setTab(t.key)}
-                className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${
-                  tab === t.key ? "bg-ink text-void" : "text-muted hover:text-ink"
-                }`}
-              >
-                {t.label}
-              </button>
-            ))}
-          </div>
+          {/* Abas — mesmo padrao do Painel do Time (icone + sublinhado). */}
+          <TabNav className="mt-6" value={tab} onChange={setTab} options={TABS} />
 
           <div className="mt-4">
             {tab === "financeiro" && <AbaFinanceiro data={data} />}

@@ -60,7 +60,7 @@ export function TeamLibrary({ tabs }: { tabs?: React.ReactNode }) {
   if (!myTeam) {
     return (
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-        {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+        {tabs && <div className="mb-4">{tabs}</div>}
         <div className="rounded-xl border border-hairline bg-surface p-10 text-center">
           <Users size={28} className="mx-auto mb-3 text-muted" />
           <p className="text-sm text-muted">
@@ -73,7 +73,7 @@ export function TeamLibrary({ tabs }: { tabs?: React.ReactNode }) {
 
   return (
     <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+      {tabs && <div className="mb-4">{tabs}</div>}
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
       <p className="mb-4 text-sm text-muted">
         Tudo que foi publicado pro time <span className="font-medium text-ink">{myTeam.team.name}</span>. Cada item

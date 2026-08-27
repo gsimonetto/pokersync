@@ -130,7 +130,7 @@ export function RangeCompare({
           padrao do Treino/Banca (uma tela, um card), em vez de cada
           pedaco flutuando solto contra o void. */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+      {tabs && <div className="mb-4">{tabs}</div>}
       <div className="mb-6 grid grid-cols-1 gap-3 sm:grid-cols-2">
         <select
           value={idA}

@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { TabNav } from "@/components/ui/tab-nav";
 import { RankChip } from "@/components/ui/rank-chip";
 import {
   Trophy, Flame, Zap, Target, TrendingUp,
@@ -792,12 +792,12 @@ function ViewToggle({
   setView: (v: "missoes" | "ranking") => void;
 }) {
   return (
-    <SegmentedControl
+    <TabNav
       value={view}
       onChange={setView}
       options={[
-        { value: "missoes", label: <><Target size={13} /> Missões</> },
-        { value: "ranking", label: <><Trophy size={13} /> Ranking</> },
+        { value: "missoes", label: "Missões", icon: Target },
+        { value: "ranking", label: "Ranking", icon: Trophy },
       ]}
     />
   );
