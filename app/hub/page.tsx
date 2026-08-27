@@ -333,9 +333,7 @@ export default function HubPage() {
       {view === "missoes" && (
       <>
       <div className="hub-level-card relative overflow-hidden rounded-xl border border-hairline bg-surface p-6">
-        <div className="relative mb-4 flex flex-wrap items-center justify-between gap-2">
-          <ViewToggle view={view} setView={setView} />
-        </div>
+        <ViewToggle view={view} setView={setView} className="relative mb-4" />
         <div
           className="pointer-events-none absolute inset-0"
           style={{ background: `radial-gradient(ellipse at 100% 0%, ${ACCENT}12 0%, transparent 60%)` }}
@@ -787,12 +785,15 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
 function ViewToggle({
   view,
   setView,
+  className,
 }: {
   view: "missoes" | "ranking";
   setView: (v: "missoes" | "ranking") => void;
+  className?: string;
 }) {
   return (
     <TabNav
+      className={className}
       value={view}
       onChange={setView}
       options={[
@@ -835,10 +836,11 @@ function RankingSection({
   const leaderXp = entries?.[0]?.xpTotal || 1;
 
   return (
-    <div>
-      <div className="mb-4 flex flex-wrap items-center justify-between gap-2">
-        <ViewToggle view={view} setView={setView} />
-      </div>
+    // Container externo unico, igual ao Painel do Time -- o alternador
+    // e o conteudo da vista de Ranking moram dentro da MESMA caixa (a
+    // vista de Missoes ja tinha isso, via o hub-level-card).
+    <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      <ViewToggle view={view} setView={setView} className="mb-4" />
 
       <div
         className="rk-banner relative mb-4 overflow-hidden rounded-xl border p-4"
