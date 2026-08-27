@@ -101,12 +101,12 @@ export function TopNav() {
 
   return (
     <header className="relative sm:sticky sm:top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
-      {/* max-w igual ao resto do app (max-w-[1280px] px-6, padrao em toda
-          pagina) — antes o header usava max-w-6xl (1152px), bem mais
-          estreito que o conteudo abaixo dele, entao a logo/icones ficavam
-          "recuados" enquanto o corpo da pagina esticava quase ate a borda,
-          dando a impressao de margem desalinhada/colada. */}
-      <div className="mx-auto flex h-16 sm:h-18 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6">
+      {/* Full-width igual ao resto do app (px-6, padrao em toda pagina) —
+          antes o header usava max-w-[1280px] centralizado, o que deixava
+          logo/icones "recuados" enquanto o corpo da pagina foi esticado
+          ate a borda pra matar o espaco vazio nas laterais em telas
+          largas, dando a impressao de margem desalinhada. */}
+      <div className="flex h-16 sm:h-18 items-center justify-between gap-4 px-4 sm:px-6">
         <Link href="/modulos" aria-label="Ir para Módulos" className="shrink-0">
           <Logo className="h-8 w-auto sm:h-10" />
         </Link>

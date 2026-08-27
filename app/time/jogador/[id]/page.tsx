@@ -32,7 +32,7 @@ import {
 // Ficha individual do jogador. Quem pode abrir: admin do time, o coach
 // responsavel, ou o proprio jogador — a checagem esta nas RPCs, esta
 // tela so mostra o erro que voltar.
-// Espacamento de borda seguindo Banca/Revisor: max-w-[1280px] px-6 py-10.
+// Espacamento de borda seguindo Banca/Revisor: full-width, px-6 py-10.
 
 const PERIODOS = [
   { label: "7 dias", days: 7 },
@@ -94,7 +94,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
 
   return (
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
+    <main className="w-full px-6 py-10 text-ink print:p-0">
       <AppHeader
         insideShell
         backHref="/time/painel?tab=jogadores"

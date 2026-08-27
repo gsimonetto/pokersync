@@ -586,14 +586,14 @@ export default function BankrollPage() {
   if (loading) {
     return (
       <AppShell>
-        <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-center text-sm text-muted">Carregando sua banca...</main>
+        <main className="w-full px-6 py-10 text-center text-sm text-muted">Carregando sua banca...</main>
       </AppShell>
     );
   }
 
   return (
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+    <main className="w-full px-6 py-10 text-ink">
       {err && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{err}</p>
       )}

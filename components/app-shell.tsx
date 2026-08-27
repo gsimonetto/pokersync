@@ -42,9 +42,12 @@ const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
 // REGRA DE PADRÃO VISUAL (pedido explícito: "todos seguindo o mesmo
 // padrão do modo treino") -- todo `app/**/page.tsx` que usa <AppShell>
 // segue isto, com /treino como referência:
-//   1. `<main className="w-full mx-auto max-w-[1280px] px-6 py-10 ...">`
-//      (Banca usa `px-4 py-10 md:px-6` -- variação só de margem lateral
-//      no mobile, mesma altura). Nunca outro valor de `py-*`.
+//   1. `<main className="w-full px-6 py-10 ...">` -- full-bleed, sem
+//      `max-w-*`/`mx-auto`: telas largas não podem sobrar espaço vazio
+//      nas laterais (isso é o que deixava a informação "espremida" no
+//      centro). /modulos (Home) usa `px-4 py-6 md:px-6` -- variação só
+//      de margem lateral/vertical no mobile, mesmo princípio full-width.
+//      Nunca outro valor de `py-*` fora desses dois casos.
 //   2. O PRIMEIRO elemento renderizado dentro do `<main>` (ignorando um
 //      banner de erro condicional) NUNCA leva `mt-*` -- ele encosta
 //      direto no padding do `<main>`, na mesma distância do topbar em

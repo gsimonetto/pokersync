@@ -156,7 +156,7 @@ export default function PerformancePage() {
   if (loading) {
     return (
       <AppShell>
-        <main className="w-full mx-auto max-w-[1280px] px-6 py-10">
+        <main className="w-full px-6 py-10">
           <p className="text-sm text-muted">Carregando sua performance…</p>
         </main>
       </AppShell>
@@ -165,7 +165,7 @@ export default function PerformancePage() {
 
   return (
     <AppShell>
-    <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
+    <main className="w-full px-6 py-10 text-ink">
       {erro && (
         <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
       )}
