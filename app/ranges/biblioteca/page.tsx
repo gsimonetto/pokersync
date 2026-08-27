@@ -10,11 +10,7 @@ export default function BibliotecaPage() {
   return (
     <AppShell>
       <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-        <div className="mb-4 flex justify-end">
-          <RangesTabs active="biblioteca" />
-        </div>
-
-        <Biblioteca />
+        <Biblioteca tabs={<RangesTabs active="biblioteca" />} />
       </main>
     </AppShell>
   );

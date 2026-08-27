@@ -10,11 +10,7 @@ export default function JournalPage() {
   return (
     <AppShell>
       <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-        <div className="mb-4 flex justify-end">
-          <RangesTabs active="journal" />
-        </div>
-
-        <RangeJournal />
+        <RangeJournal tabs={<RangesTabs active="journal" />} />
       </main>
     </AppShell>
   );

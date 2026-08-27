@@ -13,7 +13,7 @@ import {
 } from "@/lib/services/range-service";
 import { RangeGrid } from "@/components/ranges/range-grid";
 
-export function TeamLibrary() {
+export function TeamLibrary({ tabs }: { tabs?: React.ReactNode }) {
   const router = useRouter();
   const [myTeam, setMyTeam] = useState<MyTeam | null>(null);
   const [items, setItems] = useState<TeamSharedRange[]>([]);
@@ -59,17 +59,21 @@ export function TeamLibrary() {
 
   if (!myTeam) {
     return (
-      <div className="rounded-xl border border-hairline bg-surface p-10 text-center">
-        <Users size={28} className="mx-auto mb-3 text-muted" />
-        <p className="text-sm text-muted">
-          Você ainda não faz parte de um time. Ranges publicados por colegas de time aparecem aqui.
-        </p>
+      <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+        {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
+        <div className="rounded-xl border border-hairline bg-surface p-10 text-center">
+          <Users size={28} className="mx-auto mb-3 text-muted" />
+          <p className="text-sm text-muted">
+            Você ainda não faz parte de um time. Ranges publicados por colegas de time aparecem aqui.
+          </p>
+        </div>
       </div>
     );
   }
 
   return (
-    <div>
+    <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
       <p className="mb-4 text-sm text-muted">
         Tudo que foi publicado pro time <span className="font-medium text-ink">{myTeam.team.name}</span>. Cada item
