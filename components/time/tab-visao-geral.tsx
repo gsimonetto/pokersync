@@ -98,7 +98,7 @@ export function TabVisaoGeral({
           style={{ background: lucro < 0 ? "#e0555a" : "#2FB89A" }}
         />
 
-        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 xl:grid-cols-6 xl:divide-y-0">
           <HeroMetric
             label="Resultado no time"
             value={BRL.format(lucro)}
@@ -183,12 +183,15 @@ function HeroMetric({
 }) {
   const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
   return (
-    <div className="px-6 py-6">
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
-      <p className={`mt-2 font-bold leading-none tracking-tight tabular-nums ${destaque ? "text-[2.25rem]" : "text-[1.75rem]"} ${cor}`}>
+    <div className="min-w-0 px-4 py-6 sm:px-6">
+      <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
+      <p
+        className={`mt-2 whitespace-nowrap font-bold leading-none tracking-tight tabular-nums ${cor}`}
+        style={{ fontSize: destaque ? "clamp(1.375rem, 2.4vw, 2.25rem)" : "clamp(1.125rem, 1.8vw, 1.75rem)" }}
+      >
         {value}
       </p>
-      {hint && <p className="mt-2.5 text-[11.5px] text-muted">{hint}</p>}
+      {hint && <p className="mt-2.5 text-[11.5px] leading-snug text-muted">{hint}</p>}
     </div>
   );
 }
