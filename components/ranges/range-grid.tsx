@@ -405,7 +405,12 @@ export function RangeGrid({
         {!readOnly && (
           <div className="mb-3 space-y-2">
             <div className="flex flex-wrap items-center gap-1.5">
-              <div className="flex flex-1 flex-wrap items-center gap-1.5 rounded-full border border-hairline bg-elevated p-1">
+              {/* overflow-x-auto + shrink-0 nos botoes em vez de flex-wrap:
+                  com flex-wrap, esse pill (rounded-full) quebrava em 2
+                  linhas em telas estreitas e o border-radius de "full"
+                  virava uma bolha enorme em vez de continuar parecendo
+                  pilula -- rola na horizontal e mantem a forma. */}
+              <div className="flex flex-1 items-center gap-1.5 overflow-x-auto rounded-full border border-hairline bg-elevated p-1">
                 {TOOL_ORDER.map((t) => {
                   const active = tool === t;
                   return (
@@ -414,7 +419,7 @@ export function RangeGrid({
                       type="button"
                       onClick={() => setTool(t)}
                       title={`${TOOL_META[t].label} (tecla ${TOOL_ORDER.indexOf(t) + 1})`}
-                      className={`flex items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all ${
+                      className={`flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1.5 text-xs font-medium transition-all ${
                         active ? "shadow-sm" : "text-muted hover:text-ink"
                       }`}
                       style={active ? { backgroundColor: `${TOOL_META[t].color}26`, color: TOOL_META[t].color } : undefined}
