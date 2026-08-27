@@ -24,6 +24,7 @@ function Field({ icon: Icon, value, onChange, placeholder, type = "text", right 
         value={value}
         onChange={(e) => onChange(e.target.value)}
         placeholder={placeholder}
+        aria-label={placeholder}
         className={`w-full rounded-lg border border-hairline bg-elevated py-3.5 pl-11 ${
           right ? "pr-12" : "pr-4"
         } text-sm text-ink outline-none transition focus:border-ink`}
