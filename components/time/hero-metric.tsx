@@ -20,19 +20,20 @@ export function HeroMetric({
   const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
   return (
     <div className="min-w-0 px-4 py-6 sm:px-6">
-      <p className="truncate text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
-      {/* overflow-hidden + ellipsis: rede de seguranca -- se algum dia o
-          valor nao couber (moeda com muitos digitos numa coluna estreita),
-          trunca com "…" em vez de vazar visualmente por cima da coluna
-          vizinha, como acontecia antes com so' whitespace-nowrap. */}
+      <p className="text-[10px] font-bold uppercase leading-snug tracking-[0.14em] text-muted/80">{label}</p>
+      {/* Nunca corta o valor -- nem com "…" nem vazando por cima da coluna
+          vizinha. Sem nowrap/ellipsis: se um numero muito comprido nao
+          couber na largura da coluna, ele quebra pra segunda linha
+          (leading-tight evita a linha de baixo colar na de cima), mas o
+          valor inteiro sempre fica visivel. */}
       <p
-        className={`mt-2 overflow-hidden text-ellipsis whitespace-nowrap font-bold leading-none tracking-tight tabular-nums ${
-          destaque ? "text-[1.75rem] sm:text-[2.25rem]" : "text-[1.375rem] sm:text-[1.75rem]"
+        className={`mt-2 break-words font-bold leading-tight tracking-tight tabular-nums ${
+          destaque ? "text-2xl sm:text-3xl" : "text-xl sm:text-2xl"
         } ${cor}`}
       >
         {value}
       </p>
-      {hint && <p className="mt-2.5 truncate text-[11.5px] leading-snug text-muted">{hint}</p>}
+      {hint && <p className="mt-2.5 text-[11.5px] leading-snug text-muted">{hint}</p>}
     </div>
   );
 }
