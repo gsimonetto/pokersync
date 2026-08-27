@@ -328,6 +328,16 @@ inteira tem **8 linhas**, todas RFI/Jam de pré-flop.
 
 ## 9. Changelog
 
+### 2026-08-27 — Login com Google no agente desktop
+- Nova página `app/agent-login/` — o agente desktop (`pokersync-agent`)
+  não consegue rodar o OAuth do Google dentro da webview embutida
+  (bloqueado pelo próprio Google), então abre essa página no navegador do
+  sistema. `app/auth/confirm/route.ts` ganhou um segundo desvio: quando o
+  parâmetro `agent_state` está presente, devolve os tokens pro agente via
+  deep link (`pokersync-agent://auth`) em vez de abrir `/modulos` na aba.
+  Resolve o caso relatado de "logou pelo Google, senha não funciona no
+  agente" — contas OAuth-only nunca tiveram senha no Supabase.
+
 ### 2026-08-26 — Agente desktop extraído para repo próprio
 - Código do agente (antes em `agent-desktop/` neste repo) movido para
   [`gsimonetto/pokersync-agent`](https://github.com/gsimonetto/pokersync-agent)

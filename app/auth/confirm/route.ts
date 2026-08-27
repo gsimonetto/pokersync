@@ -27,9 +27,28 @@ export async function GET(request: Request) {
 
   // Fluxo 2: login social (Google) — Supabase manda um "code" na URL
   if (code) {
-    const { error } = await supabase.auth.exchangeCodeForSession(code);
+    const { data, error } = await supabase.auth.exchangeCodeForSession(code);
 
     if (!error) {
+      // Fluxo 2b: esse login começou no agente desktop (ver
+      // app/agent-login/page.tsx) — devolve os tokens pro app nativo via
+      // deep link em vez de entrar na sessão web. agent_state é o nonce
+      // que o agente gerou antes de abrir o navegador; ele confere que a
+      // resposta corresponde ao login que ele mesmo iniciou.
+      const agentState = searchParams.get("agent_state");
+      if (agentState && data.session) {
+        const params = new URLSearchParams({
+          access_token: data.session.access_token,
+          refresh_token: data.session.refresh_token,
+          state: agentState,
+        });
+        // Sessão web não deve continuar logada nesta aba — quem está
+        // usando essa janela de navegador é o agente, não o jogador
+        // navegando o produto.
+        await supabase.auth.signOut();
+        redirect(`pokersync-agent://auth?${params.toString()}`);
+      }
+
       // Login com Google já cria sessão de verdade — aqui SIM deixamos
       // o usuário entrar direto, sem precisar digitar senha de novo.
       redirect("/modulos");
