@@ -189,6 +189,13 @@ export default function PerformancePage() {
             >
               Revisar mãos
             </Link>
+            <Link
+              href="/performance/analise"
+              className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3.5 py-2 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+            >
+              <LineChart size={13} />
+              Análise avançada
+            </Link>
           </div>
         </section>
       )}
@@ -211,7 +218,7 @@ export default function PerformancePage() {
               <div className="flex items-center gap-3">
               <Link
                 href="/performance/analise"
-                className="hidden items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink sm:flex"
+                className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
               >
                 <LineChart size={13} />
                 Análise avançada
