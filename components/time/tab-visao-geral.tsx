@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, Trophy, ChevronRight } from "lucide-react";
+import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, Trophy, ChevronRight, GitCompare, CalendarCheck } from "lucide-react";
 import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
@@ -17,6 +17,7 @@ import {
   type TeamActivityDay,
   type TeamDashboardRow,
 } from "@/lib/services/team-service";
+import type { TeamEvent } from "@/lib/services/team-calendar-service";
 import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-service";
 import { BRL, variacao } from "@/lib/format";
 
@@ -38,6 +39,7 @@ export function TabVisaoGeral({
   atividade,
   financeiro,
   comparacao,
+  eventos,
   pronto,
   dias,
   periodos,
@@ -50,6 +52,7 @@ export function TabVisaoGeral({
   atividade: TeamActivityDay[];
   financeiro: FinancialDay[];
   comparacao: PeriodComparison | null;
+  eventos: TeamEvent[];
   pronto: boolean;
   dias: number;
   periodos: { label: string; days: number }[];
@@ -129,6 +132,11 @@ export function TabVisaoGeral({
         <TopDoPeriodo jogadores={jogadores} />
       </section>
 
+      <section className="grid gap-4 lg:grid-cols-2">
+        <ComparacaoPeriodo comparacao={comparacao} />
+        <ConfirmacaoPresenca eventos={eventos} />
+      </section>
+
       <GraficoEstudo dados={atividade} pronto={pronto} />
     </div>
   );
@@ -206,6 +214,84 @@ function TopDoPeriodo({ jogadores }: { jogadores: TeamDashboardRow[] }) {
             </li>
           ))}
         </ul>
+      )}
+    </PainelCard>
+  );
+}
+
+// ------------------------------------------------------------
+// Periodo atual vs anterior — mesmo par de colunas do "Comparar meses"
+// do Gestor de Banca, so' que com as metricas de estudo do time
+// (comparacao ja vem do fetchPeriodComparison, mesmo periodo em dias
+// usado no resto da aba, contra o periodo imediatamente anterior).
+// ------------------------------------------------------------
+function ComparacaoPeriodo({ comparacao }: { comparacao: PeriodComparison | null }) {
+  if (!comparacao || (comparacao.treinosAnterior === 0 && comparacao.treinosAtual === 0)) {
+    return (
+      <PainelCard titulo="Comparação de período" icone={<GitCompare size={13} className="text-training" />}>
+        <p className="text-sm text-muted">Sem dados suficientes pra comparar com o período anterior.</p>
+      </PainelCard>
+    );
+  }
+
+  const acertoAtualPct = comparacao.treinosAtual > 0 ? Math.round((comparacao.acertosAtual / comparacao.treinosAtual) * 100) : null;
+  const acertoAnteriorPct = comparacao.treinosAnterior > 0 ? Math.round((comparacao.acertosAnterior / comparacao.treinosAnterior) * 100) : null;
+
+  const linhas: { label: string; atual: string; anterior: string }[] = [
+    { label: "Treinos", atual: String(comparacao.treinosAtual), anterior: String(comparacao.treinosAnterior) },
+    { label: "Acerto GTO", atual: acertoAtualPct === null ? "—" : `${acertoAtualPct}%`, anterior: acertoAnteriorPct === null ? "—" : `${acertoAnteriorPct}%` },
+    { label: "Mãos revisadas", atual: String(comparacao.revisadasAtual), anterior: String(comparacao.revisadasAnterior) },
+    { label: "XP do time", atual: String(comparacao.xpAtual), anterior: String(comparacao.xpAnterior) },
+  ];
+
+  return (
+    <PainelCard titulo="Comparação de período" icone={<GitCompare size={13} className="text-training" />}>
+      <div className="grid grid-cols-3 gap-2 text-center">
+        <div />
+        <p className="text-[10px] font-semibold uppercase text-muted">Atual</p>
+        <p className="text-[10px] font-semibold uppercase text-muted">Anterior</p>
+
+        {linhas.map((l) => (
+          <div key={l.label} className="contents">
+            <p className="text-left text-[12px] text-muted">{l.label}</p>
+            <p className="text-sm font-bold tnum text-ink">{l.atual}</p>
+            <p className="text-sm font-bold tnum text-muted">{l.anterior}</p>
+          </div>
+        ))}
+      </div>
+    </PainelCard>
+  );
+}
+
+// ------------------------------------------------------------
+// Taxa de resposta e confirmacao de presenca nos eventos do calendario
+// do time -- olha o "aderencia ao convite" que hoje so aparecia
+// escondida como leak individual em faltas_consecutivas, aqui vira
+// numero direto do time inteiro.
+// ------------------------------------------------------------
+function ConfirmacaoPresenca({ eventos }: { eventos: TeamEvent[] }) {
+  const participantes = eventos.flatMap((e) => e.participants);
+  const total = participantes.length;
+  const confirmados = participantes.filter((p) => p.status === "confirmado").length;
+  const recusados = participantes.filter((p) => p.status === "recusado").length;
+  const pendentes = participantes.filter((p) => p.status === "pendente").length;
+  const taxaResposta = total > 0 ? Math.round(((confirmados + recusados) / total) * 100) : null;
+  const taxaConfirmacao = total > 0 ? Math.round((confirmados / total) * 100) : null;
+
+  return (
+    <PainelCard titulo="Confirmação de presença" icone={<CalendarCheck size={13} className="text-review" />}>
+      {total === 0 ? (
+        <p className="text-sm text-muted">Sem eventos com convidados no calendário ainda.</p>
+      ) : (
+        <>
+          <div className="grid grid-cols-2 gap-2.5">
+            <Kpi icon={CalendarCheck} label="Confirmaram presença" value={taxaConfirmacao === null ? "—" : `${taxaConfirmacao}%`}
+              hint={`${confirmados} de ${total} convites`} tom={taxaConfirmacao !== null && taxaConfirmacao >= 60 ? "positivo" : undefined} />
+            <Kpi icon={AlertTriangle} label="Sem resposta" value={String(pendentes)}
+              hint={`${taxaResposta}% já responderam`} tom={pendentes > 0 ? "negativo" : undefined} />
+          </div>
+          {recusados > 0 && <p className="mt-2.5 text-xs text-muted">{recusados} recusa(s) registrada(s) no período.</p>}
+        </>
       )}
     </PainelCard>
   );

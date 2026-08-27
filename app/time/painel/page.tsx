@@ -272,7 +272,7 @@ function PainelConteudo() {
               </>
             )}
             {aba === "estatisticas" && time && (
-              <TabVisaoGeral teamId={time.team.id} jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
+              <TabVisaoGeral teamId={time.team.id} jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
                 onAbrirFunil={() => router.push("/time/painel/funil")} onErro={setErro} />
             )}
             {aba === "jogadores" && time && (
