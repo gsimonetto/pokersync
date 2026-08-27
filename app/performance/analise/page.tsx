@@ -90,6 +90,17 @@ export default function AnalysisPage() {
     }
   }
 
+  // Depois de calcular cEV, os totais (chip_ev_total/net_ev_profit/etc)
+  // vêm de fetchTournamentMetrics — reload separado do de payouts pra não
+  // misturar os dois estados.
+  async function reloadTournamentMetrics() {
+    try {
+      setTournament(await fetchTournamentMetrics());
+    } catch (e) {
+      setErro(e instanceof Error ? e.message : "Falha ao recarregar métricas de torneio.");
+    }
+  }
+
   useEffect(() => {
     loadAll();
   }, []);
@@ -164,6 +175,7 @@ export default function AnalysisPage() {
                       tournamentSessions={tournamentSessions}
                       payouts={payouts}
                       onPayoutsChanged={reloadPayouts}
+                      onCevComputed={reloadTournamentMetrics}
                     />
                   )}
                   {tab === "leaks" && <LeakFinderTab rows={filteredRows} leaks={leaks} />}
