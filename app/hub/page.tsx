@@ -13,7 +13,7 @@ import {
 } from "lucide-react";
 import {
   fetchProgress, fetchActiveMissions, fetchMissionCatalog,
-  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, settleExpiredSeasons, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
+  fetchLeaderboardPeriod, fetchMyLeaderboardRank, fetchActiveSeason, settleExpiredSeasons, checkSeasonNotifications, xpForNextLevel, levelColor, levelMaterial, levelSubTier, MAX_LEVEL,
   type Progress, type LeaderboardEntry, type LeaderboardPeriod, type MyRank, type Season,
 } from "@/lib/services/xp-service";
 import { createClient } from "@/lib/supabase/client";
@@ -126,6 +126,7 @@ export default function HubPage() {
     // de buscar o ranking -- e' o que faz o campeao ganhar o icone assim
     // que alguem abre esta tela apos o fim da temporada.
     settleExpiredSeasons().catch(() => {});
+    checkSeasonNotifications().catch(() => {});
     Promise.all([
       fetchLeaderboardPeriod(rankingPeriod, 50).catch(() => []),
       fetchMyLeaderboardRank(rankingPeriod).catch(() => null),
