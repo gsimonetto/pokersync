@@ -10,7 +10,7 @@ function formatHours(seconds: number): string {
   return `${hours.toFixed(1)} horas`;
 }
 
-export function RangeJournal() {
+export function RangeJournal({ tabs }: { tabs?: React.ReactNode }) {
   const [data, setData] = useState<JournalData | null>(null);
   const [error, setError] = useState("");
 
@@ -24,7 +24,8 @@ export function RangeJournal() {
   if (!data) return <p className="text-sm text-muted">Carregando…</p>;
 
   return (
-    <div className="space-y-6">
+    <div className="space-y-6 rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      {tabs && <div className="flex justify-end">{tabs}</div>}
       {data.streakDays > 0 && (
         <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface px-4 py-3">
           <Flame size={18} className="text-evolution" />

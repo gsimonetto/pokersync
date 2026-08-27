@@ -247,7 +247,10 @@ export function RevisorFila({
         </p>
       )}
 
-      <div className="mb-3 flex items-center justify-between">
+      {/* Toolbar unica: abas + chips + busca + acao principal na mesma
+          linha -- mesmo padrao do Funil (Time > Painel), em vez de cada
+          grupo de filtro numa linha separada. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <SegmentedControl
           value={tab}
           onChange={setTab}
@@ -256,18 +259,9 @@ export function RevisorFila({
             { value: "avulsas", label: "Mãos avulsas" },
           ]}
         />
-        <button
-          onClick={onNova}
-          className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
-        >
-          <Plus size={16} />
-          Nova mão
-        </button>
-      </div>
 
-      {tab === "sessoes" && (
-        <>
-          <div className="mb-3 flex flex-wrap items-center gap-2">
+        {tab === "sessoes" && (
+          <>
             <FilterChip
               label="Campeão"
               icon={<Trophy size={12} />}
@@ -280,39 +274,51 @@ export function RevisorFila({
               active={sessionChipFilters.has("mystery")}
               onClick={() => toggleSessionChip("mystery")}
             />
-
             <button
               onClick={() => {
                 setSessionSearchOpen((v) => !v);
                 if (sessionSearchOpen) setSessionSearchQuery("");
               }}
               title="Buscar torneios/sessões"
-              className={`ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-colors ${
-                sessionSearchOpen ? "border-ink bg-ink text-void" : "border-hairline text-muted"
+              className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-colors ${
+                sessionSearchOpen ? "border-ink bg-ink text-void" : "border-hairline text-muted hover:border-ink/40 hover:text-ink"
               }`}
             >
               <Search size={13} />
             </button>
-          </div>
+          </>
+        )}
 
-          {sessionSearchOpen && (
-            <div className="mb-3 flex items-center gap-2 rounded-lg border border-hairline bg-void px-3 py-2">
-              <Search size={13} className="shrink-0 text-muted" />
-              <input
-                autoFocus
-                value={sessionSearchQuery}
-                onChange={(e) => setSessionSearchQuery(e.target.value)}
-                placeholder="Buscar pelo nome do torneio ou sessão"
-                className="flex-1 bg-transparent text-[13px] text-ink outline-none"
-              />
-              {sessionSearchQuery && (
-                <button onClick={() => setSessionSearchQuery("")}>
-                  <X size={13} className="text-muted" />
-                </button>
-              )}
-            </div>
+        {tab === "avulsas" &&
+          FILTERS.map((f) => (
+            <FilterChip key={f.id} label={f.label} active={filter === f.id} onClick={() => setFilter(f.id)} />
+          ))}
+
+        <button
+          onClick={onNova}
+          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
+        >
+          <Plus size={16} />
+          Nova mão
+        </button>
+      </div>
+
+      {tab === "sessoes" && sessionSearchOpen && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-hairline bg-void px-3 py-2">
+          <Search size={13} className="shrink-0 text-muted" />
+          <input
+            autoFocus
+            value={sessionSearchQuery}
+            onChange={(e) => setSessionSearchQuery(e.target.value)}
+            placeholder="Buscar pelo nome do torneio ou sessão"
+            className="flex-1 bg-transparent text-[13px] text-ink outline-none"
+          />
+          {sessionSearchQuery && (
+            <button onClick={() => setSessionSearchQuery("")}>
+              <X size={13} className="text-muted" />
+            </button>
           )}
-        </>
+        </div>
       )}
 
       {tab === "sessoes" && (
@@ -436,12 +442,6 @@ export function RevisorFila({
 
       {tab === "avulsas" && (
         <>
-          <div className="mb-4 flex flex-wrap gap-1.5">
-            {FILTERS.map((f) => (
-              <FilterChip key={f.id} label={f.label} active={filter === f.id} onClick={() => setFilter(f.id)} />
-            ))}
-          </div>
-
           {error && (
             <div className="mb-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">
               {error}

@@ -97,46 +97,47 @@ function RevisorPageInner() {
   return (
     <AppShell>
     <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink">
-      {/* Sem AppHeader (barra sticky) -- o alternador Fila/Salvos/Aderencia
-          entra como uma linha normal no topo do fluxo (mesma distancia do
-          menu que os demais modulos), nao uma barra fixa por cima. Nas
-          telas internas (nova/sessao/detalhe) um botao de voltar simples
-          basta, sem sticky. */}
-      {(screen === "fila" || screen === "salvos" || screen === "aderencia") && (
-        <div className="mb-4">
-          <SegmentedControl
-            value={screen}
-            onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : setScreen("aderencia"))}
-            options={[
-              { value: "fila", label: "Fila" },
-              { value: "salvos", label: <><Bookmark size={12} /> Salvos</> },
-              { value: "aderencia", label: "Aderência a Range" },
-            ]}
-          />
-        </div>
-      )}
-      {(screen === "nova" || screen === "sessao" || screen === "detalhe") && (
-        <button
-          onClick={screen === "detalhe" ? backFromDetalhe : goFila}
-          aria-label="Voltar"
-          className="mb-4 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
-        >
-          <ArrowLeft size={18} />
-        </button>
-      )}
+      {/* Container externo unico, igual ao Funil e ao Painel do Time:
+          nav (alternador Fila/Salvos/Aderencia ou botao de voltar) e
+          conteudo moram dentro da MESMA caixa, em vez de boiar soltos
+          contra o fundo. Sem AppHeader (barra sticky) de proposito. */}
+      <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+        {(screen === "fila" || screen === "salvos" || screen === "aderencia") && (
+          <div className="mb-4">
+            <SegmentedControl
+              value={screen}
+              onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : setScreen("aderencia"))}
+              options={[
+                { value: "fila", label: "Fila" },
+                { value: "salvos", label: <><Bookmark size={12} /> Salvos</> },
+                { value: "aderencia", label: "Aderência a Range" },
+              ]}
+            />
+          </div>
+        )}
+        {(screen === "nova" || screen === "sessao" || screen === "detalhe") && (
+          <button
+            onClick={screen === "detalhe" ? backFromDetalhe : goFila}
+            aria-label="Voltar"
+            className="mb-4 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          >
+            <ArrowLeft size={18} />
+          </button>
+        )}
 
-      {screen === "fila" && <RevisorFila onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />}
-      {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
-      {screen === "aderencia" && <AderenciaRange />}
-      {screen === "nova" && (
-        <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
-      )}
-      {screen === "sessao" && selectedSessionId && (
-        <RevisorSessao sessionId={selectedSessionId} onOpenHand={goDetalhe} />
-      )}
-      {screen === "detalhe" && selectedReviewId && (
-        <RevisorDetalhe reviewId={selectedReviewId} onBack={backFromDetalhe} />
-      )}
+        {screen === "fila" && <RevisorFila onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />}
+        {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
+        {screen === "aderencia" && <AderenciaRange />}
+        {screen === "nova" && (
+          <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
+        )}
+        {screen === "sessao" && selectedSessionId && (
+          <RevisorSessao sessionId={selectedSessionId} onOpenHand={goDetalhe} />
+        )}
+        {screen === "detalhe" && selectedReviewId && (
+          <RevisorDetalhe reviewId={selectedReviewId} onBack={backFromDetalhe} />
+        )}
+      </div>
     </main>
     </AppShell>
   );

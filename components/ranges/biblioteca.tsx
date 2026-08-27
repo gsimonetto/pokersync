@@ -26,7 +26,7 @@ type LibraryItem =
   | { kind: "range"; id: string; name: string; description: string | null; tags: string[]; hands: RangeHands }
   | { kind: "tree"; id: string; name: string; description: string | null; tags: string[] };
 
-export function Biblioteca() {
+export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
   const router = useRouter();
   const [ranges, setRanges] = useState<RangeListItem[]>([]);
   const [trees, setTrees] = useState<TreeListItem[]>([]);
@@ -34,6 +34,7 @@ export function Biblioteca() {
   const [error, setError] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
+  const [buscaAberta, setBuscaAberta] = useState(false);
 
   useEffect(() => {
     Promise.all([listRanges(), listTrees()])
@@ -80,25 +81,50 @@ export function Biblioteca() {
   if (loading) return <p className="text-sm text-muted">Carregando…</p>;
 
   return (
-    <div>
+    // Container unico envolvendo filtros + grade -- mesmo padrao do
+    // Funil e do construtor de ranges (RangeEditor), em vez do filtro
+    // boiar solto acima dos cards.
+    <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+      {tabs && <div className="mb-3 flex justify-end">{tabs}</div>}
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
 
-      <div className="relative mb-4 max-w-sm">
-        <Search size={13} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
-        <input
-          value={busca}
-          onChange={(e) => setBusca(e.target.value)}
-          placeholder="Buscar por nome…"
-          className="w-full rounded-lg border border-hairline bg-elevated py-2 pl-8 pr-3 text-sm text-ink outline-none placeholder:text-muted/50"
-        />
-      </div>
-
-      <div className="mb-6 flex flex-wrap gap-2">
+      {/* Chips + busca na mesma linha (busca vira botao que abre um
+          campo, igual ao Funil/Jogadores) -- antes eram dois blocos
+          empilhados, ocupando mais altura que precisava. */}
+      <div className="mb-4 flex flex-wrap items-center gap-2">
         <FilterChip label={`Tudo (${items.length})`} active={activeTag === null} onClick={() => setActiveTag(null)} />
         {themes.map(([tag, count]) => (
           <FilterChip key={tag} label={`${tag} (${count})`} active={activeTag === tag} onClick={() => setActiveTag(tag)} />
         ))}
+
+        <button
+          type="button"
+          onClick={() => {
+            setBuscaAberta((v) => !v);
+            if (buscaAberta) setBusca("");
+          }}
+          aria-label={buscaAberta ? "Fechar busca" : "Buscar"}
+          title="Buscar por nome"
+          className={`ml-auto grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-colors ${
+            buscaAberta || busca ? "border-ink bg-ink text-void" : "border-hairline text-muted hover:border-ink/40 hover:text-ink"
+          }`}
+        >
+          <Search size={13} />
+        </button>
       </div>
+
+      {buscaAberta && (
+        <div className="mb-4 flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2">
+          <Search size={13} className="shrink-0 text-muted" />
+          <input
+            autoFocus
+            value={busca}
+            onChange={(e) => setBusca(e.target.value)}
+            placeholder="Buscar por nome…"
+            className="flex-1 bg-transparent text-[13px] text-ink outline-none placeholder:text-muted/50"
+          />
+        </div>
+      )}
 
       {filtered.length === 0 && (
         <div className="rounded-xl border border-hairline bg-surface p-10 text-center">
