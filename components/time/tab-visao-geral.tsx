@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, Trophy, ChevronRight, GitCompare, CalendarCheck } from "lucide-react";
-import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
+import { EvolutionChart } from "@/components/time/evolution-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
@@ -113,7 +113,7 @@ export function TabVisaoGeral({
       <ResumoFunilMini onAbrirFunil={onAbrirFunil} />
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <GraficoFinanceiro
+        <EvolutionChart
           dados={financeiro}
           pronto={pronto}
           titulo="Resultado por período"

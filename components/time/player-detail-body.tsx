@@ -15,7 +15,7 @@ import {
   CalendarDays,
 } from "lucide-react";
 import { Chip } from "@/components/chip";
-import { GraficoFinanceiro } from "@/components/time/grafico-financeiro";
+import { EvolutionChart } from "@/components/time/evolution-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
 import { MetasCard } from "@/components/time/metas-card";
@@ -110,7 +110,7 @@ export function PlayerDetailBody({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
-        <GraficoFinanceiro dados={financeiro} pronto titulo="Resultado no período" />
+        <EvolutionChart dados={financeiro} titulo="Resultado no período" />
         <PainelCard titulo="Consistência" icone={<CalendarDays size={13} className="text-evolution" />} className="flex flex-col">
           <div className="flex flex-1 items-center">
             <TeamHeatmap dados={financeiro} />
