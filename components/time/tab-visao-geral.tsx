@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Flame, TriangleAlert, BookOpen, Target, Wallet, Gamepad2, Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, Trophy, ChevronRight, GitCompare, CalendarCheck } from "lucide-react";
+import { Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, Trophy, ChevronRight, GitCompare, CalendarCheck } from "lucide-react";
 import { EvolutionChart } from "@/components/time/evolution-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
@@ -22,9 +22,10 @@ import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-se
 import { BRL, variacao } from "@/lib/format";
 
 // Estatisticas do time. Hierarquia visual:
-// 1. KPIs agrupados por assunto (Financeiro / Treinos / Alertas) -- antes
-//    era uma grade unica misturando dinheiro, estudo e risco no mesmo
-//    nivel, sem hierarquia de leitura;
+// 1. Faixa herói com os KPIs lado a lado (mesmo padrão do Gestor de
+//    Banca e da Performance) -- antes cada metrica vivia dentro do
+//    proprio card agrupado por assunto, empilhando borda dentro de
+//    borda e ficando pesado;
 // 2. Resultado por periodo + heatmap de consistencia lado a lado (mesmo
 //    par "Evolucao da banca" + "Consistencia de volume" do Gestor de
 //    Banca), com o filtro de dias vivendo dentro do proprio card;
@@ -82,32 +83,55 @@ export function TabVisaoGeral({
 
   return (
     <div className="space-y-5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">Desempenho do time</p>
+      {/* Faixa herói — mesmo padrão do Gestor de Banca e da Performance:
+          um unico container com os numeros lado a lado, separados por
+          divisor, em vez de cada metrica dentro do proprio card (o que
+          empilhava borda dentro de borda e ficava pesado). */}
+      <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
+        <div className="flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
+          <p className="text-sm text-muted">Desempenho do time</p>
+        </div>
 
-      <section className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-        <PainelCard titulo="Financeiro" icone={<Wallet size={13} className="text-positive" />}>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Kpi d={0} pronto={pronto} icon={Wallet} label="Resultado no time" value={BRL.format(lucro)}
-              hint="desde a entrada de cada um" tom={lucro > 0 ? "positivo" : lucro < 0 ? "negativo" : undefined} destaque />
-            <Kpi d={40} pronto={pronto} icon={Gamepad2} label="Jogos" value={String(jogos)} hint="desde a entrada" />
-          </div>
-        </PainelCard>
+        <div
+          aria-hidden="true"
+          className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full opacity-[0.13] blur-3xl"
+          style={{ background: lucro < 0 ? "#e0555a" : "#2FB89A" }}
+        />
 
-        <PainelCard titulo="Treinos" icone={<Target size={13} className="text-training" />}>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Kpi d={80} pronto={pronto} icon={Target} label="Treinos no período" value={String(treinos)} tendencia={varTreinos} />
-            <Kpi d={120} pronto={pronto} icon={Flame} label="Acerto GTO" value={acertoPct === null ? "—" : `${acertoPct}%`}
-              hint={acertoPct === null ? "sem treinos" : undefined} tendencia={varAcerto} tendenciaSufixo="pp" />
-            <Kpi d={160} pronto={pronto} icon={BookOpen} label="Mãos revisadas" value={String(revisadas)} tendencia={varRevisadas} />
-          </div>
-        </PainelCard>
-
-        <PainelCard titulo="Alertas" icone={<TriangleAlert size={13} className="text-negative" />}>
-          <div className="grid grid-cols-1 gap-2.5">
-            <Kpi d={200} pronto={pronto} icon={TriangleAlert} label="Precisam de atenção" value={String(inativos)}
-              hint={`${jogadores.length - inativos} ativos`} tom={inativos > 0 ? "negativo" : undefined} />
-          </div>
-        </PainelCard>
+        <div className="relative grid grid-cols-2 divide-x divide-y divide-hairline sm:grid-cols-3 lg:grid-cols-6 lg:divide-y-0">
+          <HeroMetric
+            label="Resultado no time"
+            value={BRL.format(lucro)}
+            tone={lucro > 0 ? "bom" : lucro < 0 ? "ruim" : "neutro"}
+            hint="desde a entrada de cada um"
+            destaque
+          />
+          <HeroMetric label="Jogos" value={String(jogos)} tone="neutro" hint="desde a entrada" />
+          <HeroMetric
+            label="Treinos no período"
+            value={String(treinos)}
+            tone="neutro"
+            hint={varTreinos != null ? `${varTreinos > 0 ? "+" : ""}${varTreinos}% vs período anterior` : undefined}
+          />
+          <HeroMetric
+            label="Acerto GTO"
+            value={acertoPct === null ? "—" : `${acertoPct}%`}
+            tone={acertoPct === null ? "neutro" : acertoPct >= 50 ? "bom" : "ruim"}
+            hint={acertoPct === null ? "sem treinos" : varAcerto != null ? `${varAcerto > 0 ? "+" : ""}${varAcerto}pp vs período anterior` : undefined}
+          />
+          <HeroMetric
+            label="Mãos revisadas"
+            value={String(revisadas)}
+            tone="neutro"
+            hint={varRevisadas != null ? `${varRevisadas > 0 ? "+" : ""}${varRevisadas}% vs período anterior` : undefined}
+          />
+          <HeroMetric
+            label="Precisam de atenção"
+            value={String(inativos)}
+            tone={inativos > 0 ? "ruim" : "neutro"}
+            hint={`${jogadores.length - inativos} ativos`}
+          />
+        </div>
       </section>
 
       <ResumoFunilMini onAbrirFunil={onAbrirFunil} />
@@ -138,6 +162,33 @@ export function TabVisaoGeral({
       </section>
 
       <GraficoEstudo dados={atividade} pronto={pronto} />
+    </div>
+  );
+}
+
+// Mesmo HeroMetric do Gestor de Banca e da Performance: numero solto
+// dentro da faixa herói, sem card proprio por metrica.
+function HeroMetric({
+  label,
+  value,
+  hint,
+  tone,
+  destaque = false,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tone: "bom" | "ruim" | "neutro";
+  destaque?: boolean;
+}) {
+  const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
+  return (
+    <div className="px-6 py-6">
+      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
+      <p className={`mt-2 font-bold leading-none tracking-tight tabular-nums ${destaque ? "text-[2.25rem]" : "text-[1.75rem]"} ${cor}`}>
+        {value}
+      </p>
+      {hint && <p className="mt-2.5 text-[11.5px] text-muted">{hint}</p>}
     </div>
   );
 }
