@@ -1,7 +1,7 @@
 // app/login/login-form.tsx
 "use client";
 
-import React, { useState, useRef, useEffect, type ComponentType } from "react";
+import React, { useState, useRef, useEffect, useId, type ComponentType } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -34,15 +34,24 @@ interface FieldProps {
 }
 
 function Field({ icon: Icon, value, onChange, placeholder, type = "text", right, mono, label, labelRight }: FieldProps) {
+  // Label sem htmlFor + input sem id: clicar no rótulo não focava o
+  // campo, e leitor de tela não anunciava qual campo é qual (achado
+  // testando login/cadastro pela primeira vez com Playwright — o
+  // seletor por id simplesmente não existia). useId() gera um id
+  // estável e único por instância, seguro em SSR.
+  const id = useId();
   return (
     <div className="space-y-1">
       <div className="flex items-center justify-between">
-        <label className="text-[11px] font-semibold uppercase tracking-wider text-muted">{label}</label>
+        <label htmlFor={id} className="text-[11px] font-semibold uppercase tracking-wider text-muted">
+          {label}
+        </label>
         {labelRight}
       </div>
       <div className="relative">
         <Icon className="pointer-events-none w-4 h-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted" />
         <input
+          id={id}
           type={type}
           required
           value={value}
