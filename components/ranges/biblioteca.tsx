@@ -7,7 +7,6 @@ import { listRanges, type RangeHands, type RangeListItem } from "@/lib/services/
 import { listTrees, type TreeListItem } from "@/lib/services/strategy-tree-service";
 import { RangeGridPreview } from "@/components/ranges/range-grid-preview";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { MobileFiltersMenu } from "@/components/ui/mobile-filters-menu";
 
 // Temas sugeridos como atalho — aparecem mesmo com 0 itens, pra sinalizar
 // que sao categorias validas do produto (o usuario so precisa comecar a
@@ -89,37 +88,14 @@ export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
       {tabs && <div className="mb-4">{tabs}</div>}
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
 
-      {/* Categorias (Tudo + temas) + busca. No desktop os chips ficam
-          soltos na fileira, igual sempre foi. No mobile isso quebrava
-          em varias linhas e amontoava tudo -- ali os chips entram atras
-          de um botao de menu (icone sanduiche), so' pra telas pequenas. */}
+      {/* Chips + busca na mesma linha (busca vira botao que abre um
+          campo, igual ao Funil/Jogadores) -- antes eram dois blocos
+          empilhados, ocupando mais altura que precisava. */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
-        <div className="hidden flex-wrap items-center gap-2 sm:flex">
-          <FilterChip label={`Tudo (${items.length})`} active={activeTag === null} onClick={() => setActiveTag(null)} />
-          {themes.map(([tag, count]) => (
-            <FilterChip key={tag} label={`${tag} (${count})`} active={activeTag === tag} onClick={() => setActiveTag(tag)} />
-          ))}
-        </div>
-
-        <div className="sm:hidden">
-          <MobileFiltersMenu title="Filtrar por categoria" active={activeTag !== null}>
-            <div className="flex flex-wrap gap-2">
-              <FilterChip
-                label={`Tudo (${items.length})`}
-                active={activeTag === null}
-                onClick={() => setActiveTag(null)}
-              />
-              {themes.map(([tag, count]) => (
-                <FilterChip
-                  key={tag}
-                  label={`${tag} (${count})`}
-                  active={activeTag === tag}
-                  onClick={() => setActiveTag(tag)}
-                />
-              ))}
-            </div>
-          </MobileFiltersMenu>
-        </div>
+        <FilterChip label={`Tudo (${items.length})`} active={activeTag === null} onClick={() => setActiveTag(null)} />
+        {themes.map(([tag, count]) => (
+          <FilterChip key={tag} label={`${tag} (${count})`} active={activeTag === tag} onClick={() => setActiveTag(tag)} />
+        ))}
 
         <button
           type="button"

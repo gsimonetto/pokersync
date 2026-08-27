@@ -9,7 +9,6 @@ import { Chip } from "@/components/chip";
 import { RankChip } from "@/components/ui/rank-chip";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { PlayerDetailModal } from "@/components/time/player-detail-modal";
-import { MobileFiltersMenu } from "@/components/ui/mobile-filters-menu";
 import {
   assignCoach,
   assignTeamDrill,
@@ -158,36 +157,16 @@ export function TabJogadores({
         </div>
       </div>
 
-      {/* Filtro por etiqueta: no desktop fica solto na fileira, igual
-          sempre foi. No mobile, com varias etiquetas, quebrava em
-          multiplas linhas e amontoava a tela -- ali entra atras do
-          icone de menu (sanduiche), so' pra telas pequenas. */}
       {labels.length > 0 && (
-        <>
-          <div className="mt-3 hidden flex-wrap gap-1.5 sm:flex print:hidden">
-            <FiltroChip ativo={filtroLabel === "todas"} onClick={() => setFiltroLabel("todas")}>Todas</FiltroChip>
-            {labels.map((l) => (
-              <FiltroChip key={l.id} ativo={filtroLabel === l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
-                {l.name}
-              </FiltroChip>
-            ))}
-            <FiltroChip ativo={filtroLabel === "sem"} onClick={() => setFiltroLabel("sem")}>Sem etiqueta</FiltroChip>
-          </div>
-
-          <div className="mt-3 sm:hidden print:hidden">
-            <MobileFiltersMenu title="Filtrar por etiqueta" active={filtroLabel !== "todas"}>
-              <div className="flex flex-wrap gap-1.5">
-                <FiltroChip ativo={filtroLabel === "todas"} onClick={() => setFiltroLabel("todas")}>Todas</FiltroChip>
-                {labels.map((l) => (
-                  <FiltroChip key={l.id} ativo={filtroLabel === l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
-                    {l.name}
-                  </FiltroChip>
-                ))}
-                <FiltroChip ativo={filtroLabel === "sem"} onClick={() => setFiltroLabel("sem")}>Sem etiqueta</FiltroChip>
-              </div>
-            </MobileFiltersMenu>
-          </div>
-        </>
+        <div className="mt-3 flex flex-wrap gap-1.5 print:hidden">
+          <FiltroChip ativo={filtroLabel === "todas"} onClick={() => setFiltroLabel("todas")}>Todas</FiltroChip>
+          {labels.map((l) => (
+            <FiltroChip key={l.id} ativo={filtroLabel === l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
+              {l.name}
+            </FiltroChip>
+          ))}
+          <FiltroChip ativo={filtroLabel === "sem"} onClick={() => setFiltroLabel("sem")}>Sem etiqueta</FiltroChip>
+        </div>
       )}
 
       {lista.length === 0 ? (
