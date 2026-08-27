@@ -41,6 +41,7 @@ import { TabTime } from "@/components/time/tab-time";
 import { TabCalendario } from "@/components/time/tab-calendario";
 import { TeamPrintStyles } from "@/components/time/print-styles";
 import { useConfirm } from "@/components/confirm-dialog";
+import { MobileTabsMenu } from "@/components/ui/mobile-tabs-menu";
 
 // Painel do time: um so lugar, cinco abas (Funil tem pagina propria em
 // /time/painel/funil — precisa de mais espaco vertical que uma aba
@@ -213,14 +214,13 @@ function PainelConteudo() {
 
         {/* Container externo unico, igual ao Funil (TabKanban): nav de
             abas + conteudo moram dentro da MESMA caixa, em vez da barra
-            de abas boiando solta acima de cards separados. justify-start
-            no mobile: com 6 abas + Funil a barra nao cabe (overflow-x-auto)
-            -- centralizada, o scroll comeca sem conseguir mostrar a
-            primeira aba ("Perfil do time" ficava fora de alcance rolando
-            pra esquerda). A partir de sm a barra cabe inteira sem rolar,
-            entao centralizar volta a fazer sentido visualmente. */}
+            de abas boiando solta acima de cards separados. No mobile,
+            6 abas + Funil lado a lado nao cabe -- viram um botao com a
+            aba atual + icone de menu (sanduiche), que abre a lista
+            completa (mesmo padrao do Construtor de Ranges). A partir de
+            sm a barra cabe inteira, entao continua igual sempre foi. */}
         <div className="rounded-2xl border border-hairline bg-surface p-5 sm:p-6 print:border-0 print:bg-transparent print:p-0">
-          <nav className="relative mb-4 flex justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center print:hidden">
+          <nav className="relative mb-4 hidden justify-center gap-1 overflow-x-auto border-b border-hairline sm:flex print:hidden">
             {ABAS.map((a) => {
               const Icon = a.icon;
               const pend = a.key === "convites" ? pendentes.length : 0;
@@ -245,6 +245,23 @@ function PainelConteudo() {
               <ArrowUpRight size={12} className="text-muted/70" />
             </Link>
           </nav>
+
+          <div className="mb-4 sm:hidden print:hidden">
+            <MobileTabsMenu
+              title="Meu Time"
+              activeKey={aba}
+              items={[
+                ...ABAS.map((a) => ({
+                  key: a.key,
+                  label: a.label,
+                  icon: a.icon,
+                  badge: a.key === "convites" ? pendentes.length : undefined,
+                  onSelect: () => trocarAba(a.key),
+                })),
+                { key: "funil", label: "Funil", icon: Kanban, href: "/time/painel/funil" },
+              ]}
+            />
+          </div>
 
           {loading ? (
             <p className="text-sm text-muted">Carregando painel…</p>
