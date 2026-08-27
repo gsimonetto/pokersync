@@ -2,11 +2,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Layers, GitBranch, Search } from "lucide-react";
+import { Layers, GitBranch, Search, SlidersHorizontal, X } from "lucide-react";
 import { listRanges, type RangeHands, type RangeListItem } from "@/lib/services/range-service";
 import { listTrees, type TreeListItem } from "@/lib/services/strategy-tree-service";
 import { RangeGridPreview } from "@/components/ranges/range-grid-preview";
 import { FilterChip } from "@/components/ui/filter-chip";
+import { ModalPortal } from "@/components/modal-portal";
+import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 
 // Temas sugeridos como atalho — aparecem mesmo com 0 itens, pra sinalizar
 // que sao categorias validas do produto (o usuario so precisa comecar a
@@ -35,6 +37,8 @@ export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [busca, setBusca] = useState("");
   const [buscaAberta, setBuscaAberta] = useState(false);
+  const [filtrosAbertos, setFiltrosAbertos] = useState(false);
+  useEscapeToClose(() => setFiltrosAbertos(false), filtrosAbertos);
 
   useEffect(() => {
     Promise.all([listRanges(), listTrees()])
@@ -88,14 +92,26 @@ export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
       {tabs && <div className="mb-4">{tabs}</div>}
       {error && <p className="mb-4 text-sm text-negative">{error}</p>}
 
-      {/* Chips + busca na mesma linha (busca vira botao que abre um
-          campo, igual ao Funil/Jogadores) -- antes eram dois blocos
-          empilhados, ocupando mais altura que precisava. */}
-      <div className="mb-4 flex flex-wrap items-center gap-2">
-        <FilterChip label={`Tudo (${items.length})`} active={activeTag === null} onClick={() => setActiveTag(null)} />
-        {themes.map(([tag, count]) => (
-          <FilterChip key={tag} label={`${tag} (${count})`} active={activeTag === tag} onClick={() => setActiveTag(tag)} />
-        ))}
+      {/* Filtro + busca na mesma linha. As categorias (Tudo + temas)
+          antes ficavam todas soltas como chips nessa fileira -- em
+          telas menores (e mesmo no desktop, com varios temas
+          customizados) isso quebrava em varias linhas e amontoava tudo.
+          Agora entram atras de um unico botao "Filtros" que abre um
+          menu (mesmo padrao dos menus do header: Notificacoes/Ajuda/
+          Perfil), igual no mobile e no desktop. */}
+      <div className="mb-4 flex items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFiltrosAbertos(true)}
+          aria-label="Filtros"
+          title="Filtrar por categoria"
+          className={`flex h-8 shrink-0 items-center gap-1.5 rounded-full border px-3 text-[11.5px] font-semibold transition-colors ${
+            activeTag ? "border-ink bg-ink text-void" : "border-hairline text-muted hover:border-ink/40 hover:text-ink"
+          }`}
+        >
+          <SlidersHorizontal size={13} />
+          <span className="max-w-[140px] truncate">{activeTag ?? "Filtros"}</span>
+        </button>
 
         <button
           type="button"
@@ -112,6 +128,52 @@ export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
           <Search size={13} />
         </button>
       </div>
+
+      {filtrosAbertos && (
+        <ModalPortal>
+          <div
+            className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-16"
+            onClick={() => setFiltrosAbertos(false)}
+          >
+            <div
+              className="w-full max-w-md overflow-hidden rounded-2xl border border-hairline bg-surface/[0.98] shadow-2xl shadow-black/60 backdrop-blur-xl"
+              onClick={(e) => e.stopPropagation()}
+            >
+              <div className="flex items-center justify-between border-b border-hairline px-4 py-3">
+                <span className="text-sm font-bold text-ink">Filtrar por categoria</span>
+                <button
+                  onClick={() => setFiltrosAbertos(false)}
+                  className="grid size-6 place-items-center rounded-lg text-muted hover:text-ink"
+                  aria-label="Fechar"
+                >
+                  <X size={15} />
+                </button>
+              </div>
+              <div className="flex flex-wrap gap-2 p-4">
+                <FilterChip
+                  label={`Tudo (${items.length})`}
+                  active={activeTag === null}
+                  onClick={() => {
+                    setActiveTag(null);
+                    setFiltrosAbertos(false);
+                  }}
+                />
+                {themes.map(([tag, count]) => (
+                  <FilterChip
+                    key={tag}
+                    label={`${tag} (${count})`}
+                    active={activeTag === tag}
+                    onClick={() => {
+                      setActiveTag(tag);
+                      setFiltrosAbertos(false);
+                    }}
+                  />
+                ))}
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
       {buscaAberta && (
         <div className="mb-4 flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2">
