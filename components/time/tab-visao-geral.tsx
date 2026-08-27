@@ -2,13 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, Trophy, ChevronRight, GitCompare, CalendarCheck } from "lucide-react";
+import { Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, GitCompare, CalendarCheck } from "lucide-react";
 import { EvolutionChart } from "@/components/time/evolution-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { Kpi } from "@/components/time/kpi";
-import { Avatar } from "@/components/avatar";
 import { PeriodSelector } from "@/components/period-selector";
 import {
   diasSemAtividade,
@@ -29,8 +28,12 @@ import { BRL, variacao } from "@/lib/format";
 // 2. Resultado por periodo + heatmap de consistencia lado a lado (mesmo
 //    par "Evolucao da banca" + "Consistencia de volume" do Gestor de
 //    Banca), com o filtro de dias vivendo dentro do proprio card;
-// 3. Assistente do coach como card entre os demais, no mesmo layout do
-//    "AI Coach" da banca -- nao mais so' escondido na aba Jogadores.
+// 3. Treino x Revisoes + Comparacao de periodo/Confirmacao de presenca
+//    lado a lado -- a comparacao nao repete XP aqui, ja que mora do
+//    lado do proprio grafico de treino;
+// 4. Assistente do coach por ultimo, largura cheia (Top do periodo foi
+//    removido daqui por pedido explicito -- ranking mora na aba
+//    Jogadores).
 
 const INATIVO_DIAS = 7;
 
@@ -152,16 +155,11 @@ export function TabVisaoGeral({
       </section>
 
       <section className="grid gap-4 lg:grid-cols-2">
-        <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} />
-        <TopDoPeriodo jogadores={jogadores} />
+        <GraficoEstudo dados={atividade} pronto={pronto} />
+        <ComparacaoEPresenca comparacao={comparacao} eventos={eventos} />
       </section>
 
-      <section className="grid gap-4 lg:grid-cols-2">
-        <ComparacaoPeriodo comparacao={comparacao} />
-        <ConfirmacaoPresenca eventos={eventos} />
-      </section>
-
-      <GraficoEstudo dados={atividade} pronto={pronto} />
+      <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} />
     </div>
   );
 }
@@ -240,90 +238,24 @@ function ResumoFunilMini({ onAbrirFunil }: { onAbrirFunil: () => void }) {
 }
 
 // ------------------------------------------------------------
-// Ranking curto por XP no periodo — mesma metrica ja usada na ordenacao
-// da aba Jogadores, aqui como vitrine rapida (top 5) dentro da grade de
-// cards da Estatisticas, ao lado do Assistente do coach.
+// Comparação de período (atual vs anterior) e confirmação de presença
+// nos eventos do calendário, juntas no mesmo card -- fica ao lado do
+// gráfico de Treino x Revisões, entao a comparação aqui não repete a
+// info de XP que já aparece no gráfico ao lado.
 // ------------------------------------------------------------
-function TopDoPeriodo({ jogadores }: { jogadores: TeamDashboardRow[] }) {
-  const top = [...jogadores].sort((a, b) => b.xpPeriodo - a.xpPeriodo).slice(0, 5);
+function ComparacaoEPresenca({ comparacao, eventos }: { comparacao: PeriodComparison | null; eventos: TeamEvent[] }) {
+  const temComparacao = comparacao && (comparacao.treinosAnterior > 0 || comparacao.treinosAtual > 0);
+  const acertoAtualPct = comparacao && comparacao.treinosAtual > 0 ? Math.round((comparacao.acertosAtual / comparacao.treinosAtual) * 100) : null;
+  const acertoAnteriorPct = comparacao && comparacao.treinosAnterior > 0 ? Math.round((comparacao.acertosAnterior / comparacao.treinosAnterior) * 100) : null;
 
-  return (
-    <PainelCard titulo="Top do período" icone={<Trophy size={13} className="text-evolution" />}>
-      {top.length === 0 ? (
-        <p className="text-sm text-muted">Sem jogadores no período.</p>
-      ) : (
-        <ul className="flex flex-col gap-1.5">
-          {top.map((j, i) => (
-            <li key={j.userId}>
-              <Link
-                href={`/time/jogador/${j.userId}`}
-                className="flex items-center gap-2.5 rounded-lg px-1.5 py-1.5 transition-colors hover:bg-elevated"
-              >
-                <span className={`w-4 shrink-0 text-center text-[12px] font-bold tnum ${i === 0 ? "text-evolution" : "text-muted"}`}>{i + 1}</span>
-                <Avatar id={j.avatarId} url={j.avatarUrl} size={28} />
-                <span className="min-w-0 flex-1 truncate text-[13px] font-medium">{j.nome}</span>
-                <span className="shrink-0 text-[12px] font-semibold tnum text-evolution">{j.xpPeriodo} XP</span>
-                <ChevronRight size={13} className="shrink-0 text-muted" />
-              </Link>
-            </li>
-          ))}
-        </ul>
-      )}
-    </PainelCard>
-  );
-}
+  const linhas: { label: string; atual: string; anterior: string }[] = comparacao
+    ? [
+        { label: "Treinos", atual: String(comparacao.treinosAtual), anterior: String(comparacao.treinosAnterior) },
+        { label: "Acerto GTO", atual: acertoAtualPct === null ? "—" : `${acertoAtualPct}%`, anterior: acertoAnteriorPct === null ? "—" : `${acertoAnteriorPct}%` },
+        { label: "Mãos revisadas", atual: String(comparacao.revisadasAtual), anterior: String(comparacao.revisadasAnterior) },
+      ]
+    : [];
 
-// ------------------------------------------------------------
-// Periodo atual vs anterior — mesmo par de colunas do "Comparar meses"
-// do Gestor de Banca, so' que com as metricas de estudo do time
-// (comparacao ja vem do fetchPeriodComparison, mesmo periodo em dias
-// usado no resto da aba, contra o periodo imediatamente anterior).
-// ------------------------------------------------------------
-function ComparacaoPeriodo({ comparacao }: { comparacao: PeriodComparison | null }) {
-  if (!comparacao || (comparacao.treinosAnterior === 0 && comparacao.treinosAtual === 0)) {
-    return (
-      <PainelCard titulo="Comparação de período" icone={<GitCompare size={13} className="text-training" />}>
-        <p className="text-sm text-muted">Sem dados suficientes pra comparar com o período anterior.</p>
-      </PainelCard>
-    );
-  }
-
-  const acertoAtualPct = comparacao.treinosAtual > 0 ? Math.round((comparacao.acertosAtual / comparacao.treinosAtual) * 100) : null;
-  const acertoAnteriorPct = comparacao.treinosAnterior > 0 ? Math.round((comparacao.acertosAnterior / comparacao.treinosAnterior) * 100) : null;
-
-  const linhas: { label: string; atual: string; anterior: string }[] = [
-    { label: "Treinos", atual: String(comparacao.treinosAtual), anterior: String(comparacao.treinosAnterior) },
-    { label: "Acerto GTO", atual: acertoAtualPct === null ? "—" : `${acertoAtualPct}%`, anterior: acertoAnteriorPct === null ? "—" : `${acertoAnteriorPct}%` },
-    { label: "Mãos revisadas", atual: String(comparacao.revisadasAtual), anterior: String(comparacao.revisadasAnterior) },
-    { label: "XP do time", atual: String(comparacao.xpAtual), anterior: String(comparacao.xpAnterior) },
-  ];
-
-  return (
-    <PainelCard titulo="Comparação de período" icone={<GitCompare size={13} className="text-training" />}>
-      <div className="grid grid-cols-3 gap-2 text-center">
-        <div />
-        <p className="text-[10px] font-semibold uppercase text-muted">Atual</p>
-        <p className="text-[10px] font-semibold uppercase text-muted">Anterior</p>
-
-        {linhas.map((l) => (
-          <div key={l.label} className="contents">
-            <p className="text-left text-[12px] text-muted">{l.label}</p>
-            <p className="text-sm font-bold tnum text-ink">{l.atual}</p>
-            <p className="text-sm font-bold tnum text-muted">{l.anterior}</p>
-          </div>
-        ))}
-      </div>
-    </PainelCard>
-  );
-}
-
-// ------------------------------------------------------------
-// Taxa de resposta e confirmacao de presenca nos eventos do calendario
-// do time -- olha o "aderencia ao convite" que hoje so aparecia
-// escondida como leak individual em faltas_consecutivas, aqui vira
-// numero direto do time inteiro.
-// ------------------------------------------------------------
-function ConfirmacaoPresenca({ eventos }: { eventos: TeamEvent[] }) {
   const participantes = eventos.flatMap((e) => e.participants);
   const total = participantes.length;
   const confirmados = participantes.filter((p) => p.status === "confirmado").length;
@@ -333,20 +265,44 @@ function ConfirmacaoPresenca({ eventos }: { eventos: TeamEvent[] }) {
   const taxaConfirmacao = total > 0 ? Math.round((confirmados / total) * 100) : null;
 
   return (
-    <PainelCard titulo="Confirmação de presença" icone={<CalendarCheck size={13} className="text-review" />}>
-      {total === 0 ? (
-        <p className="text-sm text-muted">Sem eventos com convidados no calendário ainda.</p>
+    <PainelCard titulo="Comparação de período" icone={<GitCompare size={13} className="text-training" />}>
+      {temComparacao ? (
+        <div className="grid grid-cols-3 gap-2 text-center">
+          <div />
+          <p className="text-[10px] font-semibold uppercase text-muted">Atual</p>
+          <p className="text-[10px] font-semibold uppercase text-muted">Anterior</p>
+
+          {linhas.map((l) => (
+            <div key={l.label} className="contents">
+              <p className="text-left text-[12px] text-muted">{l.label}</p>
+              <p className="text-sm font-bold tnum text-ink">{l.atual}</p>
+              <p className="text-sm font-bold tnum text-muted">{l.anterior}</p>
+            </div>
+          ))}
+        </div>
       ) : (
-        <>
-          <div className="grid grid-cols-2 gap-2.5">
-            <Kpi icon={CalendarCheck} label="Confirmaram presença" value={taxaConfirmacao === null ? "—" : `${taxaConfirmacao}%`}
-              hint={`${confirmados} de ${total} convites`} tom={taxaConfirmacao !== null && taxaConfirmacao >= 60 ? "positivo" : undefined} />
-            <Kpi icon={AlertTriangle} label="Sem resposta" value={String(pendentes)}
-              hint={`${taxaResposta}% já responderam`} tom={pendentes > 0 ? "negativo" : undefined} />
-          </div>
-          {recusados > 0 && <p className="mt-2.5 text-xs text-muted">{recusados} recusa(s) registrada(s) no período.</p>}
-        </>
+        <p className="text-sm text-muted">Sem dados suficientes pra comparar com o período anterior.</p>
       )}
+
+      <div className="mt-4 border-t border-hairline pt-4">
+        <p className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+          <CalendarCheck size={12} className="text-review" />
+          Confirmação de presença
+        </p>
+        {total === 0 ? (
+          <p className="mt-2 text-sm text-muted">Sem eventos com convidados no calendário ainda.</p>
+        ) : (
+          <>
+            <div className="mt-2.5 grid grid-cols-2 gap-2.5">
+              <Kpi icon={CalendarCheck} label="Confirmaram presença" value={taxaConfirmacao === null ? "—" : `${taxaConfirmacao}%`}
+                hint={`${confirmados} de ${total} convites`} tom={taxaConfirmacao !== null && taxaConfirmacao >= 60 ? "positivo" : undefined} />
+              <Kpi icon={AlertTriangle} label="Sem resposta" value={String(pendentes)}
+                hint={`${taxaResposta}% já responderam`} tom={pendentes > 0 ? "negativo" : undefined} />
+            </div>
+            {recusados > 0 && <p className="mt-2.5 text-xs text-muted">{recusados} recusa(s) registrada(s) no período.</p>}
+          </>
+        )}
+      </div>
     </PainelCard>
   );
 }
