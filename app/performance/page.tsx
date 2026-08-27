@@ -208,6 +208,14 @@ export default function PerformancePage() {
                 fixa à parte). */}
             <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
               <p className="text-sm text-muted">Banca, jogo e estudo em um só lugar</p>
+              <div className="flex items-center gap-3">
+              <Link
+                href="/performance/analise"
+                className="hidden items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink sm:flex"
+              >
+                <LineChart size={13} />
+                Análise avançada
+              </Link>
               {data.score_geral !== null && data.score_geral !== undefined && (
                 <div className="flex items-center gap-2">
                   <span className="hidden text-xs font-medium text-muted sm:inline">{nivelDoScore(Number(data.score_geral))}</span>
@@ -225,6 +233,7 @@ export default function PerformancePage() {
                   </div>
                 </div>
               )}
+              </div>
             </div>
 
             {/* Halo de acento atras do KPI principal — da profundidade e

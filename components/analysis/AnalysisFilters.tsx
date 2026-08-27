@@ -1,0 +1,205 @@
+"use client";
+
+import { useState } from "react";
+import { Upload, ChevronDown, SlidersHorizontal } from "lucide-react";
+import { FilterChip } from "@/components/ui/filter-chip";
+import { SegmentedControl } from "@/components/ui/segmented-control";
+import { ManualImportPanel } from "@/components/analysis/ManualImportPanel";
+import {
+  GAME_FORMAT_LABEL,
+  STACK_DEPTH_LABEL,
+  TOURNAMENT_STAGE_LABEL,
+  HERO_POSITION_LABEL,
+  HERO_POSITION_ORDER,
+  PREFLOP_ACTION_LABEL,
+  type AnalysisFilters as Filters,
+  type GameFormat,
+  type StackDepthBucket,
+  type TournamentStage,
+  type HeroPosition,
+  type PreflopActionType,
+} from "@/types/analysis";
+
+const PERIOD_OPTIONS: { label: string; days: number }[] = [
+  { label: "7d", days: 7 },
+  { label: "30d", days: 30 },
+  { label: "90d", days: 90 },
+  { label: "Tudo", days: 0 },
+];
+
+function toggle<T>(list: T[], value: T): T[] {
+  return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
+}
+
+// Barra sticky de filtros globais do módulo de Análise — mesma unidade
+// visual de FilterChip/SegmentedControl usada no resto do produto,
+// combinável (multi-seleção em cada grupo, filtros se somam por AND).
+// `available*` vem de quem tem dado real nos rows carregados: uma opção
+// sem nenhuma linha correspondente aparece desabilitada com o motivo, em
+// vez de some ou fingir que existe (mesmo espírito da tela de Performance
+// -- "não inventar número").
+export function AnalysisFilters({
+  filters,
+  onChange,
+  availableFormats,
+  availableStackDepths,
+  availablePositions,
+  onImported,
+}: {
+  filters: Filters;
+  onChange: (next: Filters) => void;
+  availableFormats: Set<GameFormat>;
+  availableStackDepths: Set<StackDepthBucket>;
+  availablePositions: Set<HeroPosition>;
+  onImported: () => void;
+}) {
+  const [periodDays, setPeriodDays] = useState(0);
+  const [importOpen, setImportOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+
+  function setPeriod(days: number) {
+    setPeriodDays(days);
+    if (days === 0) {
+      onChange({ ...filters, dateRange: { from: null, to: null } });
+      return;
+    }
+    const from = new Date(Date.now() - days * 86400000).toISOString();
+    onChange({ ...filters, dateRange: { from, to: null } });
+  }
+
+  const activeCount =
+    filters.formats.length + filters.stackDepths.length + filters.stages.length + filters.positions.length + filters.preflopActions.length;
+
+  return (
+    <div>
+      <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="flex flex-wrap items-center gap-2">
+          <SegmentedControl value={periodDays} onChange={setPeriod} options={PERIOD_OPTIONS.map((o) => ({ value: o.days, label: o.label }))} />
+
+          <button
+            type="button"
+            onClick={() => setMoreOpen((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
+              moreOpen ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-muted hover:border-ink/40 hover:text-ink"
+            }`}
+          >
+            <SlidersHorizontal size={13} />
+            Filtros
+            {activeCount > 0 && (
+              <span className="grid h-4 w-4 place-items-center rounded-full bg-evolution text-[10px] font-bold text-void">{activeCount}</span>
+            )}
+            <ChevronDown size={13} className={`transition-transform ${moreOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+
+        <button
+          type="button"
+          onClick={() => setImportOpen((v) => !v)}
+          className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+        >
+          <Upload size={13} />
+          Importar hand history
+        </button>
+      </div>
+
+      {importOpen && (
+        <div className="mt-3">
+          <ManualImportPanel
+            onImported={() => {
+              setImportOpen(false);
+              onImported();
+            }}
+          />
+        </div>
+      )}
+
+      {moreOpen && (
+        <div className="mt-3 space-y-3 border-t border-hairline pt-3">
+          <FilterGroup label="Modalidade">
+            {(Object.keys(GAME_FORMAT_LABEL) as GameFormat[]).map((f) => (
+              <FilterChip
+                key={f}
+                label={GAME_FORMAT_LABEL[f]}
+                active={filters.formats.includes(f)}
+                disabled={!availableFormats.has(f)}
+                disabledReason="Sem mãos importadas nessa modalidade ainda"
+                onClick={() => onChange({ ...filters, formats: toggle(filters.formats, f) })}
+              />
+            ))}
+          </FilterGroup>
+
+          <FilterGroup label="Profundidade de stack">
+            {(Object.keys(STACK_DEPTH_LABEL) as StackDepthBucket[]).map((s) => (
+              <FilterChip
+                key={s}
+                label={STACK_DEPTH_LABEL[s]}
+                active={filters.stackDepths.includes(s)}
+                disabled={!availableStackDepths.has(s)}
+                disabledReason="Sem mãos nessa faixa de stack ainda"
+                onClick={() => onChange({ ...filters, stackDepths: toggle(filters.stackDepths, s) })}
+              />
+            ))}
+          </FilterGroup>
+
+          <FilterGroup label="Estágio do torneio">
+            {(Object.keys(TOURNAMENT_STAGE_LABEL) as TournamentStage[]).map((s) => (
+              <FilterChip
+                key={s}
+                label={TOURNAMENT_STAGE_LABEL[s]}
+                active={filters.stages.includes(s)}
+                disabled
+                disabledReason="Depende do motor de ICM, que ainda não roda no pipeline (ver backlog)"
+                onClick={() => onChange({ ...filters, stages: toggle(filters.stages, s) })}
+              />
+            ))}
+          </FilterGroup>
+
+          <FilterGroup label="Posição do herói">
+            {HERO_POSITION_ORDER.map((p) => (
+              <FilterChip
+                key={p}
+                label={HERO_POSITION_LABEL[p]}
+                active={filters.positions.includes(p)}
+                disabled={!availablePositions.has(p)}
+                disabledReason="Sem mãos identificadas nessa posição ainda"
+                onClick={() => onChange({ ...filters, positions: toggle(filters.positions, p) })}
+              />
+            ))}
+          </FilterGroup>
+
+          <FilterGroup label="Ação preflop">
+            {(Object.keys(PREFLOP_ACTION_LABEL) as PreflopActionType[]).map((a) => (
+              <FilterChip
+                key={a}
+                label={PREFLOP_ACTION_LABEL[a]}
+                active={filters.preflopActions.includes(a)}
+                onClick={() => onChange({ ...filters, preflopActions: toggle(filters.preflopActions, a) })}
+              />
+            ))}
+          </FilterGroup>
+
+          {activeCount > 0 && (
+            <button
+              type="button"
+              onClick={() =>
+                onChange({ ...filters, formats: [], stackDepths: [], stages: [], positions: [], preflopActions: [] })
+              }
+              className="text-[11.5px] font-semibold text-muted hover:text-ink"
+            >
+              Limpar filtros
+            </button>
+          )}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function FilterGroup({ label, children }: { label: string; children: React.ReactNode }) {
+  return (
+    <div>
+      <p className="mb-1.5 text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">{label}</p>
+      <div className="flex flex-wrap gap-1.5">{children}</div>
+    </div>
+  );
+}
