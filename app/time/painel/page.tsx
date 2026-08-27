@@ -72,7 +72,7 @@ export default function PainelPage() {
     <Suspense
       fallback={
         <AppShell>
-          <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-sm text-muted">Carregando…</main>
+          <main className="w-full mx-auto max-w-[1280px] px-6 py-10 sm:px-8 text-sm text-muted">Carregando…</main>
         </AppShell>
       }
     >
@@ -204,7 +204,7 @@ function PainelConteudo() {
 
   return (
     <AppShell>
-      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 text-ink print:max-w-full print:p-0">
+      <main className="w-full mx-auto max-w-[1280px] px-6 py-10 sm:px-8 text-ink print:max-w-full print:p-0">
         {erro && (
           <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative print:hidden">
             {erro}
@@ -219,7 +219,7 @@ function PainelConteudo() {
             primeira aba ("Perfil do time" ficava fora de alcance rolando
             pra esquerda). A partir de sm a barra cabe inteira sem rolar,
             entao centralizar volta a fazer sentido visualmente. */}
-        <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5 print:border-0 print:bg-transparent print:p-0">
+        <div className="rounded-2xl border border-hairline bg-surface p-5 sm:p-6 print:border-0 print:bg-transparent print:p-0">
           <nav className="relative mb-4 flex justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center print:hidden">
             {ABAS.map((a) => {
               const Icon = a.icon;
