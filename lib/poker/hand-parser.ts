@@ -216,14 +216,17 @@ const ACTION_WORD_MAP: Record<string, string> = {
 };
 
 function extractHeroName(text: string): string | null {
-  const en = text.match(/Dealt to (\S+)/i);
+  // (.+?) nao-guloso em vez de \S+ — nickname com espaco (ex real: "da
+  // taip") faz \S+ parar no primeiro espaco e o heroi some (heroName vira
+  // null, heroCards junto, e a mesa toda perde a identificacao do heroi).
+  const en = text.match(/Dealt to (.+?) \[/i);
   if (en) return en[1];
   // PT-BR: nome e cartas vem na MESMA linha ("simoNetto11 recebe [4c 2h]"),
   // nao ha linha "Dealt to" separada. Ancorado no inicio de linha pra nao
   // confundir com outras ocorrencias da palavra "recebe" (ex: "recebeu" no
   // sumario usa palavra diferente, mas por seguranca a ancora de linha evita
   // falso-positivo em qualquer texto livre).
-  const pt = text.match(/^(\S+) recebe \[/m);
+  const pt = text.match(/^(.+?) recebe \[/m);
   return pt ? pt[1] : null;
 }
 
@@ -282,7 +285,12 @@ function extractStreetActions(
       continue;
     }
 
-    const raiseM = l.match(/^(\S+):\s+(?:raises|aumenta)\s+\$?([\d.,]+)\s+(?:to|para)\s+\$?([\d.,]+)/i);
+    // Nome nao pode ser \S+ (um token so) — PokerStars permite nickname com
+    // espaco (ex real, conta do usuario: "da taip"). \S+ parava no primeiro
+    // espaco do nome e a linha inteira falhava o match (acao/post do
+    // jogador sumia da contabilidade do pote). (.+?) nao-guloso ate o
+    // primeiro ": " resolve pros dois casos (com ou sem espaco no nome).
+    const raiseM = l.match(/^(.+?):\s+(?:raises|aumenta)\s+\$?([\d.,]+)\s+(?:to|para)\s+\$?([\d.,]+)/i);
     if (raiseM) {
       actions.push({
         player: raiseM[1],
@@ -305,7 +313,7 @@ function extractStreetActions(
     // sanidade no fim do replay (projectHandAtStep) lancava erro, impedindo
     // o evento de "award" de aparecer (pote nunca chegava a nenhum jogador).
     const postM = l.match(
-      /^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|small & big blind|dead blind|ante)\s+\$?([\d.,]+)/i
+      /^(.+?):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|small & big blind|dead blind|ante)\s+\$?([\d.,]+)/i
     );
     if (postM) {
       actions.push({
@@ -317,7 +325,7 @@ function extractStreetActions(
     }
 
     const genericM = l.match(
-      /^(\S+):\s+(folds|checks|calls|bets|allin|all-in|desiste|passa|iguala|aposta)\s*(?:\$?([\d.,]+))?/i
+      /^(.+?):\s+(folds|checks|calls|bets|allin|all-in|desiste|passa|iguala|aposta)\s*(?:\$?([\d.,]+))?/i
     );
     if (genericM) {
       const canonical = ACTION_WORD_MAP[genericM[2].toLowerCase()] ?? genericM[2].toLowerCase();
@@ -339,7 +347,10 @@ function extractPot(text: string): number | null {
 }
 
 function extractWinner(text: string): string | null {
-  const m = text.match(/(\S+) (?:collected|recebeu) \$?[\d.,]+/i);
+  // (.+?) nao-guloso — nickname com espaco quebrava \S+ e o vencedor
+  // sumia (winner null => evento de "award" nunca era criado, pote
+  // reconstruido corretamente mas nunca entregue a ninguem no replay).
+  const m = text.match(/(.+?) (?:collected|recebeu) \$?[\d.,]+/i);
   return m ? m[1] : null;
 }
 
@@ -366,7 +377,7 @@ function extractWonTournament(text: string): boolean {
 // aqui, ja aparece como oponente sumindo da mesa nas maos seguintes).
 function extractHeroFinishPlace(text: string, heroName: string | null): number | null {
   if (!heroName) return null;
-  const re = /(\S+) (?:finished the tournament in|terminou o torneio em) (\d+)(?:st|nd|rd|th|[ºª°])? (?:place|lugar)/i;
+  const re = /(.+?) (?:finished the tournament in|terminou o torneio em) (\d+)(?:st|nd|rd|th|[ºª°])? (?:place|lugar)/i;
   const m = text.match(re);
   if (!m || m[1] !== heroName) return null;
   const place = Number(m[2]);
@@ -406,7 +417,7 @@ function extractShowdown(text: string): ParsedShowdown[] {
   const results: ParsedShowdown[] = [];
   for (const rawLine of block.split("\n")) {
     const l = rawLine.trim();
-    const m = l.match(/^(\S+):\s+(?:shows|mostra)\s+\[([^\]]+)\]\s+\(([^)]+)\)/i);
+    const m = l.match(/^(.+?):\s+(?:shows|mostra)\s+\[([^\]]+)\]\s+\(([^)]+)\)/i);
     if (m) {
       results.push({ player: m[1], cards: parseCards(m[2]), handDescription: m[3] });
     }
@@ -745,7 +756,7 @@ function extractPreambleBlindActions(text: string): ParsedAction[] {
   for (const rawLine of preamble.split("\n")) {
     const l = rawLine.trim();
     const postM = l.match(
-      /^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|small & big blind|dead blind|ante)\s+\$?([\d.,]+)/i
+      /^(.+?):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|small & big blind|dead blind|ante)\s+\$?([\d.,]+)/i
     );
     if (postM) {
       actions.push({ player: postM[1], action: "posts", amount: Number(postM[3].replace(",", "")) });

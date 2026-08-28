@@ -217,6 +217,17 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
         // dinheiro de verdade), mas o texto na history bar continua
         // mostrando o valor apostado originalmente (actionLabel usa o
         // valor bruto do parser, nao afetado por essa correcao).
+        // Quando a sobra devolvida mira a propria BLIND (ninguem agiu antes
+        // — ex: mesa inteira desiste pro big blind), nao ha nenhum evento
+        // de acao pra descontar aqui (posts NAO viram events). Esse caso e'
+        // tratado a parte, de forma pura, por computeBlindReturnAdjustments
+        // — usado tanto por buildInitialState quanto pelo streetCommitted
+        // inicial em projectHandAtStep. NAO mutar hand.streets aqui: a UI
+        // chama projectHandAtStep de novo a cada step navegado reaproveitando
+        // o mesmo ParsedHand, e uma correcao por mutacao se acumularia a
+        // cada chamada (bug real encontrado ao testar em lote contra maos
+        // reais — o pote calculado ficava cada vez mais errado a cada clique
+        // de "proxima").
         const returned = a.amount ?? 0;
         for (let i = events.length - 1; i >= 0; i--) {
           const ev = events[i];
@@ -272,6 +283,35 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
   return events;
 }
 
+// Quanto subtrair do total postado de blind de cada jogador porque uma
+// "Aposta nao-igualada" devolveu parte (ou tudo) dela SEM que o jogador
+// tivesse agido antes — ex: mesa inteira desiste pro big blind, PokerStars
+// escreve "Uncalled bet (X) returned to <BB>" mesmo o BB nunca tendo feito
+// nenhuma acao. Se o jogador ja tinha agido (bet/call/raise) antes da
+// devolucao, ela mira essa acao, nao a blind — ja tratado via chipsAdded
+// dos events em buildEventList, NAO conta aqui (senao descontaria em
+// dobro). Pura (nao muta ParsedAction) de proposito: tanto buildInitialState
+// quanto o streetCommitted inicial em projectHandAtStep leem hand.streets
+// direto, e a UI chama projectHandAtStep de novo a cada step navegado
+// reaproveitando o mesmo ParsedHand — uma correcao por mutacao se
+// acumularia a cada chamada (bug real, achado testando em lote contra
+// maos reais: o pote calculado piorava a cada clique de "proxima").
+function computeBlindReturnAdjustments(preflopActions: ParsedAction[]): Map<string, number> {
+  const adjustments = new Map<string, number>();
+  const hasActedBeforeReturn = new Set<string>();
+  for (const a of preflopActions) {
+    if (a.action === "posts") continue;
+    if (a.action === "uncalled_return") {
+      if (!hasActedBeforeReturn.has(a.player)) {
+        adjustments.set(a.player, (adjustments.get(a.player) ?? 0) + (a.amount ?? 0));
+      }
+      continue;
+    }
+    hasActedBeforeReturn.add(a.player);
+  }
+  return adjustments;
+}
+
 // Calcula o estado inicial (step 0) — depois dos posts de blinds/ante e
 // antes de qualquer decisao voluntaria. Nao usa nenhum event ainda; le
 // so os posts direto do preflop.
@@ -284,8 +324,13 @@ function buildInitialState(hand: ParsedHand): {
   let pot = 0;
   const preflop = hand.streets.find((s) => s.name === "preflop");
   if (preflop) {
+    const adjustments = computeBlindReturnAdjustments(preflop.actions);
     for (const a of preflop.actions) {
-      if (a.action === "posts") pot += a.amount ?? 0;
+      if (a.action !== "posts") continue;
+      const owed = adjustments.get(a.player) ?? 0;
+      const applied = Math.min(owed, a.amount ?? 0);
+      if (applied > 0) adjustments.set(a.player, owed - applied);
+      pot += (a.amount ?? 0) - applied;
     }
   }
   return {
@@ -343,11 +388,19 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
     const posByName = new Map(seatLayout.filter((s) => s.playerName).map((s) => [s.playerName as string, s.posLabel]));
     const preflop = hand.streets.find((st) => st.name === "preflop");
     if (preflop) {
+      // Mesmo ajuste de computeBlindReturnAdjustments usado em
+      // buildInitialState — senao a ficha "parada em frente ao assento"
+      // no step 0 mostra a blind inteira mesmo quando parte dela voltou
+      // sem nenhuma acao do jogador (ver comentario na funcao).
+      const adjustments = computeBlindReturnAdjustments(preflop.actions);
       for (const a of preflop.actions) {
-        if (a.action === "posts") {
-          const pos = posByName.get(a.player);
-          if (pos) streetCommitted.set(pos, (streetCommitted.get(pos) ?? 0) + (a.amount ?? 0));
-        }
+        if (a.action !== "posts") continue;
+        const pos = posByName.get(a.player);
+        if (!pos) continue;
+        const owed = adjustments.get(a.player) ?? 0;
+        const applied = Math.min(owed, a.amount ?? 0);
+        if (applied > 0) adjustments.set(a.player, owed - applied);
+        streetCommitted.set(pos, (streetCommitted.get(pos) ?? 0) + (a.amount ?? 0) - applied);
       }
     }
   }
