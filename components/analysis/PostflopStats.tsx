@@ -1,8 +1,8 @@
 "use client";
 
 import { useMemo } from "react";
-import { Flame, Target, CornerUpLeft, Repeat, Zap, TrendingUp, Eye, Trophy } from "lucide-react";
-import { Painel, StatList, SubHeader, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
+import { Flame, Target, CornerUpLeft, Repeat, Zap, Eye, Trophy } from "lucide-react";
+import { Painel, StatList, HeroStrip, SubHeader, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
 import { computePostflopMetrics, computeMetricTrend } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PostflopMetrics } from "@/types/analysis";
 
@@ -14,28 +14,60 @@ function fmtRatio(v: number | null): string | null {
   return v === null ? null : v.toFixed(2);
 }
 
-// Segundo card da aba Preflop & Postflop — mesma leitura em lista do card
-// de preflop, pra ficar visualmente um par (não duas linguagens
-// diferentes na mesma tela).
+// Segundo card da aba Preflop & Postflop — mesma faixa de destaque +
+// lista do card de preflop, pra ficar visualmente um par.
 export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metrics: PostflopMetrics }) {
-  // Só o headliner (Flop C-Bet%) ganha tendência aqui — mesmo critério de
+  // Tendência dos 4 headliners (faixa de destaque) — mesmo critério de
   // "não virar gráfico" do card de preflop.
   const cbetFlopTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePostflopMetrics(chunk).cbet_flop_pct), [rows]);
+  const foldCbetFlopTrend = useMemo(
+    () => computeMetricTrend(rows, (chunk) => computePostflopMetrics(chunk).fold_to_cbet_flop_pct),
+    [rows]
+  );
+  const aggFactorTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePostflopMetrics(chunk).aggression_factor), [rows]);
+  const aggFreqTrend = useMemo(
+    () => computeMetricTrend(rows, (chunk) => computePostflopMetrics(chunk).aggression_frequency_pct),
+    [rows]
+  );
 
   return (
     <Painel titulo="Tendências pós-flop" icone={<Flame size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
-      <SubHeader>C-Bet & fold to c-bet</SubHeader>
-      <StatList
+      <HeroStrip
         items={[
           {
             label: "Flop C-Bet %",
             value: fmtPct(metrics.cbet_flop_pct),
-            icon: Target,
             tone: toneFromRange(metrics.cbet_flop_pct, 55, 75),
-            bar: statBar(metrics.cbet_flop_pct, 55, 75, 100),
             trend: cbetFlopTrend,
             hint: "Frequência de apostar no flop quando você foi o último agressor no preflop.",
           },
+          {
+            label: "Fold to Flop C-Bet %",
+            value: fmtPct(metrics.fold_to_cbet_flop_pct),
+            tone: toneFromRange(metrics.fold_to_cbet_flop_pct, 40, 55),
+            trend: foldCbetFlopTrend,
+            hint: "Frequência que você desiste diante de um c-bet de flop adversário.",
+          },
+          {
+            label: "Aggression Factor",
+            value: fmtRatio(metrics.aggression_factor),
+            tone: toneFromRange(metrics.aggression_factor, 2, 4),
+            trend: aggFactorTrend,
+            hint: "(Bet + Raise) / Call pós-flop — quão agressivo você é quando participa da mão.",
+          },
+          {
+            label: "Aggression Freq. %",
+            value: fmtPct(metrics.aggression_frequency_pct),
+            tone: toneFromRange(metrics.aggression_frequency_pct, 35, 50),
+            trend: aggFreqTrend,
+            hint: "% das suas ações pós-flop que são bet ou raise, em vez de call ou fold.",
+          },
+        ]}
+      />
+
+      <SubHeader>C-Bet & fold to c-bet</SubHeader>
+      <StatList
+        items={[
           {
             label: "Turn C-Bet %",
             value: fmtPct(metrics.cbet_turn_pct),
@@ -47,14 +79,6 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
             value: fmtPct(metrics.cbet_river_pct),
             icon: Target,
             hint: "Frequência de apostar no river quando você já vinha apostando flop e turn.",
-          },
-          {
-            label: "Fold to Flop C-Bet %",
-            value: fmtPct(metrics.fold_to_cbet_flop_pct),
-            icon: CornerUpLeft,
-            tone: toneFromRange(metrics.fold_to_cbet_flop_pct, 40, 55),
-            bar: statBar(metrics.fold_to_cbet_flop_pct, 40, 55, 100),
-            hint: "Frequência que você desiste diante de um c-bet de flop adversário.",
           },
           {
             label: "Fold to Turn C-Bet %",
@@ -71,7 +95,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
         ]}
       />
 
-      <SubHeader>Check-raise & donk bet</SubHeader>
+      <SubHeader>Check-raise, donk bet & showdown</SubHeader>
       <StatList
         items={[
           {
@@ -97,28 +121,6 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
             value: fmtPct(metrics.donk_bet_pct),
             icon: Zap,
             hint: "Frequência que você aposta fora de posição sem ter sido o último agressor no preflop.",
-          },
-        ]}
-      />
-
-      <SubHeader>Agressão & showdown</SubHeader>
-      <StatList
-        items={[
-          {
-            label: "Aggression Factor",
-            value: fmtRatio(metrics.aggression_factor),
-            icon: TrendingUp,
-            tone: toneFromRange(metrics.aggression_factor, 2, 4),
-            bar: statBar(metrics.aggression_factor, 2, 4, 8),
-            hint: "(Bet + Raise) / Call pós-flop — quão agressivo você é quando participa da mão.",
-          },
-          {
-            label: "Aggression Frequency %",
-            value: fmtPct(metrics.aggression_frequency_pct),
-            icon: TrendingUp,
-            tone: toneFromRange(metrics.aggression_frequency_pct, 35, 50),
-            bar: statBar(metrics.aggression_frequency_pct, 35, 50, 100),
-            hint: "% das suas ações pós-flop que são bet ou raise, em vez de call ou fold.",
           },
           {
             label: "WSD %",

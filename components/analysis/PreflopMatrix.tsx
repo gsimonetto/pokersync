@@ -2,8 +2,8 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers, ArrowUpRight, Shuffle } from "lucide-react";
-import { Painel, StatList, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
+import { Target, Grid3x3, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
+import { Painel, StatList, HeroStrip, SubHeader, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
@@ -35,44 +35,53 @@ export function PreflopTab({
   const matchups = useMemo(() => computeMatchupBreakdown(rows), [rows]);
   const router = useRouter();
 
-  // Tendência por bloco de mãos (ver computeMetricTrend) — só nos 3
-  // headliners de preflop, pra não transformar toda a lista num gráfico.
+  // Tendência por bloco de mãos (ver computeMetricTrend) — só nos 4
+  // headliners de preflop (faixa de destaque), pra não transformar toda a
+  // lista num gráfico.
   const vpipTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).vpip_pct), [rows]);
   const pfrTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).pfr_pct), [rows]);
   const threeBetTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).three_bet_pct), [rows]);
+  const stealTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).steal_pct), [rows]);
 
   return (
     <div className="space-y-4">
       <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
-        <StatList
+        <HeroStrip
           items={[
             {
               label: "VPIP",
               value: fmtPct(metrics.vpip_pct),
-              icon: Hand,
               tone: toneFromRange(metrics.vpip_pct, 20, 28),
-              bar: statBar(metrics.vpip_pct, 20, 28, 60),
               trend: vpipTrend,
               hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
             },
             {
               label: "PFR",
               value: fmtPct(metrics.pfr_pct),
-              icon: TrendingUp,
               tone: toneFromRange(metrics.pfr_pct, 15, 24),
-              bar: statBar(metrics.pfr_pct, 15, 24, 50),
               trend: pfrTrend,
               hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
             },
             {
               label: "3-Bet %",
               value: fmtPct(metrics.three_bet_pct),
-              icon: Repeat,
               tone: toneFromRange(metrics.three_bet_pct, 6, 10),
-              bar: statBar(metrics.three_bet_pct, 6, 10, 20),
               trend: threeBetTrend,
               hint: "Frequência de re-raise no preflop diante de um raise anterior.",
             },
+            {
+              label: "Steal %",
+              value: fmtPct(metrics.steal_pct),
+              tone: toneFromRange(metrics.steal_pct, 35, 55),
+              trend: stealTrend,
+              hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
+            },
+          ]}
+        />
+
+        <SubHeader>Outras frequências</SubHeader>
+        <StatList
+          items={[
             {
               label: "Fold to 3-Bet %",
               value: fmtPct(metrics.fold_to_3bet_pct),
@@ -87,14 +96,6 @@ export function PreflopTab({
               value: fmtPct(metrics.fold_to_4bet_pct),
               icon: CornerUpLeft,
               hint: "Frequência que você desiste depois de ser 4-betado, quando você tinha 3-betado.",
-            },
-            {
-              label: "Steal %",
-              value: fmtPct(metrics.steal_pct),
-              icon: Swords,
-              tone: toneFromRange(metrics.steal_pct, 35, 55),
-              bar: statBar(metrics.steal_pct, 35, 55, 100),
-              hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
             },
             {
               label: "Squeeze %",
