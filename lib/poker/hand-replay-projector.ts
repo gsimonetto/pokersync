@@ -184,8 +184,16 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
         // ao total do resumo da mao (sanity check acusava divergencia).
         // Nao ha campo explicito de "tipo de post" disponivel aqui pra
         // diferenciar de outro jeito — identifica blind comparando o
-        // valor do post com hand.smallBlind/hand.bigBlind.
-        const isBlindPost = a.amount === hand.smallBlind || a.amount === hand.bigBlind;
+        // valor do post com hand.smallBlind/hand.bigBlind. Blind morta
+        // combinada ("posts small & big blind X", ver hand-parser.ts) chega
+        // aqui com amount = smallBlind + bigBlind — sem esse terceiro caso
+        // ela caia no "else" (tratada como se fosse ante) e o commitment
+        // da rua ficava sem a parte viva (big blind) desse jogador, quebrando
+        // o delta de um raise-to que viesse logo depois.
+        const isBlindPost =
+          a.amount === hand.smallBlind ||
+          a.amount === hand.bigBlind ||
+          a.amount === (hand.smallBlind ?? 0) + (hand.bigBlind ?? 0);
         if (isBlindPost) {
           committed.set(a.player, (committed.get(a.player) ?? 0) + (a.amount ?? 0));
         }

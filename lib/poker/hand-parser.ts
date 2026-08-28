@@ -296,7 +296,17 @@ function extractStreetActions(
 
     // PT-BR usa verbo diferente pra ante ("coloca ante X") vs blind ("paga
     // o small/big blind X") — alternancia cobre os dois em um so regex.
-    const postM = l.match(/^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|ante)\s+\$?([\d.,]+)/i);
+    // Blinds mortos (jogador voltou de ausencia e deve blind atrasada)
+    // aparecem como "posts dead blind X" (linha separada, ex: GGPoker) ou
+    // combinados numa linha so, "posts small & big blind X" (PokerStars,
+    // quando o jogador deve as duas). Sem esses dois padroes no regex, a
+    // linha inteira era ignorada — o pote reconstruido ficava menor que o
+    // total real da mao (falta o valor da blind morta) e a checagem de
+    // sanidade no fim do replay (projectHandAtStep) lancava erro, impedindo
+    // o evento de "award" de aparecer (pote nunca chegava a nenhum jogador).
+    const postM = l.match(
+      /^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|small & big blind|dead blind|ante)\s+\$?([\d.,]+)/i
+    );
     if (postM) {
       actions.push({
         player: postM[1],
@@ -727,7 +737,9 @@ function extractPreambleBlindActions(text: string): ParsedAction[] {
   const actions: ParsedAction[] = [];
   for (const rawLine of preamble.split("\n")) {
     const l = rawLine.trim();
-    const postM = l.match(/^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|ante)\s+\$?([\d.,]+)/i);
+    const postM = l.match(
+      /^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|small & big blind|dead blind|ante)\s+\$?([\d.,]+)/i
+    );
     if (postM) {
       actions.push({ player: postM[1], action: "posts", amount: Number(postM[3].replace(",", "")) });
     }
