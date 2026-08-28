@@ -202,20 +202,13 @@ export default function PerformancePage() {
 
       {data && (
         <>
-          {/* ----------------------------------------------------------
-              Faixa herói: os 3 números que o grinder olha primeiro. Peso
-              visual desproporcional de propósito — o resto da tela é
-              contexto, isto aqui é o placar.
-             ---------------------------------------------------------- */}
-          <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
-            {/* Subtitulo + Score Geral -- antes viviam numa AppHeader
-                sticky separada por cima da tela; agora entram como
-                primeira linha do proprio card herói, mesmo padrão do
-                Treino (controles dentro do container, não numa barra
-                fixa à parte). */}
-            <div className="relative flex flex-wrap items-center justify-between gap-3 border-b border-hairline px-6 py-4">
-              <p className="text-sm text-muted">Banca, jogo e estudo em um só lugar</p>
-              <div className="flex items-center gap-3">
+          {/* Barra superior: abas fazem o papel de filtro deste módulo
+              (mesmo padrão do resto do produto — filtros/navegação no
+              topo), com Análise avançada e o Score Geral na mesma linha,
+              não soltos dentro de um card à parte. */}
+          <div className="flex flex-wrap items-center justify-between gap-3">
+            <TabNav value={tab} onChange={setTab} options={TABS} className="min-w-0 flex-1" />
+            <div className="flex shrink-0 items-center gap-3">
               <Link
                 href="/performance/analise"
                 className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
@@ -240,82 +233,89 @@ export default function PerformancePage() {
                   </div>
                 </div>
               )}
-              </div>
             </div>
+          </div>
 
-            {/* Halo de acento atras do KPI principal — da profundidade e
-                ancora o olho no canto superior esquerdo, onde a leitura
-                comeca. Cor segue o sinal do ROI. */}
-            <div
-              aria-hidden="true"
-              className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full opacity-[0.13] blur-3xl"
-              style={{
-                background:
-                  data.roi_pct === null ? "#5AA6E0" : Number(data.roi_pct) >= 0 ? "#2FB89A" : "#e0555a",
-              }}
-            />
+          <div className="mt-4 space-y-4">
+            {tab === "financeiro" && (
+              <>
+                {/* ----------------------------------------------------
+                    Faixa herói: os 3 números que o grinder olha primeiro.
+                    Peso visual desproporcional de propósito. Só aparece na
+                    aba Financeiro agora — antes ficava fixa em toda aba,
+                    competindo com o conteúdo das outras.
+                   ---------------------------------------------------- */}
+                <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface">
+                  {/* Halo de acento atras do KPI principal — da profundidade e
+                      ancora o olho no canto superior esquerdo, onde a leitura
+                      comeca. Cor segue o sinal do ROI. */}
+                  <div
+                    aria-hidden="true"
+                    className="pointer-events-none absolute -left-24 -top-24 size-64 rounded-full opacity-[0.13] blur-3xl"
+                    style={{
+                      background:
+                        data.roi_pct === null ? "#5AA6E0" : Number(data.roi_pct) >= 0 ? "#2FB89A" : "#e0555a",
+                    }}
+                  />
 
-            <div className="relative grid grid-cols-1 divide-y divide-hairline sm:grid-cols-3 sm:divide-x sm:divide-y-0">
-              <HeroMetric
-                label="ROI acumulado"
-                value={fmtPct(data.roi_pct, 2)}
-                tone={data.roi_pct === null ? "neutro" : Number(data.roi_pct) >= 0 ? "bom" : "ruim"}
-                hint={data.total_investido !== null ? `sobre ${fmtMoney(data.total_investido)} investidos` : undefined}
-                destaque
-              />
-              <HeroMetric
-                label="Resultado"
-                value={fmtSignedMoney(data.lucro_acumulado)}
-                tone={data.lucro_acumulado === null ? "neutro" : Number(data.lucro_acumulado) >= 0 ? "bom" : "ruim"}
-                hint={data.dolar_hora !== null ? `${fmtMoney(data.dolar_hora)} por hora` : "sem horas registradas"}
-              />
-              <HeroMetric
-                label="Volume"
-                value={fmtNum(data.num_sessoes)}
-                tone="neutro"
-                hint={
-                  data.frequencia_semanal_sessoes !== null
-                    ? `${data.frequencia_semanal_sessoes} sessões por semana`
-                    : "sessões registradas"
-                }
-              />
-            </div>
+                  <div className="relative grid grid-cols-1 divide-y divide-hairline sm:grid-cols-3 sm:divide-x sm:divide-y-0">
+                    <HeroMetric
+                      label="ROI acumulado"
+                      value={fmtPct(data.roi_pct, 2)}
+                      tone={data.roi_pct === null ? "neutro" : Number(data.roi_pct) >= 0 ? "bom" : "ruim"}
+                      hint={data.total_investido !== null ? `sobre ${fmtMoney(data.total_investido)} investidos` : undefined}
+                      destaque
+                    />
+                    <HeroMetric
+                      label="Resultado"
+                      value={fmtSignedMoney(data.lucro_acumulado)}
+                      tone={data.lucro_acumulado === null ? "neutro" : Number(data.lucro_acumulado) >= 0 ? "bom" : "ruim"}
+                      hint={data.dolar_hora !== null ? `${fmtMoney(data.dolar_hora)} por hora` : "sem horas registradas"}
+                    />
+                    <HeroMetric
+                      label="Volume"
+                      value={fmtNum(data.num_sessoes)}
+                      tone="neutro"
+                      hint={
+                        data.frequencia_semanal_sessoes !== null
+                          ? `${data.frequencia_semanal_sessoes} sessões por semana`
+                          : "sessões registradas"
+                      }
+                    />
+                  </div>
 
-            {/* Veredito como faixa propria, nao como paragrafo solto: barra
-                de acento a esquerda + fundo levemente tingido dao a ele o
-                peso de "conclusao", nao de legenda. */}
-            {veredito && (
-              <div
-                className={`relative flex items-start gap-3 border-t border-hairline px-6 py-4 ${
-                  veredito.tom === "bom"
-                    ? "bg-positive/[0.06]"
-                    : veredito.tom === "ruim"
-                      ? "bg-negative/[0.06]"
-                      : "bg-elevated/40"
-                }`}
-              >
-                <span
-                  aria-hidden="true"
-                  className={`absolute inset-y-0 left-0 w-[3px] ${
-                    veredito.tom === "bom" ? "bg-positive" : veredito.tom === "ruim" ? "bg-negative" : "bg-muted/40"
-                  }`}
-                />
-                <Sparkles
-                  size={14}
-                  className={`mt-0.5 shrink-0 ${
-                    veredito.tom === "bom" ? "text-positive" : veredito.tom === "ruim" ? "text-negative" : "text-muted"
-                  }`}
-                />
-                <p className="text-[13px] leading-relaxed text-ink/80">{veredito.texto}</p>
-              </div>
+                  {/* Veredito como faixa propria, nao como paragrafo solto: barra
+                      de acento a esquerda + fundo levemente tingido dao a ele o
+                      peso de "conclusao", nao de legenda. */}
+                  {veredito && (
+                    <div
+                      className={`relative flex items-start gap-3 border-t border-hairline px-6 py-4 ${
+                        veredito.tom === "bom"
+                          ? "bg-positive/[0.06]"
+                          : veredito.tom === "ruim"
+                            ? "bg-negative/[0.06]"
+                            : "bg-elevated/40"
+                      }`}
+                    >
+                      <span
+                        aria-hidden="true"
+                        className={`absolute inset-y-0 left-0 w-[3px] ${
+                          veredito.tom === "bom" ? "bg-positive" : veredito.tom === "ruim" ? "bg-negative" : "bg-muted/40"
+                        }`}
+                      />
+                      <Sparkles
+                        size={14}
+                        className={`mt-0.5 shrink-0 ${
+                          veredito.tom === "bom" ? "text-positive" : veredito.tom === "ruim" ? "text-negative" : "text-muted"
+                        }`}
+                      />
+                      <p className="text-[13px] leading-relaxed text-ink/80">{veredito.texto}</p>
+                    </div>
+                  )}
+                </section>
+                <AbaFinanceiro data={data} />
+              </>
             )}
-          </section>
-
-          {/* Abas — mesmo padrao do Painel do Time (icone + sublinhado). */}
-          <TabNav className="mt-6" value={tab} onChange={setTab} options={TABS} />
-
-          <div className="mt-4">
-            {tab === "financeiro" && <AbaFinanceiro data={data} />}
             {tab === "jogo" && (
               <AbaJogo data={data} posStats={posStats} matchupStats={matchupStats} ipOop={ipOop} preflopSit={preflopSit} />
             )}
