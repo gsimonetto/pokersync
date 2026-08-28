@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Loader2, Bot, PenLine } from "lucide-react";
 import { upsertTournamentPayout, type TournamentPayout, type PayoutPlace } from "@/lib/services/tournament-payout-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
@@ -38,12 +38,30 @@ export function TournamentPayoutsPanel({
   sessions,
   payouts,
   onChanged,
+  focusPending,
+  onFocusConsumed,
 }: {
   sessions: HandSession[];
   payouts: TournamentPayout[];
   onChanged: () => void;
+  focusPending?: boolean;
+  onFocusConsumed?: () => void;
 }) {
   const byTournament = new Map(payouts.map((p) => [p.tournamentIdPs, p]));
+
+  function hasPayoutFor(s: HandSession): boolean {
+    const p = s.tournament_id_ps ? byTournament.get(s.tournament_id_ps) : undefined;
+    return p != null && (p.heroPayoutAmount != null || p.places.length > 0);
+  }
+
+  // Veio do botão "Importar → Torneio": abre e rola direto pro primeiro
+  // torneio sem premiação, em vez de deixar o jogador procurar na lista.
+  // Consome a flag uma vez (no mount) pra não repetir em toda troca de aba.
+  const pendingSession = focusPending ? sessions.find((s) => !hasPayoutFor(s)) : undefined;
+  useEffect(() => {
+    if (focusPending) onFocusConsumed?.();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [focusPending]);
 
   if (sessions.length === 0) {
     return <EmptyState texto="Nenhum torneio importado ainda — a estrutura de premiação aparece aqui assim que houver mãos de torneio." />;
@@ -57,14 +75,30 @@ export function TournamentPayoutsPanel({
           session={s}
           payout={s.tournament_id_ps ? byTournament.get(s.tournament_id_ps) : undefined}
           onChanged={onChanged}
+          highlight={pendingSession?.id === s.id}
         />
       ))}
     </div>
   );
 }
 
-function TournamentRow({ session, payout, onChanged }: { session: HandSession; payout?: TournamentPayout; onChanged: () => void }) {
-  const [open, setOpen] = useState(false);
+function TournamentRow({
+  session,
+  payout,
+  onChanged,
+  highlight,
+}: {
+  session: HandSession;
+  payout?: TournamentPayout;
+  onChanged: () => void;
+  highlight?: boolean;
+}) {
+  const [open, setOpen] = useState(!!highlight);
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    if (highlight) rowRef.current?.scrollIntoView({ behavior: "smooth", block: "center" });
+  }, [highlight]);
   const [heroFinishPlace, setHeroFinishPlace] = useState(payout?.heroFinishPlace != null ? String(payout.heroFinishPlace) : "");
   const [heroPayoutAmount, setHeroPayoutAmount] = useState(payout?.heroPayoutAmount != null ? String(payout.heroPayoutAmount) : "");
   const [totalEntrants, setTotalEntrants] = useState(payout?.totalEntrants != null ? String(payout.totalEntrants) : "");
@@ -97,7 +131,10 @@ function TournamentRow({ session, payout, onChanged }: { session: HandSession; p
   const hasPayout = payout != null && (payout.heroPayoutAmount != null || payout.places.length > 0);
 
   return (
-    <div className="rounded-lg border border-hairline bg-elevated">
+    <div
+      ref={rowRef}
+      className={`rounded-lg border bg-elevated transition-colors ${highlight ? "border-evolution/60 ring-1 ring-evolution/40" : "border-hairline"}`}
+    >
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 p-3 text-left">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">{session.label}</p>
