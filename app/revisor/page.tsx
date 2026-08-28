@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState, Suspense } from "react";
-import { useSearchParams } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Bookmark, ListChecks, PieChart } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { TabNav } from "@/components/ui/tab-nav";
@@ -31,8 +31,15 @@ type Screen = "fila" | "salvos" | "nova" | "sessao" | "detalhe" | "aderencia";
 // uso (o coach normalmente so chega aqui via notificacao mesmo).
 
 function RevisorPageInner() {
+  const router = useRouter();
   const searchParams = useSearchParams();
   const [screen, setScreen] = useState<Screen>("fila");
+  // Deep-link "?hands=id1,id2&label=..." — vem de Análise (posição,
+  // matchup, leak): já entra na fila filtrada só com essas mãos, em vez de
+  // uma lista solta lá na tela de Análise que duplicaria a UI do Revisor.
+  const handsParam = searchParams.get("hands");
+  const filterHandIds = handsParam ? handsParam.split(",").filter(Boolean) : undefined;
+  const filterLabel = searchParams.get("label") ?? undefined;
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   // De onde "detalhe" foi aberto (fila normal ou biblioteca de salvos) —
@@ -124,7 +131,16 @@ function RevisorPageInner() {
           </button>
         )}
 
-        {screen === "fila" && <RevisorFila onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />}
+        {screen === "fila" && (
+          <RevisorFila
+            onNova={goNova}
+            onOpen={goDetalhe}
+            onOpenSession={goSessao}
+            filterHandIds={filterHandIds}
+            filterLabel={filterLabel}
+            onClearFilter={() => router.replace("/revisor")}
+          />
+        )}
         {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
         {screen === "aderencia" && <AderenciaRange />}
         {screen === "nova" && (

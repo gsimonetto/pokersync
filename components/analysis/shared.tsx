@@ -1,7 +1,6 @@
 "use client";
 
-import Link from "next/link";
-import { Lock, PlayCircle, type LucideIcon } from "lucide-react";
+import { Lock, type LucideIcon } from "lucide-react";
 
 // Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
 // (rounded-xl border-hairline bg-surface) que app/performance/page.tsx já
@@ -151,46 +150,16 @@ function Sparkline({ points, tone }: { points: number[]; tone?: "bom" | "ruim" }
   );
 }
 
-// Linha de mãos clicáveis pro Revisor — mesmo padrão que o Leak Finder já
-// usa (PlayCircle + posição/formato + data), extraído aqui pra reusar nos
-// outros pontos da tela que também precisam de "quais mãos compõem esse
-// número" (Por posição, Matchups), em vez de cada aba reimplementar.
-export function HandLinks({
-  hands,
-  limit = 30,
-}: {
-  hands: { handId: string; playedAt: string; position?: string | null; format?: string | null }[];
-  limit?: number;
-}) {
-  if (hands.length === 0) {
-    return <p className="text-xs text-muted">Nenhuma mão encontrada pra esse recorte.</p>;
-  }
-  const shown = hands.slice(-limit).reverse();
-  return (
-    <div>
-      {hands.length > limit && (
-        <p className="mb-2 text-[11px] text-muted/70">
-          Mostrando as {limit} mais recentes de {hands.length}.
-        </p>
-      )}
-      <ul className="max-h-64 space-y-1.5 overflow-y-auto">
-        {shown.map((h) => (
-          <li key={h.handId}>
-            <Link
-              href={`/revisor?shared=${h.handId}`}
-              className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-void px-3 py-2 text-xs text-ink transition-colors hover:border-ink/40"
-            >
-              <span className="flex items-center gap-2">
-                <PlayCircle size={13} className="text-review" />
-                {[h.position, h.format?.toUpperCase()].filter(Boolean).join(" · ") || "Mão sem detalhes identificados"}
-              </span>
-              <span className="text-muted">{new Date(h.playedAt).toLocaleDateString("pt-BR")}</span>
-            </Link>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+// Monta a URL do Revisor já filtrado pras mãos passadas (deep-link
+// "?hands=...&label=..." — ver RevisorFila) — clicar num recorte da
+// Análise (posição, matchup, leak) leva direto pra lá com a lista pronta,
+// em vez de abrir uma listagem solta aqui na própria tela de Análise.
+// Teto de 150 ids: a base de um usuário hoje é ~200 mãos no total (ver
+// fetchAnalysisHandRows), então nenhum recorte real bate nisso — é só
+// uma trava de sanidade pro tamanho da URL, não um corte que aconteça.
+export function revisorHandsHref(handIds: string[], label: string): string {
+  const ids = handIds.slice(-150);
+  return `/revisor?hands=${ids.join(",")}&label=${encodeURIComponent(label)}`;
 }
 
 // Referência simplificada de "faixa saudável" pra colorir StatList sem

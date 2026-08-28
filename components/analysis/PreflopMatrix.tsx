@@ -1,11 +1,12 @@
 "use client";
 
-import { Fragment, useMemo, useState } from "react";
-import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers, ChevronDown, Shuffle } from "lucide-react";
-import { Painel, StatList, EmptyState, SampleBadge, toneFromRange, statBar, HandLinks } from "@/components/analysis/shared";
+import { useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
+import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers, ArrowUpRight, Shuffle } from "lucide-react";
+import { Painel, StatList, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
-import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown, rowsToHandRefs } from "@/lib/services/analysis-service";
-import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics, HeroPosition } from "@/types/analysis";
+import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown } from "@/lib/services/analysis-service";
+import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
@@ -32,8 +33,7 @@ export function PreflopTab({
   // UTG→BB (essa já está implícita no rótulo da posição).
   const byPositionSorted = useMemo(() => [...byPosition].sort((a, b) => b.hands - a.hands), [byPosition]);
   const matchups = useMemo(() => computeMatchupBreakdown(rows), [rows]);
-  const [expandedPosition, setExpandedPosition] = useState<HeroPosition | null>(null);
-  const [expandedMatchup, setExpandedMatchup] = useState<string | null>(null);
+  const router = useRouter();
 
   // Tendência por bloco de mãos (ver computeMetricTrend) — só nos 3
   // headliners de preflop, pra não transformar toda a lista num gráfico.
@@ -161,38 +161,34 @@ export function PreflopTab({
               </thead>
               <tbody>
                 {byPositionSorted.map((p) => (
-                  <Fragment key={p.position}>
-                    <tr
-                      onClick={() => setExpandedPosition((cur) => (cur === p.position ? null : p.position))}
-                      className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
-                    >
-                      <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.vpip_pct) ?? "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.pfr_pct) ?? "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.three_bet_pct) ?? "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.steal_pct) ?? "—"}</td>
-                      <td className="px-3 py-2 text-right">
-                        <ChevronDown
-                          size={13}
-                          className={`ml-auto text-muted transition-transform ${expandedPosition === p.position ? "rotate-180" : ""}`}
-                        />
-                      </td>
-                    </tr>
-                    {expandedPosition === p.position && (
-                      <tr className="border-b border-hairline last:border-b-0">
-                        <td colSpan={7} className="bg-elevated/40 p-3">
-                          <HandLinks hands={rowsToHandRefs(rows.filter((r) => r.heroPosition === p.position))} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                  <tr
+                    key={p.position}
+                    onClick={() =>
+                      router.push(
+                        revisorHandsHref(
+                          rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
+                          `Posição ${p.position}`
+                        )
+                      )
+                    }
+                    className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
+                  >
+                    <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.vpip_pct) ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.pfr_pct) ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.three_bet_pct) ?? "—"}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.steal_pct) ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <ArrowUpRight size={13} className="ml-auto text-muted" />
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
           </div>
         )}
-        <p className="mt-2 text-[11px] text-muted/70">Clique numa posição pra ver quais mãos compõem esse resultado.</p>
+        <p className="mt-2 text-[11px] text-muted/70">Clique numa posição pra abrir essas mãos no Revisor.</p>
       </Painel>
 
       <Painel titulo="Matchups" icone={<Shuffle size={14} className="text-review" />}>
@@ -211,29 +207,25 @@ export function PreflopTab({
               </thead>
               <tbody>
                 {matchups.map((m) => (
-                  <Fragment key={m.matchup}>
-                    <tr
-                      onClick={() => setExpandedMatchup((cur) => (cur === m.matchup ? null : m.matchup))}
-                      className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
-                    >
-                      <td className="px-3 py-2 font-semibold text-ink">{m.matchup.replace("_vs_", " vs ")}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted">{m.hands}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.vpip_pct) ?? "—"}</td>
-                      <td className="px-3 py-2 text-right">
-                        <ChevronDown
-                          size={13}
-                          className={`ml-auto text-muted transition-transform ${expandedMatchup === m.matchup ? "rotate-180" : ""}`}
-                        />
-                      </td>
-                    </tr>
-                    {expandedMatchup === m.matchup && (
-                      <tr className="border-b border-hairline last:border-b-0">
-                        <td colSpan={4} className="bg-elevated/40 p-3">
-                          <HandLinks hands={rowsToHandRefs(rows.filter((r) => r.matchup === m.matchup))} />
-                        </td>
-                      </tr>
-                    )}
-                  </Fragment>
+                  <tr
+                    key={m.matchup}
+                    onClick={() =>
+                      router.push(
+                        revisorHandsHref(
+                          rows.filter((r) => r.matchup === m.matchup).map((r) => r.handReviewId),
+                          `Matchup ${m.matchup.replace("_vs_", " vs ")}`
+                        )
+                      )
+                    }
+                    className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
+                  >
+                    <td className="px-3 py-2 font-semibold text-ink">{m.matchup.replace("_vs_", " vs ")}</td>
+                    <td className="px-3 py-2 text-right tabular-nums text-muted">{m.hands}</td>
+                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.vpip_pct) ?? "—"}</td>
+                    <td className="px-3 py-2 text-right">
+                      <ArrowUpRight size={13} className="ml-auto text-muted" />
+                    </td>
+                  </tr>
                 ))}
               </tbody>
             </table>
@@ -241,7 +233,7 @@ export function PreflopTab({
         )}
         <p className="mt-2 text-[11px] leading-relaxed text-muted/70">
           Só cobre pots que ficaram heads-up (você contra um adversário) até o flop — é a única situação em que o motor
-          identifica os dois lados do confronto com segurança.
+          identifica os dois lados do confronto com segurança. Clique num matchup pra abrir essas mãos no Revisor.
         </p>
       </Painel>
 
