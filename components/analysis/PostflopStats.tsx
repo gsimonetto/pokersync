@@ -2,7 +2,7 @@
 
 import { useMemo } from "react";
 import { Flame, Target, CornerUpLeft, Repeat, Zap, Eye, Trophy } from "lucide-react";
-import { Painel, StatList, HeroStrip, SubHeader, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
+import { Painel, StatCardGrid, HeroStrip, SubHeader, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
 import { computePostflopMetrics, computeMetricTrend } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PostflopMetrics } from "@/types/analysis";
 
@@ -66,7 +66,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
       />
 
       <SubHeader>C-Bet & fold to c-bet</SubHeader>
-      <StatList
+      <StatCardGrid
         items={[
           {
             label: "Turn C-Bet %",
@@ -96,7 +96,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
       />
 
       <SubHeader>Check-raise, donk bet & showdown</SubHeader>
-      <StatList
+      <StatCardGrid
         items={[
           {
             label: "Check-Raise Flop %",
@@ -139,7 +139,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
 
       <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
         Cor e barra = faixa de referência comum pra 6-max/MTT (heurística de população, não output do motor GTO) — métrica
-        sem barra é métrica sem consenso amplo, mostramos só o número. Passe o mouse sobre qualquer linha pra ver a
+        sem barra é métrica sem consenso amplo, mostramos só o número. Passe o mouse sobre qualquer card pra ver a
         definição. W$SD% usa o vencedor gravado da mão (um único nome) como aproximação — não cobre split pot com precisão
         de equity. Aggression Factor fica sem valor quando não há nenhum call registrado na amostra (denominador zero).
       </p>
