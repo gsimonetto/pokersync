@@ -31,10 +31,14 @@ export async function GET(request: Request) {
 
     if (!error) {
       // Fluxo 2b: esse login começou no agente desktop (ver
-      // app/agent-login/page.tsx) — devolve os tokens pro app nativo via
-      // deep link em vez de entrar na sessão web. agent_state é o nonce
-      // que o agente gerou antes de abrir o navegador; ele confere que a
-      // resposta corresponde ao login que ele mesmo iniciou.
+      // app/agent-login/page.tsx). Não redireciona direto pro deep link
+      // (pokersync-agent://auth) — registro de esquema customizado
+      // depende de COMO o instalador rodou em cada SO (varia até entre
+      // .deb e AppImage no Linux), e quando falha o navegador só fica
+      // "carregando" pra sempre, sem erro nenhum pro usuário ver
+      // (relatado: "eu confirmo e fica apenas rodando"). Em vez disso,
+      // manda pra uma página nossa que tenta o deep link E mostra um
+      // link pra colar manualmente no agente se não abrir sozinho.
       const agentState = searchParams.get("agent_state");
       if (agentState && data.session) {
         const params = new URLSearchParams({
@@ -46,7 +50,7 @@ export async function GET(request: Request) {
         // usando essa janela de navegador é o agente, não o jogador
         // navegando o produto.
         await supabase.auth.signOut();
-        redirect(`pokersync-agent://auth?${params.toString()}`);
+        redirect(`/agent-login/concluido?${params.toString()}`);
       }
 
       // Login com Google já cria sessão de verdade — aqui SIM deixamos
