@@ -6,9 +6,24 @@ import { Lock, type LucideIcon } from "lucide-react";
 // (rounded-xl border-hairline bg-surface) que app/performance/page.tsx já
 // usa, centralizado aqui porque as 5 abas precisam dele em paralelo (uma
 // única tela, não 5 telas isoladas reinventando o card cada uma).
-export function Painel({ titulo, icone, action, children }: { titulo: string; icone?: React.ReactNode; action?: React.ReactNode; children: React.ReactNode }) {
+export function Painel({
+  titulo,
+  icone,
+  action,
+  children,
+  id,
+}: {
+  titulo: string;
+  icone?: React.ReactNode;
+  action?: React.ReactNode;
+  children: React.ReactNode;
+  // Âncora opcional pra sub-navegação dentro de uma aba longa (ver
+  // SectionNav) — scroll-mt compensa a barra de filtros/sub-nav sticky
+  // acima, senão o topo do card fica escondido atrás delas.
+  id?: string;
+}) {
   return (
-    <section className="rounded-xl border border-hairline bg-surface p-5">
+    <section id={id} className="scroll-mt-28 rounded-xl border border-hairline bg-surface p-5">
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {icone}
@@ -18,6 +33,26 @@ export function Painel({ titulo, icone, action, children }: { titulo: string; ic
       </div>
       <div>{children}</div>
     </section>
+  );
+}
+
+// Sub-navegação por âncora — pra uma aba longa (várias seções empilhadas
+// dentro da mesma tela) não virar "role a página até achar"; mesma pill
+// do FilterChip (padrão já estabelecido no produto), só que aqui navega
+// em vez de filtrar. Sticky logo abaixo da barra de filtros/TabNav.
+export function SectionNav({ items }: { items: { id: string; label: string }[] }) {
+  return (
+    <nav className="sticky top-0 z-20 mb-4 flex flex-wrap gap-1.5 border-b border-hairline bg-surface/95 py-2 backdrop-blur sm:top-18">
+      {items.map((it) => (
+        <a
+          key={it.id}
+          href={`#${it.id}`}
+          className="inline-flex items-center rounded-full border border-hairline px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+        >
+          {it.label}
+        </a>
+      ))}
+    </nav>
   );
 }
 

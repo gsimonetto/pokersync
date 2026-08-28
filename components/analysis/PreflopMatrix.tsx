@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Target, Grid3x3, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
-import { Painel, StatCardGrid, HeroStrip, SubHeader, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
+import { Painel, StatCardGrid, HeroStrip, SubHeader, SectionNav, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
@@ -44,8 +44,24 @@ export function PreflopTab({
   const stealTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).steal_pct), [rows]);
 
   return (
-    <div className="space-y-4">
-      <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
+    <div>
+      <SectionNav
+        items={[
+          { id: "preflop", label: "Preflop" },
+          { id: "postflop", label: "Postflop" },
+          { id: "por-posicao", label: "Por posição" },
+          { id: "matchups", label: "Matchups" },
+          { id: "matriz", label: "Matriz 13×13" },
+        ]}
+      />
+
+      <div className="space-y-4">
+        <Painel
+          id="preflop"
+          titulo="Frequências pré-flop"
+          icone={<Target size={14} className="text-training" />}
+          action={<SampleBadge hands={metrics.hands} />}
+        >
         <HeroStrip
           items={[
             {
@@ -141,115 +157,103 @@ export function PreflopTab({
         </p>
       </Painel>
 
-      <PostflopTab rows={rows} metrics={postflopMetrics} />
+        <PostflopTab rows={rows} metrics={postflopMetrics} />
 
-      <Painel titulo="Por posição" icone={<Target size={14} className="text-evolution" />}>
-        {byPosition.length === 0 ? (
-          <EmptyState texto="Sem mãos suficientes com posição identificada." />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-hairline">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
-                  <th className="px-3 py-2 text-left font-bold">Posição</th>
-                  <th className="px-3 py-2 text-right font-bold">Mãos</th>
-                  <th className="px-3 py-2 text-right font-bold">VPIP</th>
-                  <th className="px-3 py-2 text-right font-bold">PFR</th>
-                  <th className="px-3 py-2 text-right font-bold">3-Bet</th>
-                  <th className="px-3 py-2 text-right font-bold">Steal</th>
-                  <th className="px-3 py-2 text-right font-bold"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {byPositionSorted.map((p) => (
-                  <tr
-                    key={p.position}
-                    onClick={() =>
-                      router.push(
-                        revisorHandsHref(
-                          rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
-                          `Posição ${p.position}`
-                        )
+        <Painel id="por-posicao" titulo="Por posição" icone={<Target size={14} className="text-evolution" />}>
+          {byPosition.length === 0 ? (
+            <EmptyState texto="Sem mãos suficientes com posição identificada." />
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {byPositionSorted.map((p) => (
+                <button
+                  key={p.position}
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      revisorHandsHref(
+                        rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
+                        `Posição ${p.position}`
                       )
-                    }
-                    className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
-                  >
-                    <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.vpip_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.pfr_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.three_bet_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.steal_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">
-                      <ArrowUpRight size={13} className="ml-auto text-muted" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="mt-2 text-[11px] text-muted/70">Clique numa posição pra abrir essas mãos no Revisor.</p>
-      </Painel>
+                    )
+                  }
+                  className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-colors hover:border-ink/40"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-ink">{p.position}</span>
+                    <ArrowUpRight size={13} className="shrink-0 text-muted" />
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted">{p.hands} {p.hands === 1 ? "mão" : "mãos"}</p>
+                  <div className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-muted">
+                    <span>
+                      VPIP <b className="text-ink">{fmtPct(p.vpip_pct) ?? "—"}</b>
+                    </span>
+                    <span>
+                      PFR <b className="text-ink">{fmtPct(p.pfr_pct) ?? "—"}</b>
+                    </span>
+                    <span>
+                      3-Bet <b className="text-ink">{fmtPct(p.three_bet_pct) ?? "—"}</b>
+                    </span>
+                    <span>
+                      Steal <b className="text-ink">{fmtPct(p.steal_pct) ?? "—"}</b>
+                    </span>
+                  </div>
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-[11px] text-muted/70">Clique numa posição pra abrir essas mãos no Revisor.</p>
+        </Painel>
 
-      <Painel titulo="Matchups" icone={<Shuffle size={14} className="text-review" />}>
-        {matchups.length === 0 ? (
-          <EmptyState texto="Nenhum matchup heads-up até o flop identificado ainda — só entra aqui quando o pot fica você-vs-um-adversário até o flop." />
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-hairline">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
-                  <th className="px-3 py-2 text-left font-bold">Matchup</th>
-                  <th className="px-3 py-2 text-right font-bold">Mãos</th>
-                  <th className="px-3 py-2 text-right font-bold">VPIP</th>
-                  <th className="px-3 py-2 text-right font-bold"></th>
-                </tr>
-              </thead>
-              <tbody>
-                {matchups.map((m) => (
-                  <tr
-                    key={m.matchup}
-                    onClick={() =>
-                      router.push(
-                        revisorHandsHref(
-                          rows.filter((r) => r.matchup === m.matchup).map((r) => r.handReviewId),
-                          `Matchup ${m.matchup.replace("_vs_", " vs ")}`
-                        )
+        <Painel id="matchups" titulo="Matchups" icone={<Shuffle size={14} className="text-review" />}>
+          {matchups.length === 0 ? (
+            <EmptyState texto="Nenhum matchup heads-up até o flop identificado ainda — só entra aqui quando o pot fica você-vs-um-adversário até o flop." />
+          ) : (
+            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+              {matchups.map((m) => (
+                <button
+                  key={m.matchup}
+                  type="button"
+                  onClick={() =>
+                    router.push(
+                      revisorHandsHref(
+                        rows.filter((r) => r.matchup === m.matchup).map((r) => r.handReviewId),
+                        `Matchup ${m.matchup.replace("_vs_", " vs ")}`
                       )
-                    }
-                    className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
-                  >
-                    <td className="px-3 py-2 font-semibold text-ink">{m.matchup.replace("_vs_", " vs ")}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted">{m.hands}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.vpip_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right">
-                      <ArrowUpRight size={13} className="ml-auto text-muted" />
-                    </td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        <p className="mt-2 text-[11px] leading-relaxed text-muted/70">
-          Só cobre pots que ficaram heads-up (você contra um adversário) até o flop — é a única situação em que o motor
-          identifica os dois lados do confronto com segurança. Clique num matchup pra abrir essas mãos no Revisor.
-        </p>
-      </Painel>
+                    )
+                  }
+                  className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-colors hover:border-ink/40"
+                >
+                  <div className="flex items-center justify-between gap-2">
+                    <span className="text-sm font-bold text-ink">{m.matchup.replace("_vs_", " vs ")}</span>
+                    <ArrowUpRight size={13} className="shrink-0 text-muted" />
+                  </div>
+                  <p className="mt-0.5 text-[11px] text-muted">{m.hands} {m.hands === 1 ? "mão" : "mãos"}</p>
+                  <p className="mt-2.5 text-[11px] text-muted">
+                    VPIP <b className="text-ink">{fmtPct(m.vpip_pct) ?? "—"}</b>
+                  </p>
+                </button>
+              ))}
+            </div>
+          )}
+          <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
+            Só cobre pots que ficaram heads-up (você contra um adversário) até o flop — é a única situação em que o motor
+            identifica os dois lados do confronto com segurança. Clique num matchup pra abrir essas mãos no Revisor.
+          </p>
+        </Painel>
 
-      <Painel titulo="Matriz posicional 13×13" icone={<Grid3x3 size={14} className="text-review" />}>
-        <p className="mb-3 text-xs leading-relaxed text-muted">
-          Intensidade = % de vezes que você jogou (VPIP) cada combinação. O contorno tracejado mostra uma referência simplificada
-          de range de abertura — não é output do motor GTO, é só escala visual (o solver próprio ainda não gera range por
-          posição pra este grid — ver backlog).
-        </p>
-        {/* Só informativo (não é editável como o Construtor de Ranges) —
-            mesmo teto de largura (580px) pra não dominar a tela à toa. */}
-        <div style={{ maxWidth: 580 }}>
-          <HandMatrixGrid cells={matrix} />
-        </div>
-      </Painel>
+        <Painel id="matriz" titulo="Matriz posicional 13×13" icone={<Grid3x3 size={14} className="text-review" />}>
+          <p className="mb-3 text-xs leading-relaxed text-muted">
+            Intensidade = % de vezes que você jogou (VPIP) cada combinação. O contorno tracejado mostra uma referência
+            simplificada de range de abertura — não é output do motor GTO, é só escala visual (o solver próprio ainda não
+            gera range por posição pra este grid — ver backlog).
+          </p>
+          {/* Só informativo (não é editável como o Construtor de Ranges) —
+              mesmo teto de largura (580px) pra não dominar a tela à toa. */}
+          <div style={{ maxWidth: 580 }}>
+            <HandMatrixGrid cells={matrix} />
+          </div>
+        </Painel>
+      </div>
     </div>
   );
 }
