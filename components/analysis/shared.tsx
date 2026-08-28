@@ -88,21 +88,16 @@ export function SubHeader({ children }: { children: React.ReactNode }) {
   return <p className="mb-1.5 mt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-muted/70 first:mt-0">{children}</p>;
 }
 
-// Lista densa de métricas (rótulo + valor, uma linha por métrica) — usada
-// no lugar de MetricGrid quando o número de métricas é alto e o grid de
-// cards vira ruído visual (ex.: Tendências pós-flop). Mesma leitura
-// escaneável de uma tabela, sem as bordas repetidas de cada card. `icon`
-// é opcional — um ícone fino por linha ajuda a escanear rápido sem virar
-// decoração (mesmo ícone pra métricas da mesma família, ex. todo "fold
-// to X" usa o mesmo ícone de retorno).
-// `bar` só existe quando há faixa de referência conhecida (toneFromRange
-// com min/max reais) — vira uma trilha horizontal com a faixa saudável
-// sombreada e um traço na posição do seu valor, no estilo HUD do
-// HM3/PT4 (barra vs. população) em vez de só número solto. Métrica sem
-// consenso de faixa fica só como número — não inventamos escala pra ela.
+// Grade compacta de métricas (rótulo + valor num card pequeno) — substitui
+// a antiga StatList (linha full-width, rótulo numa ponta e valor na outra)
+// porque em telas largas essa linha sobrava um vão vazio enorme no meio
+// sem nenhuma informação. Um grid de 3-5 colunas usa a mesma largura pra
+// mostrar 3-5x mais números por vez, sem a "poluição" do MetricGrid antigo
+// porque todo card aqui tem o mesmo desenho (ícone, cor por faixa, barra
+// quando existe referência) em vez de layouts variados competindo.
 type StatBar = { pct: number; bandStart: number; bandEnd: number };
 
-export function StatList({
+export function StatCardGrid({
   items,
 }: {
   items: {
@@ -112,48 +107,41 @@ export function StatList({
     tone?: "bom" | "ruim";
     hint?: string;
     bar?: StatBar;
-    trend?: number[];
     locked?: string;
   }[];
 }) {
   return (
-    <div className="divide-y divide-hairline">
-      {items.map((it) => {
-        const Icon = it.icon;
-        const cor = it.tone === "bom" ? "text-positive" : it.tone === "ruim" ? "text-negative" : "text-ink";
-        const barCor = it.tone === "bom" ? "bg-positive" : it.tone === "ruim" ? "bg-negative" : "bg-muted";
-        return it.locked ? (
-          <div key={it.label} className="flex items-center justify-between gap-3 py-2.5 opacity-60" title={it.locked}>
-            <span className="flex items-center gap-2 text-[13px] font-medium text-muted">
-              <Lock size={13} className="shrink-0" />
-              {it.label}
-            </span>
-            <span className="shrink-0 text-base font-bold tabular-nums text-muted/40">—</span>
-          </div>
+    <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
+      {items.map((it) =>
+        it.locked ? (
+          <LockedMetric key={it.label} label={it.label} reason={it.locked} />
         ) : (
-          <div key={it.label} className="py-2.5" title={it.hint}>
-            <div className="flex items-center justify-between gap-3">
-              <span className="flex items-center gap-2 text-[13px] font-medium text-ink">
-                {Icon && <Icon size={13} className="shrink-0 text-muted" />}
-                {it.label}
-              </span>
-              <span className="flex shrink-0 items-center gap-2">
-                {it.trend && it.trend.length >= 2 && <Sparkline points={it.trend} tone={it.tone} />}
-                <span className={`text-base font-bold tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</span>
-              </span>
-            </div>
-            {it.bar && it.value && (
-              <div className="relative mt-1.5 h-1 rounded-full bg-elevated">
-                <div
-                  className="absolute inset-y-0 rounded-full bg-positive/15"
-                  style={{ left: `${it.bar.bandStart}%`, width: `${Math.max(0, it.bar.bandEnd - it.bar.bandStart)}%` }}
-                />
-                <div className={`absolute inset-y-0 w-[3px] rounded-full ${barCor}`} style={{ left: `calc(${it.bar.pct}% - 1.5px)` }} />
-              </div>
-            )}
-          </div>
-        );
-      })}
+          <StatCard key={it.label} {...it} />
+        )
+      )}
+    </div>
+  );
+}
+
+function StatCard({ label, value, icon: Icon, tone, hint, bar }: { label: string; value: string | null; icon?: LucideIcon; tone?: "bom" | "ruim"; hint?: string; bar?: StatBar }) {
+  const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
+  const barCor = tone === "bom" ? "bg-positive" : tone === "ruim" ? "bg-negative" : "bg-muted";
+  return (
+    <div className="rounded-lg border border-hairline bg-elevated p-2.5" title={hint}>
+      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase leading-tight tracking-[0.06em] text-muted/80">
+        {Icon && <Icon size={11} className="shrink-0" />}
+        <span>{label}</span>
+      </p>
+      <p className={`mt-1.5 text-lg font-bold leading-none tabular-nums ${value ? cor : "text-muted/30"}`}>{value ?? "—"}</p>
+      {bar && value && (
+        <div className="relative mt-2 h-1 rounded-full bg-void/40">
+          <div
+            className="absolute inset-y-0 rounded-full bg-positive/15"
+            style={{ left: `${bar.bandStart}%`, width: `${Math.max(0, bar.bandEnd - bar.bandStart)}%` }}
+          />
+          <div className={`absolute inset-y-0 w-[3px] rounded-full ${barCor}`} style={{ left: `calc(${bar.pct}% - 1.5px)` }} />
+        </div>
+      )}
     </div>
   );
 }
@@ -232,12 +220,12 @@ export function SampleBadge({ hands }: { hands: number }) {
 
 export function LockedMetric({ label, reason }: { label: string; reason: string }) {
   return (
-    <div className="flex flex-col justify-between rounded-lg border border-dashed border-hairline p-3.5 opacity-70" title={reason}>
-      <p className="flex items-center gap-1 text-[10px] font-bold uppercase tracking-[0.1em] text-muted/60">
-        <Lock size={10} />
-        {label}
+    <div className="rounded-lg border border-dashed border-hairline p-2.5 opacity-70" title={reason}>
+      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase leading-tight tracking-[0.06em] text-muted/60">
+        <Lock size={11} className="shrink-0" />
+        <span>{label}</span>
       </p>
-      <p className="mt-1 text-xl font-bold leading-none text-muted/30">—</p>
+      <p className="mt-1.5 text-lg font-bold leading-none text-muted/30">—</p>
     </div>
   );
 }
