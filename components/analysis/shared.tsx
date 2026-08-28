@@ -1,6 +1,7 @@
 "use client";
 
-import { Lock, type LucideIcon } from "lucide-react";
+import Link from "next/link";
+import { Lock, PlayCircle, type LucideIcon } from "lucide-react";
 
 // Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
 // (rounded-xl border-hairline bg-surface) que app/performance/page.tsx já
@@ -73,7 +74,16 @@ type StatBar = { pct: number; bandStart: number; bandEnd: number };
 export function StatList({
   items,
 }: {
-  items: { label: string; value: string | null; icon?: LucideIcon; tone?: "bom" | "ruim"; hint?: string; bar?: StatBar; locked?: string }[];
+  items: {
+    label: string;
+    value: string | null;
+    icon?: LucideIcon;
+    tone?: "bom" | "ruim";
+    hint?: string;
+    bar?: StatBar;
+    trend?: number[];
+    locked?: string;
+  }[];
 }) {
   return (
     <div className="divide-y divide-hairline">
@@ -96,7 +106,10 @@ export function StatList({
                 {Icon && <Icon size={13} className="shrink-0 text-muted" />}
                 {it.label}
               </span>
-              <span className={`shrink-0 text-base font-bold tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</span>
+              <span className="flex shrink-0 items-center gap-2">
+                {it.trend && it.trend.length >= 2 && <Sparkline points={it.trend} tone={it.tone} />}
+                <span className={`text-base font-bold tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</span>
+              </span>
             </div>
             {it.bar && it.value && (
               <div className="relative mt-1.5 h-1 rounded-full bg-elevated">
@@ -110,6 +123,72 @@ export function StatList({
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Mini-gráfico de tendência (últimos N blocos do período filtrado, ver
+// computeMetricTrend em analysis-service.ts) — mesma ideia do "Graphing"
+// do HM3/PT4, mas em miniatura dentro da própria linha da lista em vez de
+// aba separada. Só aparece quando a amostra é grande o bastante pra não
+// virar ruído (gate fica na chamada de computeMetricTrend).
+function Sparkline({ points, tone }: { points: number[]; tone?: "bom" | "ruim" }) {
+  const w = 44;
+  const h = 16;
+  const min = Math.min(...points);
+  const max = Math.max(...points);
+  const span = max - min || 1;
+  const coords = points.map((v, i) => {
+    const x = (i / (points.length - 1)) * w;
+    const y = h - ((v - min) / span) * h;
+    return `${x.toFixed(1)},${y.toFixed(1)}`;
+  });
+  const stroke = tone === "bom" ? "var(--color-positive, #2FB89A)" : tone === "ruim" ? "var(--color-negative, #e0555a)" : "currentColor";
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0 text-muted/60" aria-hidden="true">
+      <polyline points={coords.join(" ")} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
+}
+
+// Linha de mãos clicáveis pro Revisor — mesmo padrão que o Leak Finder já
+// usa (PlayCircle + posição/formato + data), extraído aqui pra reusar nos
+// outros pontos da tela que também precisam de "quais mãos compõem esse
+// número" (Por posição, Matchups), em vez de cada aba reimplementar.
+export function HandLinks({
+  hands,
+  limit = 30,
+}: {
+  hands: { handId: string; playedAt: string; position?: string | null; format?: string | null }[];
+  limit?: number;
+}) {
+  if (hands.length === 0) {
+    return <p className="text-xs text-muted">Nenhuma mão encontrada pra esse recorte.</p>;
+  }
+  const shown = hands.slice(-limit).reverse();
+  return (
+    <div>
+      {hands.length > limit && (
+        <p className="mb-2 text-[11px] text-muted/70">
+          Mostrando as {limit} mais recentes de {hands.length}.
+        </p>
+      )}
+      <ul className="max-h-64 space-y-1.5 overflow-y-auto">
+        {shown.map((h) => (
+          <li key={h.handId}>
+            <Link
+              href={`/revisor?shared=${h.handId}`}
+              className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-void px-3 py-2 text-xs text-ink transition-colors hover:border-ink/40"
+            >
+              <span className="flex items-center gap-2">
+                <PlayCircle size={13} className="text-review" />
+                {[h.position, h.format?.toUpperCase()].filter(Boolean).join(" · ") || "Mão sem detalhes identificados"}
+              </span>
+              <span className="text-muted">{new Date(h.playedAt).toLocaleDateString("pt-BR")}</span>
+            </Link>
+          </li>
+        ))}
+      </ul>
     </div>
   );
 }
