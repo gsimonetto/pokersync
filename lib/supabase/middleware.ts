@@ -16,6 +16,14 @@ const PUBLIC_ROUTES = [
   // Sem isso o middleware redireciona pro /login antes da página carregar
   // e o convidado perde o contexto de qual time/papel está aceitando.
   "/time/convite",
+  // API do agente desktop: autentica por header Authorization: Bearer
+  // (lib/supabase/agent.ts), não por cookie de sessão do navegador — o
+  // agente é um app nativo, não tem cookie nenhum. Sem isso aqui, TODA
+  // chamada do agente (ping/sync) recebia um redirect 307 pro /login
+  // antes de chegar no route handler, e o cliente (reqwest, no Rust)
+  // não conseguia interpretar a resposta como JSON — reportado como
+  // "erro ao testar conexão e ao sincronizar".
+  "/api/agent",
 ];
 
 function isPublicRoute(pathname: string) {
