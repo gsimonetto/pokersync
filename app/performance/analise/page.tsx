@@ -1,12 +1,11 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Grid3x3, Flame, Trophy, AlertTriangle } from "lucide-react";
+import { Grid3x3, Trophy, AlertTriangle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { TabNav } from "@/components/ui/tab-nav";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
 import { PreflopTab } from "@/components/analysis/PreflopMatrix";
-import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { TournamentTab } from "@/components/analysis/TournamentTab";
 import { LeakFinderTab } from "@/components/analysis/LeakFinderTab";
 import {
@@ -31,11 +30,10 @@ import {
   type TournamentMetrics,
 } from "@/types/analysis";
 
-type TabKey = "preflop" | "postflop" | "tournament" | "leaks";
+type TabKey = "preflop" | "tournament" | "leaks";
 
 const TABS: { value: TabKey; label: string; icon: typeof Grid3x3 }[] = [
-  { value: "preflop", label: "Preflop & Matriz", icon: Grid3x3 },
-  { value: "postflop", label: "Postflop & Tendências", icon: Flame },
+  { value: "preflop", label: "Preflop & Postflop", icon: Grid3x3 },
   { value: "tournament", label: "Torneios", icon: Trophy },
   { value: "leaks", label: "Leak Finder", icon: AlertTriangle },
 ];
@@ -111,7 +109,7 @@ export default function AnalysisPage() {
 
   return (
     <AppShell>
-      <main className="w-full px-6 py-10 text-ink">
+      <main className="w-full px-6 pb-10 pt-6 text-ink">
         {erro && <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>}
 
         {loading ? (
@@ -142,8 +140,9 @@ export default function AnalysisPage() {
                 </p>
               ) : (
                 <>
-                  {tab === "preflop" && <PreflopTab rows={filteredRows} metrics={preflop} byPosition={byPosition} />}
-                  {tab === "postflop" && <PostflopTab metrics={postflop} />}
+                  {tab === "preflop" && (
+                    <PreflopTab rows={filteredRows} metrics={preflop} byPosition={byPosition} postflopMetrics={postflop} />
+                  )}
                   {tab === "tournament" && tournament && (
                     <TournamentTab
                       metrics={tournament}

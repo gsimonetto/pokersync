@@ -1,16 +1,31 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { Target, Grid3x3 } from "lucide-react";
-import { Painel, MetricGrid, EmptyState } from "@/components/analysis/shared";
+import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers } from "lucide-react";
+import { Painel, StatList, EmptyState, SampleBadge } from "@/components/analysis/shared";
+import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { computeHandMatrix } from "@/lib/services/analysis-service";
-import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition } from "@/types/analysis";
+import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
 }
 
-export function PreflopTab({ rows, metrics, byPosition }: { rows: AnalysisHandRow[]; metrics: PreflopMetrics; byPosition: PreflopMetricsByPosition[] }) {
+// Card 1 (preflop) + Card 2 (postflop, ver PostflopStats.tsx) numa única
+// aba — mesma linguagem de lista nos dois, em vez de uma aba em grid de
+// cards e outra em lista. "Por posição" e a matriz 13×13 seguem como
+// cards adicionais, contexto que só faz sentido depois das frequências.
+export function PreflopTab({
+  rows,
+  metrics,
+  byPosition,
+  postflopMetrics,
+}: {
+  rows: AnalysisHandRow[];
+  metrics: PreflopMetrics;
+  byPosition: PreflopMetricsByPosition[];
+  postflopMetrics: PostflopMetrics;
+}) {
   const matrix = useMemo(() => computeHandMatrix(rows), [rows]);
   // Maior volume primeiro — mais útil pra achar rápido onde a amostra é
   // grande o suficiente pra confiar no número, em vez da ordem canônica
@@ -19,25 +34,27 @@ export function PreflopTab({ rows, metrics, byPosition }: { rows: AnalysisHandRo
 
   return (
     <div className="space-y-4">
-      <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />}>
-        <MetricGrid
+      <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
+        <StatList
           items={[
-            { label: "VPIP", value: fmtPct(metrics.vpip_pct), sample: metrics.hands },
-            { label: "PFR", value: fmtPct(metrics.pfr_pct), sample: metrics.hands },
-            { label: "3-Bet %", value: fmtPct(metrics.three_bet_pct), sample: metrics.hands },
-            { label: "Fold to 3-Bet %", value: fmtPct(metrics.fold_to_3bet_pct) },
-            { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct) },
-            { label: "Fold to 4-Bet %", value: fmtPct(metrics.fold_to_4bet_pct) },
-            { label: "Steal %", value: fmtPct(metrics.steal_pct) },
-            { label: "Squeeze %", value: fmtPct(metrics.squeeze_pct), sample: metrics.hands },
-            { label: "Fold to Steal (SB vs BTN)", value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct) },
-            { label: "Fold to Steal (BB vs BTN)", value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct) },
-            { label: "Fold to Steal (BB vs SB)", value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct) },
+            { label: "VPIP", value: fmtPct(metrics.vpip_pct), icon: Hand },
+            { label: "PFR", value: fmtPct(metrics.pfr_pct), icon: TrendingUp },
+            { label: "3-Bet %", value: fmtPct(metrics.three_bet_pct), icon: Repeat },
+            { label: "Fold to 3-Bet %", value: fmtPct(metrics.fold_to_3bet_pct), icon: CornerUpLeft },
+            { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap },
+            { label: "Fold to 4-Bet %", value: fmtPct(metrics.fold_to_4bet_pct), icon: CornerUpLeft },
+            { label: "Steal %", value: fmtPct(metrics.steal_pct), icon: Swords },
+            { label: "Squeeze %", value: fmtPct(metrics.squeeze_pct), icon: Layers },
+            { label: "Fold to Steal (SB vs BTN)", value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct), icon: CornerUpLeft },
+            { label: "Fold to Steal (BB vs BTN)", value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct), icon: CornerUpLeft },
+            { label: "Fold to Steal (BB vs SB)", value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct), icon: CornerUpLeft },
             { label: "Limp-Fold %", value: null, locked: "Hand tags não isola fold pós-limp — pipeline de postflop ainda não cobre esse caso" },
             { label: "Open Push %", value: null, locked: "Depende de classificar profundidade all-in no open — parser ainda não faz essa leitura" },
           ]}
         />
       </Painel>
+
+      <PostflopTab metrics={postflopMetrics} />
 
       <Painel titulo="Por posição" icone={<Target size={14} className="text-evolution" />}>
         {byPosition.length === 0 ? (

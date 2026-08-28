@@ -3,7 +3,6 @@
 import { useState } from "react";
 import { Upload, ChevronDown, SlidersHorizontal } from "lucide-react";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ManualImportPanel } from "@/components/analysis/ManualImportPanel";
 import {
   GAME_FORMAT_LABEL,
@@ -19,13 +18,6 @@ import {
   type HeroPosition,
   type PreflopActionType,
 } from "@/types/analysis";
-
-const PERIOD_OPTIONS: { label: string; days: number }[] = [
-  { label: "7d", days: 7 },
-  { label: "30d", days: 30 },
-  { label: "90d", days: 90 },
-  { label: "Tudo", days: 0 },
-];
 
 function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -55,33 +47,19 @@ export function AnalysisFilters({
   onImported: () => void;
   onSelectTournamentImport: () => void;
 }) {
-  const [periodDays, setPeriodDays] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
-
-  function setPeriod(days: number) {
-    setPeriodDays(days);
-    if (days === 0) {
-      onChange({ ...filters, dateRange: { from: null, to: null } });
-      return;
-    }
-    const from = new Date(Date.now() - days * 86400000).toISOString();
-    onChange({ ...filters, dateRange: { from, to: null } });
-  }
 
   const activeCount =
     filters.formats.length + filters.stackDepths.length + filters.stages.length + filters.positions.length + filters.preflopActions.length;
 
   return (
     <div>
-      {/* Um único grupo à direita — filtro de período, "Filtros" e
-          "Importar" vivem juntos porque são as três ações que decidem
-          "quais dados eu vejo / de onde eles vêm"; nada mais compete
-          pelo lado esquerdo da barra. */}
+      {/* Um único grupo à direita — "Filtros" e "Importar" vivem juntos
+          porque são as duas ações que decidem "quais dados eu vejo / de
+          onde eles vêm"; nada mais compete pelo lado esquerdo da barra. */}
       <div className="flex flex-wrap items-center justify-end gap-2">
-        <SegmentedControl value={periodDays} onChange={setPeriod} options={PERIOD_OPTIONS.map((o) => ({ value: o.days, label: o.label }))} />
-
         <button
           type="button"
           onClick={() => setMoreOpen((v) => !v)}
