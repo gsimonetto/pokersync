@@ -29,6 +29,10 @@ type OpenMenu = "profile" | "notifications" | "help" | null;
 
 const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha", "/agent-login"];
 
+function isHiddenRoute(pathname: string) {
+  return HIDDEN_ROUTES.some((route) => pathname === route || pathname.startsWith(`${route}/`));
+}
+
 // Modulos que ja migraram pro AppShell (sidebar/topbar propria,
 // components/app-shell.tsx) -- mostrar o TopNav global junto duplicaria
 // navegacao no topo da tela. Prefixo, nao rota exata: cobre sub-rotas
@@ -95,7 +99,7 @@ export function TopNav() {
       .catch(() => {});
   }
 
-  if (HIDDEN_ROUTES.includes(pathname) || usaAppShell(pathname)) {
+  if (isHiddenRoute(pathname) || usaAppShell(pathname)) {
     return null;
   }
 
