@@ -12,6 +12,10 @@ function fmtPct(v: number | null): string | null {
 
 export function PreflopTab({ rows, metrics, byPosition }: { rows: AnalysisHandRow[]; metrics: PreflopMetrics; byPosition: PreflopMetricsByPosition[] }) {
   const matrix = useMemo(() => computeHandMatrix(rows), [rows]);
+  // Maior volume primeiro — mais útil pra achar rápido onde a amostra é
+  // grande o suficiente pra confiar no número, em vez da ordem canônica
+  // UTG→BB (essa já está implícita no rótulo da posição).
+  const byPositionSorted = useMemo(() => [...byPosition].sort((a, b) => b.hands - a.hands), [byPosition]);
 
   return (
     <div className="space-y-4">
@@ -52,7 +56,7 @@ export function PreflopTab({ rows, metrics, byPosition }: { rows: AnalysisHandRo
                 </tr>
               </thead>
               <tbody>
-                {byPosition.map((p) => (
+                {byPositionSorted.map((p) => (
                   <tr key={p.position} className="border-b border-hairline last:border-b-0">
                     <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
                     <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
@@ -74,7 +78,11 @@ export function PreflopTab({ rows, metrics, byPosition }: { rows: AnalysisHandRo
           de range de abertura — não é output do motor GTO, é só escala visual (o solver próprio ainda não gera range por
           posição pra este grid — ver backlog).
         </p>
-        <HandMatrixGrid cells={matrix} />
+        {/* Só informativo (não é editável como o Construtor de Ranges) —
+            mesmo teto de largura (580px) pra não dominar a tela à toa. */}
+        <div style={{ maxWidth: 580 }}>
+          <HandMatrixGrid cells={matrix} />
+        </div>
       </Painel>
     </div>
   );
@@ -99,13 +107,13 @@ function HandMatrixGrid({ cells }: { cells: ReturnType<typeof computeHandMatrix>
 
   return (
     <div className="relative">
-      <div className="grid gap-[2px] overflow-x-auto" style={{ gridTemplateColumns: "repeat(13, minmax(26px, 1fr))" }}>
+      <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-[2px] rounded-xl border border-hairline bg-surface p-1.5">
         {cells.map((c) => (
           <div
             key={c.hand}
             onMouseEnter={() => setHover(`${c.row}-${c.col}`)}
             onMouseLeave={() => setHover((h) => (h === `${c.row}-${c.col}` ? null : h))}
-            className="flex aspect-square items-center justify-center rounded-[3px] text-[8px] font-bold text-ink/80 sm:text-[9px]"
+            className="flex aspect-square items-center justify-center rounded-[3px] text-[9px] font-semibold text-ink/80"
             style={{ backgroundColor: colorFor(c.playedPct, c.gtoPct), border: c.row === c.col ? "1px solid rgba(255,255,255,0.18)" : undefined }}
             title={`${c.hand} — ${c.playedPct !== null ? `${c.playedPct}% jogada (${c.sample} mãos)` : "sem amostra"}`}
           >

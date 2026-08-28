@@ -136,17 +136,19 @@ export default function AnalysisPage() {
         {loading ? (
           <p className="text-sm text-muted">Carregando sua análise…</p>
         ) : (
-          <>
-            <div className="rounded-xl border border-hairline bg-surface p-4">
-              <AnalysisFilters
-                filters={filters}
-                onChange={setFilters}
-                availableFormats={availableFormats}
-                availableStackDepths={availableStackDepths}
-                availablePositions={availablePositions}
-                onImported={loadAll}
-              />
-            </div>
+          // Container único envolvendo filtros + abas + conteúdo — mesmo
+          // padrão de toda ferramenta de tela única do produto (Treino,
+          // Construtor de Ranges, Comparar, Equidade, Árvores), em vez de
+          // caixas separadas competindo por hierarquia visual.
+          <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+            <AnalysisFilters
+              filters={filters}
+              onChange={setFilters}
+              availableFormats={availableFormats}
+              availableStackDepths={availableStackDepths}
+              availablePositions={availablePositions}
+              onImported={loadAll}
+            />
 
             <TabNav className="mt-4" value={tab} onChange={setTab} options={TABS} />
 
@@ -182,7 +184,7 @@ export default function AnalysisPage() {
                 </>
               )}
             </div>
-          </>
+          </div>
         )}
       </main>
     </AppShell>
