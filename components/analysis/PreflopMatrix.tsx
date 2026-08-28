@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers } from "lucide-react";
-import { Painel, StatList, EmptyState, SampleBadge } from "@/components/analysis/shared";
+import { Painel, StatList, EmptyState, SampleBadge, toneFromRange } from "@/components/analysis/shared";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { computeHandMatrix } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
@@ -37,21 +37,38 @@ export function PreflopTab({
       <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
         <StatList
           items={[
-            { label: "VPIP", value: fmtPct(metrics.vpip_pct), icon: Hand },
-            { label: "PFR", value: fmtPct(metrics.pfr_pct), icon: TrendingUp },
-            { label: "3-Bet %", value: fmtPct(metrics.three_bet_pct), icon: Repeat },
-            { label: "Fold to 3-Bet %", value: fmtPct(metrics.fold_to_3bet_pct), icon: CornerUpLeft },
+            { label: "VPIP", value: fmtPct(metrics.vpip_pct), icon: Hand, tone: toneFromRange(metrics.vpip_pct, 20, 28) },
+            { label: "PFR", value: fmtPct(metrics.pfr_pct), icon: TrendingUp, tone: toneFromRange(metrics.pfr_pct, 15, 24) },
+            { label: "3-Bet %", value: fmtPct(metrics.three_bet_pct), icon: Repeat, tone: toneFromRange(metrics.three_bet_pct, 6, 10) },
+            {
+              label: "Fold to 3-Bet %",
+              value: fmtPct(metrics.fold_to_3bet_pct),
+              icon: CornerUpLeft,
+              tone: toneFromRange(metrics.fold_to_3bet_pct, 55, 65),
+            },
             { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap },
             { label: "Fold to 4-Bet %", value: fmtPct(metrics.fold_to_4bet_pct), icon: CornerUpLeft },
-            { label: "Steal %", value: fmtPct(metrics.steal_pct), icon: Swords },
+            { label: "Steal %", value: fmtPct(metrics.steal_pct), icon: Swords, tone: toneFromRange(metrics.steal_pct, 35, 55) },
             { label: "Squeeze %", value: fmtPct(metrics.squeeze_pct), icon: Layers },
             { label: "Fold to Steal (SB vs BTN)", value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct), icon: CornerUpLeft },
             { label: "Fold to Steal (BB vs BTN)", value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct), icon: CornerUpLeft },
             { label: "Fold to Steal (BB vs SB)", value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct), icon: CornerUpLeft },
-            { label: "Limp-Fold %", value: null, locked: "Hand tags não isola fold pós-limp — pipeline de postflop ainda não cobre esse caso" },
-            { label: "Open Push %", value: null, locked: "Depende de classificar profundidade all-in no open — parser ainda não faz essa leitura" },
+            {
+              label: "Limp-Fold %",
+              value: null,
+              locked: "Hand tags não isola fold pós-limp — no roadmap do pipeline de postflop",
+            },
+            {
+              label: "Open Push %",
+              value: null,
+              locked: "Depende de classificar profundidade all-in no open — no roadmap do parser",
+            },
           ]}
         />
+        <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
+          Cor = faixa de referência comum pra 6-max/MTT (heurística de população, não output do motor GTO) — verde perto do
+          consenso, vermelho bem fora dele. Sem cor quando não há uma faixa amplamente aceita pra métrica.
+        </p>
       </Painel>
 
       <PostflopTab metrics={postflopMetrics} />
@@ -130,7 +147,8 @@ function HandMatrixGrid({ cells }: { cells: ReturnType<typeof computeHandMatrix>
             key={c.hand}
             onMouseEnter={() => setHover(`${c.row}-${c.col}`)}
             onMouseLeave={() => setHover((h) => (h === `${c.row}-${c.col}` ? null : h))}
-            className="flex aspect-square items-center justify-center rounded-[3px] text-[9px] font-semibold text-ink/80"
+            onClick={() => setHover((h) => (h === `${c.row}-${c.col}` ? null : `${c.row}-${c.col}`))}
+            className="flex aspect-square cursor-pointer items-center justify-center rounded-[3px] text-[9px] font-semibold text-ink/80"
             style={{ backgroundColor: colorFor(c.playedPct, c.gtoPct), border: c.row === c.col ? "1px solid rgba(255,255,255,0.18)" : undefined }}
             title={`${c.hand} — ${c.playedPct !== null ? `${c.playedPct}% jogada (${c.sample} mãos)` : "sem amostra"}`}
           >

@@ -63,11 +63,16 @@ export function SubHeader({ children }: { children: React.ReactNode }) {
 // é opcional — um ícone fino por linha ajuda a escanear rápido sem virar
 // decoração (mesmo ícone pra métricas da mesma família, ex. todo "fold
 // to X" usa o mesmo ícone de retorno).
-export function StatList({ items }: { items: { label: string; value: string | null; icon?: LucideIcon; locked?: string }[] }) {
+export function StatList({
+  items,
+}: {
+  items: { label: string; value: string | null; icon?: LucideIcon; tone?: "bom" | "ruim"; locked?: string }[];
+}) {
   return (
     <div className="divide-y divide-hairline">
       {items.map((it) => {
         const Icon = it.icon;
+        const cor = it.tone === "bom" ? "text-positive" : it.tone === "ruim" ? "text-negative" : "text-ink";
         return it.locked ? (
           <div key={it.label} className="flex items-center justify-between gap-3 py-2.5 opacity-60" title={it.locked}>
             <span className="flex items-center gap-2 text-[13px] font-medium text-muted">
@@ -82,12 +87,24 @@ export function StatList({ items }: { items: { label: string; value: string | nu
               {Icon && <Icon size={13} className="shrink-0 text-muted" />}
               {it.label}
             </span>
-            <span className={`shrink-0 text-base font-bold tabular-nums ${it.value ? "text-ink" : "text-muted/30"}`}>{it.value ?? "—"}</span>
+            <span className={`shrink-0 text-base font-bold tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</span>
           </div>
         );
       })}
     </div>
   );
+}
+
+// Referência simplificada de "faixa saudável" pra colorir StatList sem
+// depender do solver — mesmo espírito da matriz 13×13 (heurística de
+// população, não output de GTO). `tone()` devolve undefined (cor
+// neutra) fora das métricas com consenso conhecido, em vez de inventar
+// faixa pra tudo.
+export function toneFromRange(value: number | null, min: number, max: number): "bom" | "ruim" | undefined {
+  if (value === null) return undefined;
+  if (value >= min && value <= max) return "bom";
+  if (value < min * 0.6 || value > max * 1.6) return "ruim";
+  return undefined;
 }
 
 // Contador único de amostra pro cabeçalho de um Painel (slot `action`) —

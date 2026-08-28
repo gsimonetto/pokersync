@@ -29,12 +29,16 @@ export function TournamentTab({
   payouts,
   onPayoutsChanged,
   onCevComputed,
+  focusPendingPayout,
+  onFocusPendingPayoutConsumed,
 }: {
   metrics: TournamentMetrics;
   tournamentSessions: HandSession[];
   payouts: TournamentPayout[];
   onPayoutsChanged: () => void;
   onCevComputed: () => void;
+  focusPendingPayout?: boolean;
+  onFocusPendingPayoutConsumed?: () => void;
 }) {
   const [computing, setComputing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -91,7 +95,13 @@ export function TournamentTab({
           decisão "deveria" valer em $. Hoje é só manual; quando o agente desktop buscar isso sozinho, aparece aqui do mesmo jeito
           (mesmo torneio, sem tela nova).
         </p>
-        <TournamentPayoutsPanel sessions={tournamentSessions} payouts={payouts} onChanged={onPayoutsChanged} />
+        <TournamentPayoutsPanel
+          sessions={tournamentSessions}
+          payouts={payouts}
+          onChanged={onPayoutsChanged}
+          focusPending={focusPendingPayout}
+          onFocusConsumed={onFocusPendingPayoutConsumed}
+        />
       </Painel>
 
       <Painel

@@ -1,7 +1,7 @@
 "use client";
 
 import { Flame, Target, CornerUpLeft, Repeat, Zap, TrendingUp, Eye, Trophy } from "lucide-react";
-import { Painel, StatList, SubHeader, SampleBadge } from "@/components/analysis/shared";
+import { Painel, StatList, SubHeader, SampleBadge, toneFromRange } from "@/components/analysis/shared";
 import type { PostflopMetrics } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
@@ -21,10 +21,15 @@ export function PostflopTab({ metrics }: { metrics: PostflopMetrics }) {
       <SubHeader>C-Bet & fold to c-bet</SubHeader>
       <StatList
         items={[
-          { label: "Flop C-Bet %", value: fmtPct(metrics.cbet_flop_pct), icon: Target },
+          { label: "Flop C-Bet %", value: fmtPct(metrics.cbet_flop_pct), icon: Target, tone: toneFromRange(metrics.cbet_flop_pct, 55, 75) },
           { label: "Turn C-Bet %", value: fmtPct(metrics.cbet_turn_pct), icon: Target },
           { label: "River C-Bet %", value: fmtPct(metrics.cbet_river_pct), icon: Target },
-          { label: "Fold to Flop C-Bet %", value: fmtPct(metrics.fold_to_cbet_flop_pct), icon: CornerUpLeft },
+          {
+            label: "Fold to Flop C-Bet %",
+            value: fmtPct(metrics.fold_to_cbet_flop_pct),
+            icon: CornerUpLeft,
+            tone: toneFromRange(metrics.fold_to_cbet_flop_pct, 40, 55),
+          },
           { label: "Fold to Turn C-Bet %", value: fmtPct(metrics.fold_to_cbet_turn_pct), icon: CornerUpLeft },
           { label: "Fold to River C-Bet %", value: fmtPct(metrics.fold_to_cbet_river_pct), icon: CornerUpLeft },
         ]}
@@ -43,16 +48,23 @@ export function PostflopTab({ metrics }: { metrics: PostflopMetrics }) {
       <SubHeader>Agressão & showdown</SubHeader>
       <StatList
         items={[
-          { label: "Aggression Factor", value: fmtRatio(metrics.aggression_factor), icon: TrendingUp },
-          { label: "Aggression Frequency %", value: fmtPct(metrics.aggression_frequency_pct), icon: TrendingUp },
+          { label: "Aggression Factor", value: fmtRatio(metrics.aggression_factor), icon: TrendingUp, tone: toneFromRange(metrics.aggression_factor, 2, 4) },
+          {
+            label: "Aggression Frequency %",
+            value: fmtPct(metrics.aggression_frequency_pct),
+            icon: TrendingUp,
+            tone: toneFromRange(metrics.aggression_frequency_pct, 35, 50),
+          },
           { label: "WSD %", value: fmtPct(metrics.wsd_pct), icon: Eye },
           { label: "W$SD %", value: fmtPct(metrics.wsd_won_pct), icon: Trophy },
         ]}
       />
 
       <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
-        W$SD% usa o vencedor gravado da mão (um único nome) como aproximação — não cobre split pot com precisão de equity.
-        Aggression Factor fica sem valor quando não há nenhum call registrado na amostra (denominador zero).
+        Cor = faixa de referência comum pra 6-max/MTT (heurística de população, não output do motor GTO) — sem cor quando
+        não há consenso amplo pra métrica. W$SD% usa o vencedor gravado da mão (um único nome) como aproximação — não cobre
+        split pot com precisão de equity. Aggression Factor fica sem valor quando não há nenhum call registrado na amostra
+        (denominador zero).
       </p>
     </Painel>
   );

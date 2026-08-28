@@ -47,6 +47,7 @@ export default function AnalysisPage() {
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("preflop");
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
+  const [focusPendingPayout, setFocusPendingPayout] = useState(false);
 
   async function loadAll() {
     setErro("");
@@ -97,6 +98,13 @@ export default function AnalysisPage() {
   const postflop = useMemo(() => computePostflopMetrics(filteredRows), [filteredRows]);
   const leaks = useMemo(() => computeLeaks(preflop, postflop), [preflop, postflop]);
 
+  // Badge de leaks na própria aba — antes só descobria clicando em Leak
+  // Finder; o número já existe (computeLeaks), só faltava subir pro TabNav.
+  const tabsWithBadge = useMemo(
+    () => TABS.map((t) => (t.value === "leaks" ? { ...t, badge: leaks.length } : t)),
+    [leaks.length]
+  );
+
   const availableFormats = useMemo(() => new Set(rows.map((r) => r.format).filter((f): f is GameFormat => f !== null)), [rows]);
   const availableStackDepths = useMemo(
     () => new Set(rows.map((r) => r.stackDepthBucket).filter((s): s is StackDepthBucket => s !== null)),
@@ -127,10 +135,13 @@ export default function AnalysisPage() {
               availableStackDepths={availableStackDepths}
               availablePositions={availablePositions}
               onImported={loadAll}
-              onSelectTournamentImport={() => setTab("tournament")}
+              onSelectTournamentImport={() => {
+                setTab("tournament");
+                setFocusPendingPayout(true);
+              }}
             />
 
-            <TabNav className="mt-4" value={tab} onChange={setTab} options={TABS} />
+            <TabNav className="mt-4" value={tab} onChange={setTab} options={tabsWithBadge} />
 
             <div className="mt-4">
               {rows.length === 0 ? (
@@ -150,6 +161,8 @@ export default function AnalysisPage() {
                       payouts={payouts}
                       onPayoutsChanged={reloadPayouts}
                       onCevComputed={reloadTournamentMetrics}
+                      focusPendingPayout={focusPendingPayout}
+                      onFocusPendingPayoutConsumed={() => setFocusPendingPayout(false)}
                     />
                   )}
                   {tab === "leaks" && <LeakFinderTab rows={filteredRows} leaks={leaks} />}
