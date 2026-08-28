@@ -1,8 +1,10 @@
 "use client";
 
+import { useMemo } from "react";
 import { Flame, Target, CornerUpLeft, Repeat, Zap, TrendingUp, Eye, Trophy } from "lucide-react";
 import { Painel, StatList, SubHeader, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
-import type { PostflopMetrics } from "@/types/analysis";
+import { computePostflopMetrics, computeMetricTrend } from "@/lib/services/analysis-service";
+import type { AnalysisHandRow, PostflopMetrics } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
@@ -15,7 +17,11 @@ function fmtRatio(v: number | null): string | null {
 // Segundo card da aba Preflop & Postflop — mesma leitura em lista do card
 // de preflop, pra ficar visualmente um par (não duas linguagens
 // diferentes na mesma tela).
-export function PostflopTab({ metrics }: { metrics: PostflopMetrics }) {
+export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metrics: PostflopMetrics }) {
+  // Só o headliner (Flop C-Bet%) ganha tendência aqui — mesmo critério de
+  // "não virar gráfico" do card de preflop.
+  const cbetFlopTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePostflopMetrics(chunk).cbet_flop_pct), [rows]);
+
   return (
     <Painel titulo="Tendências pós-flop" icone={<Flame size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
       <SubHeader>C-Bet & fold to c-bet</SubHeader>
@@ -27,6 +33,7 @@ export function PostflopTab({ metrics }: { metrics: PostflopMetrics }) {
             icon: Target,
             tone: toneFromRange(metrics.cbet_flop_pct, 55, 75),
             bar: statBar(metrics.cbet_flop_pct, 55, 75, 100),
+            trend: cbetFlopTrend,
             hint: "Frequência de apostar no flop quando você foi o último agressor no preflop.",
           },
           {

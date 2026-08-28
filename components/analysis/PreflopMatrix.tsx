@@ -1,11 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
-import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers } from "lucide-react";
-import { Painel, StatList, EmptyState, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
+import { Fragment, useMemo, useState } from "react";
+import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers, ChevronDown, Shuffle } from "lucide-react";
+import { Painel, StatList, EmptyState, SampleBadge, toneFromRange, statBar, HandLinks } from "@/components/analysis/shared";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
-import { computeHandMatrix } from "@/lib/services/analysis-service";
-import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
+import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown, rowsToHandRefs } from "@/lib/services/analysis-service";
+import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics, HeroPosition } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
@@ -31,6 +31,15 @@ export function PreflopTab({
   // grande o suficiente pra confiar no número, em vez da ordem canônica
   // UTG→BB (essa já está implícita no rótulo da posição).
   const byPositionSorted = useMemo(() => [...byPosition].sort((a, b) => b.hands - a.hands), [byPosition]);
+  const matchups = useMemo(() => computeMatchupBreakdown(rows), [rows]);
+  const [expandedPosition, setExpandedPosition] = useState<HeroPosition | null>(null);
+  const [expandedMatchup, setExpandedMatchup] = useState<string | null>(null);
+
+  // Tendência por bloco de mãos (ver computeMetricTrend) — só nos 3
+  // headliners de preflop, pra não transformar toda a lista num gráfico.
+  const vpipTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).vpip_pct), [rows]);
+  const pfrTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).pfr_pct), [rows]);
+  const threeBetTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).three_bet_pct), [rows]);
 
   return (
     <div className="space-y-4">
@@ -43,6 +52,7 @@ export function PreflopTab({
               icon: Hand,
               tone: toneFromRange(metrics.vpip_pct, 20, 28),
               bar: statBar(metrics.vpip_pct, 20, 28, 60),
+              trend: vpipTrend,
               hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
             },
             {
@@ -51,6 +61,7 @@ export function PreflopTab({
               icon: TrendingUp,
               tone: toneFromRange(metrics.pfr_pct, 15, 24),
               bar: statBar(metrics.pfr_pct, 15, 24, 50),
+              trend: pfrTrend,
               hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
             },
             {
@@ -59,6 +70,7 @@ export function PreflopTab({
               icon: Repeat,
               tone: toneFromRange(metrics.three_bet_pct, 6, 10),
               bar: statBar(metrics.three_bet_pct, 6, 10, 20),
+              trend: threeBetTrend,
               hint: "Frequência de re-raise no preflop diante de um raise anterior.",
             },
             {
@@ -123,11 +135,12 @@ export function PreflopTab({
         <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
           Cor e barra = faixa de referência comum pra 6-max/MTT (heurística de população, não output do motor GTO) — verde
           perto do consenso, vermelho bem fora dele. Métrica sem barra é métrica sem uma faixa amplamente aceita — mostramos
-          só o número, sem inventar escala. Passe o mouse sobre qualquer linha pra ver a definição.
+          só o número, sem inventar escala. O gráfico ao lado de VPIP/PFR/3-Bet% mostra a tendência ao longo do período
+          filtrado (só aparece com pelo menos 30 mãos). Passe o mouse sobre qualquer linha pra ver a definição.
         </p>
       </Painel>
 
-      <PostflopTab metrics={postflopMetrics} />
+      <PostflopTab rows={rows} metrics={postflopMetrics} />
 
       <Painel titulo="Por posição" icone={<Target size={14} className="text-evolution" />}>
         {byPosition.length === 0 ? (
@@ -143,23 +156,93 @@ export function PreflopTab({
                   <th className="px-3 py-2 text-right font-bold">PFR</th>
                   <th className="px-3 py-2 text-right font-bold">3-Bet</th>
                   <th className="px-3 py-2 text-right font-bold">Steal</th>
+                  <th className="px-3 py-2 text-right font-bold"></th>
                 </tr>
               </thead>
               <tbody>
                 {byPositionSorted.map((p) => (
-                  <tr key={p.position} className="border-b border-hairline last:border-b-0">
-                    <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.vpip_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.pfr_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.three_bet_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.steal_pct) ?? "—"}</td>
-                  </tr>
+                  <Fragment key={p.position}>
+                    <tr
+                      onClick={() => setExpandedPosition((cur) => (cur === p.position ? null : p.position))}
+                      className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
+                    >
+                      <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.vpip_pct) ?? "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.pfr_pct) ?? "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.three_bet_pct) ?? "—"}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.steal_pct) ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">
+                        <ChevronDown
+                          size={13}
+                          className={`ml-auto text-muted transition-transform ${expandedPosition === p.position ? "rotate-180" : ""}`}
+                        />
+                      </td>
+                    </tr>
+                    {expandedPosition === p.position && (
+                      <tr className="border-b border-hairline last:border-b-0">
+                        <td colSpan={7} className="bg-elevated/40 p-3">
+                          <HandLinks hands={rowsToHandRefs(rows.filter((r) => r.heroPosition === p.position))} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
                 ))}
               </tbody>
             </table>
           </div>
         )}
+        <p className="mt-2 text-[11px] text-muted/70">Clique numa posição pra ver quais mãos compõem esse resultado.</p>
+      </Painel>
+
+      <Painel titulo="Matchups" icone={<Shuffle size={14} className="text-review" />}>
+        {matchups.length === 0 ? (
+          <EmptyState texto="Nenhum matchup heads-up até o flop identificado ainda — só entra aqui quando o pot fica você-vs-um-adversário até o flop." />
+        ) : (
+          <div className="overflow-x-auto rounded-lg border border-hairline">
+            <table className="w-full text-xs">
+              <thead>
+                <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
+                  <th className="px-3 py-2 text-left font-bold">Matchup</th>
+                  <th className="px-3 py-2 text-right font-bold">Mãos</th>
+                  <th className="px-3 py-2 text-right font-bold">VPIP</th>
+                  <th className="px-3 py-2 text-right font-bold"></th>
+                </tr>
+              </thead>
+              <tbody>
+                {matchups.map((m) => (
+                  <Fragment key={m.matchup}>
+                    <tr
+                      onClick={() => setExpandedMatchup((cur) => (cur === m.matchup ? null : m.matchup))}
+                      className="cursor-pointer border-b border-hairline transition-colors last:border-b-0 hover:bg-elevated/60"
+                    >
+                      <td className="px-3 py-2 font-semibold text-ink">{m.matchup.replace("_vs_", " vs ")}</td>
+                      <td className="px-3 py-2 text-right tabular-nums text-muted">{m.hands}</td>
+                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.vpip_pct) ?? "—"}</td>
+                      <td className="px-3 py-2 text-right">
+                        <ChevronDown
+                          size={13}
+                          className={`ml-auto text-muted transition-transform ${expandedMatchup === m.matchup ? "rotate-180" : ""}`}
+                        />
+                      </td>
+                    </tr>
+                    {expandedMatchup === m.matchup && (
+                      <tr className="border-b border-hairline last:border-b-0">
+                        <td colSpan={4} className="bg-elevated/40 p-3">
+                          <HandLinks hands={rowsToHandRefs(rows.filter((r) => r.matchup === m.matchup))} />
+                        </td>
+                      </tr>
+                    )}
+                  </Fragment>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+        <p className="mt-2 text-[11px] leading-relaxed text-muted/70">
+          Só cobre pots que ficaram heads-up (você contra um adversário) até o flop — é a única situação em que o motor
+          identifica os dois lados do confronto com segurança.
+        </p>
       </Painel>
 
       <Painel titulo="Matriz posicional 13×13" icone={<Grid3x3 size={14} className="text-review" />}>

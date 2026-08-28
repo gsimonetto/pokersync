@@ -198,6 +198,63 @@ export function computePreflopByPosition(rows: AnalysisHandRow[]): PreflopMetric
   }).filter((p) => p.hands > 0);
 }
 
+// Matchups reais (ex.: "SB_vs_BTN") — só existe quando o pot foi
+// heads-up até o flop (ver matchup em types/analysis.ts), então a lista
+// tem só os confrontos que de fato aconteceram, sem preencher o resto de
+// uma grade 8×8 com "sem amostra" que não ajudaria em nada.
+export interface MatchupBreakdown {
+  matchup: string;
+  hands: number;
+  vpip_pct: number | null;
+}
+
+export function computeMatchupBreakdown(rows: AnalysisHandRow[]): MatchupBreakdown[] {
+  const groups = new Map<string, AnalysisHandRow[]>();
+  for (const r of rows) {
+    if (!r.matchup) continue;
+    const arr = groups.get(r.matchup) ?? [];
+    arr.push(r);
+    groups.set(r.matchup, arr);
+  }
+  return [...groups.entries()]
+    .map(([matchup, subset]) => ({ matchup, hands: subset.length, vpip_pct: pct(countIf(subset, (r) => r.vpip), subset.length) }))
+    .sort((a, b) => b.hands - a.hands);
+}
+
+// Tendência de uma métrica ao longo do período filtrado — divide as mãos
+// (já ordenadas cronologicamente por fetchAnalysisHandRows) em blocos de
+// tamanho igual e recalcula a métrica em cada um, no espírito do
+// "Graphing" do HM3/PT4. Bloco por volume de mãos, não por data — sessões
+// desiguais no calendário não viram ruído no gráfico. Amostra mínima de
+// 30 mãos pro total pra cada ponto ter uma base decente.
+export function computeMetricTrend(rows: AnalysisHandRow[], metricFn: (subset: AnalysisHandRow[]) => number | null, buckets = 6): number[] {
+  if (rows.length < 30) return [];
+  const chunkSize = Math.ceil(rows.length / buckets);
+  const out: number[] = [];
+  for (let i = 0; i < rows.length; i += chunkSize) {
+    const value = metricFn(rows.slice(i, i + chunkSize));
+    if (value !== null) out.push(value);
+  }
+  return out;
+}
+
+// Mãos que compõem um recorte (posição, matchup) — pra "ver as mãos que
+// deram esse número" ficar disponível fora do Leak Finder também, mesmo
+// formato que computeLeakHands já usa (LeakHandForReview reaproveitado,
+// campos que não fazem sentido aqui ficam vazios).
+export function rowsToHandRefs(rows: AnalysisHandRow[]): LeakHandForReview[] {
+  return rows.map((r) => ({
+    handId: r.handReviewId,
+    playedAt: r.playedAt,
+    format: r.format ?? "mtt",
+    position: r.heroPosition,
+    street: "preflop",
+    potBB: null,
+    netResultBB: null,
+    leakTags: [],
+  }));
+}
+
 // ============================================================
 // Postflop
 // ============================================================
