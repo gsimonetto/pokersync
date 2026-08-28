@@ -63,16 +63,24 @@ export function SubHeader({ children }: { children: React.ReactNode }) {
 // é opcional — um ícone fino por linha ajuda a escanear rápido sem virar
 // decoração (mesmo ícone pra métricas da mesma família, ex. todo "fold
 // to X" usa o mesmo ícone de retorno).
+// `bar` só existe quando há faixa de referência conhecida (toneFromRange
+// com min/max reais) — vira uma trilha horizontal com a faixa saudável
+// sombreada e um traço na posição do seu valor, no estilo HUD do
+// HM3/PT4 (barra vs. população) em vez de só número solto. Métrica sem
+// consenso de faixa fica só como número — não inventamos escala pra ela.
+type StatBar = { pct: number; bandStart: number; bandEnd: number };
+
 export function StatList({
   items,
 }: {
-  items: { label: string; value: string | null; icon?: LucideIcon; tone?: "bom" | "ruim"; locked?: string }[];
+  items: { label: string; value: string | null; icon?: LucideIcon; tone?: "bom" | "ruim"; hint?: string; bar?: StatBar; locked?: string }[];
 }) {
   return (
     <div className="divide-y divide-hairline">
       {items.map((it) => {
         const Icon = it.icon;
         const cor = it.tone === "bom" ? "text-positive" : it.tone === "ruim" ? "text-negative" : "text-ink";
+        const barCor = it.tone === "bom" ? "bg-positive" : it.tone === "ruim" ? "bg-negative" : "bg-muted";
         return it.locked ? (
           <div key={it.label} className="flex items-center justify-between gap-3 py-2.5 opacity-60" title={it.locked}>
             <span className="flex items-center gap-2 text-[13px] font-medium text-muted">
@@ -82,12 +90,23 @@ export function StatList({
             <span className="shrink-0 text-base font-bold tabular-nums text-muted/40">—</span>
           </div>
         ) : (
-          <div key={it.label} className="flex items-center justify-between gap-3 py-2.5">
-            <span className="flex items-center gap-2 text-[13px] font-medium text-ink">
-              {Icon && <Icon size={13} className="shrink-0 text-muted" />}
-              {it.label}
-            </span>
-            <span className={`shrink-0 text-base font-bold tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</span>
+          <div key={it.label} className="py-2.5" title={it.hint}>
+            <div className="flex items-center justify-between gap-3">
+              <span className="flex items-center gap-2 text-[13px] font-medium text-ink">
+                {Icon && <Icon size={13} className="shrink-0 text-muted" />}
+                {it.label}
+              </span>
+              <span className={`shrink-0 text-base font-bold tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</span>
+            </div>
+            {it.bar && it.value && (
+              <div className="relative mt-1.5 h-1 rounded-full bg-elevated">
+                <div
+                  className="absolute inset-y-0 rounded-full bg-positive/15"
+                  style={{ left: `${it.bar.bandStart}%`, width: `${Math.max(0, it.bar.bandEnd - it.bar.bandStart)}%` }}
+                />
+                <div className={`absolute inset-y-0 w-[3px] rounded-full ${barCor}`} style={{ left: `calc(${it.bar.pct}% - 1.5px)` }} />
+              </div>
+            )}
           </div>
         );
       })}
@@ -105,6 +124,19 @@ export function toneFromRange(value: number | null, min: number, max: number): "
   if (value >= min && value <= max) return "bom";
   if (value < min * 0.6 || value > max * 1.6) return "ruim";
   return undefined;
+}
+
+// Monta a trilha visual (StatBar) pra uma métrica com faixa de referência
+// conhecida — `scaleMax` é só o teto visual da barra (não um limite real),
+// escolhido folgado o bastante pra outliers não estourarem 100%.
+export function statBar(value: number | null, min: number, max: number, scaleMax: number): StatBar | undefined {
+  if (value === null) return undefined;
+  const clamp = (n: number) => Math.max(0, Math.min(100, n));
+  return {
+    pct: clamp((value / scaleMax) * 100),
+    bandStart: clamp((min / scaleMax) * 100),
+    bandEnd: clamp((max / scaleMax) * 100),
+  };
 }
 
 // Contador único de amostra pro cabeçalho de um Painel (slot `action`) —

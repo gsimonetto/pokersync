@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { Target, Grid3x3, Hand, TrendingUp, Repeat, CornerUpLeft, Zap, Swords, Layers } from "lucide-react";
-import { Painel, StatList, EmptyState, SampleBadge, toneFromRange } from "@/components/analysis/shared";
+import { Painel, StatList, EmptyState, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { computeHandMatrix } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
@@ -37,22 +37,77 @@ export function PreflopTab({
       <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
         <StatList
           items={[
-            { label: "VPIP", value: fmtPct(metrics.vpip_pct), icon: Hand, tone: toneFromRange(metrics.vpip_pct, 20, 28) },
-            { label: "PFR", value: fmtPct(metrics.pfr_pct), icon: TrendingUp, tone: toneFromRange(metrics.pfr_pct, 15, 24) },
-            { label: "3-Bet %", value: fmtPct(metrics.three_bet_pct), icon: Repeat, tone: toneFromRange(metrics.three_bet_pct, 6, 10) },
+            {
+              label: "VPIP",
+              value: fmtPct(metrics.vpip_pct),
+              icon: Hand,
+              tone: toneFromRange(metrics.vpip_pct, 20, 28),
+              bar: statBar(metrics.vpip_pct, 20, 28, 60),
+              hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
+            },
+            {
+              label: "PFR",
+              value: fmtPct(metrics.pfr_pct),
+              icon: TrendingUp,
+              tone: toneFromRange(metrics.pfr_pct, 15, 24),
+              bar: statBar(metrics.pfr_pct, 15, 24, 50),
+              hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
+            },
+            {
+              label: "3-Bet %",
+              value: fmtPct(metrics.three_bet_pct),
+              icon: Repeat,
+              tone: toneFromRange(metrics.three_bet_pct, 6, 10),
+              bar: statBar(metrics.three_bet_pct, 6, 10, 20),
+              hint: "Frequência de re-raise no preflop diante de um raise anterior.",
+            },
             {
               label: "Fold to 3-Bet %",
               value: fmtPct(metrics.fold_to_3bet_pct),
               icon: CornerUpLeft,
               tone: toneFromRange(metrics.fold_to_3bet_pct, 55, 65),
+              bar: statBar(metrics.fold_to_3bet_pct, 55, 65, 100),
+              hint: "Frequência que você desiste depois de ser 3-betado, quando você tinha aberto o pote.",
             },
-            { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap },
-            { label: "Fold to 4-Bet %", value: fmtPct(metrics.fold_to_4bet_pct), icon: CornerUpLeft },
-            { label: "Steal %", value: fmtPct(metrics.steal_pct), icon: Swords, tone: toneFromRange(metrics.steal_pct, 35, 55) },
-            { label: "Squeeze %", value: fmtPct(metrics.squeeze_pct), icon: Layers },
-            { label: "Fold to Steal (SB vs BTN)", value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct), icon: CornerUpLeft },
-            { label: "Fold to Steal (BB vs BTN)", value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct), icon: CornerUpLeft },
-            { label: "Fold to Steal (BB vs SB)", value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct), icon: CornerUpLeft },
+            { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap, hint: "Frequência de re-raise diante de um 3-bet adversário." },
+            {
+              label: "Fold to 4-Bet %",
+              value: fmtPct(metrics.fold_to_4bet_pct),
+              icon: CornerUpLeft,
+              hint: "Frequência que você desiste depois de ser 4-betado, quando você tinha 3-betado.",
+            },
+            {
+              label: "Steal %",
+              value: fmtPct(metrics.steal_pct),
+              icon: Swords,
+              tone: toneFromRange(metrics.steal_pct, 35, 55),
+              bar: statBar(metrics.steal_pct, 35, 55, 100),
+              hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
+            },
+            {
+              label: "Squeeze %",
+              value: fmtPct(metrics.squeeze_pct),
+              icon: Layers,
+              hint: "Frequência de 3-bet quando já houve um raise e pelo menos um call antes de você.",
+            },
+            {
+              label: "Fold to Steal (SB vs BTN)",
+              value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct),
+              icon: CornerUpLeft,
+              hint: "Frequência que você desiste no SB contra um open-raise do BTN.",
+            },
+            {
+              label: "Fold to Steal (BB vs BTN)",
+              value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct),
+              icon: CornerUpLeft,
+              hint: "Frequência que você desiste no BB contra um open-raise do BTN.",
+            },
+            {
+              label: "Fold to Steal (BB vs SB)",
+              value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct),
+              icon: CornerUpLeft,
+              hint: "Frequência que você desiste no BB contra um open-raise do SB.",
+            },
             {
               label: "Limp-Fold %",
               value: null,
@@ -66,8 +121,9 @@ export function PreflopTab({
           ]}
         />
         <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
-          Cor = faixa de referência comum pra 6-max/MTT (heurística de população, não output do motor GTO) — verde perto do
-          consenso, vermelho bem fora dele. Sem cor quando não há uma faixa amplamente aceita pra métrica.
+          Cor e barra = faixa de referência comum pra 6-max/MTT (heurística de população, não output do motor GTO) — verde
+          perto do consenso, vermelho bem fora dele. Métrica sem barra é métrica sem uma faixa amplamente aceita — mostramos
+          só o número, sem inventar escala. Passe o mouse sobre qualquer linha pra ver a definição.
         </p>
       </Painel>
 
