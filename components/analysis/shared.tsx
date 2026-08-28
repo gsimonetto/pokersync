@@ -49,6 +49,40 @@ export function MetricGrid({ items }: { items: { label: string; value: string | 
   );
 }
 
+// Cabeçalho de subseção dentro de um Painel — separa grupos de métricas
+// relacionadas sem abrir um novo card pra cada grupo (evita a "poluição"
+// de muitos cards pequenos competindo por atenção na mesma tela).
+export function SubHeader({ children }: { children: React.ReactNode }) {
+  return <p className="mb-1.5 mt-4 text-[10px] font-bold uppercase tracking-[0.12em] text-muted/70 first:mt-0">{children}</p>;
+}
+
+// Lista densa de métricas (rótulo + valor, uma linha por métrica) — usada
+// no lugar de MetricGrid quando o número de métricas é alto e o grid de
+// cards vira ruído visual (ex.: Tendências pós-flop). Mesma leitura
+// escaneável de uma tabela, sem as bordas repetidas de cada card.
+export function StatList({ items }: { items: { label: string; value: string | null; locked?: string }[] }) {
+  return (
+    <div className="divide-y divide-hairline">
+      {items.map((it) =>
+        it.locked ? (
+          <div key={it.label} className="flex items-center justify-between gap-3 py-2.5 opacity-60" title={it.locked}>
+            <span className="flex items-center gap-1.5 text-[13px] font-medium text-muted">
+              <Lock size={11} />
+              {it.label}
+            </span>
+            <span className="shrink-0 text-base font-bold tabular-nums text-muted/40">—</span>
+          </div>
+        ) : (
+          <div key={it.label} className="flex items-center justify-between gap-3 py-2.5">
+            <span className="text-[13px] font-medium text-ink">{it.label}</span>
+            <span className={`shrink-0 text-base font-bold tabular-nums ${it.value ? "text-ink" : "text-muted/30"}`}>{it.value ?? "—"}</span>
+          </div>
+        )
+      )}
+    </div>
+  );
+}
+
 export function LockedMetric({ label, reason }: { label: string; reason: string }) {
   return (
     <div className="flex flex-col justify-between rounded-lg border border-dashed border-hairline p-3.5 opacity-70" title={reason}>

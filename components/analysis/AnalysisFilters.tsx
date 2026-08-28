@@ -45,6 +45,7 @@ export function AnalysisFilters({
   availableStackDepths,
   availablePositions,
   onImported,
+  onSelectTournamentImport,
 }: {
   filters: Filters;
   onChange: (next: Filters) => void;
@@ -52,9 +53,11 @@ export function AnalysisFilters({
   availableStackDepths: Set<StackDepthBucket>;
   availablePositions: Set<HeroPosition>;
   onImported: () => void;
+  onSelectTournamentImport: () => void;
 }) {
   const [periodDays, setPeriodDays] = useState(0);
   const [importOpen, setImportOpen] = useState(false);
+  const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
   function setPeriod(days: number) {
@@ -72,34 +75,71 @@ export function AnalysisFilters({
 
   return (
     <div>
-      <div className="flex flex-wrap items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-2">
-          <SegmentedControl value={periodDays} onChange={setPeriod} options={PERIOD_OPTIONS.map((o) => ({ value: o.days, label: o.label }))} />
-
-          <button
-            type="button"
-            onClick={() => setMoreOpen((v) => !v)}
-            className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
-              moreOpen ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-muted hover:border-ink/40 hover:text-ink"
-            }`}
-          >
-            <SlidersHorizontal size={13} />
-            Filtros
-            {activeCount > 0 && (
-              <span className="grid h-4 w-4 place-items-center rounded-full bg-evolution text-[10px] font-bold text-void">{activeCount}</span>
-            )}
-            <ChevronDown size={13} className={`transition-transform ${moreOpen ? "rotate-180" : ""}`} />
-          </button>
-        </div>
+      {/* Um único grupo à direita — filtro de período, "Filtros" e
+          "Importar" vivem juntos porque são as três ações que decidem
+          "quais dados eu vejo / de onde eles vêm"; nada mais compete
+          pelo lado esquerdo da barra. */}
+      <div className="flex flex-wrap items-center justify-end gap-2">
+        <SegmentedControl value={periodDays} onChange={setPeriod} options={PERIOD_OPTIONS.map((o) => ({ value: o.days, label: o.label }))} />
 
         <button
           type="button"
-          onClick={() => setImportOpen((v) => !v)}
-          className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          onClick={() => setMoreOpen((v) => !v)}
+          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
+            moreOpen ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-muted hover:border-ink/40 hover:text-ink"
+          }`}
         >
-          <Upload size={13} />
-          Importar hand history
+          <SlidersHorizontal size={13} />
+          Filtros
+          {activeCount > 0 && (
+            <span className="grid h-4 w-4 place-items-center rounded-full bg-evolution text-[10px] font-bold text-void">{activeCount}</span>
+          )}
+          <ChevronDown size={13} className={`transition-transform ${moreOpen ? "rotate-180" : ""}`} />
         </button>
+
+        <div className="relative">
+          <button
+            type="button"
+            onClick={() => setImportMenuOpen((v) => !v)}
+            className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
+              importMenuOpen || importOpen
+                ? "border-ink bg-ink text-void"
+                : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
+            }`}
+          >
+            <Upload size={13} />
+            Importar
+            <ChevronDown size={13} className={`transition-transform ${importMenuOpen ? "rotate-180" : ""}`} />
+          </button>
+
+          {importMenuOpen && (
+            <div className="absolute right-0 top-full z-10 mt-1.5 w-52 overflow-hidden rounded-lg border border-hairline bg-elevated shadow-lg">
+              <button
+                type="button"
+                onClick={() => {
+                  setImportOpen(true);
+                  setImportMenuOpen(false);
+                }}
+                className="block w-full px-3.5 py-2.5 text-left text-[13px] font-medium text-ink hover:bg-void/40"
+              >
+                Hand history
+                <span className="mt-0.5 block text-[11px] font-normal text-muted">Cole o texto exportado do site</span>
+              </button>
+              <button
+                type="button"
+                onClick={() => {
+                  setImportOpen(false);
+                  setImportMenuOpen(false);
+                  onSelectTournamentImport();
+                }}
+                className="block w-full border-t border-hairline px-3.5 py-2.5 text-left text-[13px] font-medium text-ink hover:bg-void/40"
+              >
+                Torneio
+                <span className="mt-0.5 block text-[11px] font-normal text-muted">Premiação / colocação na aba Torneios</span>
+              </button>
+            </div>
+          )}
+        </div>
       </div>
 
       {importOpen && (
