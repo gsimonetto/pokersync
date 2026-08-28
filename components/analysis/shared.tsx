@@ -49,6 +49,38 @@ export function MetricGrid({ items }: { items: { label: string; value: string | 
   );
 }
 
+// Faixa de destaque — mesmo padrão da "Faixa herói" da Gestão de Banca
+// (HeroMetric): número grande e em negrito, label pequeno em caixa alta
+// acima, divisor fino entre blocos em vez de borda por métrica. Só pros
+// 3-4 headliners de cada card (ex. VPIP/PFR/3-Bet%/Steal% no Preflop) —
+// o resto continua na StatList abaixo, senão a tela vira uma parede de
+// números grandes competindo entre si.
+export function HeroStrip({
+  items,
+}: {
+  items: { label: string; value: string | null; tone?: "bom" | "ruim"; trend?: number[]; hint?: string }[];
+}) {
+  return (
+    <div
+      className="grid grid-cols-2 divide-x divide-y divide-hairline overflow-hidden rounded-lg border border-hairline bg-elevated sm:grid-cols-4 sm:divide-y-0"
+      style={{ gridAutoRows: "1fr" }}
+    >
+      {items.map((it) => {
+        const cor = it.tone === "bom" ? "text-positive" : it.tone === "ruim" ? "text-negative" : "text-ink";
+        return (
+          <div key={it.label} className="px-4 py-3.5" title={it.hint}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{it.label}</p>
+            <div className="mt-1.5 flex items-end justify-between gap-2">
+              <p className={`text-2xl font-bold leading-none tracking-tight tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</p>
+              {it.trend && it.trend.length >= 2 && <Sparkline points={it.trend} tone={it.tone} />}
+            </div>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 // Cabeçalho de subseção dentro de um Painel — separa grupos de métricas
 // relacionadas sem abrir um novo card pra cada grupo (evita a "poluição"
 // de muitos cards pequenos competindo por atenção na mesma tela).
