@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { LineChart, Grid3x3, Flame, Trophy, AlertTriangle } from "lucide-react";
+import { Grid3x3, Flame, Trophy, AlertTriangle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { AppHeader } from "@/components/app-header";
 import { TabNav } from "@/components/ui/tab-nav";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
-import { OverviewTab } from "@/components/analysis/OverviewTab";
 import { PreflopTab } from "@/components/analysis/PreflopMatrix";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { TournamentTab } from "@/components/analysis/TournamentTab";
@@ -19,11 +17,8 @@ import {
   computePostflopMetrics,
   computeLeaks,
   fetchTournamentMetrics,
-  fetchFinancialDaySeries,
   fetchTournamentSessions,
 } from "@/lib/services/analysis-service";
-import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
-import type { FinancialDay } from "@/lib/services/team-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import {
@@ -36,10 +31,9 @@ import {
   type TournamentMetrics,
 } from "@/types/analysis";
 
-type TabKey = "overview" | "preflop" | "postflop" | "tournament" | "leaks";
+type TabKey = "preflop" | "postflop" | "tournament" | "leaks";
 
-const TABS: { value: TabKey; label: string; icon: typeof LineChart }[] = [
-  { value: "overview", label: "Visão Geral", icon: LineChart },
+const TABS: { value: TabKey; label: string; icon: typeof Grid3x3 }[] = [
   { value: "preflop", label: "Preflop & Matriz", icon: Grid3x3 },
   { value: "postflop", label: "Postflop & Tendências", icon: Flame },
   { value: "tournament", label: "Torneios", icon: Trophy },
@@ -48,30 +42,24 @@ const TABS: { value: TabKey; label: string; icon: typeof LineChart }[] = [
 
 export default function AnalysisPage() {
   const [rows, setRows] = useState<AnalysisHandRow[]>([]);
-  const [performance, setPerformance] = useState<PlayerPerformance | null>(null);
-  const [financialDays, setFinancialDays] = useState<FinancialDay[]>([]);
   const [tournament, setTournament] = useState<TournamentMetrics | null>(null);
   const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
   const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
-  const [tab, setTab] = useState<TabKey>("overview");
+  const [tab, setTab] = useState<TabKey>("preflop");
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
 
   async function loadAll() {
     setErro("");
     try {
-      const [r, perf, fin, tourn, sessions, po] = await Promise.all([
+      const [r, tourn, sessions, po] = await Promise.all([
         fetchAnalysisHandRows(),
-        fetchPlayerPerformance(),
-        fetchFinancialDaySeries(),
         fetchTournamentMetrics(),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
       ]);
       setRows(r);
-      setPerformance(perf);
-      setFinancialDays(fin);
       setTournament(tourn);
       setTournamentSessions(sessions);
       setPayouts(po);
@@ -124,13 +112,6 @@ export default function AnalysisPage() {
   return (
     <AppShell>
       <main className="w-full px-6 py-10 text-ink">
-        <AppHeader
-          insideShell
-          backHref="/performance"
-          title="Análise"
-          subtitle="Preflop, postflop, torneios e leak finder num só lugar — o melhor do HM3/PT4 em cima dos seus dados."
-        />
-
         {erro && <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>}
 
         {loading ? (
@@ -148,6 +129,7 @@ export default function AnalysisPage() {
               availableStackDepths={availableStackDepths}
               availablePositions={availablePositions}
               onImported={loadAll}
+              onSelectTournamentImport={() => setTab("tournament")}
             />
 
             <TabNav className="mt-4" value={tab} onChange={setTab} options={TABS} />
@@ -160,15 +142,6 @@ export default function AnalysisPage() {
                 </p>
               ) : (
                 <>
-                  {tab === "overview" && (
-                    <OverviewTab
-                      performance={performance}
-                      financialDays={financialDays}
-                      handCount={filteredRows.length}
-                      leaks={leaks}
-                      onGoToLeaks={() => setTab("leaks")}
-                    />
-                  )}
                   {tab === "preflop" && <PreflopTab rows={filteredRows} metrics={preflop} byPosition={byPosition} />}
                   {tab === "postflop" && <PostflopTab metrics={postflop} />}
                   {tab === "tournament" && tournament && (
