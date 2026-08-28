@@ -5,7 +5,6 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import {
   LineChart,
-  Lock,
   ShieldAlert,
   Flame,
   BookOpen,
@@ -17,29 +16,19 @@ import {
   TrendingUp,
   TrendingDown,
   Sparkles,
-  Spade,
 } from "lucide-react";
 import { TabNav } from "@/components/ui/tab-nav";
 import {
   fetchPlayerPerformance,
-  fetchPositionStats,
   fetchPlayerTimeline,
-  fetchMatchupStats,
-  fetchIpOopSplit,
   fetchSkillBreakdown,
   fetchPeriodComparison,
   fetchPlayerInsights,
   nivelDoScore,
-  computePositionHighlights,
-  fetchPreflopSituations,
   type PlayerPerformance,
-  type PositionStat,
   type TimelineEvent,
-  type MatchupStat,
-  type IpOopSplit,
   type SkillArea,
   type PeriodComparisonRow,
-  type PreflopSituation,
 } from "@/lib/services/performance-service";
 import { fetchPlayerCards, STAT_METRIC_LABEL, type PlayerCard } from "@/lib/services/team-funnel-service";
 
@@ -68,25 +57,26 @@ function fmtNum(v: number | null | undefined, suffix = ""): string | null {
   return `${Number(v).toLocaleString("pt-BR")}${suffix}`;
 }
 
-type TabKey = "financeiro" | "jogo" | "estudo" | "evolucao";
+// "analise" nunca é setada via onChange (é uma opção href, ver TabNav) —
+// só existe na união pra não precisar de cast na lista de abas abaixo.
+type TabKey = "financeiro" | "estudo" | "evolucao" | "analise";
 
-const TABS: { value: TabKey; label: string; icon: typeof Wallet }[] = [
+// "Análise avançada" entra como última aba (href, ver TabNav) em vez de
+// botão separado — as métricas de jogo (VPIP/PFR/posição/matchups) que
+// viviam na aba "Jogo" agora só existem lá, sem duplicar as duas telas.
+const TABS: { value: TabKey; label: string; icon: typeof Wallet; href?: string }[] = [
   { value: "financeiro", label: "Financeiro", icon: Wallet },
-  { value: "jogo", label: "Jogo", icon: Spade },
   { value: "estudo", label: "Estudo", icon: BookOpen },
   { value: "evolucao", label: "Evolução", icon: TrendingUp },
+  { value: "analise", label: "Análise avançada", icon: LineChart, href: "/performance/analise" },
 ];
 
 export default function PerformancePage() {
   const [data, setData] = useState<PlayerPerformance | null>(null);
-  const [posStats, setPosStats] = useState<PositionStat[]>([]);
   const [timeline, setTimeline] = useState<TimelineEvent[]>([]);
-  const [matchupStats, setMatchupStats] = useState<MatchupStat[]>([]);
-  const [ipOop, setIpOop] = useState<IpOopSplit | null>(null);
   const [skills, setSkills] = useState<SkillArea[]>([]);
   const [periods, setPeriods] = useState<PeriodComparisonRow[]>([]);
   const [insights, setInsights] = useState<string[]>([]);
-  const [preflopSit, setPreflopSit] = useState<PreflopSituation[]>([]);
   const [metaCoach, setMetaCoach] = useState<PlayerCard | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -96,16 +86,12 @@ export default function PerformancePage() {
     let alive = true;
     (async () => {
       try {
-        const [d, ps, tl, ms, io, sk, pc, ins, pfs, cards] = await Promise.all([
+        const [d, tl, sk, pc, ins, cards] = await Promise.all([
           fetchPlayerPerformance(),
-          fetchPositionStats(),
           fetchPlayerTimeline(),
-          fetchMatchupStats(),
-          fetchIpOopSplit(),
           fetchSkillBreakdown(),
           fetchPeriodComparison(),
           fetchPlayerInsights(),
-          fetchPreflopSituations(),
           // So' quem tem time atribui essa meta -- sem time, a RPC volta
           // vazia (nao e' erro), entao o card "Meta do coach" so' aparece
           // pra quem de fato tem um coach acompanhando.
@@ -113,14 +99,10 @@ export default function PerformancePage() {
         ]);
         if (alive) {
           setData(d);
-          setPosStats(ps);
           setTimeline(tl);
-          setMatchupStats(ms);
-          setIpOop(io);
           setSkills(sk);
           setPeriods(pc);
           setInsights(ins);
-          setPreflopSit(pfs);
           setMetaCoach(cards[0] ?? null);
         }
       } catch (e) {
@@ -204,18 +186,12 @@ export default function PerformancePage() {
         <>
           {/* Barra superior: abas fazem o papel de filtro deste módulo
               (mesmo padrão do resto do produto — filtros/navegação no
-              topo), com Análise avançada e o Score Geral na mesma linha,
-              não soltos dentro de um card à parte. */}
+              topo). "Análise avançada" é a última aba da lista (ver
+              TABS/TabNav), não um botão separado; só o Score Geral fica
+              fora da lista de abas, à direita. */}
           <div className="flex flex-wrap items-center justify-between gap-3">
             <TabNav value={tab} onChange={setTab} options={TABS} className="min-w-0 flex-1" />
             <div className="flex shrink-0 items-center gap-3">
-              <Link
-                href="/performance/analise"
-                className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-              >
-                <LineChart size={13} />
-                Análise avançada
-              </Link>
               {data.score_geral !== null && data.score_geral !== undefined && (
                 <div className="flex items-center gap-2">
                   <span className="hidden text-xs font-medium text-muted sm:inline">{nivelDoScore(Number(data.score_geral))}</span>
@@ -316,9 +292,6 @@ export default function PerformancePage() {
                 <AbaFinanceiro data={data} />
               </>
             )}
-            {tab === "jogo" && (
-              <AbaJogo data={data} posStats={posStats} matchupStats={matchupStats} ipOop={ipOop} preflopSit={preflopSit} />
-            )}
             {tab === "estudo" && <AbaEstudo data={data} metaCoach={metaCoach} />}
             {tab === "evolucao" && (
               <AbaEvolucao data={data} timeline={timeline} skills={skills} periods={periods} insights={insights} />
@@ -385,178 +358,6 @@ function AbaFinanceiro({ data }: { data: PlayerPerformance }) {
           vazio={{ texto: "Preencha a duração ao registrar a sessão", href: "/banca", cta: "Registrar" }}
         />
         <Linha label="Torneios / Cash" valor={`${data.num_torneios ?? 0} / ${data.num_cash ?? 0}`} />
-      </Painel>
-    </div>
-  );
-}
-
-// Referencias de MTT usadas so como CONTEXTO visual (faixa clara ao
-// fundo da barra), nunca como veredito de certo/errado — VPIP/PFR
-// "ideal" varia demais por stack, mesa e fase do torneio pra virar
-// semaforo verde/vermelho.
-const REF = {
-  vpip: { min: 18, max: 28, escala: 60 },
-  pfr: { min: 14, max: 22, escala: 60 },
-  threeBet: { min: 5, max: 10, escala: 20 },
-};
-
-function AbaJogo({
-  data,
-  posStats,
-  matchupStats,
-  ipOop,
-  preflopSit,
-}: {
-  data: PlayerPerformance;
-  posStats: PositionStat[];
-  matchupStats: MatchupStat[];
-  ipOop: IpOopSplit | null;
-  preflopSit: PreflopSituation[];
-}) {
-  const amostra = data.maos_com_dados_frequencia ?? 0;
-  const ipTotal = (ipOop?.ip_hands ?? 0) + (ipOop?.oop_hands ?? 0);
-  return (
-    <div className="space-y-4">
-      <Painel titulo="Situações pré-flop" icone={<Target size={14} className="text-training" />}>
-        <p className="text-xs leading-relaxed text-muted">
-          Steal, 3-bet/4-bet e defesa de blinds — direto da hand history, sem depender de solver. Re-steal e squeeze
-          aparecem só como contagem: ainda não guardamos quantas vezes um oponente tentou roubar contra você, então uma
-          % aqui seria inventada.
-        </p>
-        <div className="mt-2 divide-y divide-hairline">
-          {preflopSit.map((s) => (
-            <div key={s.label} className="flex items-center justify-between py-2 text-sm">
-              <span className="text-muted">{s.label}</span>
-              <span className="tabular-nums">
-                {s.pct !== null ? <strong className="text-ink">{s.pct}%</strong> : <strong className="text-ink">{s.sample}</strong>}
-                <span className="ml-1.5 text-[11px] text-muted/70">
-                  {s.pct !== null ? `(${s.sample})` : "mãos"}
-                </span>
-              </span>
-            </div>
-          ))}
-        </div>
-      </Painel>
-
-      <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="text-training" />}>
-        <p className="text-xs leading-relaxed text-muted">
-          Calculado sobre <strong className="text-ink/85">{amostra}</strong> {amostra === 1 ? "mão" : "mãos"} com hand
-          history estruturada. A faixa marcada na régua é apenas uma referência comum de MTT — não é um veredito sobre o
-          seu jogo.
-        </p>
-        <div className="grid grid-cols-1 gap-3 pt-1 sm:grid-cols-3">
-          <Frequencia label="VPIP" valor={data.vpip_pct} referencia={REF.vpip} />
-          <Frequencia label="PFR" valor={data.pfr_pct} referencia={REF.pfr} />
-          <Frequencia label="3-Bet" valor={data.three_bet_pct} referencia={REF.threeBet} />
-        </div>
-      </Painel>
-
-      <Painel titulo="Por posição" icone={<Target size={14} className="text-evolution" />}>
-        {posStats.length === 0 ? (
-          <p className="text-xs leading-relaxed text-muted">
-            Ainda sem mãos suficientes com posição identificada para separar por posição.
-          </p>
-        ) : (
-          <>
-            {computePositionHighlights(posStats).length > 0 && (
-              <ul className="mb-3 space-y-1">
-                {computePositionHighlights(posStats).map((h, i) => (
-                  <li key={i} className="flex gap-2 text-sm text-ink">
-                    <span className="text-evolution">•</span>
-                    {h}
-                  </li>
-                ))}
-              </ul>
-            )}
-            <div className="overflow-x-auto rounded-lg border border-hairline">
-              <table className="w-full text-xs">
-                <thead>
-                  <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
-                    <th className="px-3 py-2 text-left font-bold">Posição</th>
-                    <th className="px-3 py-2 text-right font-bold">Mãos</th>
-                    <th className="px-3 py-2 text-right font-bold">VPIP</th>
-                    <th className="px-3 py-2 text-right font-bold">PFR</th>
-                    <th className="px-3 py-2 text-right font-bold">3-Bet</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {posStats.map((p) => (
-                    <tr key={p.position} className="border-b border-hairline last:border-b-0">
-                      <td className="px-3 py-2 font-semibold text-ink">{p.position}</td>
-                      <td className="px-3 py-2 text-right tabular-nums text-muted">{p.hands}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.vpip_pct) ?? "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.pfr_pct) ?? "—"}</td>
-                      <td className="px-3 py-2 text-right tabular-nums">{fmtPct(p.three_bet_pct) ?? "—"}</td>
-                    </tr>
-                  ))}
-                </tbody>
-              </table>
-            </div>
-          </>
-        )}
-      </Painel>
-
-      <Painel titulo="Dentro vs fora de posição" icone={<Target size={14} className="text-training" />}>
-        <p className="text-xs leading-relaxed text-muted">
-          Só conta mãos onde exatamente 2 jogadores chegaram ao flop (heads-up pot) — é o único caso em que IP/OOP tem
-          um valor único e correto. Mãos com 3+ jogadores no flop não entram aqui.
-        </p>
-        {ipTotal === 0 ? (
-          <p className="mt-2 text-xs text-muted/70">Sem mãos heads-up suficientes ainda.</p>
-        ) : (
-          <div className="mt-2 space-y-2">
-            <div className="flex h-3 w-full overflow-hidden rounded-full bg-void/40">
-              <div className="h-full bg-positive" style={{ width: `${((ipOop?.ip_hands ?? 0) / ipTotal) * 100}%` }} />
-              <div className="h-full bg-review" style={{ width: `${((ipOop?.oop_hands ?? 0) / ipTotal) * 100}%` }} />
-            </div>
-            <div className="flex justify-between text-xs">
-              <span className="text-positive">Em posição — {ipOop?.ip_hands ?? 0} mãos ({fmtPct(ipOop?.ip_pct) ?? "—"})</span>
-              <span className="text-review">Fora de posição — {ipOop?.oop_hands ?? 0} mãos</span>
-            </div>
-          </div>
-        )}
-      </Painel>
-
-      <Painel titulo="Matchups mais jogados" icone={<Target size={14} className="text-review" />}>
-        {matchupStats.length === 0 ? (
-          <p className="text-xs leading-relaxed text-muted">
-            Ainda sem matchups heads-up suficientes para listar.
-          </p>
-        ) : (
-          <div className="overflow-x-auto rounded-lg border border-hairline">
-            <table className="w-full text-xs">
-              <thead>
-                <tr className="border-b border-hairline bg-elevated text-[10px] uppercase tracking-[0.08em] text-muted">
-                  <th className="px-3 py-2 text-left font-bold">Matchup</th>
-                  <th className="px-3 py-2 text-right font-bold">Mãos</th>
-                  <th className="px-3 py-2 text-right font-bold">VPIP</th>
-                  <th className="px-3 py-2 text-right font-bold">PFR</th>
-                </tr>
-              </thead>
-              <tbody>
-                {matchupStats.map((m) => (
-                  <tr key={m.matchup} className="border-b border-hairline last:border-b-0">
-                    <td className="px-3 py-2 font-semibold text-ink">{m.matchup}</td>
-                    <td className="px-3 py-2 text-right tabular-nums text-muted">{m.hands}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.vpip_pct) ?? "—"}</td>
-                    <td className="px-3 py-2 text-right tabular-nums">{fmtPct(m.pfr_pct) ?? "—"}</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-      </Painel>
-
-      <Painel titulo="Precisão" icone={<Lock size={14} className="text-muted" />}>
-        <Bloqueado
-          titulo="bb/100"
-          texto="Depende do stake numérico real de cada mão. Chega junto com o agente desktop, que lê o hand history direto da pasta da sala."
-        />
-        <Bloqueado
-          titulo="ITM% real"
-          texto="Exige ligar a colocação final do torneio ao buy-in da sessão. Também vem com o agente desktop."
-        />
       </Painel>
     </div>
   );
@@ -968,82 +769,6 @@ function MiniCard({
         {label}
       </p>
       <p className="relative mt-0.5 text-xl font-bold tabular-nums">{valor}</p>
-    </div>
-  );
-}
-
-// Barra de frequência com faixa de referência ao fundo. O ponto não é
-// dizer "certo/errado" — é dar escala: 31% de VPIP sozinho não significa
-// nada pra quem não tem parâmetro na cabeça.
-// Régua em vez de barra preenchida. A barra cheia competia visualmente
-// com a faixa de referência (o pedaço cinza sobrando depois do
-// preenchimento parecia defeito) e sugeria "quanto mais cheio, melhor" —
-// leitura errada para VPIP/PFR, onde o que importa é ONDE você está, não
-// o tamanho. O marcador resolve isso: a faixa é o contexto, o traço é
-// você.
-function Frequencia({
-  label,
-  valor,
-  referencia,
-}: {
-  label: string;
-  valor: number | null;
-  referencia: { min: number; max: number; escala: number };
-}) {
-  const v = valor === null || valor === undefined ? null : Number(valor);
-  const pos = v === null ? 0 : Math.min(Math.max((v / referencia.escala) * 100, 0), 100);
-  const refLeft = (referencia.min / referencia.escala) * 100;
-  const refWidth = ((referencia.max - referencia.min) / referencia.escala) * 100;
-
-  const situacao =
-    v === null ? null : v < referencia.min ? "abaixo" : v > referencia.max ? "acima" : "dentro";
-
-  return (
-    <div className="rounded-lg border border-hairline bg-elevated p-3.5">
-      <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">{label}</p>
-      <p className={`mt-1 text-2xl font-bold leading-none tabular-nums ${v === null ? "text-muted/30" : "text-ink"}`}>
-        {v === null ? "—" : `${v.toFixed(1)}%`}
-      </p>
-
-      <div className="relative mt-4 h-1 w-full rounded-full bg-void/60">
-        {/* faixa de referência */}
-        <div
-          aria-hidden="true"
-          className="absolute inset-y-0 rounded-full bg-ink/15"
-          style={{ left: `${refLeft}%`, width: `${refWidth}%` }}
-        />
-        {/* marcador do jogador */}
-        {v !== null && (
-          <span
-            className="absolute top-1/2 h-3.5 w-[3px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-training shadow-[0_0_8px_rgba(90,166,224,.6)] transition-[left] duration-500 ease-out"
-            style={{ left: `${pos}%` }}
-          />
-        )}
-      </div>
-
-      <p className="mt-2.5 text-[11px] text-muted/70">
-        {situacao === "dentro" ? (
-          <span className="text-muted">dentro da referência ({referencia.min}–{referencia.max}%)</span>
-        ) : (
-          <>
-            {situacao === null ? "referência" : situacao} de {referencia.min}–{referencia.max}%
-          </>
-        )}
-      </p>
-    </div>
-  );
-}
-
-function Bloqueado({ titulo, texto }: { titulo: string; texto: string }) {
-  return (
-    <div className="flex items-start gap-3 rounded-lg border border-dashed border-hairline p-3.5">
-      <span className="mt-0.5 grid h-7 w-7 shrink-0 place-items-center rounded-md bg-void/40 text-muted">
-        <Lock size={13} />
-      </span>
-      <div>
-        <p className="text-sm font-medium text-muted">{titulo}</p>
-        <p className="mt-0.5 text-[11px] leading-relaxed text-muted/70">{texto}</p>
-      </div>
     </div>
   );
 }
