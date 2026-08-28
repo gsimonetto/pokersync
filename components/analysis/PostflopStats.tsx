@@ -31,7 +31,12 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
   );
 
   return (
-    <Painel titulo="Tendências pós-flop" icone={<Flame size={14} className="text-training" />} action={<SampleBadge hands={metrics.hands} />}>
+    <Painel
+      id="postflop"
+      titulo="Tendências pós-flop"
+      icone={<Flame size={14} className="text-training" />}
+      action={<SampleBadge hands={metrics.hands} />}
+    >
       <HeroStrip
         items={[
           {
