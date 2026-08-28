@@ -35,15 +35,32 @@ export function RevisorFila({
   onNova,
   onOpen,
   onOpenSession,
+  filterHandIds,
+  filterLabel,
+  onClearFilter,
 }: {
   onNova: () => void;
   onOpen: (id: string) => void;
   onOpenSession: (sessionId: string) => void;
+  // Deep-link "?hands=id1,id2&label=..." (vem de Análise: clicar numa
+  // posição/matchup/leak leva direto pra cá já filtrado, em vez de expandir
+  // uma lista solta na própria tela de Análise) — quando presente, substitui
+  // as abas Sessões/Avulsas por uma lista flat só com essas mãos.
+  filterHandIds?: string[];
+  filterLabel?: string;
+  onClearFilter?: () => void;
 }) {
   const router = useRouter();
   const confirm = useConfirm();
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("sessoes");
+
+  // ---- Lista filtrada (deep-link de Análise) ----
+  const [filteredItems, setFilteredItems] = useState<ReviewListItem[]>([]);
+  const [filteredThumbs, setFilteredThumbs] = useState<Record<string, string | null>>({});
+  const [filteredLoading, setFilteredLoading] = useState(true);
+  const [filteredError, setFilteredError] = useState("");
+  const hasFilter = !!filterHandIds && filterHandIds.length > 0;
 
   // Resumo consolidado (RPC ja existia pronta, nunca era chamada) --
   // Revisor era so uma lista de maos sem nenhum numero de topo, diferente
@@ -101,16 +118,61 @@ export function RevisorFila({
   }, []);
 
   useEffect(() => {
-    if (!userId || tab !== "sessoes") return;
+    if (!userId || tab !== "sessoes" || hasFilter) return;
     loadSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, tab]);
+  }, [userId, tab, hasFilter]);
 
   useEffect(() => {
-    if (!userId || tab !== "avulsas") return;
+    if (!userId || tab !== "avulsas" || hasFilter) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, filter, tab]);
+  }, [userId, filter, tab, hasFilter]);
+
+  useEffect(() => {
+    if (!userId || !hasFilter) return;
+    loadFiltered();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, filterHandIds?.join(",")]);
+
+  async function loadFiltered() {
+    setFilteredLoading(true);
+    setFilteredError("");
+    try {
+      const supabase = createClient();
+      const { data, error: qErr } = await supabase
+        .from("hand_reviews")
+        .select(
+          `
+          id, title, free_text, status, created_at, updated_at, concluded_at,
+          hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
+          hand_review_images ( id, storage_path, position )
+        `
+        )
+        .eq("user_id", userId!)
+        .in("id", filterHandIds!)
+        .order("created_at", { ascending: false });
+      if (qErr) throw qErr;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows: ReviewListItem[] = (data ?? []).map((r: any) => ({
+        ...r,
+        tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
+        thumb: r.hand_review_images?.[0]?.storage_path || null,
+      }));
+      setFilteredItems(rows);
+      const urls: Record<string, string | null> = {};
+      await Promise.all(
+        rows.map(async (r) => {
+          if (r.thumb) urls[r.id] = await getThumbUrl(r.thumb);
+        })
+      );
+      setFilteredThumbs(urls);
+    } catch {
+      setFilteredError("Erro ao carregar as mãos desse filtro.");
+    } finally {
+      setFilteredLoading(false);
+    }
+  }
 
   async function loadSessions() {
     setSessionsLoading(true);
@@ -222,6 +284,50 @@ export function RevisorFila({
     });
     return acc;
   }, [items]);
+
+  if (hasFilter) {
+    return (
+      <div>
+        <div className="mb-4 flex items-center justify-between gap-3">
+          <div>
+            <p className="text-sm font-semibold text-ink">{filterLabel || "Mãos filtradas"}</p>
+            <p className="text-[11px] text-muted">
+              {filterHandIds!.length} {filterHandIds!.length === 1 ? "mão" : "mãos"} — vindas da Análise
+            </p>
+          </div>
+          {onClearFilter && (
+            <button
+              onClick={onClearFilter}
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+            >
+              <X size={13} />
+              Limpar filtro
+            </button>
+          )}
+        </div>
+
+        {filteredError && (
+          <div className="mb-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{filteredError}</div>
+        )}
+
+        {filteredLoading ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+            Carregando…
+          </div>
+        ) : filteredItems.length === 0 ? (
+          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+            Nenhuma mão encontrada pra esse filtro.
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-2.5">
+            {filteredItems.map((r) => (
+              <ReviewCard key={r.id} item={r} thumb={filteredThumbs[r.id]} onOpen={() => onOpen(r.id)} />
+            ))}
+          </ul>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div>
@@ -468,77 +574,9 @@ export function RevisorFila({
             </div>
           ) : (
             <ul className="flex flex-col gap-2.5">
-              {items.map((r) => {
-                const meta = STATUS_META[r.status] || STATUS_META.pendente;
-                const StatusIcon = meta.Icon;
-                return (
-                  <li
-                    key={r.id}
-                    onClick={() => onOpen(r.id)}
-                    className="flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-colors hover:border-ink/40"
-                  >
-                    <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">
-                      {thumbs[r.id] ? (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img src={thumbs[r.id]!} alt="" className="h-full w-full object-cover" />
-                      ) : (
-                        <ImageIcon size={22} className="text-elevated" />
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-semibold text-ink">{r.title || "Mão sem título"}</span>
-                        <span
-                          className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
-                          style={{ color: meta.color, borderColor: meta.color }}
-                        >
-                          <StatusIcon size={12} />
-                          {meta.label}
-                        </span>
-                      </div>
-
-                      {r.free_text && (
-                        <p className="mt-1.5 text-xs leading-relaxed text-muted">
-                          {r.free_text.length > 90 ? r.free_text.slice(0, 90) + "…" : r.free_text}
-                        </p>
-                      )}
-
-                      {r.tags.length > 0 && (
-                        <div className="mt-2 flex flex-wrap gap-1">
-                          {r.tags.slice(0, 4).map((t) => (
-                            <span
-                              key={t.id}
-                              className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review"
-                            >
-                              {t.label}
-                            </span>
-                          ))}
-                          {r.tags.length > 4 && (
-                            <span className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
-                              +{r.tags.length - 4}
-                            </span>
-                          )}
-                        </div>
-                      )}
-
-                      <div className="mt-2 flex items-center justify-between">
-                        <span className="text-[11px] text-muted">{formatDate(r.created_at)}</span>
-                        <button
-                          onClick={(e) => {
-                            e.stopPropagation();
-                            handleDelete(r.id);
-                          }}
-                          className="p-1 text-muted"
-                          aria-label="Excluir"
-                        >
-                          <Trash2 size={14} />
-                        </button>
-                      </div>
-                    </div>
-                  </li>
-                );
-              })}
+              {items.map((r) => (
+                <ReviewCard key={r.id} item={r} thumb={thumbs[r.id]} onOpen={() => onOpen(r.id)} onDelete={() => handleDelete(r.id)} />
+              ))}
             </ul>
           )}
 
@@ -564,6 +602,84 @@ export function RevisorFila({
 function formatDate(iso: string) {
   const d = new Date(iso);
   return d.toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
+}
+
+// Card de mão avulsa — usado tanto na aba "Mãos avulsas" quanto na lista
+// filtrada vinda da Análise (deep-link ?hands=), pra não duplicar o mesmo
+// bloco de ~70 linhas duas vezes. `onDelete` some (sem lixeira) na lista
+// filtrada: excluir uma mão dali não é uma ação que faz sentido nesse
+// contexto de "auditoria de um número".
+function ReviewCard({
+  item: r,
+  thumb,
+  onOpen,
+  onDelete,
+}: {
+  item: ReviewListItem;
+  thumb: string | null | undefined;
+  onOpen: () => void;
+  onDelete?: () => void;
+}) {
+  const meta = STATUS_META[r.status] || STATUS_META.pendente;
+  const StatusIcon = meta.Icon;
+  return (
+    <li onClick={onOpen} className="flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-colors hover:border-ink/40">
+      <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">
+        {thumb ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={thumb} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <ImageIcon size={22} className="text-elevated" />
+        )}
+      </div>
+
+      <div className="min-w-0 flex-1">
+        <div className="flex items-center justify-between gap-2">
+          <span className="truncate text-sm font-semibold text-ink">{r.title || "Mão sem título"}</span>
+          <span
+            className="inline-flex shrink-0 items-center gap-1 rounded-full border px-2 py-0.5 text-[10px]"
+            style={{ color: meta.color, borderColor: meta.color }}
+          >
+            <StatusIcon size={12} />
+            {meta.label}
+          </span>
+        </div>
+
+        {r.free_text && (
+          <p className="mt-1.5 text-xs leading-relaxed text-muted">{r.free_text.length > 90 ? r.free_text.slice(0, 90) + "…" : r.free_text}</p>
+        )}
+
+        {r.tags.length > 0 && (
+          <div className="mt-2 flex flex-wrap gap-1">
+            {r.tags.slice(0, 4).map((t) => (
+              <span key={t.id} className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
+                {t.label}
+              </span>
+            ))}
+            {r.tags.length > 4 && (
+              <span className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">+{r.tags.length - 4}</span>
+            )}
+          </div>
+        )}
+
+        <div className="mt-2 flex items-center justify-between">
+          <span className="text-[11px] text-muted">{formatDate(r.created_at)}</span>
+          {onDelete && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onDelete();
+              }}
+              className="p-1 text-muted"
+              aria-label="Excluir"
+            >
+              <Trash2 size={14} />
+            </button>
+          )}
+        </div>
+      </div>
+    </li>
+  );
 }
 
 function SummaryStat({

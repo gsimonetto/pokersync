@@ -238,23 +238,6 @@ export function computeMetricTrend(rows: AnalysisHandRow[], metricFn: (subset: A
   return out;
 }
 
-// Mãos que compõem um recorte (posição, matchup) — pra "ver as mãos que
-// deram esse número" ficar disponível fora do Leak Finder também, mesmo
-// formato que computeLeakHands já usa (LeakHandForReview reaproveitado,
-// campos que não fazem sentido aqui ficam vazios).
-export function rowsToHandRefs(rows: AnalysisHandRow[]): LeakHandForReview[] {
-  return rows.map((r) => ({
-    handId: r.handReviewId,
-    playedAt: r.playedAt,
-    format: r.format ?? "mtt",
-    position: r.heroPosition,
-    street: "preflop",
-    potBB: null,
-    netResultBB: null,
-    leakTags: [],
-  }));
-}
-
 // ============================================================
 // Postflop
 // ============================================================
@@ -476,9 +459,11 @@ export function computeLeakHands(rows: AnalysisHandRow[], leakId: string): LeakH
   };
   const pred = predicate[leakId];
   if (!pred) return [];
+  // Sem corte aqui — quem limita o tamanho pro deep-link é
+  // revisorHandsHref (150 ids), já que agora isso abre a lista real no
+  // Revisor em vez de uma prévia inline de 25 itens.
   return rows
     .filter(pred)
-    .slice(-25)
     .map((r) => ({
       handId: r.handReviewId,
       playedAt: r.playedAt,
