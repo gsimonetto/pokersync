@@ -379,7 +379,14 @@ function extractStakes(text: string): string | null {
 }
 
 function extractBlinds(text: string): { smallBlind: number | null; bigBlind: number | null } {
-  const m = text.match(/\(\$?([\d.,]+)\/\$?([\d.,]+)\)/);
+  // BUG real (2026-08): mesas em dinheiro real do PokerStars escrevem
+  // "(\$0.10/\$0.25 USD)" — o codigo da moeda antes do ")" fazia esse
+  // regex nunca casar, entao smallBlind/bigBlind ficavam null pra toda mao
+  // de dinheiro real em USD. Sem eles, a heuristica de "isBlindPost" em
+  // hand-replay-projector.ts (que compara o valor do post com esses dois
+  // campos) nunca reconhece blind nenhuma, quebrando o commitment-da-rua
+  // usado no delta de "raises X to Y" logo apos os blinds.
+  const m = text.match(/\(\$?([\d.,]+)\/\$?([\d.,]+)(?:\s+\S+)?\)/);
   if (!m) return { smallBlind: null, bigBlind: null };
   return { smallBlind: Number(m[1].replace(",", "")), bigBlind: Number(m[2].replace(",", "")) };
 }
