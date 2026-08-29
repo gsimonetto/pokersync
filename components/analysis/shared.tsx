@@ -1,5 +1,7 @@
 "use client";
 
+import { useId } from "react";
+import { motion } from "framer-motion";
 import { Lock, type LucideIcon } from "lucide-react";
 
 // Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
@@ -185,22 +187,73 @@ function StatCard({ label, value, icon: Icon, tone, hint, bar }: { label: string
 // computeMetricTrend em analysis-service.ts) — mesma ideia do "Graphing"
 // do HM3/PT4, mas em miniatura dentro da própria linha da lista em vez de
 // aba separada. Só aparece quando a amostra é grande o bastante pra não
-// virar ruído (gate fica na chamada de computeMetricTrend).
+// virar ruído (gate fica na chamada de computeMetricTrend). Área
+// preenchida com gradiente + traço animado (desenha ao entrar em tela) e
+// um ponto pulsando no último valor, pra chamar mais atenção que uma
+// polyline estática.
 function Sparkline({ points, tone }: { points: number[]; tone?: "bom" | "ruim" }) {
-  const w = 44;
-  const h = 16;
+  const w = 56;
+  const h = 20;
+  const gradientId = useId();
   const min = Math.min(...points);
   const max = Math.max(...points);
   const span = max - min || 1;
   const coords = points.map((v, i) => {
     const x = (i / (points.length - 1)) * w;
     const y = h - ((v - min) / span) * h;
-    return `${x.toFixed(1)},${y.toFixed(1)}`;
+    return [x, y] as const;
   });
+  const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
+  const area = `${line} L${w},${h} L0,${h} Z`;
+  const [lastX, lastY] = coords[coords.length - 1];
   const stroke = tone === "bom" ? "var(--color-positive, #2FB89A)" : tone === "ruim" ? "var(--color-negative, #e0555a)" : "currentColor";
+
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0 text-muted/60" aria-hidden="true">
-      <polyline points={coords.join(" ")} fill="none" stroke={stroke} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0 overflow-visible text-muted/60" aria-hidden="true">
+      <defs>
+        <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
+          <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
+          <stop offset="100%" stopColor={stroke} stopOpacity={0} />
+        </linearGradient>
+      </defs>
+      <motion.path
+        d={area}
+        fill={`url(#${gradientId})`}
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        transition={{ duration: 0.5, delay: 0.25 }}
+      />
+      <motion.path
+        d={line}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={1.5}
+        strokeLinecap="round"
+        strokeLinejoin="round"
+        initial={{ pathLength: 0 }}
+        animate={{ pathLength: 1 }}
+        transition={{ duration: 0.6, ease: "easeOut" }}
+      />
+      <motion.circle
+        cx={lastX}
+        cy={lastY}
+        r={2}
+        fill={stroke}
+        initial={{ scale: 0, opacity: 0 }}
+        animate={{ scale: [0, 1.4, 1], opacity: 1 }}
+        transition={{ duration: 0.4, delay: 0.6, ease: "easeOut" }}
+      />
+      <motion.circle
+        cx={lastX}
+        cy={lastY}
+        r={2}
+        fill="none"
+        stroke={stroke}
+        strokeWidth={1}
+        initial={{ scale: 1, opacity: 0.6 }}
+        animate={{ scale: 2.6, opacity: 0 }}
+        transition={{ duration: 1.6, delay: 0.9, repeat: Infinity, ease: "easeOut" }}
+      />
     </svg>
   );
 }

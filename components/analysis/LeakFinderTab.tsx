@@ -22,8 +22,7 @@ export function LeakFinderTab({ rows, leaks }: { rows: AnalysisHandRow[]; leaks:
   return (
     <div className="space-y-3">
       <p className="text-xs leading-relaxed text-muted">
-        Detecção automática por regra simples (métrica fora da faixa de referência comum, com amostra mínima) — não é output de
-        solver. Clique num leak pra abrir as mãos que geraram o alerta direto no Revisor.
+        Clique num leak pra abrir as mãos que geraram o alerta direto no Revisor.
       </p>
       {leaks.map((leak) => (
         <LeakCard key={leak.id} leak={leak} rows={rows} />
