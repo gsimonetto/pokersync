@@ -149,12 +149,6 @@ export function PreflopTab({
             },
           ]}
         />
-        <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
-          Cor e barra = faixa de referência comum pra 6-max/MTT (heurística de população, não output do motor GTO) — verde
-          perto do consenso, vermelho bem fora dele. Métrica sem barra é métrica sem uma faixa amplamente aceita — mostramos
-          só o número, sem inventar escala. O gráfico na faixa de destaque mostra a tendência ao longo do período filtrado
-          (só aparece com pelo menos 30 mãos). Passe o mouse sobre qualquer card pra ver a definição.
-        </p>
       </Painel>
 
         <PostflopTab rows={rows} metrics={postflopMetrics} />
