@@ -42,10 +42,10 @@ function LeakCard({ leak, rows }: { leak: Leak; rows: AnalysisHandRow[] }) {
         const handIds = computeLeakHands(rows, leak.id).map((h) => h.handId);
         router.push(revisorHandsHref(handIds, leak.title));
       }}
-      className={`flex w-full items-center justify-between gap-3 rounded-xl border p-4 text-left transition-colors hover:brightness-110 ${style.border} ${style.bg}`}
+      className={`flex w-full items-center justify-between gap-3 rounded-xl border p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:brightness-110 ${style.border} ${style.bg}`}
     >
       <div className="flex items-start gap-3">
-        <AlertTriangle size={16} className={`mt-0.5 shrink-0 ${style.text}`} />
+        <AlertTriangle size={16} className={`icon-glow mt-0.5 shrink-0 ${style.text}`} />
         <div>
           <div className="flex items-center gap-2">
             <p className={`text-sm font-semibold ${style.text}`}>{leak.title}</p>

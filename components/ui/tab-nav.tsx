@@ -20,11 +20,16 @@ export function TabNav<T extends string>({
   onChange,
   options,
   className,
+  glowIcons,
 }: {
   value: T;
   onChange: (v: T) => void;
   options: { value: T; label: string; icon: LucideIcon; badge?: number; href?: string }[];
   className?: string;
+  // Ícones com brilho sutil (ver .icon-glow em globals.css) — opt-in
+  // porque o TabNav é reusado em telas fora do módulo de Análise, onde
+  // esse acabamento não foi pedido.
+  glowIcons?: boolean;
 }) {
   return (
     <nav className={`relative flex justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center ${className ?? ""}`}>
@@ -36,7 +41,7 @@ export function TabNav<T extends string>({
         }`;
         const content = (
           <>
-            <Icon size={15} />
+            <Icon size={15} className={glowIcons ? "icon-glow" : undefined} />
             {o.label}
             {o.badge != null && o.badge > 0 && (
               <span className="rounded-full bg-evolution px-1.5 text-[10px] font-bold leading-4 text-void">{o.badge}</span>

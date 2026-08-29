@@ -7,25 +7,27 @@ import { Lock, type LucideIcon } from "lucide-react";
 // Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
 // (rounded-xl border-hairline bg-surface) que app/performance/page.tsx já
 // usa, centralizado aqui porque as 5 abas precisam dele em paralelo (uma
-// única tela, não 5 telas isoladas reinventando o card cada uma).
+// única tela, não 5 telas isoladas reinventando o card cada uma). Entra
+// com um fade + leve subida (framer-motion) em vez de aparecer estático,
+// pra dar mais vida à troca de aba/sub-aba.
 export function Painel({
   titulo,
   icone,
   action,
   children,
-  id,
 }: {
   titulo: string;
   icone?: React.ReactNode;
   action?: React.ReactNode;
   children: React.ReactNode;
-  // Âncora opcional pra sub-navegação dentro de uma aba longa (ver
-  // SectionNav) — scroll-mt compensa a barra de filtros/sub-nav sticky
-  // acima, senão o topo do card fica escondido atrás delas.
-  id?: string;
 }) {
   return (
-    <section id={id} className="scroll-mt-28 rounded-xl border border-hairline bg-surface p-5">
+    <motion.section
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.35, ease: "easeOut" }}
+      className="rounded-xl border border-hairline bg-surface p-5"
+    >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {icone}
@@ -34,27 +36,7 @@ export function Painel({
         {action}
       </div>
       <div>{children}</div>
-    </section>
-  );
-}
-
-// Sub-navegação por âncora — pra uma aba longa (várias seções empilhadas
-// dentro da mesma tela) não virar "role a página até achar"; mesma pill
-// do FilterChip (padrão já estabelecido no produto), só que aqui navega
-// em vez de filtrar. Sticky logo abaixo da barra de filtros/TabNav.
-export function SectionNav({ items }: { items: { id: string; label: string }[] }) {
-  return (
-    <nav className="sticky top-0 z-20 mb-4 flex flex-wrap gap-1.5 border-b border-hairline bg-surface/95 py-2 backdrop-blur sm:top-18">
-      {items.map((it) => (
-        <a
-          key={it.id}
-          href={`#${it.id}`}
-          className="inline-flex items-center rounded-full border border-hairline px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-        >
-          {it.label}
-        </a>
-      ))}
-    </nav>
+    </motion.section>
   );
 }
 
@@ -95,7 +77,7 @@ export function MetricGrid({ items }: { items: { label: string; value: string | 
 export function HeroStrip({
   items,
 }: {
-  items: { label: string; value: string | null; tone?: "bom" | "ruim"; trend?: number[]; hint?: string }[];
+  items: { label: string; value: string | null; tone?: "bom" | "ruim"; trend?: number[]; hint?: string; bar?: StatBar }[];
 }) {
   return (
     <div
@@ -111,6 +93,7 @@ export function HeroStrip({
               <p className={`text-2xl font-bold leading-none tracking-tight tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</p>
               {it.trend && it.trend.length >= 2 && <Sparkline points={it.trend} tone={it.tone} />}
             </div>
+            {it.bar && it.value && <ReferenceBar bar={it.bar} tone={it.tone} className="mt-2.5" />}
           </div>
         );
       })}
@@ -132,7 +115,30 @@ export function SubHeader({ children }: { children: React.ReactNode }) {
 // mostrar 3-5x mais números por vez, sem a "poluição" do MetricGrid antigo
 // porque todo card aqui tem o mesmo desenho (ícone, cor por faixa, barra
 // quando existe referência) em vez de layouts variados competindo.
-type StatBar = { pct: number; bandStart: number; bandEnd: number };
+// `label` carrega o texto exato da faixa (ex. "ref. 20–28%") calculado a
+// partir dos mesmos min/max passados pra toneFromRange/statBar — nunca um
+// número novo inventado só pra exibição.
+type StatBar = { pct: number; bandStart: number; bandEnd: number; label: string };
+
+// Trilha + marcador + rótulo da faixa ideal — usada tanto no StatCard
+// (grade densa) quanto no HeroStrip (headliners), pra manter a mesma
+// linguagem visual de "onde você está vs. onde seria o ideal" em
+// qualquer tamanho de card.
+function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: "bom" | "ruim"; className?: string }) {
+  const barCor = tone === "bom" ? "bg-positive" : tone === "ruim" ? "bg-negative" : "bg-muted";
+  return (
+    <div className={className}>
+      <div className="relative h-1 rounded-full bg-void/40">
+        <div
+          className="absolute inset-y-0 rounded-full bg-positive/15"
+          style={{ left: `${bar.bandStart}%`, width: `${Math.max(0, bar.bandEnd - bar.bandStart)}%` }}
+        />
+        <div className={`absolute inset-y-0 w-[3px] rounded-full ${barCor}`} style={{ left: `calc(${bar.pct}% - 1.5px)` }} />
+      </div>
+      <p className="mt-1 text-[10px] font-medium tabular-nums text-muted/60">{bar.label}</p>
+    </div>
+  );
+}
 
 export function StatCardGrid({
   items,
@@ -162,23 +168,14 @@ export function StatCardGrid({
 
 function StatCard({ label, value, icon: Icon, tone, hint, bar }: { label: string; value: string | null; icon?: LucideIcon; tone?: "bom" | "ruim"; hint?: string; bar?: StatBar }) {
   const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
-  const barCor = tone === "bom" ? "bg-positive" : tone === "ruim" ? "bg-negative" : "bg-muted";
   return (
-    <div className="rounded-lg border border-hairline bg-elevated p-2.5" title={hint}>
+    <div className="rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)]" title={hint}>
       <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase leading-tight tracking-[0.06em] text-muted/80">
-        {Icon && <Icon size={11} className="shrink-0" />}
+        {Icon && <Icon size={11} className="icon-glow shrink-0" />}
         <span>{label}</span>
       </p>
       <p className={`mt-1.5 text-lg font-bold leading-none tabular-nums ${value ? cor : "text-muted/30"}`}>{value ?? "—"}</p>
-      {bar && value && (
-        <div className="relative mt-2 h-1 rounded-full bg-void/40">
-          <div
-            className="absolute inset-y-0 rounded-full bg-positive/15"
-            style={{ left: `${bar.bandStart}%`, width: `${Math.max(0, bar.bandEnd - bar.bandStart)}%` }}
-          />
-          <div className={`absolute inset-y-0 w-[3px] rounded-full ${barCor}`} style={{ left: `calc(${bar.pct}% - 1.5px)` }} />
-        </div>
-      )}
+      {bar && value && <ReferenceBar bar={bar} tone={tone} className="mt-2" />}
     </div>
   );
 }
@@ -282,16 +279,27 @@ export function toneFromRange(value: number | null, min: number, max: number): "
   return undefined;
 }
 
+// Texto exato da faixa ideal (ex. "ref. 20–28%") a partir dos mesmos
+// min/max usados em toneFromRange/statBar — nunca uma escala nova
+// inventada só pra exibição.
+function fmtRangeLabel(min: number, max: number, unit: string): string {
+  const f = (n: number) => (Number.isInteger(n) ? String(n) : n.toFixed(2));
+  return `ref. ${f(min)}–${f(max)}${unit}`;
+}
+
 // Monta a trilha visual (StatBar) pra uma métrica com faixa de referência
 // conhecida — `scaleMax` é só o teto visual da barra (não um limite real),
-// escolhido folgado o bastante pra outliers não estourarem 100%.
-export function statBar(value: number | null, min: number, max: number, scaleMax: number): StatBar | undefined {
+// escolhido folgado o bastante pra outliers não estourarem 100%. `unit`
+// vai só no rótulo (ex. "%"), pra métricas em razão (Aggression Factor)
+// não ganharem um "%" que não faz sentido.
+export function statBar(value: number | null, min: number, max: number, scaleMax: number, unit = "%"): StatBar | undefined {
   if (value === null) return undefined;
   const clamp = (n: number) => Math.max(0, Math.min(100, n));
   return {
     pct: clamp((value / scaleMax) * 100),
     bandStart: clamp((min / scaleMax) * 100),
     bandEnd: clamp((max / scaleMax) * 100),
+    label: fmtRangeLabel(min, max, unit),
   };
 }
 

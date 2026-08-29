@@ -73,7 +73,7 @@ export function TournamentTab({
 
   return (
     <div className="space-y-4">
-      <Painel titulo="Resultado em torneios" icone={<Trophy size={14} className="text-evolution" />}>
+      <Painel titulo="Resultado em torneios" icone={<Trophy size={14} className="icon-glow text-evolution" />}>
         <MetricGrid
           items={[
             { label: "Total Games", value: metrics.total_games > 0 ? String(metrics.total_games) : null },
@@ -89,7 +89,7 @@ export function TournamentTab({
         )}
       </Painel>
 
-      <Painel titulo="Estrutura de premiação" icone={<Award size={14} className="text-training" />}>
+      <Painel titulo="Estrutura de premiação" icone={<Award size={14} className="icon-glow text-training" />}>
         <p className="mb-3 text-xs leading-relaxed text-muted">
           Pré-requisito pro cálculo de cEV/ICM abaixo — sem saber quanto cada colocação pagou, não dá pra calcular quanto sua
           decisão "deveria" valer em $. Hoje é só manual; quando o agente desktop buscar isso sozinho, aparece aqui do mesmo jeito
@@ -106,14 +106,14 @@ export function TournamentTab({
 
       <Painel
         titulo="cEV & ICM"
-        icone={<Layers size={14} className="text-review" />}
+        icone={<Layers size={14} className="icon-glow text-review" />}
         action={
           <button
             onClick={handleCompute}
             disabled={computing}
             className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink disabled:opacity-50"
           >
-            {computing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} />}
+            {computing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="icon-glow" />}
             {computing && progress ? `Calculando ${progress.done}/${progress.total}` : "Calcular cEV"}
           </button>
         }

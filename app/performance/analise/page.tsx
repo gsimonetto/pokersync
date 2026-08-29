@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Grid3x3, Trophy, AlertTriangle } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { TabNav } from "@/components/ui/tab-nav";
@@ -141,7 +142,7 @@ export default function AnalysisPage() {
               }}
             />
 
-            <TabNav className="mt-4" value={tab} onChange={setTab} options={tabsWithBadge} />
+            <TabNav className="mt-4" value={tab} onChange={setTab} options={tabsWithBadge} glowIcons />
 
             <div className="mt-4">
               {rows.length === 0 ? (
@@ -150,23 +151,31 @@ export default function AnalysisPage() {
                   as métricas aparecem aqui automaticamente assim que houver dado.
                 </p>
               ) : (
-                <>
-                  {tab === "preflop" && (
-                    <PreflopTab rows={filteredRows} metrics={preflop} byPosition={byPosition} postflopMetrics={postflop} />
-                  )}
-                  {tab === "tournament" && tournament && (
-                    <TournamentTab
-                      metrics={tournament}
-                      tournamentSessions={tournamentSessions}
-                      payouts={payouts}
-                      onPayoutsChanged={reloadPayouts}
-                      onCevComputed={reloadTournamentMetrics}
-                      focusPendingPayout={focusPendingPayout}
-                      onFocusPendingPayoutConsumed={() => setFocusPendingPayout(false)}
-                    />
-                  )}
-                  {tab === "leaks" && <LeakFinderTab rows={filteredRows} leaks={leaks} />}
-                </>
+                <AnimatePresence mode="wait">
+                  <motion.div
+                    key={tab}
+                    initial={{ opacity: 0, y: 6 }}
+                    animate={{ opacity: 1, y: 0 }}
+                    exit={{ opacity: 0, y: -6 }}
+                    transition={{ duration: 0.18, ease: "easeOut" }}
+                  >
+                    {tab === "preflop" && (
+                      <PreflopTab rows={filteredRows} metrics={preflop} byPosition={byPosition} postflopMetrics={postflop} />
+                    )}
+                    {tab === "tournament" && tournament && (
+                      <TournamentTab
+                        metrics={tournament}
+                        tournamentSessions={tournamentSessions}
+                        payouts={payouts}
+                        onPayoutsChanged={reloadPayouts}
+                        onCevComputed={reloadTournamentMetrics}
+                        focusPendingPayout={focusPendingPayout}
+                        onFocusPendingPayoutConsumed={() => setFocusPendingPayout(false)}
+                      />
+                    )}
+                    {tab === "leaks" && <LeakFinderTab rows={filteredRows} leaks={leaks} />}
+                  </motion.div>
+                </AnimatePresence>
               )}
             </div>
           </div>
