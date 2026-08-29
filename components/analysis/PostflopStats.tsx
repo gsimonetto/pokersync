@@ -32,9 +32,8 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
 
   return (
     <Painel
-      id="postflop"
       titulo="Tendências pós-flop"
-      icone={<Flame size={14} className="text-training" />}
+      icone={<Flame size={14} className="icon-glow text-training" />}
       action={<SampleBadge hands={metrics.hands} />}
     >
       <HeroStrip
@@ -44,6 +43,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
             value: fmtPct(metrics.cbet_flop_pct),
             tone: toneFromRange(metrics.cbet_flop_pct, 55, 75),
             trend: cbetFlopTrend,
+            bar: statBar(metrics.cbet_flop_pct, 55, 75, 100),
             hint: "Frequência de apostar no flop quando você foi o último agressor no preflop.",
           },
           {
@@ -51,6 +51,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
             value: fmtPct(metrics.fold_to_cbet_flop_pct),
             tone: toneFromRange(metrics.fold_to_cbet_flop_pct, 40, 55),
             trend: foldCbetFlopTrend,
+            bar: statBar(metrics.fold_to_cbet_flop_pct, 40, 55, 100),
             hint: "Frequência que você desiste diante de um c-bet de flop adversário.",
           },
           {
@@ -58,6 +59,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
             value: fmtRatio(metrics.aggression_factor),
             tone: toneFromRange(metrics.aggression_factor, 2, 4),
             trend: aggFactorTrend,
+            bar: statBar(metrics.aggression_factor, 2, 4, 8, ""),
             hint: "(Bet + Raise) / Call pós-flop — quão agressivo você é quando participa da mão.",
           },
           {
@@ -65,6 +67,7 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
             value: fmtPct(metrics.aggression_frequency_pct),
             tone: toneFromRange(metrics.aggression_frequency_pct, 35, 50),
             trend: aggFreqTrend,
+            bar: statBar(metrics.aggression_frequency_pct, 35, 50, 100),
             hint: "% das suas ações pós-flop que são bet ou raise, em vez de call ou fold.",
           },
         ]}
@@ -141,7 +144,6 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
           },
         ]}
       />
-
     </Painel>
   );
 }

@@ -2,8 +2,10 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Target, Grid3x3, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
-import { Painel, StatCardGrid, HeroStrip, SubHeader, SectionNav, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
+import { AnimatePresence, motion } from "framer-motion";
+import { Target, Flame, MapPin, Grid3x3, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
+import { Painel, StatCardGrid, HeroStrip, SubHeader, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
+import { TabNav } from "@/components/ui/tab-nav";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
@@ -12,10 +14,21 @@ function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
 }
 
-// Card 1 (preflop) + Card 2 (postflop, ver PostflopStats.tsx) numa única
-// aba — mesma linguagem de lista nos dois, em vez de uma aba em grid de
-// cards e outra em lista. "Por posição" e a matriz 13×13 seguem como
-// cards adicionais, contexto que só faz sentido depois das frequências.
+type SubTab = "preflop" | "postflop" | "posicao" | "matchups" | "matriz";
+
+const SUB_TABS: { value: SubTab; label: string; icon: typeof Target }[] = [
+  { value: "preflop", label: "Preflop", icon: Target },
+  { value: "postflop", label: "Postflop", icon: Flame },
+  { value: "posicao", label: "Por posição", icon: MapPin },
+  { value: "matchups", label: "Matchups", icon: Shuffle },
+  { value: "matriz", label: "Matriz 13×13", icon: Grid3x3 },
+];
+
+// Card 1 (preflop) + Card 2 (postflop, ver PostflopStats.tsx) + Por
+// posição/Matchups/Matriz — antes tudo empilhado numa rolagem só com
+// âncoras (SectionNav), o que deixava a aba "Preflop & Postflop" densa
+// demais. Agora são sub-abas de verdade (mesmo TabNav do resto do
+// produto): só uma seção na tela por vez, com crossfade ao trocar.
 export function PreflopTab({
   rows,
   metrics,
@@ -27,6 +40,7 @@ export function PreflopTab({
   byPosition: PreflopMetricsByPosition[];
   postflopMetrics: PostflopMetrics;
 }) {
+  const [subTab, setSubTab] = useState<SubTab>("preflop");
   const matrix = useMemo(() => computeHandMatrix(rows), [rows]);
   // Maior volume primeiro — mais útil pra achar rápido onde a amostra é
   // grande o suficiente pra confiar no número, em vez da ordem canônica
@@ -45,209 +59,217 @@ export function PreflopTab({
 
   return (
     <div>
-      <SectionNav
-        items={[
-          { id: "preflop", label: "Preflop" },
-          { id: "postflop", label: "Postflop" },
-          { id: "por-posicao", label: "Por posição" },
-          { id: "matchups", label: "Matchups" },
-          { id: "matriz", label: "Matriz 13×13" },
-        ]}
-      />
+      <TabNav value={subTab} onChange={setSubTab} options={SUB_TABS} glowIcons />
 
-      <div className="space-y-4">
-        <Painel
-          id="preflop"
-          titulo="Frequências pré-flop"
-          icone={<Target size={14} className="text-training" />}
-          action={<SampleBadge hands={metrics.hands} />}
+      <AnimatePresence mode="wait">
+        <motion.div
+          key={subTab}
+          initial={{ opacity: 0, y: 6 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0, y: -6 }}
+          transition={{ duration: 0.18, ease: "easeOut" }}
+          className="mt-4"
         >
-        <HeroStrip
-          items={[
-            {
-              label: "VPIP",
-              value: fmtPct(metrics.vpip_pct),
-              tone: toneFromRange(metrics.vpip_pct, 20, 28),
-              trend: vpipTrend,
-              hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
-            },
-            {
-              label: "PFR",
-              value: fmtPct(metrics.pfr_pct),
-              tone: toneFromRange(metrics.pfr_pct, 15, 24),
-              trend: pfrTrend,
-              hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
-            },
-            {
-              label: "3-Bet %",
-              value: fmtPct(metrics.three_bet_pct),
-              tone: toneFromRange(metrics.three_bet_pct, 6, 10),
-              trend: threeBetTrend,
-              hint: "Frequência de re-raise no preflop diante de um raise anterior.",
-            },
-            {
-              label: "Steal %",
-              value: fmtPct(metrics.steal_pct),
-              tone: toneFromRange(metrics.steal_pct, 35, 55),
-              trend: stealTrend,
-              hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
-            },
-          ]}
-        />
+          {subTab === "preflop" && (
+            <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="icon-glow text-training" />} action={<SampleBadge hands={metrics.hands} />}>
+              <HeroStrip
+                items={[
+                  {
+                    label: "VPIP",
+                    value: fmtPct(metrics.vpip_pct),
+                    tone: toneFromRange(metrics.vpip_pct, 20, 28),
+                    trend: vpipTrend,
+                    bar: statBar(metrics.vpip_pct, 20, 28, 100),
+                    hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
+                  },
+                  {
+                    label: "PFR",
+                    value: fmtPct(metrics.pfr_pct),
+                    tone: toneFromRange(metrics.pfr_pct, 15, 24),
+                    trend: pfrTrend,
+                    bar: statBar(metrics.pfr_pct, 15, 24, 100),
+                    hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
+                  },
+                  {
+                    label: "3-Bet %",
+                    value: fmtPct(metrics.three_bet_pct),
+                    tone: toneFromRange(metrics.three_bet_pct, 6, 10),
+                    trend: threeBetTrend,
+                    bar: statBar(metrics.three_bet_pct, 6, 10, 100),
+                    hint: "Frequência de re-raise no preflop diante de um raise anterior.",
+                  },
+                  {
+                    label: "Steal %",
+                    value: fmtPct(metrics.steal_pct),
+                    tone: toneFromRange(metrics.steal_pct, 35, 55),
+                    trend: stealTrend,
+                    bar: statBar(metrics.steal_pct, 35, 55, 100),
+                    hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
+                  },
+                ]}
+              />
 
-        <SubHeader>Outras frequências</SubHeader>
-        <StatCardGrid
-          items={[
-            {
-              label: "Fold to 3-Bet %",
-              value: fmtPct(metrics.fold_to_3bet_pct),
-              icon: CornerUpLeft,
-              tone: toneFromRange(metrics.fold_to_3bet_pct, 55, 65),
-              bar: statBar(metrics.fold_to_3bet_pct, 55, 65, 100),
-              hint: "Frequência que você desiste depois de ser 3-betado, quando você tinha aberto o pote.",
-            },
-            { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap, hint: "Frequência de re-raise diante de um 3-bet adversário." },
-            {
-              label: "Fold to 4-Bet %",
-              value: fmtPct(metrics.fold_to_4bet_pct),
-              icon: CornerUpLeft,
-              hint: "Frequência que você desiste depois de ser 4-betado, quando você tinha 3-betado.",
-            },
-            {
-              label: "Squeeze %",
-              value: fmtPct(metrics.squeeze_pct),
-              icon: Layers,
-              hint: "Frequência de 3-bet quando já houve um raise e pelo menos um call antes de você.",
-            },
-            {
-              label: "Fold to Steal (SB vs BTN)",
-              value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct),
-              icon: CornerUpLeft,
-              hint: "Frequência que você desiste no SB contra um open-raise do BTN.",
-            },
-            {
-              label: "Fold to Steal (BB vs BTN)",
-              value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct),
-              icon: CornerUpLeft,
-              hint: "Frequência que você desiste no BB contra um open-raise do BTN.",
-            },
-            {
-              label: "Fold to Steal (BB vs SB)",
-              value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct),
-              icon: CornerUpLeft,
-              hint: "Frequência que você desiste no BB contra um open-raise do SB.",
-            },
-            {
-              label: "Limp-Fold %",
-              value: null,
-              locked: "Hand tags não isola fold pós-limp — no roadmap do pipeline de postflop",
-            },
-            {
-              label: "Open Push %",
-              value: null,
-              locked: "Depende de classificar profundidade all-in no open — no roadmap do parser",
-            },
-          ]}
-        />
-      </Painel>
-
-        <PostflopTab rows={rows} metrics={postflopMetrics} />
-
-        <Painel id="por-posicao" titulo="Por posição" icone={<Target size={14} className="text-evolution" />}>
-          {byPosition.length === 0 ? (
-            <EmptyState texto="Sem mãos suficientes com posição identificada." />
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {byPositionSorted.map((p) => (
-                <button
-                  key={p.position}
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      revisorHandsHref(
-                        rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
-                        `Posição ${p.position}`
-                      )
-                    )
-                  }
-                  className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-colors hover:border-ink/40"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold text-ink">{p.position}</span>
-                    <ArrowUpRight size={13} className="shrink-0 text-muted" />
-                  </div>
-                  <p className="mt-0.5 text-[11px] text-muted">{p.hands} {p.hands === 1 ? "mão" : "mãos"}</p>
-                  <div className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-muted">
-                    <span>
-                      VPIP <b className="text-ink">{fmtPct(p.vpip_pct) ?? "—"}</b>
-                    </span>
-                    <span>
-                      PFR <b className="text-ink">{fmtPct(p.pfr_pct) ?? "—"}</b>
-                    </span>
-                    <span>
-                      3-Bet <b className="text-ink">{fmtPct(p.three_bet_pct) ?? "—"}</b>
-                    </span>
-                    <span>
-                      Steal <b className="text-ink">{fmtPct(p.steal_pct) ?? "—"}</b>
-                    </span>
-                  </div>
-                </button>
-              ))}
-            </div>
+              <SubHeader>Outras frequências</SubHeader>
+              <StatCardGrid
+                items={[
+                  {
+                    label: "Fold to 3-Bet %",
+                    value: fmtPct(metrics.fold_to_3bet_pct),
+                    icon: CornerUpLeft,
+                    tone: toneFromRange(metrics.fold_to_3bet_pct, 55, 65),
+                    bar: statBar(metrics.fold_to_3bet_pct, 55, 65, 100),
+                    hint: "Frequência que você desiste depois de ser 3-betado, quando você tinha aberto o pote.",
+                  },
+                  { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap, hint: "Frequência de re-raise diante de um 3-bet adversário." },
+                  {
+                    label: "Fold to 4-Bet %",
+                    value: fmtPct(metrics.fold_to_4bet_pct),
+                    icon: CornerUpLeft,
+                    hint: "Frequência que você desiste depois de ser 4-betado, quando você tinha 3-betado.",
+                  },
+                  {
+                    label: "Squeeze %",
+                    value: fmtPct(metrics.squeeze_pct),
+                    icon: Layers,
+                    hint: "Frequência de 3-bet quando já houve um raise e pelo menos um call antes de você.",
+                  },
+                  {
+                    label: "Fold to Steal (SB vs BTN)",
+                    value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct),
+                    icon: CornerUpLeft,
+                    hint: "Frequência que você desiste no SB contra um open-raise do BTN.",
+                  },
+                  {
+                    label: "Fold to Steal (BB vs BTN)",
+                    value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct),
+                    icon: CornerUpLeft,
+                    hint: "Frequência que você desiste no BB contra um open-raise do BTN.",
+                  },
+                  {
+                    label: "Fold to Steal (BB vs SB)",
+                    value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct),
+                    icon: CornerUpLeft,
+                    hint: "Frequência que você desiste no BB contra um open-raise do SB.",
+                  },
+                  {
+                    label: "Limp-Fold %",
+                    value: null,
+                    locked: "Hand tags não isola fold pós-limp — no roadmap do pipeline de postflop",
+                  },
+                  {
+                    label: "Open Push %",
+                    value: null,
+                    locked: "Depende de classificar profundidade all-in no open — no roadmap do parser",
+                  },
+                ]}
+              />
+            </Painel>
           )}
-          <p className="mt-3 text-[11px] text-muted/70">Clique numa posição pra abrir essas mãos no Revisor.</p>
-        </Painel>
 
-        <Painel id="matchups" titulo="Matchups" icone={<Shuffle size={14} className="text-review" />}>
-          {matchups.length === 0 ? (
-            <EmptyState texto="Nenhum matchup heads-up até o flop identificado ainda — só entra aqui quando o pot fica você-vs-um-adversário até o flop." />
-          ) : (
-            <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-              {matchups.map((m) => (
-                <button
-                  key={m.matchup}
-                  type="button"
-                  onClick={() =>
-                    router.push(
-                      revisorHandsHref(
-                        rows.filter((r) => r.matchup === m.matchup).map((r) => r.handReviewId),
-                        `Matchup ${m.matchup.replace("_vs_", " vs ")}`
-                      )
-                    )
-                  }
-                  className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-colors hover:border-ink/40"
-                >
-                  <div className="flex items-center justify-between gap-2">
-                    <span className="text-sm font-bold text-ink">{m.matchup.replace("_vs_", " vs ")}</span>
-                    <ArrowUpRight size={13} className="shrink-0 text-muted" />
-                  </div>
-                  <p className="mt-0.5 text-[11px] text-muted">{m.hands} {m.hands === 1 ? "mão" : "mãos"}</p>
-                  <p className="mt-2.5 text-[11px] text-muted">
-                    VPIP <b className="text-ink">{fmtPct(m.vpip_pct) ?? "—"}</b>
-                  </p>
-                </button>
-              ))}
-            </div>
+          {subTab === "postflop" && <PostflopTab rows={rows} metrics={postflopMetrics} />}
+
+          {subTab === "posicao" && (
+            <Painel titulo="Por posição" icone={<MapPin size={14} className="icon-glow text-evolution" />}>
+              {byPosition.length === 0 ? (
+                <EmptyState texto="Sem mãos suficientes com posição identificada." />
+              ) : (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {byPositionSorted.map((p) => (
+                    <button
+                      key={p.position}
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          revisorHandsHref(
+                            rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
+                            `Posição ${p.position}`
+                          )
+                        )
+                      }
+                      className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/40"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-ink">{p.position}</span>
+                        <ArrowUpRight size={13} className="shrink-0 text-muted" />
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-muted">{p.hands} {p.hands === 1 ? "mão" : "mãos"}</p>
+                      <div className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-muted">
+                        <span>
+                          VPIP <b className="text-ink">{fmtPct(p.vpip_pct) ?? "—"}</b>
+                        </span>
+                        <span>
+                          PFR <b className="text-ink">{fmtPct(p.pfr_pct) ?? "—"}</b>
+                        </span>
+                        <span>
+                          3-Bet <b className="text-ink">{fmtPct(p.three_bet_pct) ?? "—"}</b>
+                        </span>
+                        <span>
+                          Steal <b className="text-ink">{fmtPct(p.steal_pct) ?? "—"}</b>
+                        </span>
+                      </div>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="mt-3 text-[11px] text-muted/70">Clique numa posição pra abrir essas mãos no Revisor.</p>
+            </Painel>
           )}
-          <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
-            Só cobre pots que ficaram heads-up (você contra um adversário) até o flop — é a única situação em que o motor
-            identifica os dois lados do confronto com segurança. Clique num matchup pra abrir essas mãos no Revisor.
-          </p>
-        </Painel>
 
-        <Painel id="matriz" titulo="Matriz posicional 13×13" icone={<Grid3x3 size={14} className="text-review" />}>
-          <p className="mb-3 text-xs leading-relaxed text-muted">
-            Intensidade = % de vezes que você jogou (VPIP) cada combinação. O contorno tracejado mostra uma referência
-            simplificada de range de abertura — não é output do motor GTO, é só escala visual (o solver próprio ainda não
-            gera range por posição pra este grid — ver backlog).
-          </p>
-          {/* Só informativo (não é editável como o Construtor de Ranges) —
-              mesmo teto de largura (580px) pra não dominar a tela à toa. */}
-          <div style={{ maxWidth: 580 }}>
-            <HandMatrixGrid cells={matrix} />
-          </div>
-        </Painel>
-      </div>
+          {subTab === "matchups" && (
+            <Painel titulo="Matchups" icone={<Shuffle size={14} className="icon-glow text-review" />}>
+              {matchups.length === 0 ? (
+                <EmptyState texto="Nenhum matchup heads-up até o flop identificado ainda — só entra aqui quando o pot fica você-vs-um-adversário até o flop." />
+              ) : (
+                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
+                  {matchups.map((m) => (
+                    <button
+                      key={m.matchup}
+                      type="button"
+                      onClick={() =>
+                        router.push(
+                          revisorHandsHref(
+                            rows.filter((r) => r.matchup === m.matchup).map((r) => r.handReviewId),
+                            `Matchup ${m.matchup.replace("_vs_", " vs ")}`
+                          )
+                        )
+                      }
+                      className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/40"
+                    >
+                      <div className="flex items-center justify-between gap-2">
+                        <span className="text-sm font-bold text-ink">{m.matchup.replace("_vs_", " vs ")}</span>
+                        <ArrowUpRight size={13} className="shrink-0 text-muted" />
+                      </div>
+                      <p className="mt-0.5 text-[11px] text-muted">{m.hands} {m.hands === 1 ? "mão" : "mãos"}</p>
+                      <p className="mt-2.5 text-[11px] text-muted">
+                        VPIP <b className="text-ink">{fmtPct(m.vpip_pct) ?? "—"}</b>
+                      </p>
+                    </button>
+                  ))}
+                </div>
+              )}
+              <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
+                Só cobre pots que ficaram heads-up (você contra um adversário) até o flop — é a única situação em que o motor
+                identifica os dois lados do confronto com segurança. Clique num matchup pra abrir essas mãos no Revisor.
+              </p>
+            </Painel>
+          )}
+
+          {subTab === "matriz" && (
+            <Painel titulo="Matriz posicional 13×13" icone={<Grid3x3 size={14} className="icon-glow text-review" />}>
+              <p className="mb-3 text-xs leading-relaxed text-muted">
+                Intensidade = % de vezes que você jogou (VPIP) cada combinação. O contorno tracejado mostra uma referência
+                simplificada de range de abertura — não é output do motor GTO, é só escala visual (o solver próprio ainda não
+                gera range por posição pra este grid — ver backlog).
+              </p>
+              {/* Só informativo (não é editável como o Construtor de Ranges) —
+                  mesmo teto de largura (580px) pra não dominar a tela à toa. */}
+              <div style={{ maxWidth: 580 }}>
+                <HandMatrixGrid cells={matrix} />
+              </div>
+            </Painel>
+          )}
+        </motion.div>
+      </AnimatePresence>
     </div>
   );
 }
