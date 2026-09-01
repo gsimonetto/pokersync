@@ -16,6 +16,23 @@ export const GAME_FORMAT_LABEL: Record<GameFormat, string> = {
   cash: "Cash",
 };
 
+// ------------------------------------------------------------------
+// Perfil de referência (faixas "comuns" de população, ver
+// computeReferenceProfile em analysis-service.ts) — MTT joga com mais
+// gente por mesa (8-9 handed) que Cash (6-max padrão), então a faixa
+// saudável de VPIP/PFR/etc. é mais apertada em torneio. Escolhido pelo
+// formato predominante nas mãos filtradas, nunca pelo usuário à mão —
+// se a maioria das mãos é "mtt", usa mtt8max; qualquer outra maioria
+// (cash/spin/sng/sem formato) usa cash6max, que já era a única faixa
+// que o produto tinha antes disso existir.
+// ------------------------------------------------------------------
+export type ReferenceProfile = "cash6max" | "mtt8max";
+
+export const REFERENCE_PROFILE_LABEL: Record<ReferenceProfile, string> = {
+  cash6max: "Cash 6-max",
+  mtt8max: "MTT 8-max",
+};
+
 // Faixas batem exatamente com `compute_stack_bucket()` no Postgres (stack
 // do herói em bb no início da mão) — não inventamos cortes diferentes dos
 // que o trigger de hand_tags já grava, senão o filtro nunca bateria com

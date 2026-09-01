@@ -16,6 +16,7 @@ import {
   computePreflopByPosition,
   computePostflopMetrics,
   computeLeaks,
+  computeReferenceProfile,
   fetchTournamentMetrics,
   fetchTournamentSessions,
 } from "@/lib/services/analysis-service";
@@ -97,7 +98,11 @@ export default function AnalysisPage() {
   const preflop = useMemo(() => computePreflopMetrics(filteredRows), [filteredRows]);
   const byPosition = useMemo(() => computePreflopByPosition(filteredRows), [filteredRows]);
   const postflop = useMemo(() => computePostflopMetrics(filteredRows), [filteredRows]);
-  const leaks = useMemo(() => computeLeaks(preflop, postflop), [preflop, postflop]);
+  // Cash joga 6-max, MTT joga cheio (8-9 handed) — a faixa "saudável" de
+  // cada métrica muda com isso, então o perfil de referência segue o
+  // formato predominante nas mãos já filtradas (ver computeReferenceProfile).
+  const referenceProfile = useMemo(() => computeReferenceProfile(filteredRows), [filteredRows]);
+  const leaks = useMemo(() => computeLeaks(preflop, postflop, referenceProfile), [preflop, postflop, referenceProfile]);
 
   // Badge de leaks na própria aba — antes só descobria clicando em Leak
   // Finder; o número já existe (computeLeaks), só faltava subir pro TabNav.
@@ -160,7 +165,13 @@ export default function AnalysisPage() {
                     transition={{ duration: 0.18, ease: "easeOut" }}
                   >
                     {tab === "preflop" && (
-                      <PreflopTab rows={filteredRows} metrics={preflop} byPosition={byPosition} postflopMetrics={postflop} />
+                      <PreflopTab
+                        rows={filteredRows}
+                        metrics={preflop}
+                        byPosition={byPosition}
+                        postflopMetrics={postflop}
+                        referenceProfile={referenceProfile}
+                      />
                     )}
                     {tab === "tournament" && tournament && (
                       <TournamentTab
