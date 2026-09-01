@@ -55,19 +55,47 @@ export const PREFLOP_REFERENCE: Record<
   },
 };
 
+// `cbetTurn`/`cbetRiver`/`foldToCbetTurn`/`foldToCbetRiver`/`donkBet` têm
+// o mesmo nível de consenso que os 4 headliners acima (citado com
+// frequência em material de treino/HUD, ainda assim heurística, não
+// GTO). Check-Raise% e WSD%/W$SD% ficaram de fora de propósito — não
+// achamos uma faixa "saudável" com consenso parecido pra elas (WSD/W$SD
+// em especial dependem muito de variância e do range do adversário pra
+// virar uma meta única), então preferimos não exibir marcador nenhum a
+// inventar um número.
 export const POSTFLOP_REFERENCE: Record<
   ReferenceProfile,
-  { cbetFlop: MetricRange; foldToCbetFlop: MetricRange; aggFactor: MetricRange; aggFreq: MetricRange }
+  {
+    cbetFlop: MetricRange;
+    foldToCbetFlop: MetricRange;
+    cbetTurn: MetricRange;
+    cbetRiver: MetricRange;
+    foldToCbetTurn: MetricRange;
+    foldToCbetRiver: MetricRange;
+    donkBet: MetricRange;
+    aggFactor: MetricRange;
+    aggFreq: MetricRange;
+  }
 > = {
   cash6max: {
     cbetFlop: { min: 55, max: 75 },
     foldToCbetFlop: { min: 40, max: 55 },
+    cbetTurn: { min: 50, max: 65 },
+    cbetRiver: { min: 40, max: 55 },
+    foldToCbetTurn: { min: 50, max: 65 },
+    foldToCbetRiver: { min: 50, max: 65 },
+    donkBet: { min: 2, max: 8 },
     aggFactor: { min: 2, max: 4 },
     aggFreq: { min: 35, max: 50 },
   },
   mtt8max: {
     cbetFlop: { min: 50, max: 70 },
     foldToCbetFlop: { min: 45, max: 60 },
+    cbetTurn: { min: 45, max: 60 },
+    cbetRiver: { min: 35, max: 50 },
+    foldToCbetTurn: { min: 55, max: 70 },
+    foldToCbetRiver: { min: 55, max: 70 },
+    donkBet: { min: 2, max: 8 },
     aggFactor: { min: 1.5, max: 3.5 },
     aggFreq: { min: 30, max: 45 },
   },

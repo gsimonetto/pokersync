@@ -256,19 +256,24 @@ function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: Tone; cla
 
 // Categoria opcional (ver CATEGORY_LABEL/CATEGORY_DOT_CLASS abaixo) — só
 // um agrupamento visual (ponto colorido no canto do card), não muda o
-// valor nem a cor por faixa do card.
-export type StatCategory = "defesa" | "agressao" | "posicional";
+// valor nem a cor por faixa do card. "posicional" só faz sentido pra
+// grade de Preflop (fold to steal por posição); "resultado" é a mesma
+// cor reaproveitada pra grade de Postflop, em métricas de showdown
+// (WSD%/W$SD%) que não são nem defesa nem agressão.
+export type StatCategory = "defesa" | "agressao" | "posicional" | "resultado";
 
 export const CATEGORY_LABEL: Record<StatCategory, string> = {
   defesa: "Defesa",
   agressao: "Agressão",
   posicional: "Posicional",
+  resultado: "Resultado",
 };
 
 const CATEGORY_DOT_CLASS: Record<StatCategory, string> = {
   defesa: "bg-training",
   agressao: "bg-evolution",
   posicional: "bg-review",
+  resultado: "bg-review",
 };
 
 // Legenda das categorias acima — uma vez por grid categorizado (ver
