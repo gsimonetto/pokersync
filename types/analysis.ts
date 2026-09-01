@@ -57,6 +57,18 @@ export const TOURNAMENT_STAGE_LABEL: Record<TournamentStage, string> = {
   final_table: "Mesa Final",
 };
 
+// Faixa de buy-in pra filtrar a aba Torneios — cortes fixos em R$, mesmo
+// espírito do StackDepthBucket (faixas arredondadas, não um número por
+// torneio). Ver buyinBucketOf em analysis-service.ts.
+export type BuyinBucket = "0-10" | "10-50" | "50-200" | "200+";
+
+export const BUYIN_BUCKET_LABEL: Record<BuyinBucket, string> = {
+  "0-10": "Até R$10",
+  "10-50": "R$10–50",
+  "50-200": "R$50–200",
+  "200+": "R$200+",
+};
+
 // 8 posições reais gravadas em hand_tags.hero_position (mesma granularidade
 // de components/services/performance-service.ts POSITION_ORDER) — UTG+1 e
 // HJ não colapsam em MP/CO pra não perder resolução que a base já tem.
@@ -202,20 +214,6 @@ export interface PayoutStructureRow {
   payoutAmount: number | null;
 }
 
-// ------------------------------------------------------------------
-// Matriz posicional 13x13 (preflop range grid)
-// ------------------------------------------------------------------
-export interface HandCell {
-  hand: string; // "AKs", "72o", "TT"
-  row: number; // 0-12
-  col: number; // 0-12
-  playedPct: number | null; // % de vezes jogada (VPIP) nessa combinação de filtros
-  gtoPct: number | null; // range GTO de referência (RFI ou defesa, conforme contexto)
-  sample: number;
-  netBB: number | null; // resultado acumulado em bb com essa mão
-}
-
-export type MatrixMode = "played_vs_gto" | "net_result" | "sample_size";
 
 // ------------------------------------------------------------------
 // Leak Finder & Replayer

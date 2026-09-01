@@ -2,7 +2,19 @@
 
 import { useMemo } from "react";
 import { Flame, Target, CornerUpLeft, Repeat, Zap, Eye, Trophy } from "lucide-react";
-import { Painel, StatCardGrid, HeroStrip, HealthGauge, SubHeader, SampleBadge, ReferenceProfileBadge, toneFromRange, rangeCoaching, statBar } from "@/components/analysis/shared";
+import {
+  Painel,
+  StatCardGrid,
+  HeroStrip,
+  HealthGauge,
+  SubHeader,
+  SampleBadge,
+  ReferenceProfileBadge,
+  CategoryLegend,
+  toneFromRange,
+  rangeCoaching,
+  statBar,
+} from "@/components/analysis/shared";
 import { computePostflopMetrics, computeMetricTrend, POSTFLOP_REFERENCE } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PostflopMetrics, ReferenceProfile } from "@/types/analysis";
 
@@ -126,36 +138,54 @@ export function PostflopTab({
       </div>
 
       <SubHeader>C-Bet & fold to c-bet</SubHeader>
+      <div className="mb-2 flex justify-end">
+        <CategoryLegend categories={["agressao", "defesa"]} />
+      </div>
       <StatCardGrid
         items={[
           {
             label: "Turn C-Bet %",
             value: fmtPct(metrics.cbet_turn_pct),
             icon: Target,
+            tone: toneFromRange(metrics.cbet_turn_pct, ref.cbetTurn.min, ref.cbetTurn.max),
+            bar: statBar(metrics.cbet_turn_pct, ref.cbetTurn.min, ref.cbetTurn.max, 100),
             hint: "Frequência de apostar no turn quando você já tinha feito c-bet no flop.",
+            category: "agressao",
           },
           {
             label: "River C-Bet %",
             value: fmtPct(metrics.cbet_river_pct),
             icon: Target,
+            tone: toneFromRange(metrics.cbet_river_pct, ref.cbetRiver.min, ref.cbetRiver.max),
+            bar: statBar(metrics.cbet_river_pct, ref.cbetRiver.min, ref.cbetRiver.max, 100),
             hint: "Frequência de apostar no river quando você já vinha apostando flop e turn.",
+            category: "agressao",
           },
           {
             label: "Fold to Turn C-Bet %",
             value: fmtPct(metrics.fold_to_cbet_turn_pct),
             icon: CornerUpLeft,
+            tone: toneFromRange(metrics.fold_to_cbet_turn_pct, ref.foldToCbetTurn.min, ref.foldToCbetTurn.max),
+            bar: statBar(metrics.fold_to_cbet_turn_pct, ref.foldToCbetTurn.min, ref.foldToCbetTurn.max, 100),
             hint: "Frequência que você desiste diante de um c-bet de turn adversário.",
+            category: "defesa",
           },
           {
             label: "Fold to River C-Bet %",
             value: fmtPct(metrics.fold_to_cbet_river_pct),
             icon: CornerUpLeft,
+            tone: toneFromRange(metrics.fold_to_cbet_river_pct, ref.foldToCbetRiver.min, ref.foldToCbetRiver.max),
+            bar: statBar(metrics.fold_to_cbet_river_pct, ref.foldToCbetRiver.min, ref.foldToCbetRiver.max, 100),
             hint: "Frequência que você desiste diante de um c-bet de river adversário.",
+            category: "defesa",
           },
         ]}
       />
 
       <SubHeader>Check-raise, donk bet & showdown</SubHeader>
+      <div className="mb-2 flex justify-end">
+        <CategoryLegend categories={["agressao", "resultado"]} />
+      </div>
       <StatCardGrid
         items={[
           {
@@ -163,36 +193,48 @@ export function PostflopTab({
             value: fmtPct(metrics.check_raise_flop_pct),
             icon: Repeat,
             hint: "Frequência que você dá check e depois raise na mesma rua, no flop.",
+            category: "agressao",
           },
           {
             label: "Check-Raise Turn %",
             value: fmtPct(metrics.check_raise_turn_pct),
             icon: Repeat,
             hint: "Frequência que você dá check e depois raise na mesma rua, no turn.",
+            category: "agressao",
           },
           {
             label: "Check-Raise River %",
             value: fmtPct(metrics.check_raise_river_pct),
             icon: Repeat,
             hint: "Frequência que você dá check e depois raise na mesma rua, no river.",
+            category: "agressao",
           },
           {
             label: "Donk Bet %",
             value: fmtPct(metrics.donk_bet_pct),
             icon: Zap,
+            tone: toneFromRange(metrics.donk_bet_pct, ref.donkBet.min, ref.donkBet.max),
+            bar: statBar(metrics.donk_bet_pct, ref.donkBet.min, ref.donkBet.max, 20),
             hint: "Frequência que você aposta fora de posição sem ter sido o último agressor no preflop.",
+            category: "agressao",
           },
           {
             label: "WSD %",
             value: fmtPct(metrics.wsd_pct),
             icon: Eye,
+            tone: toneFromRange(metrics.wsd_pct, ref.wsd.min, ref.wsd.max),
+            bar: statBar(metrics.wsd_pct, ref.wsd.min, ref.wsd.max, 100),
             hint: "Frequência que você chega ao showdown, entre as mãos em que você viu o flop.",
+            category: "resultado",
           },
           {
             label: "W$SD %",
             value: fmtPct(metrics.wsd_won_pct),
             icon: Trophy,
+            tone: toneFromRange(metrics.wsd_won_pct, ref.wsdWon.min, ref.wsdWon.max),
+            bar: statBar(metrics.wsd_won_pct, ref.wsdWon.min, ref.wsdWon.max, 100),
             hint: "Frequência que você ganha o pote quando chega ao showdown.",
+            category: "resultado",
           },
         ]}
       />

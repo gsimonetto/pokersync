@@ -3,7 +3,7 @@
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
-import { Target, Flame, MapPin, Grid3x3, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
+import { Target, Flame, MapPin, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
 import {
   Painel,
   StatCardGrid,
@@ -22,21 +22,20 @@ import {
 } from "@/components/analysis/shared";
 import { TabNav } from "@/components/ui/tab-nav";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
-import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown, PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
+import { computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown, PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics, ReferenceProfile } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
 }
 
-type SubTab = "preflop" | "postflop" | "posicao" | "matchups" | "matriz";
+type SubTab = "preflop" | "postflop" | "posicao" | "matchups";
 
 const SUB_TABS: { value: SubTab; label: string; icon: typeof Target }[] = [
   { value: "preflop", label: "Preflop", icon: Target },
   { value: "postflop", label: "Postflop", icon: Flame },
   { value: "posicao", label: "Por posição", icon: MapPin },
   { value: "matchups", label: "Matchups", icon: Shuffle },
-  { value: "matriz", label: "Matriz 13×13", icon: Grid3x3 },
 ];
 
 // Card 1 (preflop) + Card 2 (postflop, ver PostflopStats.tsx) + Por
@@ -59,7 +58,6 @@ export function PreflopTab({
 }) {
   const [subTab, setSubTab] = useState<SubTab>("preflop");
   const ref = PREFLOP_REFERENCE[referenceProfile];
-  const matrix = useMemo(() => computeHandMatrix(rows), [rows]);
   // Maior volume primeiro — mais útil pra achar rápido onde a amostra é
   // grande o suficiente pra confiar no número, em vez da ordem canônica
   // UTG→BB (essa já está implícita no rótulo da posição).
@@ -214,6 +212,8 @@ export function PreflopTab({
                     label: "Fold to Steal (SB vs BTN)",
                     value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct),
                     icon: CornerUpLeft,
+                    tone: toneFromRange(metrics.fold_to_steal_sb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max),
+                    bar: statBar(metrics.fold_to_steal_sb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max, 100),
                     hint: "Frequência que você desiste no SB contra um open-raise do BTN.",
                     category: "posicional",
                   },
@@ -221,6 +221,8 @@ export function PreflopTab({
                     label: "Fold to Steal (BB vs BTN)",
                     value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct),
                     icon: CornerUpLeft,
+                    tone: toneFromRange(metrics.fold_to_steal_bb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max),
+                    bar: statBar(metrics.fold_to_steal_bb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max, 100),
                     hint: "Frequência que você desiste no BB contra um open-raise do BTN.",
                     category: "posicional",
                   },
@@ -228,6 +230,8 @@ export function PreflopTab({
                     label: "Fold to Steal (BB vs SB)",
                     value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct),
                     icon: CornerUpLeft,
+                    tone: toneFromRange(metrics.fold_to_steal_bb_vs_sb_pct, ref.foldToSteal.min, ref.foldToSteal.max),
+                    bar: statBar(metrics.fold_to_steal_bb_vs_sb_pct, ref.foldToSteal.min, ref.foldToSteal.max, 100),
                     hint: "Frequência que você desiste no BB contra um open-raise do SB.",
                     category: "posicional",
                   },
@@ -368,91 +372,8 @@ export function PreflopTab({
             </Painel>
           )}
 
-          {subTab === "matriz" && (
-            <Painel titulo="Matriz posicional 13×13" icone={<Grid3x3 size={14} className="icon-glow text-review" />}>
-              <p className="mb-3 text-xs leading-relaxed text-muted">
-                Intensidade = % de vezes que você jogou (VPIP) cada combinação. O contorno tracejado mostra uma referência
-                simplificada de range de abertura — não é output do motor GTO, é só escala visual (o solver próprio ainda não
-                gera range por posição pra este grid — ver backlog).
-              </p>
-              {/* Só informativo (não é editável como o Construtor de Ranges) —
-                  mesmo teto de largura (580px) pra não dominar a tela à toa. */}
-              <div style={{ maxWidth: 580 }}>
-                <HandMatrixGrid cells={matrix} />
-              </div>
-            </Painel>
-          )}
         </motion.div>
       </AnimatePresence>
     </div>
-  );
-}
-
-function HandMatrixGrid({ cells }: { cells: ReturnType<typeof computeHandMatrix> }) {
-  const [hover, setHover] = useState<string | null>(null);
-  const byKey = new Map(cells.map((c) => [`${c.row}-${c.col}`, c]));
-  const hovered = hover ? byKey.get(hover) : null;
-
-  function colorFor(playedPct: number | null, gtoPct: number | null): string {
-    if (playedPct === null) return "rgba(255,255,255,0.04)";
-    // Verde quando perto/acima da referência, âmbar levemente abaixo,
-    // vermelho quando bem abaixo — mesma linguagem de cor do resto do
-    // produto (positive/evolution/negative), não um heatmap arco-íris.
-    const ref = gtoPct ?? 30;
-    const ratio = ref > 0 ? playedPct / ref : 1;
-    if (ratio >= 0.85) return "rgba(34,197,94,0.55)";
-    if (ratio >= 0.5) return "rgba(245,158,11,0.5)";
-    return "rgba(224,85,90,0.45)";
-  }
-
-  return (
-    <div className="relative">
-      <div className="grid grid-cols-[repeat(13,minmax(0,1fr))] gap-[2px] rounded-xl border border-hairline bg-surface p-1.5">
-        {cells.map((c) => (
-          <div
-            key={c.hand}
-            onMouseEnter={() => setHover(`${c.row}-${c.col}`)}
-            onMouseLeave={() => setHover((h) => (h === `${c.row}-${c.col}` ? null : h))}
-            onClick={() => setHover((h) => (h === `${c.row}-${c.col}` ? null : `${c.row}-${c.col}`))}
-            className="flex aspect-square cursor-pointer items-center justify-center rounded-[3px] text-[9px] font-semibold text-ink/80"
-            style={{ backgroundColor: colorFor(c.playedPct, c.gtoPct), border: c.row === c.col ? "1px solid rgba(255,255,255,0.18)" : undefined }}
-            title={`${c.hand} — ${c.playedPct !== null ? `${c.playedPct}% jogada (${c.sample} mãos)` : "sem amostra"}`}
-          >
-            {c.hand}
-          </div>
-        ))}
-      </div>
-
-      {hovered && (
-        <div className="mt-2 flex flex-wrap items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2 text-xs">
-          <span className="font-bold text-ink">{hovered.hand}</span>
-          <span className="text-muted">
-            Jogada: <strong className="text-ink">{hovered.playedPct !== null ? `${hovered.playedPct}%` : "sem amostra"}</strong>
-          </span>
-          <span className="text-muted">
-            Referência: <strong className="text-ink">{hovered.gtoPct}%</strong>
-          </span>
-          <span className="text-muted">
-            Amostra: <strong className="text-ink">{hovered.sample}</strong> {hovered.sample === 1 ? "mão" : "mãos"}
-          </span>
-        </div>
-      )}
-
-      <div className="mt-3 flex items-center gap-4 text-[10px] text-muted">
-        <LegendDot color="rgba(34,197,94,0.55)" label="Na referência ou acima" />
-        <LegendDot color="rgba(245,158,11,0.5)" label="Abaixo da referência" />
-        <LegendDot color="rgba(224,85,90,0.45)" label="Bem abaixo da referência" />
-        <LegendDot color="rgba(255,255,255,0.04)" label="Sem amostra" />
-      </div>
-    </div>
-  );
-}
-
-function LegendDot({ color, label }: { color: string; label: string }) {
-  return (
-    <span className="flex items-center gap-1.5">
-      <span className="h-2.5 w-2.5 rounded-sm" style={{ backgroundColor: color }} />
-      {label}
-    </span>
   );
 }
