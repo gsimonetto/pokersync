@@ -8,11 +8,14 @@ import {
   Painel,
   StatCardGrid,
   HeroStrip,
+  HealthGauge,
   SubHeader,
   EmptyState,
   SampleBadge,
   ReferenceProfileBadge,
+  CategoryLegend,
   toneFromRange,
+  rangeCoaching,
   statBar,
   revisorHandsHref,
 } from "@/components/analysis/shared";
@@ -95,44 +98,85 @@ export function PreflopTab({
                 </div>
               }
             >
-              <HeroStrip
-                items={[
-                  {
-                    label: "VPIP",
-                    value: fmtPct(metrics.vpip_pct),
-                    tone: toneFromRange(metrics.vpip_pct, ref.vpip.min, ref.vpip.max),
-                    trend: vpipTrend,
-                    bar: statBar(metrics.vpip_pct, ref.vpip.min, ref.vpip.max, 100),
-                    hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
-                  },
-                  {
-                    label: "PFR",
-                    value: fmtPct(metrics.pfr_pct),
-                    tone: toneFromRange(metrics.pfr_pct, ref.pfr.min, ref.pfr.max),
-                    trend: pfrTrend,
-                    bar: statBar(metrics.pfr_pct, ref.pfr.min, ref.pfr.max, 100),
-                    hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
-                  },
-                  {
-                    label: "3-Bet %",
-                    value: fmtPct(metrics.three_bet_pct),
-                    tone: toneFromRange(metrics.three_bet_pct, ref.threeBet.min, ref.threeBet.max),
-                    trend: threeBetTrend,
-                    bar: statBar(metrics.three_bet_pct, ref.threeBet.min, ref.threeBet.max, 100),
-                    hint: "Frequência de re-raise no preflop diante de um raise anterior.",
-                  },
-                  {
-                    label: "Steal %",
-                    value: fmtPct(metrics.steal_pct),
-                    tone: toneFromRange(metrics.steal_pct, ref.steal.min, ref.steal.max),
-                    trend: stealTrend,
-                    bar: statBar(metrics.steal_pct, ref.steal.min, ref.steal.max, 100),
-                    hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
-                  },
-                ]}
-              />
+              <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
+                <HealthGauge
+                  items={[
+                    { value: metrics.vpip_pct, min: ref.vpip.min, max: ref.vpip.max },
+                    { value: metrics.pfr_pct, min: ref.pfr.min, max: ref.pfr.max },
+                    { value: metrics.three_bet_pct, min: ref.threeBet.min, max: ref.threeBet.max },
+                    { value: metrics.steal_pct, min: ref.steal.min, max: ref.steal.max },
+                  ]}
+                />
+                <HeroStrip
+                  items={[
+                    {
+                      label: "VPIP",
+                      value: fmtPct(metrics.vpip_pct),
+                      tone: toneFromRange(metrics.vpip_pct, ref.vpip.min, ref.vpip.max),
+                      trend: vpipTrend,
+                      bar: statBar(metrics.vpip_pct, ref.vpip.min, ref.vpip.max, 100),
+                      hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
+                      coaching: rangeCoaching(
+                        metrics.vpip_pct,
+                        ref.vpip.min,
+                        ref.vpip.max,
+                        "VPIP abaixo da faixa — você está entrando em poucas mãos voluntariamente. Considere abrir o range em posições tardias (CO/BTN) pra não deixar pote fácil na mesa.",
+                        "VPIP acima da faixa — você está entrando em mãos especulativas demais. Aperte o range fora de posição, principalmente EP/MP."
+                      ),
+                    },
+                    {
+                      label: "PFR",
+                      value: fmtPct(metrics.pfr_pct),
+                      tone: toneFromRange(metrics.pfr_pct, ref.pfr.min, ref.pfr.max),
+                      trend: pfrTrend,
+                      bar: statBar(metrics.pfr_pct, ref.pfr.min, ref.pfr.max, 100),
+                      hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
+                      coaching: rangeCoaching(
+                        metrics.pfr_pct,
+                        ref.pfr.min,
+                        ref.pfr.max,
+                        "PFR abaixo da faixa — você entra na mão mas levanta pouco. Prefira abrir com raise em vez de call nas posições de abertura.",
+                        "PFR acima da faixa — sua frequência de raise está alta em relação ao VPIP. Reveja se não está abrindo mãos fracas fora de posição."
+                      ),
+                    },
+                    {
+                      label: "3-Bet %",
+                      value: fmtPct(metrics.three_bet_pct),
+                      tone: toneFromRange(metrics.three_bet_pct, ref.threeBet.min, ref.threeBet.max),
+                      trend: threeBetTrend,
+                      bar: statBar(metrics.three_bet_pct, ref.threeBet.min, ref.threeBet.max, 100),
+                      hint: "Frequência de re-raise no preflop diante de um raise anterior.",
+                      coaching: rangeCoaching(
+                        metrics.three_bet_pct,
+                        ref.threeBet.min,
+                        ref.threeBet.max,
+                        "3-Bet % abaixo da faixa — você está flat-callando demais. Adversários vão explorar sabendo que você raramente re-raise.",
+                        "3-Bet % acima da faixa — sua frequência de re-raise está alta. Cuidado pra não virar previsível pra 4-bet bluffs."
+                      ),
+                    },
+                    {
+                      label: "Steal %",
+                      value: fmtPct(metrics.steal_pct),
+                      tone: toneFromRange(metrics.steal_pct, ref.steal.min, ref.steal.max),
+                      trend: stealTrend,
+                      bar: statBar(metrics.steal_pct, ref.steal.min, ref.steal.max, 100),
+                      hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
+                      coaching: rangeCoaching(
+                        metrics.steal_pct,
+                        ref.steal.min,
+                        ref.steal.max,
+                        "Steal % abaixo da faixa — você está deixando pote fácil (CO/BTN/SB foldados até você) na mesa. Aumente a frequência de open nessas posições.",
+                        "Steal % acima da faixa — blinds competentes já ajustam a defesa contra roubo frequente. Priorize steals com mãos com mais equity real."
+                      ),
+                    },
+                  ]}
+                />
+              </div>
 
               <SubHeader>Outras frequências</SubHeader>
+              <div className="mb-2 flex justify-end">
+                <CategoryLegend categories={["defesa", "agressao", "posicional"]} />
+              </div>
               <StatCardGrid
                 items={[
                   {
@@ -142,37 +186,49 @@ export function PreflopTab({
                     tone: toneFromRange(metrics.fold_to_3bet_pct, ref.foldTo3bet.min, ref.foldTo3bet.max),
                     bar: statBar(metrics.fold_to_3bet_pct, ref.foldTo3bet.min, ref.foldTo3bet.max, 100),
                     hint: "Frequência que você desiste depois de ser 3-betado, quando você tinha aberto o pote.",
+                    category: "defesa",
                   },
-                  { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap, hint: "Frequência de re-raise diante de um 3-bet adversário." },
+                  {
+                    label: "4-Bet %",
+                    value: fmtPct(metrics.four_bet_pct),
+                    icon: Zap,
+                    hint: "Frequência de re-raise diante de um 3-bet adversário.",
+                    category: "agressao",
+                  },
                   {
                     label: "Fold to 4-Bet %",
                     value: fmtPct(metrics.fold_to_4bet_pct),
                     icon: CornerUpLeft,
                     hint: "Frequência que você desiste depois de ser 4-betado, quando você tinha 3-betado.",
+                    category: "defesa",
                   },
                   {
                     label: "Squeeze %",
                     value: fmtPct(metrics.squeeze_pct),
                     icon: Layers,
                     hint: "Frequência de 3-bet quando já houve um raise e pelo menos um call antes de você.",
+                    category: "agressao",
                   },
                   {
                     label: "Fold to Steal (SB vs BTN)",
                     value: fmtPct(metrics.fold_to_steal_sb_vs_btn_pct),
                     icon: CornerUpLeft,
                     hint: "Frequência que você desiste no SB contra um open-raise do BTN.",
+                    category: "posicional",
                   },
                   {
                     label: "Fold to Steal (BB vs BTN)",
                     value: fmtPct(metrics.fold_to_steal_bb_vs_btn_pct),
                     icon: CornerUpLeft,
                     hint: "Frequência que você desiste no BB contra um open-raise do BTN.",
+                    category: "posicional",
                   },
                   {
                     label: "Fold to Steal (BB vs SB)",
                     value: fmtPct(metrics.fold_to_steal_bb_vs_sb_pct),
                     icon: CornerUpLeft,
                     hint: "Frequência que você desiste no BB contra um open-raise do SB.",
+                    category: "posicional",
                   },
                   {
                     label: "Limp-Fold %",
@@ -192,49 +248,83 @@ export function PreflopTab({
           {subTab === "postflop" && <PostflopTab rows={rows} metrics={postflopMetrics} referenceProfile={referenceProfile} />}
 
           {subTab === "posicao" && (
-            <Painel titulo="Por posição" icone={<MapPin size={14} className="icon-glow text-evolution" />}>
+            <Painel
+              titulo="Por posição"
+              icone={<MapPin size={14} className="icon-glow text-evolution" />}
+              action={<ReferenceProfileBadge profile={referenceProfile} />}
+            >
               {byPosition.length === 0 ? (
                 <EmptyState texto="Sem mãos suficientes com posição identificada." />
               ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {byPositionSorted.map((p) => (
-                    <button
-                      key={p.position}
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          revisorHandsHref(
-                            rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
-                            `Posição ${p.position}`
-                          )
-                        )
-                      }
-                      className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/40"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-bold text-ink">{p.position}</span>
-                        <ArrowUpRight size={13} className="shrink-0 text-muted" />
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-muted">{p.hands} {p.hands === 1 ? "mão" : "mãos"}</p>
-                      <div className="mt-2.5 grid grid-cols-2 gap-x-2 gap-y-1 text-[11px] text-muted">
-                        <span>
-                          VPIP <b className="text-ink">{fmtPct(p.vpip_pct) ?? "—"}</b>
-                        </span>
-                        <span>
-                          PFR <b className="text-ink">{fmtPct(p.pfr_pct) ?? "—"}</b>
-                        </span>
-                        <span>
-                          3-Bet <b className="text-ink">{fmtPct(p.three_bet_pct) ?? "—"}</b>
-                        </span>
-                        <span>
-                          Steal <b className="text-ink">{fmtPct(p.steal_pct) ?? "—"}</b>
-                        </span>
-                      </div>
-                    </button>
-                  ))}
+                <div className="overflow-x-auto rounded-lg border border-hairline">
+                  <table className="w-full text-sm">
+                    <thead>
+                      <tr className="border-b border-hairline">
+                        {["Posição", "VPIP", "PFR", "PFR : VPIP", "3-Bet", "Steal", "Mãos", ""].map((h) => (
+                          <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">
+                            {h}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {byPositionSorted.map((p, i) => {
+                        const ratio = p.vpip_pct && p.vpip_pct > 0 && p.pfr_pct !== null ? Math.round((p.pfr_pct / p.vpip_pct) * 100) : null;
+                        return (
+                          <tr
+                            key={p.position}
+                            onClick={() =>
+                              router.push(
+                                revisorHandsHref(
+                                  rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
+                                  `Posição ${p.position}`
+                                )
+                              )
+                            }
+                            className={`cursor-pointer bg-elevated/0 transition-colors hover:bg-elevated ${
+                              i < byPositionSorted.length - 1 ? "border-b border-hairline" : ""
+                            }`}
+                          >
+                            <td className="px-4 py-3">
+                              <span className="inline-flex h-6 min-w-6 items-center justify-center rounded bg-elevated px-1.5 text-[11px] font-bold text-ink">
+                                {p.position}
+                              </span>
+                            </td>
+                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneFromRange(p.vpip_pct, ref.vpip.min, ref.vpip.max) === "ruim" ? "text-negative" : "text-ink"}`}>
+                              {fmtPct(p.vpip_pct) ?? "—"}
+                            </td>
+                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneFromRange(p.pfr_pct, ref.pfr.min, ref.pfr.max) === "ruim" ? "text-negative" : "text-ink"}`}>
+                              {fmtPct(p.pfr_pct) ?? "—"}
+                            </td>
+                            <td className="px-4 py-3">
+                              {ratio !== null ? (
+                                <div className="flex items-center gap-2">
+                                  <div className="h-1 w-14 rounded-full bg-void/40">
+                                    <div className="h-full rounded-full bg-training" style={{ width: `${Math.min(100, ratio)}%` }} />
+                                  </div>
+                                  <span className="text-[11px] tabular-nums text-muted">{ratio}%</span>
+                                </div>
+                              ) : (
+                                <span className="text-muted/50">—</span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{fmtPct(p.three_bet_pct) ?? "—"}</td>
+                            <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{fmtPct(p.steal_pct) ?? "—"}</td>
+                            <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{p.hands}</td>
+                            <td className="px-4 py-3">
+                              <ArrowUpRight size={13} className="text-muted" />
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
               )}
-              <p className="mt-3 text-[11px] text-muted/70">Clique numa posição pra abrir essas mãos no Revisor.</p>
+              <p className="mt-3 text-[11px] text-muted/70">
+                PFR : VPIP é quanto do seu VPIP virou raise — quanto mais perto de 100%, menos você entra só de call. Clique numa
+                posição pra abrir essas mãos no Revisor.
+              </p>
             </Painel>
           )}
 

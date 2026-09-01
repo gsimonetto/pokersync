@@ -1,8 +1,8 @@
 "use client";
 
-import { useId } from "react";
-import { motion } from "framer-motion";
-import { Lock, type LucideIcon } from "lucide-react";
+import { useId, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
+import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 import { REFERENCE_PROFILE_LABEL, type ReferenceProfile } from "@/types/analysis";
 
 // Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
@@ -75,11 +75,23 @@ export function MetricGrid({ items }: { items: { label: string; value: string | 
 // 3-4 headliners de cada card (ex. VPIP/PFR/3-Bet%/Steal% no Preflop) —
 // o resto continua na StatList abaixo, senão a tela vira uma parede de
 // números grandes competindo entre si.
-export function HeroStrip({
-  items,
-}: {
-  items: { label: string; value: string | null; tone?: "bom" | "ruim"; trend?: number[]; hint?: string; bar?: StatBar }[];
-}) {
+// `coaching` só existe quando a métrica saiu da faixa (ver chamadas em
+// PreflopMatrix/PostflopStats) — card sem coaching fica só informativo
+// (hover mostra a definição via `hint`); card com coaching vira clicável
+// e expande o texto embaixo, no lugar de um painel de insights à parte
+// duplicando a mesma informação.
+type HeroStripItem = {
+  label: string;
+  value: string | null;
+  tone?: "bom" | "ruim";
+  trend?: number[];
+  hint?: string;
+  bar?: StatBar;
+  coaching?: string;
+};
+
+export function HeroStrip({ items }: { items: HeroStripItem[] }) {
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <div
       className="grid grid-cols-2 divide-x divide-y divide-hairline overflow-hidden rounded-lg border border-hairline bg-elevated sm:grid-cols-4 sm:divide-y-0"
@@ -87,17 +99,118 @@ export function HeroStrip({
     >
       {items.map((it) => {
         const cor = it.tone === "bom" ? "text-positive" : it.tone === "ruim" ? "text-negative" : "text-ink";
+        const clickable = !!(it.coaching && it.value);
+        const isOpen = clickable && open === it.label;
         return (
-          <div key={it.label} className="px-4 py-3.5" title={it.hint}>
-            <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{it.label}</p>
+          <div
+            key={it.label}
+            className={`px-4 py-3.5 transition-colors ${clickable ? "cursor-pointer hover:bg-white/[0.02]" : ""}`}
+            title={clickable ? undefined : it.hint}
+            onClick={clickable ? () => setOpen(isOpen ? null : it.label) : undefined}
+          >
+            <div className="flex items-center gap-1">
+              <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{it.label}</p>
+              {clickable && (
+                <ChevronDown size={11} className={`text-muted/60 transition-transform ${isOpen ? "rotate-180" : ""}`} />
+              )}
+            </div>
             <div className="mt-1.5 flex items-end justify-between gap-2">
               <p className={`text-2xl font-bold leading-none tracking-tight tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</p>
               {it.trend && it.trend.length >= 2 && <Sparkline points={it.trend} tone={it.tone} />}
             </div>
             {it.bar && it.value && <ReferenceBar bar={it.bar} tone={it.tone} className="mt-2.5" />}
+            <AnimatePresence>
+              {isOpen && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2, ease: "easeOut" }}
+                  className="overflow-hidden"
+                >
+                  <p className="mt-2.5 border-t border-hairline pt-2.5 text-[11px] leading-relaxed text-ink/80">{it.coaching}</p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </div>
         );
       })}
+    </div>
+  );
+}
+
+// Anel de "saúde" — média de quão perto cada headliner está da própria
+// faixa de referência (100 = na faixa, cai proporcional à distância).
+// Mesmos min/max já usados no toneFromRange/statBar de cada card, então
+// nunca diverge do que os cards individuais já mostram.
+function computeHealthScore(items: { value: number | null; min: number; max: number }[]): number | null {
+  const valid = items.filter((i) => i.value !== null) as { value: number; min: number; max: number }[];
+  if (valid.length === 0) return null;
+  const scores = valid.map((i) => {
+    if (i.value >= i.min && i.value <= i.max) return 100;
+    const dist = i.value < i.min ? i.min - i.value : i.value - i.max;
+    const span = i.max - i.min || 1;
+    return Math.max(0, 100 - (dist / span) * 100);
+  });
+  return Math.round(scores.reduce((a, b) => a + b, 0) / scores.length);
+}
+
+export function HealthGauge({ items }: { items: { value: number | null; min: number; max: number }[] }) {
+  const score = computeHealthScore(items);
+  if (score === null) return null;
+  const valid = items.filter((i) => i.value !== null) as { value: number; min: number; max: number }[];
+  const inRange = valid.filter((i) => i.value >= i.min && i.value <= i.max).length;
+  const cor = score >= 70 ? "text-positive" : score >= 45 ? "text-evolution" : "text-negative";
+  const stroke = score >= 70 ? "var(--color-positive)" : score >= 45 ? "var(--color-evolution)" : "var(--color-negative)";
+  const label = score >= 70 ? "Sólido" : score >= 45 ? "Atenção" : "Crítico";
+  const resumo =
+    score >= 70
+      ? "Headliners majoritariamente dentro da faixa."
+      : score >= 45
+        ? "Alguns headliners fora da faixa — clique num card acima pra ver o porquê."
+        : "Vários headliners fora da faixa — vale revisar.";
+  const r = 30;
+  const cx = 36;
+  const cy = 36;
+  const circ = 2 * Math.PI * r;
+
+  return (
+    <div className="flex items-center gap-4 rounded-lg border border-hairline bg-elevated p-4">
+      <div className="relative shrink-0">
+        <svg width={72} height={72} viewBox="0 0 72 72" className="-rotate-90">
+          <circle cx={cx} cy={cy} r={r} fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth={5} />
+          <motion.circle
+            cx={cx}
+            cy={cy}
+            r={r}
+            fill="none"
+            stroke={stroke}
+            strokeWidth={5}
+            strokeLinecap="round"
+            strokeDasharray={circ}
+            initial={{ strokeDashoffset: circ }}
+            animate={{ strokeDashoffset: circ - (score / 100) * circ }}
+            transition={{ duration: 0.9, ease: "easeOut" }}
+            style={{ filter: `drop-shadow(0 0 4px ${stroke})` }}
+          />
+        </svg>
+        <div className="absolute inset-0 flex flex-col items-center justify-center">
+          <span className={`text-lg font-bold leading-none tabular-nums ${cor}`}>{score}</span>
+          <span className="text-[8px] text-muted/70">/100</span>
+        </div>
+      </div>
+      <div className="min-w-0">
+        <p className={`text-sm font-semibold ${cor}`}>{label}</p>
+        <p className="mt-0.5 text-[11px] leading-relaxed text-muted">{resumo}</p>
+        <div className="mt-2 flex gap-3 text-[11px]">
+          <span>
+            <b className="tabular-nums text-positive">{inRange}</b> <span className="text-muted/70">na faixa</span>
+          </span>
+          <span>
+            <b className="tabular-nums text-negative">{valid.length - inRange}</b> <span className="text-muted/70">fora</span>
+          </span>
+        </div>
+      </div>
     </div>
   );
 }
@@ -141,6 +254,38 @@ function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: "bom" | "
   );
 }
 
+// Categoria opcional (ver CATEGORY_LABEL/CATEGORY_DOT_CLASS abaixo) — só
+// um agrupamento visual (ponto colorido no canto do card), não muda o
+// valor nem a cor por faixa do card.
+export type StatCategory = "defesa" | "agressao" | "posicional";
+
+export const CATEGORY_LABEL: Record<StatCategory, string> = {
+  defesa: "Defesa",
+  agressao: "Agressão",
+  posicional: "Posicional",
+};
+
+const CATEGORY_DOT_CLASS: Record<StatCategory, string> = {
+  defesa: "bg-training",
+  agressao: "bg-evolution",
+  posicional: "bg-review",
+};
+
+// Legenda das categorias acima — uma vez por grid categorizado (ver
+// "Outras frequências" em PreflopMatrix.tsx), não repetida em cada card.
+export function CategoryLegend({ categories }: { categories: StatCategory[] }) {
+  return (
+    <div className="flex items-center gap-3 text-[10px] text-muted/70">
+      {categories.map((c) => (
+        <span key={c} className="flex items-center gap-1">
+          <span className={`h-1.5 w-1.5 rounded-full ${CATEGORY_DOT_CLASS[c]}`} />
+          {CATEGORY_LABEL[c]}
+        </span>
+      ))}
+    </div>
+  );
+}
+
 export function StatCardGrid({
   items,
 }: {
@@ -152,6 +297,7 @@ export function StatCardGrid({
     hint?: string;
     bar?: StatBar;
     locked?: string;
+    category?: StatCategory;
   }[];
 }) {
   return (
@@ -167,11 +313,33 @@ export function StatCardGrid({
   );
 }
 
-function StatCard({ label, value, icon: Icon, tone, hint, bar }: { label: string; value: string | null; icon?: LucideIcon; tone?: "bom" | "ruim"; hint?: string; bar?: StatBar }) {
+function StatCard({
+  label,
+  value,
+  icon: Icon,
+  tone,
+  hint,
+  bar,
+  category,
+}: {
+  label: string;
+  value: string | null;
+  icon?: LucideIcon;
+  tone?: "bom" | "ruim";
+  hint?: string;
+  bar?: StatBar;
+  category?: StatCategory;
+}) {
   const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
   return (
-    <div className="rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)]" title={hint}>
-      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase leading-tight tracking-[0.06em] text-muted/80">
+    <div
+      className="relative rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)]"
+      title={hint}
+    >
+      {category && (
+        <span className={`absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full opacity-50 ${CATEGORY_DOT_CLASS[category]}`} title={CATEGORY_LABEL[category]} />
+      )}
+      <p className="flex items-center gap-1.5 pr-3 text-[10px] font-bold uppercase leading-tight tracking-[0.06em] text-muted/80">
         {Icon && <Icon size={11} className="icon-glow shrink-0" />}
         <span>{label}</span>
       </p>
@@ -277,6 +445,18 @@ export function toneFromRange(value: number | null, min: number, max: number): "
   if (value === null) return undefined;
   if (value >= min && value <= max) return "bom";
   if (value < min * 0.6 || value > max * 1.6) return "ruim";
+  return undefined;
+}
+
+// Texto de coaching pra um headliner do HeroStrip — só devolve algo
+// quando o valor está fora da própria faixa de referência (mesma
+// condição de `ruim` no toneFromRange), pra não inventar conselho pra
+// métrica que já está saudável. `low`/`high` são a mensagem pronta pra
+// cada direção, escrita no call site (varia por métrica).
+export function rangeCoaching(value: number | null, min: number, max: number, low: string, high: string): string | undefined {
+  if (value === null) return undefined;
+  if (value < min) return low;
+  if (value > max) return high;
   return undefined;
 }
 
