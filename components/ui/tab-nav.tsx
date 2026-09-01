@@ -32,12 +32,12 @@ export function TabNav<T extends string>({
   glowIcons?: boolean;
 }) {
   return (
-    <nav className={`relative flex justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center ${className ?? ""}`}>
+    <nav className={`relative flex justify-start gap-1 overflow-x-auto rounded-xl border border-hairline bg-surface p-1 [scrollbar-width:none] [&::-webkit-scrollbar]:hidden sm:justify-center ${className ?? ""}`} aria-label="Navegação de seção">
       {options.map((o) => {
         const Icon = o.icon;
         const active = !o.href && value === o.value;
-        const itemClassName = `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-          active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
+        const itemClassName = `flex shrink-0 items-center gap-1.5 rounded-lg px-3 py-2 text-[12px] font-semibold transition-all ${
+          active ? "bg-elevated text-ink shadow-[0_4px_14px_-8px_rgba(255,255,255,0.5)]" : "text-muted hover:bg-elevated/60 hover:text-ink"
         }`;
         const content = (
           <>

@@ -58,7 +58,7 @@ export function PreflopTab({
   const stealTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).steal_pct), [rows]);
 
   return (
-    <div>
+    <div className="space-y-4">
       <TabNav value={subTab} onChange={setSubTab} options={SUB_TABS} glowIcons />
 
       <AnimatePresence mode="wait">
@@ -68,7 +68,7 @@ export function PreflopTab({
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}
           transition={{ duration: 0.18, ease: "easeOut" }}
-          className="mt-4"
+          className=""
         >
           {subTab === "preflop" && (
             <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="icon-glow text-training" />} action={<SampleBadge hands={metrics.hands} />}>

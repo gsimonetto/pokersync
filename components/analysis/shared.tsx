@@ -81,13 +81,13 @@ export function HeroStrip({
 }) {
   return (
     <div
-      className="grid grid-cols-2 divide-x divide-y divide-hairline overflow-hidden rounded-lg border border-hairline bg-elevated sm:grid-cols-4 sm:divide-y-0"
+      className="grid grid-cols-2 divide-x divide-y divide-hairline overflow-hidden rounded-xl border border-hairline bg-elevated shadow-[0_14px_40px_-28px_rgba(0,0,0,0.9)] sm:grid-cols-4 sm:divide-y-0"
       style={{ gridAutoRows: "1fr" }}
     >
       {items.map((it) => {
         const cor = it.tone === "bom" ? "text-positive" : it.tone === "ruim" ? "text-negative" : "text-ink";
         return (
-          <div key={it.label} className="px-4 py-3.5" title={it.hint}>
+          <div key={it.label} className="group relative px-4 py-4 transition-colors hover:bg-void/20" title={it.hint}>
             <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{it.label}</p>
             <div className="mt-1.5 flex items-end justify-between gap-2">
               <p className={`text-2xl font-bold leading-none tracking-tight tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</p>
