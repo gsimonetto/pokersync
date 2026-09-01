@@ -72,8 +72,8 @@ export function PostflopTab({
                 metrics.cbet_flop_pct,
                 ref.cbetFlop.min,
                 ref.cbetFlop.max,
-                "Flop C-Bet % abaixo da faixa — você está deixando fold equity na mesa como agressor pré-flop. Aposte mais no flop quando chegou como último agressor.",
-                "Flop C-Bet % acima da faixa — apostar sem seletividade abre espaço pra check-raise e float. Reveja c-bets em boards ruins pro seu range."
+                "Quando você foi o último a apostar antes das primeiras 3 cartas da mesa, você quase não continua apostando depois delas. Está desistindo de uma vantagem que já tinha construído — o adversário pode não ter nada e vai desistir se você continuar apostando.",
+                "Você continua apostando depois das primeiras 3 cartas da mesa com frequência alta demais, mesmo quando elas não ajudam sua mão. Isso fica fácil de perceber e o adversário passa a te desafiar de volta."
               ),
             },
             {
@@ -87,8 +87,8 @@ export function PostflopTab({
                 metrics.fold_to_cbet_flop_pct,
                 ref.foldToCbetFlop.min,
                 ref.foldToCbetFlop.max,
-                "Fold to Flop C-Bet % abaixo da faixa — você está pagando c-bets demais. Considere desistir mais em boards que não favorecem seu range.",
-                "Fold to Flop C-Bet % acima da faixa — você desiste demais contra c-bet. Pode estar sendo explorado por barrels leves."
+                "Você continua pagando quando o adversário aposta logo depois das primeiras 3 cartas da mesa com frequência alta demais. Desista mais quando essas cartas não ajudam a mão que você tinha.",
+                "Você desiste demais quando o adversário aposta logo depois das primeiras 3 cartas da mesa. Isso é fácil de perceber, e o adversário passa a apostar mesmo sem ter nada, só porque sabe que você desiste."
               ),
             },
             {
@@ -102,8 +102,8 @@ export function PostflopTab({
                 metrics.aggression_factor,
                 ref.aggFactor.min,
                 ref.aggFactor.max,
-                "Aggression Factor abaixo da faixa — você está mais passivo (call) que agressivo (bet/raise) pós-flop. Converta mais calls em raises com mãos fortes.",
-                "Aggression Factor acima da faixa — você está muito agressivo em relação a quanto paga. Cuidado pra não virar alvo de check-raise."
+                "Depois das primeiras cartas da mesa, você prefere só pagar em vez de apostar mais. Isso entrega o controle da mão pro adversário — com mão boa, aposte mais em vez de só acompanhar.",
+                "Você aposta e sobe demais em relação a quanto só paga depois das primeiras cartas da mesa. Cuidado pra não virar alvo fácil de um contra-ataque forte."
               ),
             },
             {
@@ -117,8 +117,8 @@ export function PostflopTab({
                 metrics.aggression_frequency_pct,
                 ref.aggFreq.min,
                 ref.aggFreq.max,
-                "Aggression Freq. % abaixo da faixa — a maioria das suas ações pós-flop são call/fold. Busque mais spots pra apostar/subir em vez de só acompanhar.",
-                "Aggression Freq. % acima da faixa — você aposta/sobe demais em relação a quanto dá check/desiste. Pode estar se expondo a check-raise."
+                "A maioria das suas decisões depois das primeiras cartas da mesa são só pagar ou desistir. Procure mais chances de apostar ou subir em vez de só reagir ao que o adversário faz.",
+                "Você aposta ou sobe demais em relação a quanto só observa ou desiste. Pode estar se expondo a um contra-ataque forte com muita frequência."
               ),
             },
           ]}

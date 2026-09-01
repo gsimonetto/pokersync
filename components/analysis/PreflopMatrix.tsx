@@ -15,6 +15,7 @@ import {
   ReferenceProfileBadge,
   CategoryLegend,
   toneFromRange,
+  toneTextClass,
   rangeCoaching,
   statBar,
   revisorHandsHref,
@@ -76,7 +77,7 @@ export function PreflopTab({
 
   return (
     <div>
-      <TabNav value={subTab} onChange={setSubTab} options={SUB_TABS} glowIcons />
+      <TabNav value={subTab} onChange={setSubTab} options={SUB_TABS} />
 
       <AnimatePresence mode="wait">
         <motion.div
@@ -120,8 +121,8 @@ export function PreflopTab({
                         metrics.vpip_pct,
                         ref.vpip.min,
                         ref.vpip.max,
-                        "VPIP abaixo da faixa — você está entrando em poucas mãos voluntariamente. Considere abrir o range em posições tardias (CO/BTN) pra não deixar pote fácil na mesa.",
-                        "VPIP acima da faixa — você está entrando em mãos especulativas demais. Aperte o range fora de posição, principalmente EP/MP."
+                        "Você está entrando em poucas mãos. Quando a ação chega foldada até você perto do fim da rodada, dá pra jogar mais mãos com segurança — você está deixando isso passar.",
+                        "Você está entrando em mãos demais, inclusive fracas. Isso te deixa em decisões difíceis depois que as cartas da mesa aparecem, principalmente quando ainda faltam jogadores pra agir depois de você."
                       ),
                     },
                     {
@@ -135,8 +136,8 @@ export function PreflopTab({
                         metrics.pfr_pct,
                         ref.pfr.min,
                         ref.pfr.max,
-                        "PFR abaixo da faixa — você entra na mão mas levanta pouco. Prefira abrir com raise em vez de call nas posições de abertura.",
-                        "PFR acima da faixa — sua frequência de raise está alta em relação ao VPIP. Reveja se não está abrindo mãos fracas fora de posição."
+                        "Quando você decide entrar na mão, prefere só pagar em vez de apostar mais. Isso entrega o controle da mão pro adversário — se a mão é boa o suficiente pra jogar, geralmente também é boa o suficiente pra você apostar mais.",
+                        "Você está apostando mais do que deveria em relação a quantas mãos joga. Reveja se não está fazendo isso com mãos fracas quando ainda tem gente pra agir depois de você."
                       ),
                     },
                     {
@@ -150,8 +151,8 @@ export function PreflopTab({
                         metrics.three_bet_pct,
                         ref.threeBet.min,
                         ref.threeBet.max,
-                        "3-Bet % abaixo da faixa — você está flat-callando demais. Adversários vão explorar sabendo que você raramente re-raise.",
-                        "3-Bet % acima da faixa — sua frequência de re-raise está alta. Cuidado pra não virar previsível pra 4-bet bluffs."
+                        "Quase nunca você aposta mais em cima de quem já apostou antes de você. Os outros jogadores vão perceber e vão te respeitar cada vez menos.",
+                        "Você está apostando mais em cima de quem já apostou com frequência alta demais. Cuidado — fica fácil de identificar e virar alvo de um contra-ataque."
                       ),
                     },
                     {
@@ -165,8 +166,8 @@ export function PreflopTab({
                         metrics.steal_pct,
                         ref.steal.min,
                         ref.steal.max,
-                        "Steal % abaixo da faixa — você está deixando pote fácil (CO/BTN/SB foldados até você) na mesa. Aumente a frequência de open nessas posições.",
-                        "Steal % acima da faixa — blinds competentes já ajustam a defesa contra roubo frequente. Priorize steals com mãos com mais equity real."
+                        "Quando ninguém entrou na mão antes de chegar em você perto do fim da rodada, você quase não aproveita pra tentar ficar com o pote. Está deixando dinheiro fácil na mesa.",
+                        "Você tenta ficar com o pote com ninguém tendo entrado antes com frequência alta demais. Jogadores atentos já perceberam e estão passando a te desafiar de volta."
                       ),
                     },
                   ]}
@@ -290,10 +291,10 @@ export function PreflopTab({
                                 {p.position}
                               </span>
                             </td>
-                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneFromRange(p.vpip_pct, ref.vpip.min, ref.vpip.max) === "ruim" ? "text-negative" : "text-ink"}`}>
+                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneTextClass(toneFromRange(p.vpip_pct, ref.vpip.min, ref.vpip.max))}`}>
                               {fmtPct(p.vpip_pct) ?? "—"}
                             </td>
-                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneFromRange(p.pfr_pct, ref.pfr.min, ref.pfr.max) === "ruim" ? "text-negative" : "text-ink"}`}>
+                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneTextClass(toneFromRange(p.pfr_pct, ref.pfr.min, ref.pfr.max))}`}>
                               {fmtPct(p.pfr_pct) ?? "—"}
                             </td>
                             <td className="px-4 py-3">
