@@ -1,15 +1,18 @@
 "use client";
 
 import { useState } from "react";
-import { Trophy, Layers, Award, Loader2, Sparkles } from "lucide-react";
-import { Painel, MetricGrid, Bloqueado } from "@/components/analysis/shared";
+import { Trophy, Layers, Award, Loader2, Sparkles, Hash, TrendingUp, CheckCircle2, Wallet } from "lucide-react";
+import { Painel, StatCardGrid, Bloqueado } from "@/components/analysis/shared";
+import { FilterChip } from "@/components/ui/filter-chip";
 import { TournamentPayoutsPanel } from "@/components/analysis/TournamentPayoutsPanel";
+import { buyinBucketOf } from "@/lib/services/analysis-service";
 import { fetchEligibleHandReviewIds, computeHandEvBatch } from "@/lib/services/hand-ev-service";
-import type { TournamentMetrics } from "@/types/analysis";
+import { BUYIN_BUCKET_LABEL, type BuyinBucket, type TournamentMetrics } from "@/types/analysis";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import type { TournamentPayout } from "@/lib/services/tournament-payout-service";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+const BUYIN_BUCKET_ORDER: BuyinBucket[] = ["0-10", "10-50", "50-200", "200+"];
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
@@ -31,6 +34,9 @@ export function TournamentTab({
   onCevComputed,
   focusPendingPayout,
   onFocusPendingPayoutConsumed,
+  buyinFilter,
+  onBuyinFilterChange,
+  availableBuyinBuckets,
 }: {
   metrics: TournamentMetrics;
   tournamentSessions: HandSession[];
@@ -39,6 +45,9 @@ export function TournamentTab({
   onCevComputed: () => void;
   focusPendingPayout?: boolean;
   onFocusPendingPayoutConsumed?: () => void;
+  buyinFilter: BuyinBucket[];
+  onBuyinFilterChange: (next: BuyinBucket[]) => void;
+  availableBuyinBuckets: Set<BuyinBucket>;
 }) {
   const [computing, setComputing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -46,6 +55,17 @@ export function TournamentTab({
   const [summary, setSummary] = useState<{ computed: number; skipped: number } | null>(null);
 
   const hasCev = metrics.chip_ev_total !== null;
+
+  // Painel de premiação/torneios (hand_sessions) filtrado pelo mesmo
+  // corte de buy-in — fonte diferente das bankroll_sessions que alimentam
+  // `metrics` (ver comentário em fetchTournamentMetrics), então a lista
+  // abaixo é filtrada aqui no cliente em vez de recarregar do servidor.
+  const filteredSessions =
+    buyinFilter.length === 0 ? tournamentSessions : tournamentSessions.filter((s) => s.buyin != null && buyinFilter.includes(buyinBucketOf(s.buyin)));
+
+  function toggleBuyin(b: BuyinBucket) {
+    onBuyinFilterChange(buyinFilter.includes(b) ? buyinFilter.filter((x) => x !== b) : [...buyinFilter, b]);
+  }
 
   async function handleCompute() {
     if (computing) return;
@@ -73,13 +93,45 @@ export function TournamentTab({
 
   return (
     <div className="space-y-4">
+      <div className="flex flex-wrap items-center gap-1.5">
+        <span className="mr-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">Buy-in</span>
+        {BUYIN_BUCKET_ORDER.map((b) => (
+          <FilterChip
+            key={b}
+            label={BUYIN_BUCKET_LABEL[b]}
+            active={buyinFilter.includes(b)}
+            disabled={!availableBuyinBuckets.has(b)}
+            disabledReason="Sem torneio importado nessa faixa de buy-in ainda"
+            onClick={() => toggleBuyin(b)}
+          />
+        ))}
+        {buyinFilter.length > 0 && (
+          <button type="button" onClick={() => onBuyinFilterChange([])} className="ml-1 text-[11.5px] font-semibold text-muted hover:text-ink">
+            Limpar
+          </button>
+        )}
+      </div>
+
       <Painel titulo="Resultado em torneios" icone={<Trophy size={14} className="icon-glow text-evolution" />}>
-        <MetricGrid
+        {/* ROI/Lucro reaproveitam "bom"/"acima" só pela cor (verde/vermelho)
+            — aqui não tem faixa de referência nenhuma, é só positivo vs.
+            negativo; "acima" não significa "acima de uma faixa saudável". */}
+        <StatCardGrid
           items={[
-            { label: "Total Games", value: metrics.total_games > 0 ? String(metrics.total_games) : null },
-            { label: "ROI %", value: fmtPct(metrics.roi_pct) },
-            { label: "ITM %", value: fmtPct(metrics.itm_pct) },
-            { label: "Lucro total", value: fmtMoney(metrics.total_profit) },
+            { label: "Total Games", value: metrics.total_games > 0 ? String(metrics.total_games) : null, icon: Hash },
+            {
+              label: "ROI %",
+              value: fmtPct(metrics.roi_pct),
+              icon: TrendingUp,
+              tone: metrics.roi_pct === null ? undefined : metrics.roi_pct >= 0 ? "bom" : "acima",
+            },
+            { label: "ITM %", value: fmtPct(metrics.itm_pct), icon: CheckCircle2 },
+            {
+              label: "Lucro total",
+              value: fmtMoney(metrics.total_profit),
+              icon: Wallet,
+              tone: metrics.total_profit === null ? undefined : metrics.total_profit >= 0 ? "bom" : "acima",
+            },
           ]}
         />
         {metrics.total_games === 0 && (
@@ -96,7 +148,7 @@ export function TournamentTab({
           (mesmo torneio, sem tela nova).
         </p>
         <TournamentPayoutsPanel
-          sessions={tournamentSessions}
+          sessions={filteredSessions}
           payouts={payouts}
           onChanged={onPayoutsChanged}
           focusPending={focusPendingPayout}

@@ -17,6 +17,7 @@ import {
   computePostflopMetrics,
   computeLeaks,
   computeReferenceProfile,
+  buyinBucketOf,
   fetchTournamentMetrics,
   fetchTournamentSessions,
 } from "@/lib/services/analysis-service";
@@ -30,6 +31,7 @@ import {
   type StackDepthBucket,
   type HeroPosition,
   type TournamentMetrics,
+  type BuyinBucket,
 } from "@/types/analysis";
 
 type TabKey = "preflop" | "tournament" | "leaks";
@@ -50,13 +52,18 @@ export default function AnalysisPage() {
   const [tab, setTab] = useState<TabKey>("preflop");
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
   const [focusPendingPayout, setFocusPendingPayout] = useState(false);
+  // Filtro de buy-in — só afeta a aba Torneios (Total Games/ROI/ITM/Lucro
+  // total, que vêm de bankroll_sessions; cEV/ICM não têm buy-in associado,
+  // ver comentário em fetchTournamentMetrics), por isso vive separado do
+  // `filters` de cima (que filtra mãos preflop/postflop/leaks).
+  const [tournamentBuyinFilter, setTournamentBuyinFilter] = useState<BuyinBucket[]>([]);
 
   async function loadAll() {
     setErro("");
     try {
       const [r, tourn, sessions, po] = await Promise.all([
         fetchAnalysisHandRows(),
-        fetchTournamentMetrics(),
+        fetchTournamentMetrics(tournamentBuyinFilter),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
       ]);
@@ -82,12 +89,17 @@ export default function AnalysisPage() {
   // Depois de calcular cEV, os totais (chip_ev_total/net_ev_profit/etc)
   // vêm de fetchTournamentMetrics — reload separado do de payouts pra não
   // misturar os dois estados.
-  async function reloadTournamentMetrics() {
+  async function reloadTournamentMetrics(buyinFilter: BuyinBucket[] = tournamentBuyinFilter) {
     try {
-      setTournament(await fetchTournamentMetrics());
+      setTournament(await fetchTournamentMetrics(buyinFilter));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao recarregar métricas de torneio.");
     }
+  }
+
+  function handleBuyinFilterChange(next: BuyinBucket[]) {
+    setTournamentBuyinFilter(next);
+    reloadTournamentMetrics(next);
   }
 
   useEffect(() => {
@@ -119,6 +131,14 @@ export default function AnalysisPage() {
   const availablePositions = useMemo(
     () => new Set(rows.map((r) => r.heroPosition).filter((p): p is HeroPosition => p !== null)),
     [rows]
+  );
+  // Buckets disponíveis pro filtro de buy-in — aproximação a partir de
+  // tournamentSessions (hand_sessions, o que já está carregado aqui),
+  // não das bankroll_sessions que efetivamente alimentam ROI/ITM/Lucro
+  // total (essas não são expostas fora de fetchTournamentMetrics hoje).
+  const availableBuyinBuckets = useMemo(
+    () => new Set(tournamentSessions.map((s) => (s.buyin != null ? buyinBucketOf(s.buyin) : null)).filter((b): b is BuyinBucket => b !== null)),
+    [tournamentSessions]
   );
 
   return (
@@ -179,9 +199,12 @@ export default function AnalysisPage() {
                         tournamentSessions={tournamentSessions}
                         payouts={payouts}
                         onPayoutsChanged={reloadPayouts}
-                        onCevComputed={reloadTournamentMetrics}
+                        onCevComputed={() => reloadTournamentMetrics()}
                         focusPendingPayout={focusPendingPayout}
                         onFocusPendingPayoutConsumed={() => setFocusPendingPayout(false)}
+                        buyinFilter={tournamentBuyinFilter}
+                        onBuyinFilterChange={handleBuyinFilterChange}
+                        availableBuyinBuckets={availableBuyinBuckets}
                       />
                     )}
                     {tab === "leaks" && <LeakFinderTab rows={filteredRows} leaks={leaks} />}

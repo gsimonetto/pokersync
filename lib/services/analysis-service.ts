@@ -14,11 +14,11 @@ import {
   type PreflopMetrics,
   type PreflopMetricsByPosition,
   type PostflopMetrics,
-  type HandCell,
   type Leak,
   type LeakHandForReview,
   type TournamentMetrics,
   type ReferenceProfile,
+  type BuyinBucket,
   HERO_POSITION_ORDER,
   PREFLOP_ACTION_TO_POT_TYPE,
 } from "@/types/analysis";
@@ -404,74 +404,6 @@ export function computePostflopMetrics(rows: AnalysisHandRow[]): PostflopMetrics
 }
 
 // ============================================================
-// Matriz 13x13
-// ============================================================
-const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
-
-// Referência simplificada de RFI (não é output de solver) — mesma lógica
-// de "faixa de referência, não veredito" já usada em REF (VPIP/PFR) na
-// tela de Performance: dá escala visual pro heatmap sem fingir precisão
-// que o produto ainda não tem (o motor GTO próprio nunca rodou pra este
-// grid — ver preflop_ranges/flop_subsets em POKERSYNC.md §8, órfãos).
-function referenceRfiPct(row: number, col: number): number {
-  const gap = Math.abs(row - col);
-  if (row === col) return Math.max(6, 100 - row * 7); // pares: baixa com a força
-  const suited = col > row;
-  const base = suited ? 100 - gap * 9 - row * 4 : 100 - gap * 13 - row * 6;
-  return Math.max(0, Math.min(100, base));
-}
-
-function cardToHandLabel(a: string, b: string): { hand: string; row: number; col: number } | null {
-  const rankOf = (c: string) => c[0]?.toUpperCase();
-  const ra = rankOf(a);
-  const rb = rankOf(b);
-  const ia = RANKS.indexOf(ra);
-  const ib = RANKS.indexOf(rb);
-  if (ia === -1 || ib === -1) return null;
-  const suited = a[1]?.toLowerCase() === b[1]?.toLowerCase();
-  if (ia === ib) return { hand: `${ra}${rb}`, row: ia, col: ia };
-  const hi = Math.min(ia, ib);
-  const lo = Math.max(ia, ib);
-  // Convenção HM3/PT4: acima da diagonal = suited (col > row), abaixo = offsuit.
-  if (suited) return { hand: `${RANKS[hi]}${RANKS[lo]}s`, row: hi, col: lo };
-  return { hand: `${RANKS[hi]}${RANKS[lo]}o`, row: lo, col: hi };
-}
-
-export function computeHandMatrix(rows: AnalysisHandRow[]): HandCell[] {
-  const cells: HandCell[] = [];
-  for (let row = 0; row < 13; row++) {
-    for (let col = 0; col < 13; col++) {
-      const suited = col > row;
-      const hand = row === col ? `${RANKS[row]}${RANKS[row]}` : suited ? `${RANKS[row]}${RANKS[col]}s` : `${RANKS[col]}${RANKS[row]}o`;
-      cells.push({ hand, row, col, playedPct: null, gtoPct: referenceRfiPct(row, col), sample: 0, netBB: null });
-    }
-  }
-
-  const byHand = new Map(cells.map((c) => [`${c.row}-${c.col}`, c]));
-  const dealtCount = new Map<string, { dealt: number; played: number }>();
-
-  for (const r of rows) {
-    if (!r.heroCards) continue;
-    const label = cardToHandLabel(r.heroCards[0], r.heroCards[1]);
-    if (!label) continue;
-    const key = `${label.row}-${label.col}`;
-    const agg = dealtCount.get(key) ?? { dealt: 0, played: 0 };
-    agg.dealt += 1;
-    if (r.vpip) agg.played += 1;
-    dealtCount.set(key, agg);
-  }
-
-  for (const [key, agg] of dealtCount) {
-    const cell = byHand.get(key);
-    if (!cell) continue;
-    cell.sample = agg.dealt;
-    cell.playedPct = pct(agg.played, agg.dealt);
-  }
-
-  return cells;
-}
-
-// ============================================================
 // Leak Finder
 // ============================================================
 // Faixa de cada leak vem de PREFLOP_REFERENCE/POSTFLOP_REFERENCE (mesma
@@ -622,9 +554,20 @@ function isTournamentSession(s: BankrollSession): boolean {
   return f === "mtt" || f === "torneio" || f === "sng" || f === "spin";
 }
 
-export async function fetchTournamentMetrics(): Promise<TournamentMetrics> {
+// Corte fixo em R$ (ver BuyinBucket em types/analysis.ts) — mesmo
+// espírito do StackDepthBucket: faixa redonda, não um valor por torneio.
+export function buyinBucketOf(buyin: number): BuyinBucket {
+  if (buyin <= 10) return "0-10";
+  if (buyin <= 50) return "10-50";
+  if (buyin <= 200) return "50-200";
+  return "200+";
+}
+
+export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): Promise<TournamentMetrics> {
   const [sessionsAll, evResults] = await Promise.all([fetchSessions(), fetchHandEvResults()]);
-  const sessions = sessionsAll.filter(isTournamentSession);
+  const sessions = sessionsAll
+    .filter(isTournamentSession)
+    .filter((s) => buyinBuckets.length === 0 || buyinBuckets.includes(buyinBucketOf(s.buyIn)));
   const invested = sessions.reduce((acc, s) => acc + s.buyIn * (1 + (s.reentries || 0)), 0);
   const returned = sessions.reduce((acc, s) => acc + s.cashout, 0);
   const itmCount = sessions.filter((s) => s.cashout > 0).length;
@@ -633,7 +576,9 @@ export async function fetchTournamentMetrics(): Promise<TournamentMetrics> {
   // heads-up preflop, ambas mostradas, com premiação cadastrada — ver
   // app/api/hand-ev/compute). Amostra pequena de propósito: é só o que
   // dá pra provar com o motor validado hoje, não uma estimativa pro
-  // torneio inteiro.
+  // torneio inteiro. Não tem buy-in associado direto (hand_ev_results
+  // não guarda isso), então `buyinBuckets` não filtra esses dois números
+  // — só Total Games/ROI/ITM/Lucro total, que vêm de `sessions`.
   const chipEvTotal = evResults.reduce((acc, r) => acc + (r.heroExpectedChipDelta ?? 0), 0);
   const netEvProfit = evResults.reduce((acc, r) => acc + (r.heroExpectedIcmDeltaDollars ?? 0), 0);
 

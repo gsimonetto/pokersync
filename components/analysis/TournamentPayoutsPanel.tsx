@@ -67,8 +67,12 @@ export function TournamentPayoutsPanel({
     return <EmptyState texto="Nenhum torneio importado ainda — a estrutura de premiação aparece aqui assim que houver mãos de torneio." />;
   }
 
+  // Grid em vez de lista full-width (linha esticada com nome numa ponta e
+  // status na outra, vão vazio enorme no meio em telas largas) — mesmo
+  // problema que "Por posição"/"Matchups" já resolveram assim. O card
+  // aberto ocupa a largura toda pro formulário caber sem espremer.
   return (
-    <div className="space-y-2">
+    <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {sessions.map((s) => (
         <TournamentRow
           key={s.id}
@@ -133,30 +137,30 @@ function TournamentRow({
   return (
     <div
       ref={rowRef}
-      className={`rounded-lg border bg-elevated transition-colors ${highlight ? "border-evolution/60 ring-1 ring-evolution/40" : "border-hairline"}`}
+      className={`rounded-lg border bg-elevated transition-all duration-200 ${
+        highlight ? "border-evolution/60 ring-1 ring-evolution/40" : "border-hairline"
+      } ${open ? "sm:col-span-2 lg:col-span-3" : "hover:-translate-y-0.5 hover:border-ink/25"}`}
     >
-      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-center justify-between gap-3 p-3 text-left">
+      <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-start justify-between gap-2 p-3 text-left">
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">{session.label}</p>
-          <p className="mt-0.5 text-[11px] text-muted">
+          <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
             {session.buyin != null ? BRL.format(session.buyin) : "buy-in não identificado"}
             {payout?.heroFinishPlace != null && <> · {payout.heroFinishPlace}º lugar</>}
             {payout?.heroPayoutAmount != null && <> · {BRL.format(payout.heroPayoutAmount)}</>}
           </p>
-        </div>
-        <div className="flex shrink-0 items-center gap-2">
           {hasPayout ? (
-            <span className="inline-flex items-center gap-1 rounded-full border border-positive/35 bg-positive/10 px-2 py-0.5 text-[10px] font-semibold text-positive">
+            <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-positive/35 bg-positive/10 px-2 py-0.5 text-[10px] font-semibold text-positive">
               {payout?.source === "agent" ? <Bot size={10} /> : <PenLine size={10} />}
-              Premiação registrada
+              Registrada
             </span>
           ) : (
-            <span className="rounded-full border border-dashed border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted">
+            <span className="mt-1.5 inline-flex items-center rounded-full border border-dashed border-hairline px-2 py-0.5 text-[10px] font-semibold text-muted">
               Sem premiação
             </span>
           )}
-          <ChevronDown size={14} className={`text-muted transition-transform ${open ? "rotate-180" : ""}`} />
         </div>
+        <ChevronDown size={14} className={`mt-0.5 shrink-0 text-muted transition-transform ${open ? "rotate-180" : ""}`} />
       </button>
 
       {open && (
