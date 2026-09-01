@@ -147,7 +147,7 @@ export default function AnalysisPage() {
               }}
             />
 
-            <TabNav className="mt-4" value={tab} onChange={setTab} options={tabsWithBadge} glowIcons />
+            <TabNav className="mt-4" value={tab} onChange={setTab} options={tabsWithBadge} />
 
             <div className="mt-4">
               {rows.length === 0 ? (

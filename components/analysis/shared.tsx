@@ -41,8 +41,8 @@ export function Painel({
   );
 }
 
-export function MetricCard({ label, value, sample, tone }: { label: string; value: string | null; sample?: number; tone?: "bom" | "ruim" }) {
-  const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
+export function MetricCard({ label, value, sample, tone }: { label: string; value: string | null; sample?: number; tone?: Tone }) {
+  const cor = tone ? TONE_TEXT_CLASS[tone] : "text-ink";
   return (
     <div className="rounded-lg border border-hairline bg-elevated p-3.5">
       <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">{label}</p>
@@ -83,7 +83,7 @@ export function MetricGrid({ items }: { items: { label: string; value: string | 
 type HeroStripItem = {
   label: string;
   value: string | null;
-  tone?: "bom" | "ruim";
+  tone?: Tone;
   trend?: number[];
   hint?: string;
   bar?: StatBar;
@@ -98,7 +98,7 @@ export function HeroStrip({ items }: { items: HeroStripItem[] }) {
       style={{ gridAutoRows: "1fr" }}
     >
       {items.map((it) => {
-        const cor = it.tone === "bom" ? "text-positive" : it.tone === "ruim" ? "text-negative" : "text-ink";
+        const cor = it.tone ? TONE_TEXT_CLASS[it.tone] : "text-ink";
         const clickable = !!(it.coaching && it.value);
         const isOpen = clickable && open === it.label;
         return (
@@ -238,8 +238,8 @@ type StatBar = { pct: number; bandStart: number; bandEnd: number; label: string 
 // (grade densa) quanto no HeroStrip (headliners), pra manter a mesma
 // linguagem visual de "onde você está vs. onde seria o ideal" em
 // qualquer tamanho de card.
-function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: "bom" | "ruim"; className?: string }) {
-  const barCor = tone === "bom" ? "bg-positive" : tone === "ruim" ? "bg-negative" : "bg-muted";
+function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: Tone; className?: string }) {
+  const barCor = tone ? TONE_BG_CLASS[tone] : "bg-muted";
   return (
     <div className={className}>
       <div className="relative h-1 rounded-full bg-void/40">
@@ -293,7 +293,7 @@ export function StatCardGrid({
     label: string;
     value: string | null;
     icon?: LucideIcon;
-    tone?: "bom" | "ruim";
+    tone?: Tone;
     hint?: string;
     bar?: StatBar;
     locked?: string;
@@ -325,12 +325,12 @@ function StatCard({
   label: string;
   value: string | null;
   icon?: LucideIcon;
-  tone?: "bom" | "ruim";
+  tone?: Tone;
   hint?: string;
   bar?: StatBar;
   category?: StatCategory;
 }) {
-  const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
+  const cor = tone ? TONE_TEXT_CLASS[tone] : "text-ink";
   return (
     <div
       className="relative rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)]"
@@ -357,7 +357,7 @@ function StatCard({
 // preenchida com gradiente + traço animado (desenha ao entrar em tela) e
 // um ponto pulsando no último valor, pra chamar mais atenção que uma
 // polyline estática.
-function Sparkline({ points, tone }: { points: number[]; tone?: "bom" | "ruim" }) {
+function Sparkline({ points, tone }: { points: number[]; tone?: Tone }) {
   const w = 56;
   const h = 20;
   const gradientId = useId();
@@ -372,7 +372,7 @@ function Sparkline({ points, tone }: { points: number[]; tone?: "bom" | "ruim" }
   const line = coords.map(([x, y], i) => `${i === 0 ? "M" : "L"}${x.toFixed(1)},${y.toFixed(1)}`).join(" ");
   const area = `${line} L${w},${h} L0,${h} Z`;
   const [lastX, lastY] = coords[coords.length - 1];
-  const stroke = tone === "bom" ? "var(--color-positive, #2FB89A)" : tone === "ruim" ? "var(--color-negative, #e0555a)" : "currentColor";
+  const stroke = tone ? TONE_STROKE[tone] : "currentColor";
 
   return (
     <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0 overflow-visible text-muted/60" aria-hidden="true">
@@ -436,16 +436,44 @@ export function revisorHandsHref(handIds: string[], label: string): string {
   return `/revisor?hands=${ids.join(",")}&label=${encodeURIComponent(label)}`;
 }
 
-// Referência simplificada de "faixa saudável" pra colorir StatList sem
+// Três estados (não dois) pra faixa de referência — verde na medida
+// certa, amarelo quando fica abaixo, vermelho quando fica acima. Mesmo
+// código de cor em todo lugar que lê `tone`: número do card, sparkline,
+// barra de referência.
+export type Tone = "bom" | "abaixo" | "acima";
+
+// Referência simplificada de "faixa saudável" pra colorir os cards sem
 // depender do solver — mesmo espírito da matriz 13×13 (heurística de
-// população, não output de GTO). `tone()` devolve undefined (cor
-// neutra) fora das métricas com consenso conhecido, em vez de inventar
-// faixa pra tudo.
-export function toneFromRange(value: number | null, min: number, max: number): "bom" | "ruim" | undefined {
+// população, não output de GTO). Devolve undefined (cor neutra) fora das
+// métricas com consenso conhecido, em vez de inventar faixa pra tudo.
+export function toneFromRange(value: number | null, min: number, max: number): Tone | undefined {
   if (value === null) return undefined;
   if (value >= min && value <= max) return "bom";
-  if (value < min * 0.6 || value > max * 1.6) return "ruim";
-  return undefined;
+  return value < min ? "abaixo" : "acima";
+}
+
+const TONE_TEXT_CLASS: Record<Tone, string> = {
+  bom: "text-positive",
+  abaixo: "text-evolution",
+  acima: "text-negative",
+};
+
+const TONE_BG_CLASS: Record<Tone, string> = {
+  bom: "bg-positive",
+  abaixo: "bg-evolution",
+  acima: "bg-negative",
+};
+
+const TONE_STROKE: Record<Tone, string> = {
+  bom: "var(--color-positive, #22c55e)",
+  abaixo: "var(--color-evolution, #f59e0b)",
+  acima: "var(--color-negative, #e0555a)",
+};
+
+// Pra call sites fora deste arquivo que precisam da mesma cor (ex. a
+// tabela "Por posição" em PreflopMatrix.tsx) sem reimplementar o mapa.
+export function toneTextClass(tone: Tone | undefined): string {
+  return tone ? TONE_TEXT_CLASS[tone] : "text-ink";
 }
 
 // Texto de coaching pra um headliner do HeroStrip — só devolve algo
