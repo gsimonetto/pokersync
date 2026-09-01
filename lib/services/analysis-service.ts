@@ -29,40 +29,64 @@ import {
 // (8-9 handed) até encurtar nas fases finais, então frequências
 // preflop/postflop saudáveis são mais apertadas que num 6-max de cash
 // (menos jogadores atrás = menos gente pra 3-bet/roubar/vs. c-bet).
-// Fonte: consenso comum de HUD (HM3/PT4/GTO Wizard population stats),
-// mesmo espírito de "contexto, não veredito" do resto do produto —
-// nunca um número saído do solver.
+//
+// Fontes (pesquisa pontual em 2026-09 — não é um feed vivo, então pode
+// datar): consenso citado por sites de treino/HUD com nome — Upswing
+// Poker (upswingpoker.com), Red Chip Poker (redchippoker.com),
+// PokerCoaching.com, Split Suit (splitsuit.com), BlackRain79
+// (blackrain79.com), riverodds.app e o glossário da PokerStrategy.com —
+// mais a diferença VPIP/PFR de mesa cheia vs 6-max discutida no fórum
+// do TwoPlusTwo. Nenhum é o motor GTO do produto nem um dataset de
+// população auditável por nós; é "o que a comunidade de treino costuma
+// citar como saudável", não uma resposta resolvida. Métrica sem fonte
+// encontrada (Check-Raise%, Aggression Freq.%) ficou como heurística
+// antiga, sinalizada abaixo — não inventamos citação onde não achamos.
 // ============================================================
 export type MetricRange = { min: number; max: number };
 
 export const PREFLOP_REFERENCE: Record<
   ReferenceProfile,
-  { vpip: MetricRange; pfr: MetricRange; threeBet: MetricRange; steal: MetricRange; foldTo3bet: MetricRange }
+  {
+    vpip: MetricRange;
+    pfr: MetricRange;
+    threeBet: MetricRange;
+    steal: MetricRange;
+    foldTo3bet: MetricRange;
+    // Mesmo número aplicado nos 3 recortes de matchup (SB vs BTN, BB vs
+    // BTN, BB vs SB) — a fonte citada não distingue por matchup, só dá
+    // um "fold to steal" geral. Aproximação, não uma faixa específica
+    // pra cada situação.
+    foldToSteal: MetricRange;
+  }
 > = {
   cash6max: {
-    vpip: { min: 20, max: 28 },
-    pfr: { min: 15, max: 24 },
-    threeBet: { min: 6, max: 10 },
-    steal: { min: 35, max: 55 },
-    foldTo3bet: { min: 55, max: 65 },
+    vpip: { min: 22, max: 28 }, // Upswing/PokerCoaching/Split Suit: ~21-28% pra 6-max
+    pfr: { min: 18, max: 24 }, // PokerCoaching: PFR ~18 pareado com VPIP ~25; gap saudável até ~8-10pp
+    threeBet: { min: 6, max: 9 }, // Red Chip Poker/PokerStrategy: 6-max recomendado ~7%
+    steal: { min: 30, max: 40 }, // Ideal ATS 6-max citado em ~35% (BlackRain79/PokerCoaching)
+    foldTo3bet: { min: 50, max: 60 }, // "Balanceado gira em torno de 55%" (PokerStrategy)
+    foldToSteal: { min: 65, max: 75 }, // Ideal "fold to steal" 6-max citado em ~70% (BlackRain79)
   },
   mtt8max: {
-    vpip: { min: 14, max: 20 },
-    pfr: { min: 11, max: 17 },
-    threeBet: { min: 4, max: 7 },
-    steal: { min: 30, max: 45 },
-    foldTo3bet: { min: 60, max: 70 },
+    vpip: { min: 12, max: 18 }, // Ideal mesa cheia citado em ~15%
+    pfr: { min: 9, max: 14 }, // Ideal mesa cheia ~12%; regs vencedores "11/8 a 16/14"
+    threeBet: { min: 3.5, max: 6.5 }, // Mesa cheia ~6% (2.2-6% baixas / 3.9-6.9% altas)
+    steal: { min: 25, max: 35 }, // Ideal ATS mesa cheia citado em ~30%
+    foldTo3bet: { min: 55, max: 65 }, // Sem fonte específica de mesa cheia — heurística deslocada da versão cash
+    foldToSteal: { min: 70, max: 80 }, // Ideal mesa cheia citado em ~75%
   },
 };
 
-// `cbetTurn`/`cbetRiver`/`foldToCbetTurn`/`foldToCbetRiver`/`donkBet` têm
-// o mesmo nível de consenso que os 4 headliners acima (citado com
-// frequência em material de treino/HUD, ainda assim heurística, não
-// GTO). Check-Raise% e WSD%/W$SD% ficaram de fora de propósito — não
-// achamos uma faixa "saudável" com consenso parecido pra elas (WSD/W$SD
-// em especial dependem muito de variância e do range do adversário pra
-// virar uma meta única), então preferimos não exibir marcador nenhum a
-// inventar um número.
+// `cbetTurn`/`cbetRiver` e `wsd`/`wsdWon` (WTSD/W$SD) agora também vêm
+// de fonte citada (ver comentário acima do PREFLOP_REFERENCE).
+// `donkBet` não tem faixa numérica exata citada, só o achado
+// qualitativo de que donk bet frequente correlaciona com mais perda
+// (Upswing Poker) — mantido como heurística de "quanto menor, melhor".
+// `foldToCbetTurn`/`foldToCbetRiver` só têm MÉDIA de população citada
+// (34%/37%, não uma faixa "ideal") — a faixa aqui usa essa média como
+// centro, é menos confiável que as outras. Check-Raise% e `aggFreq`
+// continuam sem fonte nova — ficaram de fora do marcador (Check-Raise%)
+// ou como heurística antiga sem citação (aggFreq).
 export const POSTFLOP_REFERENCE: Record<
   ReferenceProfile,
   {
@@ -75,29 +99,35 @@ export const POSTFLOP_REFERENCE: Record<
     donkBet: MetricRange;
     aggFactor: MetricRange;
     aggFreq: MetricRange;
+    wsd: MetricRange;
+    wsdWon: MetricRange;
   }
 > = {
   cash6max: {
-    cbetFlop: { min: 55, max: 75 },
-    foldToCbetFlop: { min: 40, max: 55 },
-    cbetTurn: { min: 50, max: 65 },
-    cbetRiver: { min: 40, max: 55 },
-    foldToCbetTurn: { min: 50, max: 65 },
-    foldToCbetRiver: { min: 50, max: 65 },
-    donkBet: { min: 2, max: 8 },
-    aggFactor: { min: 2, max: 4 },
-    aggFreq: { min: 35, max: 50 },
+    cbetFlop: { min: 55, max: 75 }, // "Target range pra winning players": 55-75% (riverodds.app)
+    foldToCbetFlop: { min: 40, max: 55 }, // Média de população ~45% (análise de database citada)
+    cbetTurn: { min: 45, max: 65 }, // "Target range c-bet turn": 45-65% (riverodds.app)
+    cbetRiver: { min: 35, max: 50 }, // Barrel de river citado em 35-50%
+    foldToCbetTurn: { min: 24, max: 44 }, // Média de população ~34%, sem faixa "ideal" citada — banda em torno da média
+    foldToCbetRiver: { min: 27, max: 47 }, // Média de população ~37%, mesma ressalva acima
+    donkBet: { min: 2, max: 8 }, // Sem faixa exata citada — só o achado de que doncar mais correlaciona com mais perda
+    aggFactor: { min: 2, max: 4 }, // "3 é considerado ótimo", abaixo de 1.5 é passivo demais (PokerCoaching/Split Suit)
+    aggFreq: { min: 35, max: 50 }, // Sem fonte nova encontrada — heurística anterior mantida
+    wsd: { min: 25, max: 30 }, // WTSD "típico pra jogador balanceado": 25-30% (Upswing Poker)
+    wsdWon: { min: 49, max: 54 }, // W$SD "bom" citado em 49-54% (Upswing Poker)
   },
   mtt8max: {
-    cbetFlop: { min: 50, max: 70 },
+    cbetFlop: { min: 50, max: 70 }, // Sem fonte específica de mesa cheia — mesmo deslocamento proporcional já usado nos headliners
     foldToCbetFlop: { min: 45, max: 60 },
-    cbetTurn: { min: 45, max: 60 },
-    cbetRiver: { min: 35, max: 50 },
-    foldToCbetTurn: { min: 55, max: 70 },
-    foldToCbetRiver: { min: 55, max: 70 },
+    cbetTurn: { min: 40, max: 60 },
+    cbetRiver: { min: 30, max: 45 },
+    foldToCbetTurn: { min: 24, max: 44 }, // Mesma ressalva do cash — sem dado específico de mesa cheia
+    foldToCbetRiver: { min: 27, max: 47 },
     donkBet: { min: 2, max: 8 },
     aggFactor: { min: 1.5, max: 3.5 },
     aggFreq: { min: 30, max: 45 },
+    wsd: { min: 25, max: 30 }, // Sem distinção de mesa cheia na fonte — aplicado igual
+    wsdWon: { min: 49, max: 54 },
   },
 };
 

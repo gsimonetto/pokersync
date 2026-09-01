@@ -239,17 +239,27 @@ type StatBar = { pct: number; bandStart: number; bandEnd: number; label: string 
 // linguagem visual de "onde você está vs. onde seria o ideal" em
 // qualquer tamanho de card.
 function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: Tone; className?: string }) {
-  const barCor = tone ? TONE_BG_CLASS[tone] : "bg-muted";
+  const dotClass = tone ? TONE_BG_CLASS[tone] : "bg-ink/60";
+  const glow = tone ? TONE_STROKE[tone] : "transparent";
   return (
     <div className={className}>
-      <div className="relative h-1 rounded-full bg-void/40">
+      <div className="relative h-2 rounded-full bg-void/50">
+        {/* faixa saudável — verde fixo (é sempre "a zona boa", independente
+            de onde o marcador caiu) com opacidade alta o bastante pra
+            aparecer mesmo em telas mais claras/monitores ruins. */}
         <div
-          className="absolute inset-y-0 rounded-full bg-positive/15"
+          className="absolute inset-y-0 rounded-full bg-positive/35"
           style={{ left: `${bar.bandStart}%`, width: `${Math.max(0, bar.bandEnd - bar.bandStart)}%` }}
         />
-        <div className={`absolute inset-y-0 w-[3px] rounded-full ${barCor}`} style={{ left: `calc(${bar.pct}% - 1.5px)` }} />
+        {/* marcador — bolinha com halo na cor do tone (verde/amarelo/
+            vermelho), borda no tom do card pra "flutuar" sobre a trilha
+            em vez de um traço fino de 3px quase invisível. */}
+        <div
+          className={`absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-elevated ${dotClass}`}
+          style={{ left: `${bar.pct}%`, boxShadow: `0 0 6px 1px ${glow}` }}
+        />
       </div>
-      <p className="mt-1 text-[10px] font-medium tabular-nums text-muted/60">{bar.label}</p>
+      <p className="mt-2 text-[11px] font-semibold tabular-nums text-muted/80">{bar.label}</p>
     </div>
   );
 }
