@@ -1,4 +1,4 @@
-// Tipos do módulo de Análise (Player Evolution → /performance/analise).
+// Tipos do módulo de Análise (Player Evolution → /performance).
 // Cobre o volume de dados que HM3/PT4 expõem: preflop, postflop, torneios,
 // matriz de mãos e leak finder. Pensado pra Supabase/Postgres: toda métrica
 // vem `number | null` (null = sem amostra, nunca 0 forçado) e toda contagem
