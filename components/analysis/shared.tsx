@@ -139,10 +139,14 @@ export function HeroStrip({ items }: { items: HeroStripItem[] }) {
   );
 }
 
-// Anel de "saúde" — média de quão perto cada headliner está da própria
-// faixa de referência (100 = na faixa, cai proporcional à distância).
-// Mesmos min/max já usados no toneFromRange/statBar de cada card, então
-// nunca diverge do que os cards individuais já mostram.
+// Anel de "saúde" — média de quão perto cada métrica com faixa de
+// referência está da própria faixa (100 = na faixa, cai proporcional à
+// distância). Cobre TODAS as métricas com faixa da tela (não só os 3-4
+// headliners em destaque) — quem chama passa a lista completa em
+// `items`. Métrica sem valor (amostra insuficiente) ou sem faixa de
+// referência definida simplesmente não entra em `items`, então nunca
+// participa do score. Mesmos min/max já usados no toneFromRange/statBar
+// de cada card, então nunca diverge do que os cards individuais mostram.
 function computeHealthScore(items: { value: number | null; min: number; max: number }[]): number | null {
   const valid = items.filter((i) => i.value !== null) as { value: number; min: number; max: number }[];
   if (valid.length === 0) return null;
@@ -165,10 +169,10 @@ export function HealthGauge({ items }: { items: { value: number | null; min: num
   const label = score >= 70 ? "Sólido" : score >= 45 ? "Atenção" : "Crítico";
   const resumo =
     score >= 70
-      ? "Headliners majoritariamente dentro da faixa."
+      ? "Métricas majoritariamente dentro da faixa."
       : score >= 45
-        ? "Alguns headliners fora da faixa — clique num card acima pra ver o porquê."
-        : "Vários headliners fora da faixa — vale revisar.";
+        ? "Algumas métricas fora da faixa — clique num card com seta pra ver o porquê."
+        : "Várias métricas fora da faixa — vale revisar os cards abaixo.";
   const r = 30;
   const cx = 36;
   const cy = 36;
@@ -243,7 +247,7 @@ function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: Tone; cla
   const glow = tone ? TONE_STROKE[tone] : "transparent";
   return (
     <div className={className}>
-      <div className="relative h-2 rounded-full bg-void/50">
+      <div className="relative h-1.5 rounded-full bg-void/50">
         {/* faixa saudável — verde fixo (é sempre "a zona boa", independente
             de onde o marcador caiu) com opacidade alta o bastante pra
             aparecer mesmo em telas mais claras/monitores ruins. */}
@@ -253,13 +257,14 @@ function ReferenceBar({ bar, tone, className }: { bar: StatBar; tone?: Tone; cla
         />
         {/* marcador — bolinha com halo na cor do tone (verde/amarelo/
             vermelho), borda no tom do card pra "flutuar" sobre a trilha
-            em vez de um traço fino de 3px quase invisível. */}
+            em vez de um traço fino de 3px quase invisível — mas do
+            tamanho de um marcador, não maior que o próprio número. */}
         <div
-          className={`absolute top-1/2 h-3.5 w-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full border-2 border-elevated ${dotClass}`}
-          style={{ left: `${bar.pct}%`, boxShadow: `0 0 6px 1px ${glow}` }}
+          className={`absolute top-1/2 h-2.5 w-2.5 -translate-x-1/2 -translate-y-1/2 rounded-full border border-elevated ${dotClass}`}
+          style={{ left: `${bar.pct}%`, boxShadow: `0 0 4px 1px ${glow}` }}
         />
       </div>
-      <p className="mt-2 text-[11px] font-semibold tabular-nums text-muted/80">{bar.label}</p>
+      <p className="mt-1.5 text-[10px] font-semibold tabular-nums text-muted/80">{bar.label}</p>
     </div>
   );
 }
