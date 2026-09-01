@@ -14,8 +14,6 @@ import {
   type PreflopMetrics,
   type PreflopMetricsByPosition,
   type PostflopMetrics,
-  type Leak,
-  type LeakHandForReview,
   type TournamentMetrics,
   type ReferenceProfile,
   type BuyinBucket,
@@ -317,29 +315,6 @@ export function computePreflopByPosition(rows: AnalysisHandRow[]): PreflopMetric
   }).filter((p) => p.hands > 0);
 }
 
-// Matchups reais (ex.: "SB_vs_BTN") — só existe quando o pot foi
-// heads-up até o flop (ver matchup em types/analysis.ts), então a lista
-// tem só os confrontos que de fato aconteceram, sem preencher o resto de
-// uma grade 8×8 com "sem amostra" que não ajudaria em nada.
-export interface MatchupBreakdown {
-  matchup: string;
-  hands: number;
-  vpip_pct: number | null;
-}
-
-export function computeMatchupBreakdown(rows: AnalysisHandRow[]): MatchupBreakdown[] {
-  const groups = new Map<string, AnalysisHandRow[]>();
-  for (const r of rows) {
-    if (!r.matchup) continue;
-    const arr = groups.get(r.matchup) ?? [];
-    arr.push(r);
-    groups.set(r.matchup, arr);
-  }
-  return [...groups.entries()]
-    .map(([matchup, subset]) => ({ matchup, hands: subset.length, vpip_pct: pct(countIf(subset, (r) => r.vpip), subset.length) }))
-    .sort((a, b) => b.hands - a.hands);
-}
-
 // Tendência de uma métrica ao longo do período filtrado — divide as mãos
 // (já ordenadas cronologicamente por fetchAnalysisHandRows) em blocos de
 // tamanho igual e recalcula a métrica em cada um, no espírito do
@@ -404,147 +379,6 @@ export function computePostflopMetrics(rows: AnalysisHandRow[]): PostflopMetrics
 }
 
 // ============================================================
-// Leak Finder
-// ============================================================
-// Faixa de cada leak vem de PREFLOP_REFERENCE/POSTFLOP_REFERENCE (mesma
-// faixa mostrada nos cards de Preflop/Postflop) em vez de números soltos
-// aqui — assim o leak dispara exatamente quando o card já pintou de
-// vermelho/âmbar, sem um segundo padrão "invisível" só pro alerta, e
-// escala junto com o perfil (cash 6-max vs MTT 8-max, ver
-// computeReferenceProfile). `direction` decide se o leak é "abaixo do
-// mínimo" ou "acima do máximo" da faixa.
-const LEAK_THRESHOLDS: {
-  id: string;
-  title: string;
-  category: Leak["category"];
-  metric: (pf: PreflopMetrics, po: PostflopMetrics) => number | null;
-  range: (profile: ReferenceProfile) => MetricRange;
-  direction: "low" | "high";
-  minSample: number;
-  sample: (pf: PreflopMetrics, po: PostflopMetrics) => number;
-  describe: (v: number, range: MetricRange) => string;
-}[] = [
-  {
-    id: "low-cbet-flop",
-    title: "C-Bet Flop muito baixo",
-    category: "postflop",
-    metric: (_pf, po) => po.cbet_flop_pct,
-    range: (p) => POSTFLOP_REFERENCE[p].cbetFlop,
-    direction: "low",
-    minSample: 15,
-    sample: (_pf, po) => po.hands,
-    describe: (v, r) =>
-      `Você faz c-bet no flop em apenas ${v}% das vezes como agressor pré-flop — abaixo da faixa comum (${r.min}–${r.max}%). Está deixando fold equity na mesa.`,
-  },
-  {
-    id: "high-fold-cbet-flop",
-    title: "Fold to C-Bet Flop muito alto",
-    category: "postflop",
-    metric: (_pf, po) => po.fold_to_cbet_flop_pct,
-    range: (p) => POSTFLOP_REFERENCE[p].foldToCbetFlop,
-    direction: "high",
-    minSample: 10,
-    sample: (_pf, po) => po.hands,
-    describe: (v, r) =>
-      `Você foldou ${v}% das vezes que enfrentou c-bet no flop — acima da faixa comum (${r.min}–${r.max}%). Pode estar sendo explorado por barrels leves.`,
-  },
-  {
-    id: "low-3bet",
-    title: "3-Bet % muito baixo",
-    category: "preflop",
-    metric: (pf) => pf.three_bet_pct,
-    range: (p) => PREFLOP_REFERENCE[p].threeBet,
-    direction: "low",
-    minSample: 40,
-    sample: (pf) => pf.hands,
-    describe: (v, r) => `Sua taxa de 3-bet está em ${v}% — abaixo da faixa comum (${r.min}–${r.max}%). Range preflop provavelmente passivo demais.`,
-  },
-  {
-    id: "high-fold-3bet",
-    title: "Fold to 3-Bet muito alto",
-    category: "preflop",
-    metric: (pf) => pf.fold_to_3bet_pct,
-    range: (p) => PREFLOP_REFERENCE[p].foldTo3bet,
-    direction: "high",
-    minSample: 8,
-    sample: (pf) => pf.hands,
-    describe: (v, r) => `Você foldou para 3-bet em ${v}% das vezes — acima da faixa comum (${r.min}–${r.max}%). Está aberto para squeeze e 3-bet bluff.`,
-  },
-  {
-    id: "low-steal",
-    title: "Steal % muito baixo",
-    category: "preflop",
-    metric: (pf) => pf.steal_pct,
-    range: (p) => PREFLOP_REFERENCE[p].steal,
-    direction: "low",
-    minSample: 20,
-    sample: (pf) => pf.hands,
-    describe: (v, r) =>
-      `Você tenta roubar o pote em apenas ${v}% das suas chances (CO/BTN/SB) — abaixo da faixa comum (${r.min}–${r.max}%). Está deixando dinheiro fácil na mesa.`,
-  },
-];
-
-export function computeLeaks(preflop: PreflopMetrics, postflop: PostflopMetrics, profile: ReferenceProfile): Leak[] {
-  const leaks: Leak[] = [];
-  for (const t of LEAK_THRESHOLDS) {
-    const value = t.metric(preflop, postflop);
-    const sample = t.sample(preflop, postflop);
-    if (value === null || sample < t.minSample) continue;
-    const range = t.range(profile);
-    const below = t.direction === "low" && value < range.min;
-    const above = t.direction === "high" && value > range.max;
-    if (!below && !above) continue;
-    // Severidade proporcional à largura da própria faixa (não um offset
-    // fixo em pp) — assim escala igual pro perfil MTT 8-max, que tem
-    // faixas mais estreitas que o cash 6-max.
-    const span = range.max - range.min || 1;
-    const severity: Leak["severity"] =
-      (below && value < range.min - span * 0.6) || (above && value > range.max + span) ? "critical" : "warning";
-    leaks.push({
-      id: t.id,
-      title: t.title,
-      description: t.describe(value, range),
-      metricValue: value,
-      benchmarkRange: range,
-      severity,
-      category: t.category,
-      sampleSize: sample,
-      estimatedCostBB: null, // exigiria ligar cada decisão a um resultado em bb — não temos essa amarração ainda
-    });
-  }
-  return leaks.sort((a, b) => (a.severity === b.severity ? 0 : a.severity === "critical" ? -1 : 1));
-}
-
-// Mãos candidatas a revisão pra cada leak — filtra pelas mesmas flags que
-// geraram o leak, sem novo fetch (opera sobre os rows já carregados).
-export function computeLeakHands(rows: AnalysisHandRow[], leakId: string): LeakHandForReview[] {
-  const predicate: Record<string, (r: AnalysisHandRow) => boolean> = {
-    "low-cbet-flop": (r) => r.isPreflopAggressor === true && r.cbetFlop === false,
-    "high-fold-cbet-flop": (r) => r.foldToCbetFlop === true,
-    "low-3bet": (r) => r.facedThreeBet === false && r.potType === "single_raised" && r.pfr === true,
-    "high-fold-3bet": (r) => r.foldToThreeBet === true,
-    "low-steal": (r) => r.stealAttempt === false,
-  };
-  const pred = predicate[leakId];
-  if (!pred) return [];
-  // Sem corte aqui — quem limita o tamanho pro deep-link é
-  // revisorHandsHref (150 ids), já que agora isso abre a lista real no
-  // Revisor em vez de uma prévia inline de 25 itens.
-  return rows
-    .filter(pred)
-    .map((r) => ({
-      handId: r.handReviewId,
-      playedAt: r.playedAt,
-      format: r.format ?? "mtt",
-      position: r.heroPosition,
-      street: "preflop",
-      potBB: null,
-      netResultBB: null,
-      leakTags: [leakId],
-    }));
-}
-
-// ============================================================
 // Torneios — só o que dá pra provar com o que está gravado hoje
 // (bankroll_sessions: buy-in/reentries/cashout reais). cEV/ICM ficam
 // null: motor não grava chip-equity por mão (ver POKERSYNC.md §8).
@@ -571,6 +405,66 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
   const invested = sessions.reduce((acc, s) => acc + s.buyIn * (1 + (s.reentries || 0)), 0);
   const returned = sessions.reduce((acc, s) => acc + s.cashout, 0);
   const itmCount = sessions.filter((s) => s.cashout > 0).length;
+  // "Jogando desde" / "último torneio" — datas extremas da amostra
+  // filtrada, pro resumo financeiro estilo SharkScope (não é a data de
+  // cadastro da conta, é desde quando há torneio registrado na Gestão de
+  // Banca).
+  const since = sessions.reduce<string | null>((min, s) => (min === null || s.date < min ? s.date : min), null);
+  const until = sessions.reduce<string | null>((max, s) => (max === null || s.date > max ? s.date : max), null);
+
+  // Buy-in médio por torneio — sem contar re-entries (senão um jogador que
+  // faz muitas re-entries num buy-in baixo puxaria a média pra baixo do
+  // que ele de fato costuma jogar). ROI médio é a média do ROI de cada
+  // torneio individual, diferente do roi_pct acima (que é o ROI agregado
+  // do total investido/total devolvido) — os dois contam histórias
+  // diferentes: um pondera pelo tamanho do buy-in, o outro não.
+  const avgBuyin = sessions.length > 0 ? sessions.reduce((acc, s) => acc + s.buyIn, 0) / sessions.length : null;
+  const perGameRois = sessions
+    .map((s) => s.buyIn * (1 + (s.reentries || 0)))
+    .map((gameInvested, i) => (gameInvested > 0 ? ((sessions[i].cashout - gameInvested) / gameInvested) * 100 : null))
+    .filter((r): r is number => r !== null);
+  const avgRoiPct = perGameRois.length > 0 ? perGameRois.reduce((a, b) => a + b, 0) / perGameRois.length : null;
+
+  // Dias ativos / jogos por dia / dia com mais torneios — agrupado pela
+  // mesma `date` da sessão (YYYY-MM-DD), sem depender de horário.
+  const gamesByDay = new Map<string, number>();
+  const netByDay = new Map<string, number>();
+  for (const s of sessions) {
+    gamesByDay.set(s.date, (gamesByDay.get(s.date) ?? 0) + 1);
+    const net = s.cashout - s.buyIn * (1 + (s.reentries || 0));
+    netByDay.set(s.date, (netByDay.get(s.date) ?? 0) + net);
+  }
+  const activeDays = gamesByDay.size;
+  const busiestDayCount = gamesByDay.size > 0 ? Math.max(...gamesByDay.values()) : 0;
+
+  // Sequências de dias ganhando/perdendo — mesmo espírito do "streak" do
+  // SharkScope, dia a dia (não torneio a torneio) e só sobre torneios
+  // (não mistura com dias de cash), em ordem cronológica.
+  const dayResults = [...netByDay.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, net]) => net);
+  let daysWon = 0,
+    daysLost = 0,
+    daysFlat = 0,
+    maxWinStreak = 0,
+    maxLoseStreak = 0,
+    curWinStreak = 0,
+    curLoseStreak = 0;
+  for (const net of dayResults) {
+    if (net > 0) {
+      daysWon++;
+      curWinStreak++;
+      curLoseStreak = 0;
+    } else if (net < 0) {
+      daysLost++;
+      curLoseStreak++;
+      curWinStreak = 0;
+    } else {
+      daysFlat++;
+      curWinStreak = 0;
+      curLoseStreak = 0;
+    }
+    maxWinStreak = Math.max(maxWinStreak, curWinStreak);
+    maxLoseStreak = Math.max(maxLoseStreak, curLoseStreak);
+  }
 
   // cEV/$EV só cobre as mãos que passaram por hand_ev_results (all-in
   // heads-up preflop, ambas mostradas, com premiação cadastrada — ver
@@ -587,6 +481,21 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
     roi_pct: invested > 0 ? Math.round(((returned - invested) / invested) * 1000) / 10 : null,
     itm_pct: sessions.length > 0 ? pct(itmCount, sessions.length) : null,
     total_profit: sessions.length > 0 ? Math.round((returned - invested) * 100) / 100 : null,
+    total_invested: sessions.length > 0 ? Math.round(invested * 100) / 100 : null,
+    total_cashout: sessions.length > 0 ? Math.round(returned * 100) / 100 : null,
+    since,
+    until,
+    avg_profit_per_game: sessions.length > 0 ? Math.round(((returned - invested) / sessions.length) * 100) / 100 : null,
+    avg_buyin: avgBuyin !== null ? Math.round(avgBuyin * 100) / 100 : null,
+    avg_roi_pct: avgRoiPct !== null ? Math.round(avgRoiPct * 10) / 10 : null,
+    active_days: activeDays,
+    games_per_day: activeDays > 0 ? Math.round((sessions.length / activeDays) * 10) / 10 : null,
+    busiest_day_count: busiestDayCount,
+    days_won: daysWon,
+    days_lost: daysLost,
+    days_flat: daysFlat,
+    max_win_streak: maxWinStreak,
+    max_lose_streak: maxLoseStreak,
     net_ev_profit: evResults.length > 0 ? Math.round(netEvProfit * 100) / 100 : null,
     chip_ev_total: evResults.length > 0 ? Math.round(chipEvTotal * 100) / 100 : null,
     cev_per_game: evResults.length > 0 && sessions.length > 0 ? Math.round((chipEvTotal / sessions.length) * 100) / 100 : null,

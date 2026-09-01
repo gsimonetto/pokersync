@@ -1,9 +1,8 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import { useRouter } from "next/navigation";
-import { AnimatePresence, motion } from "framer-motion";
-import { Target, Flame, MapPin, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
+import { Target, MapPin, CornerUpLeft, Zap, Layers, ArrowUpRight } from "lucide-react";
 import {
   Painel,
   StatCardGrid,
@@ -20,50 +19,27 @@ import {
   statBar,
   revisorHandsHref,
 } from "@/components/analysis/shared";
-import { TabNav } from "@/components/ui/tab-nav";
-import { PostflopTab } from "@/components/analysis/PostflopStats";
-import { computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown, PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
-import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics, ReferenceProfile } from "@/types/analysis";
+import { computePreflopMetrics, computeMetricTrend, PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
+import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, ReferenceProfile } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
 }
 
-type SubTab = "preflop" | "postflop" | "posicao" | "matchups";
-
-const SUB_TABS: { value: SubTab; label: string; icon: typeof Target }[] = [
-  { value: "preflop", label: "Preflop", icon: Target },
-  { value: "postflop", label: "Postflop", icon: Flame },
-  { value: "posicao", label: "Por posição", icon: MapPin },
-  { value: "matchups", label: "Matchups", icon: Shuffle },
-];
-
-// Card 1 (preflop) + Card 2 (postflop, ver PostflopStats.tsx) + Por
-// posição/Matchups/Matriz — antes tudo empilhado numa rolagem só com
-// âncoras (SectionNav), o que deixava a aba "Preflop & Postflop" densa
-// demais. Agora são sub-abas de verdade (mesmo TabNav do resto do
-// produto): só uma seção na tela por vez, com crossfade ao trocar.
-export function PreflopTab({
+// Card de Preflop — antes vivia empilhado com Postflop/Posição/Matchups
+// numa rolagem só com âncoras (SectionNav), depois virou sub-aba dentro
+// de "Preflop & Postflop"; agora é uma aba de primeiro nível própria
+// (mesmo TabNav do resto do produto, um nível só), ver app/performance/page.tsx.
+export function PreflopPanel({
   rows,
   metrics,
-  byPosition,
-  postflopMetrics,
   referenceProfile,
 }: {
   rows: AnalysisHandRow[];
   metrics: PreflopMetrics;
-  byPosition: PreflopMetricsByPosition[];
-  postflopMetrics: PostflopMetrics;
   referenceProfile: ReferenceProfile;
 }) {
-  const [subTab, setSubTab] = useState<SubTab>("preflop");
   const ref = PREFLOP_REFERENCE[referenceProfile];
-  // Maior volume primeiro — mais útil pra achar rápido onde a amostra é
-  // grande o suficiente pra confiar no número, em vez da ordem canônica
-  // UTG→BB (essa já está implícita no rótulo da posição).
-  const byPositionSorted = useMemo(() => [...byPosition].sort((a, b) => b.hands - a.hands), [byPosition]);
-  const matchups = useMemo(() => computeMatchupBreakdown(rows), [rows]);
-  const router = useRouter();
 
   // Tendência por bloco de mãos (ver computeMetricTrend) — só nos 4
   // headliners de preflop (faixa de destaque), pra não transformar toda a
@@ -74,20 +50,7 @@ export function PreflopTab({
   const stealTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePreflopMetrics(chunk).steal_pct), [rows]);
 
   return (
-    <div>
-      <TabNav value={subTab} onChange={setSubTab} options={SUB_TABS} />
-
-      <AnimatePresence mode="wait">
-        <motion.div
-          key={subTab}
-          initial={{ opacity: 0, y: 6 }}
-          animate={{ opacity: 1, y: 0 }}
-          exit={{ opacity: 0, y: -6 }}
-          transition={{ duration: 0.18, ease: "easeOut" }}
-          className="mt-4"
-        >
-          {subTab === "preflop" && (
-            <Painel
+    <Painel
               titulo="Frequências pré-flop"
               icone={<Target size={14} className="icon-glow text-training" />}
               action={
@@ -256,132 +219,105 @@ export function PreflopTab({
                 ]}
               />
             </Painel>
-          )}
+  );
+}
 
-          {subTab === "postflop" && <PostflopTab rows={rows} metrics={postflopMetrics} referenceProfile={referenceProfile} />}
+// Tabela "Por posição" — antes era sub-aba de "Preflop & Postflop", agora
+// é aba de primeiro nível própria (ver app/performance/page.tsx).
+export function PositionPanel({
+  rows,
+  byPosition,
+  referenceProfile,
+}: {
+  rows: AnalysisHandRow[];
+  byPosition: PreflopMetricsByPosition[];
+  referenceProfile: ReferenceProfile;
+}) {
+  const ref = PREFLOP_REFERENCE[referenceProfile];
+  const router = useRouter();
+  // Maior volume primeiro — mais útil pra achar rápido onde a amostra é
+  // grande o suficiente pra confiar no número, em vez da ordem canônica
+  // UTG→BB (essa já está implícita no rótulo da posição).
+  const byPositionSorted = useMemo(() => [...byPosition].sort((a, b) => b.hands - a.hands), [byPosition]);
 
-          {subTab === "posicao" && (
-            <Painel
-              titulo="Por posição"
-              icone={<MapPin size={14} className="icon-glow text-evolution" />}
-              action={<ReferenceProfileBadge profile={referenceProfile} />}
-            >
-              {byPosition.length === 0 ? (
-                <EmptyState texto="Sem mãos suficientes com posição identificada." />
-              ) : (
-                <div className="overflow-x-auto rounded-lg border border-hairline">
-                  <table className="w-full text-sm">
-                    <thead>
-                      <tr className="border-b border-hairline">
-                        {["Posição", "VPIP", "PFR", "PFR : VPIP", "3-Bet", "Steal", "Mãos", ""].map((h) => (
-                          <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">
-                            {h}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {byPositionSorted.map((p, i) => {
-                        const ratio = p.vpip_pct && p.vpip_pct > 0 && p.pfr_pct !== null ? Math.round((p.pfr_pct / p.vpip_pct) * 100) : null;
-                        return (
-                          <tr
-                            key={p.position}
-                            onClick={() =>
-                              router.push(
-                                revisorHandsHref(
-                                  rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
-                                  `Posição ${p.position}`
-                                )
-                              )
-                            }
-                            className={`cursor-pointer bg-elevated/0 transition-colors hover:bg-elevated ${
-                              i < byPositionSorted.length - 1 ? "border-b border-hairline" : ""
-                            }`}
-                          >
-                            <td className="px-4 py-3">
-                              <span className="inline-flex h-6 min-w-6 items-center justify-center rounded bg-elevated px-1.5 text-[11px] font-bold text-ink">
-                                {p.position}
-                              </span>
-                            </td>
-                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneTextClass(toneFromRange(p.vpip_pct, ref.vpip.min, ref.vpip.max))}`}>
-                              {fmtPct(p.vpip_pct) ?? "—"}
-                            </td>
-                            <td className={`px-4 py-3 font-semibold tabular-nums ${toneTextClass(toneFromRange(p.pfr_pct, ref.pfr.min, ref.pfr.max))}`}>
-                              {fmtPct(p.pfr_pct) ?? "—"}
-                            </td>
-                            <td className="px-4 py-3">
-                              {ratio !== null ? (
-                                <div className="flex items-center gap-2">
-                                  <div className="h-1 w-14 rounded-full bg-void/40">
-                                    <div className="h-full rounded-full bg-training" style={{ width: `${Math.min(100, ratio)}%` }} />
-                                  </div>
-                                  <span className="text-[11px] tabular-nums text-muted">{ratio}%</span>
-                                </div>
-                              ) : (
-                                <span className="text-muted/50">—</span>
-                              )}
-                            </td>
-                            <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{fmtPct(p.three_bet_pct) ?? "—"}</td>
-                            <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{fmtPct(p.steal_pct) ?? "—"}</td>
-                            <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{p.hands}</td>
-                            <td className="px-4 py-3">
-                              <ArrowUpRight size={13} className="text-muted" />
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
-              )}
-              <p className="mt-3 text-[11px] text-muted/70">
-                PFR : VPIP é quanto do seu VPIP virou raise — quanto mais perto de 100%, menos você entra só de call. Clique numa
-                posição pra abrir essas mãos no Revisor.
-              </p>
-            </Painel>
-          )}
-
-          {subTab === "matchups" && (
-            <Painel titulo="Matchups" icone={<Shuffle size={14} className="icon-glow text-review" />}>
-              {matchups.length === 0 ? (
-                <EmptyState texto="Nenhum matchup heads-up até o flop identificado ainda — só entra aqui quando o pot fica você-vs-um-adversário até o flop." />
-              ) : (
-                <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4">
-                  {matchups.map((m) => (
-                    <button
-                      key={m.matchup}
-                      type="button"
-                      onClick={() =>
-                        router.push(
-                          revisorHandsHref(
-                            rows.filter((r) => r.matchup === m.matchup).map((r) => r.handReviewId),
-                            `Matchup ${m.matchup.replace("_vs_", " vs ")}`
-                          )
+  return (
+    <Painel
+      titulo="Por posição"
+      icone={<MapPin size={14} className="icon-glow text-evolution" />}
+      action={<ReferenceProfileBadge profile={referenceProfile} />}
+    >
+      {byPosition.length === 0 ? (
+        <EmptyState texto="Sem mãos suficientes com posição identificada." />
+      ) : (
+        <div className="overflow-x-auto rounded-lg border border-hairline">
+          <table className="w-full text-sm">
+            <thead>
+              <tr className="border-b border-hairline">
+                {["Posição", "VPIP", "PFR", "PFR : VPIP", "3-Bet", "Steal", "Mãos", ""].map((h) => (
+                  <th key={h} className="px-4 py-2.5 text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">
+                    {h}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {byPositionSorted.map((p, i) => {
+                const ratio = p.vpip_pct && p.vpip_pct > 0 && p.pfr_pct !== null ? Math.round((p.pfr_pct / p.vpip_pct) * 100) : null;
+                return (
+                  <tr
+                    key={p.position}
+                    onClick={() =>
+                      router.push(
+                        revisorHandsHref(
+                          rows.filter((r) => r.heroPosition === p.position).map((r) => r.handReviewId),
+                          `Posição ${p.position}`
                         )
-                      }
-                      className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/40"
-                    >
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="text-sm font-bold text-ink">{m.matchup.replace("_vs_", " vs ")}</span>
-                        <ArrowUpRight size={13} className="shrink-0 text-muted" />
-                      </div>
-                      <p className="mt-0.5 text-[11px] text-muted">{m.hands} {m.hands === 1 ? "mão" : "mãos"}</p>
-                      <p className="mt-2.5 text-[11px] text-muted">
-                        VPIP <b className="text-ink">{fmtPct(m.vpip_pct) ?? "—"}</b>
-                      </p>
-                    </button>
-                  ))}
-                </div>
-              )}
-              <p className="mt-3 text-[11px] leading-relaxed text-muted/70">
-                Só cobre pots que ficaram heads-up (você contra um adversário) até o flop — é a única situação em que o motor
-                identifica os dois lados do confronto com segurança. Clique num matchup pra abrir essas mãos no Revisor.
-              </p>
-            </Painel>
-          )}
-
-        </motion.div>
-      </AnimatePresence>
-    </div>
+                      )
+                    }
+                    className={`cursor-pointer bg-elevated/0 transition-colors hover:bg-elevated ${
+                      i < byPositionSorted.length - 1 ? "border-b border-hairline" : ""
+                    }`}
+                  >
+                    <td className="px-4 py-3">
+                      <span className="inline-flex h-6 min-w-6 items-center justify-center rounded bg-elevated px-1.5 text-[11px] font-bold text-ink">
+                        {p.position}
+                      </span>
+                    </td>
+                    <td className={`px-4 py-3 font-semibold tabular-nums ${toneTextClass(toneFromRange(p.vpip_pct, ref.vpip.min, ref.vpip.max))}`}>
+                      {fmtPct(p.vpip_pct) ?? "—"}
+                    </td>
+                    <td className={`px-4 py-3 font-semibold tabular-nums ${toneTextClass(toneFromRange(p.pfr_pct, ref.pfr.min, ref.pfr.max))}`}>
+                      {fmtPct(p.pfr_pct) ?? "—"}
+                    </td>
+                    <td className="px-4 py-3">
+                      {ratio !== null ? (
+                        <div className="flex items-center gap-2">
+                          <div className="h-1 w-14 rounded-full bg-void/40">
+                            <div className="h-full rounded-full bg-training" style={{ width: `${Math.min(100, ratio)}%` }} />
+                          </div>
+                          <span className="text-[11px] tabular-nums text-muted">{ratio}%</span>
+                        </div>
+                      ) : (
+                        <span className="text-muted/50">—</span>
+                      )}
+                    </td>
+                    <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{fmtPct(p.three_bet_pct) ?? "—"}</td>
+                    <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{fmtPct(p.steal_pct) ?? "—"}</td>
+                    <td className="px-4 py-3 text-[13px] tabular-nums text-muted">{p.hands}</td>
+                    <td className="px-4 py-3">
+                      <ArrowUpRight size={13} className="text-muted" />
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <p className="mt-3 text-[11px] text-muted/70">
+        PFR : VPIP é quanto do seu VPIP virou raise — quanto mais perto de 100%, menos você entra só de call. Clique numa
+        posição pra abrir essas mãos no Revisor.
+      </p>
+    </Painel>
   );
 }
