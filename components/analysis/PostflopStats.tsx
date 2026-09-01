@@ -63,12 +63,22 @@ export function PostflopTab({
       }
     >
       <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
+        {/* Todas as métricas de postflop que têm faixa de referência entram
+            no score — não só os 4 headliners de cima. Check-Raise% fica de
+            fora: sem faixa "ideal", sem como participar do score. */}
         <HealthGauge
           items={[
             { value: metrics.cbet_flop_pct, min: ref.cbetFlop.min, max: ref.cbetFlop.max },
             { value: metrics.fold_to_cbet_flop_pct, min: ref.foldToCbetFlop.min, max: ref.foldToCbetFlop.max },
             { value: metrics.aggression_factor, min: ref.aggFactor.min, max: ref.aggFactor.max },
             { value: metrics.aggression_frequency_pct, min: ref.aggFreq.min, max: ref.aggFreq.max },
+            { value: metrics.cbet_turn_pct, min: ref.cbetTurn.min, max: ref.cbetTurn.max },
+            { value: metrics.cbet_river_pct, min: ref.cbetRiver.min, max: ref.cbetRiver.max },
+            { value: metrics.fold_to_cbet_turn_pct, min: ref.foldToCbetTurn.min, max: ref.foldToCbetTurn.max },
+            { value: metrics.fold_to_cbet_river_pct, min: ref.foldToCbetRiver.min, max: ref.foldToCbetRiver.max },
+            { value: metrics.donk_bet_pct, min: ref.donkBet.min, max: ref.donkBet.max },
+            { value: metrics.wsd_pct, min: ref.wsd.min, max: ref.wsd.max },
+            { value: metrics.wsd_won_pct, min: ref.wsdWon.min, max: ref.wsdWon.max },
           ]}
         />
         <HeroStrip

@@ -98,12 +98,20 @@ export function PreflopTab({
               }
             >
               <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
+                {/* Todas as métricas de preflop que têm faixa de referência
+                    entram no score — não só os 4 headliners de cima. As sem
+                    faixa (4-Bet%, Squeeze%, Limp-Fold%, Open Push% etc.) não
+                    têm como participar: não existe "dentro/fora" pra elas. */}
                 <HealthGauge
                   items={[
                     { value: metrics.vpip_pct, min: ref.vpip.min, max: ref.vpip.max },
                     { value: metrics.pfr_pct, min: ref.pfr.min, max: ref.pfr.max },
                     { value: metrics.three_bet_pct, min: ref.threeBet.min, max: ref.threeBet.max },
                     { value: metrics.steal_pct, min: ref.steal.min, max: ref.steal.max },
+                    { value: metrics.fold_to_3bet_pct, min: ref.foldTo3bet.min, max: ref.foldTo3bet.max },
+                    { value: metrics.fold_to_steal_sb_vs_btn_pct, min: ref.foldToSteal.min, max: ref.foldToSteal.max },
+                    { value: metrics.fold_to_steal_bb_vs_btn_pct, min: ref.foldToSteal.min, max: ref.foldToSteal.max },
+                    { value: metrics.fold_to_steal_bb_vs_sb_pct, min: ref.foldToSteal.min, max: ref.foldToSteal.max },
                   ]}
                 />
                 <HeroStrip
