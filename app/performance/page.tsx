@@ -2,26 +2,27 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Grid3x3, Trophy, AlertTriangle } from "lucide-react";
+import { Target, Flame, BarChart3, MapPin } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { TabNav } from "@/components/ui/tab-nav";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
-import { PreflopTab } from "@/components/analysis/PreflopMatrix";
-import { TournamentTab } from "@/components/analysis/TournamentTab";
-import { LeakFinderTab } from "@/components/analysis/LeakFinderTab";
+import { PreflopPanel, PositionPanel } from "@/components/analysis/PreflopMatrix";
+import { PostflopTab } from "@/components/analysis/PostflopStats";
+import { StatisticsTab } from "@/components/analysis/StatisticsTab";
 import {
   fetchAnalysisHandRows,
   applyAnalysisFilters,
   computePreflopMetrics,
   computePreflopByPosition,
   computePostflopMetrics,
-  computeLeaks,
   computeReferenceProfile,
   buyinBucketOf,
   fetchTournamentMetrics,
   fetchTournamentSessions,
+  fetchFinancialDaySeries,
 } from "@/lib/services/analysis-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
+import type { FinancialDay } from "@/lib/services/team-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import {
   EMPTY_ANALYSIS_FILTERS,
@@ -34,12 +35,13 @@ import {
   type BuyinBucket,
 } from "@/types/analysis";
 
-type TabKey = "preflop" | "tournament" | "leaks";
+type TabKey = "preflop" | "postflop" | "estatisticas" | "posicao";
 
-const TABS: { value: TabKey; label: string; icon: typeof Grid3x3 }[] = [
-  { value: "preflop", label: "Preflop & Postflop", icon: Grid3x3 },
-  { value: "tournament", label: "Torneios", icon: Trophy },
-  { value: "leaks", label: "Leak Finder", icon: AlertTriangle },
+const TABS: { value: TabKey; label: string; icon: typeof Target }[] = [
+  { value: "preflop", label: "Preflop", icon: Target },
+  { value: "postflop", label: "Postflop", icon: Flame },
+  { value: "estatisticas", label: "Estatísticas", icon: BarChart3 },
+  { value: "posicao", label: "Por posição", icon: MapPin },
 ];
 
 export default function PerformancePage() {
@@ -47,30 +49,33 @@ export default function PerformancePage() {
   const [tournament, setTournament] = useState<TournamentMetrics | null>(null);
   const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
   const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
+  const [financialSeries, setFinancialSeries] = useState<FinancialDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("preflop");
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
   const [focusPendingPayout, setFocusPendingPayout] = useState(false);
-  // Filtro de buy-in — só afeta a aba Torneios (Total Games/ROI/ITM/Lucro
-  // total, que vêm de bankroll_sessions; cEV/ICM não têm buy-in associado,
-  // ver comentário em fetchTournamentMetrics), por isso vive separado do
-  // `filters` de cima (que filtra mãos preflop/postflop/leaks).
+  // Filtro de buy-in — só afeta a aba Estatísticas (Total Games/ROI/ITM/
+  // Lucro total, que vêm de bankroll_sessions; cEV/ICM não têm buy-in
+  // associado, ver comentário em fetchTournamentMetrics), por isso vive
+  // separado do `filters` de cima (que filtra mãos preflop/postflop).
   const [tournamentBuyinFilter, setTournamentBuyinFilter] = useState<BuyinBucket[]>([]);
 
   async function loadAll() {
     setErro("");
     try {
-      const [r, tourn, sessions, po] = await Promise.all([
+      const [r, tourn, sessions, po, fs] = await Promise.all([
         fetchAnalysisHandRows(),
         fetchTournamentMetrics(tournamentBuyinFilter),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
+        fetchFinancialDaySeries(),
       ]);
       setRows(r);
       setTournament(tourn);
       setTournamentSessions(sessions);
       setPayouts(po);
+      setFinancialSeries(fs);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar a análise.");
     } finally {
@@ -114,14 +119,6 @@ export default function PerformancePage() {
   // cada métrica muda com isso, então o perfil de referência segue o
   // formato predominante nas mãos já filtradas (ver computeReferenceProfile).
   const referenceProfile = useMemo(() => computeReferenceProfile(filteredRows), [filteredRows]);
-  const leaks = useMemo(() => computeLeaks(preflop, postflop, referenceProfile), [preflop, postflop, referenceProfile]);
-
-  // Badge de leaks na própria aba — antes só descobria clicando em Leak
-  // Finder; o número já existe (computeLeaks), só faltava subir pro TabNav.
-  const tabsWithBadge = useMemo(
-    () => TABS.map((t) => (t.value === "leaks" ? { ...t, badge: leaks.length } : t)),
-    [leaks.length]
-  );
 
   const availableFormats = useMemo(() => new Set(rows.map((r) => r.format).filter((f): f is GameFormat => f !== null)), [rows]);
   const availableStackDepths = useMemo(
@@ -162,12 +159,12 @@ export default function PerformancePage() {
               availablePositions={availablePositions}
               onImported={loadAll}
               onSelectTournamentImport={() => {
-                setTab("tournament");
+                setTab("estatisticas");
                 setFocusPendingPayout(true);
               }}
             />
 
-            <TabNav className="mt-4" value={tab} onChange={setTab} options={tabsWithBadge} />
+            <TabNav className="mt-4" value={tab} onChange={setTab} options={TABS} />
 
             <div className="mt-4">
               {rows.length === 0 ? (
@@ -184,18 +181,13 @@ export default function PerformancePage() {
                     exit={{ opacity: 0, y: -6 }}
                     transition={{ duration: 0.18, ease: "easeOut" }}
                   >
-                    {tab === "preflop" && (
-                      <PreflopTab
-                        rows={filteredRows}
-                        metrics={preflop}
-                        byPosition={byPosition}
-                        postflopMetrics={postflop}
-                        referenceProfile={referenceProfile}
-                      />
-                    )}
-                    {tab === "tournament" && tournament && (
-                      <TournamentTab
+                    {tab === "preflop" && <PreflopPanel rows={filteredRows} metrics={preflop} referenceProfile={referenceProfile} />}
+                    {tab === "postflop" && <PostflopTab rows={filteredRows} metrics={postflop} referenceProfile={referenceProfile} />}
+                    {tab === "posicao" && <PositionPanel rows={filteredRows} byPosition={byPosition} referenceProfile={referenceProfile} />}
+                    {tab === "estatisticas" && tournament && (
+                      <StatisticsTab
                         metrics={tournament}
+                        financialSeries={financialSeries}
                         tournamentSessions={tournamentSessions}
                         payouts={payouts}
                         onPayoutsChanged={reloadPayouts}
@@ -207,7 +199,6 @@ export default function PerformancePage() {
                         availableBuyinBuckets={availableBuyinBuckets}
                       />
                     )}
-                    {tab === "leaks" && <LeakFinderTab rows={filteredRows} leaks={leaks} />}
                   </motion.div>
                 </AnimatePresence>
               )}

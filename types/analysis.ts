@@ -188,6 +188,21 @@ export interface TournamentMetrics {
   roi_pct: number | null;
   itm_pct: number | null;
   total_profit: number | null;
+  total_invested: number | null; // soma de buy-in + re-entries
+  total_cashout: number | null; // soma de tudo que voltou (premiação)
+  since: string | null; // ISO date do primeiro torneio registrado
+  until: string | null; // ISO date do torneio mais recente
+  avg_profit_per_game: number | null;
+  avg_buyin: number | null; // médio, sem contar re-entries
+  avg_roi_pct: number | null; // média do ROI de cada torneio (não o ROI agregado)
+  active_days: number; // dias distintos com pelo menos 1 torneio
+  games_per_day: number | null; // total_games / active_days
+  busiest_day_count: number; // mais torneios feitos num único dia
+  days_won: number; // dias com resultado líquido positivo em torneio
+  days_lost: number; // dias com resultado líquido negativo em torneio
+  days_flat: number; // dias com resultado líquido zero
+  max_win_streak: number; // maior sequência de dias seguidos ganhando
+  max_lose_streak: number; // maior sequência de dias seguidos perdendo
   net_ev_profit: number | null; // lucro esperado (all-in EV)
   chip_ev_total: number | null; // cEV acumulado, em chips
   cev_per_game: number | null;
@@ -214,35 +229,6 @@ export interface PayoutStructureRow {
   payoutAmount: number | null;
 }
 
-
-// ------------------------------------------------------------------
-// Leak Finder & Replayer
-// ------------------------------------------------------------------
-export type LeakSeverity = "critical" | "warning" | "info";
-export type LeakCategory = "preflop" | "postflop" | "tournament" | "mental";
-
-export interface Leak {
-  id: string;
-  title: string;
-  description: string;
-  metricValue: number | null;
-  benchmarkRange: { min: number; max: number } | null;
-  severity: LeakSeverity;
-  category: LeakCategory;
-  sampleSize: number;
-  estimatedCostBB: number | null; // custo estimado do leak, em bb/100 ou bb total
-}
-
-export interface LeakHandForReview {
-  handId: string;
-  playedAt: string; // ISO
-  format: GameFormat;
-  position: HeroPosition | null;
-  street: "preflop" | "flop" | "turn" | "river";
-  potBB: number | null;
-  netResultBB: number | null;
-  leakTags: string[];
-}
 
 // ------------------------------------------------------------------
 // Gráfico principal — Net Won / All-in EV / Volume
