@@ -2,9 +2,9 @@
 
 import { useMemo } from "react";
 import { Flame, Target, CornerUpLeft, Repeat, Zap, Eye, Trophy } from "lucide-react";
-import { Painel, StatCardGrid, HeroStrip, SubHeader, SampleBadge, toneFromRange, statBar } from "@/components/analysis/shared";
-import { computePostflopMetrics, computeMetricTrend } from "@/lib/services/analysis-service";
-import type { AnalysisHandRow, PostflopMetrics } from "@/types/analysis";
+import { Painel, StatCardGrid, HeroStrip, SubHeader, SampleBadge, ReferenceProfileBadge, toneFromRange, statBar } from "@/components/analysis/shared";
+import { computePostflopMetrics, computeMetricTrend, POSTFLOP_REFERENCE } from "@/lib/services/analysis-service";
+import type { AnalysisHandRow, PostflopMetrics, ReferenceProfile } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
@@ -16,7 +16,16 @@ function fmtRatio(v: number | null): string | null {
 
 // Segundo card da aba Preflop & Postflop — mesma faixa de destaque +
 // lista do card de preflop, pra ficar visualmente um par.
-export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metrics: PostflopMetrics }) {
+export function PostflopTab({
+  rows,
+  metrics,
+  referenceProfile,
+}: {
+  rows: AnalysisHandRow[];
+  metrics: PostflopMetrics;
+  referenceProfile: ReferenceProfile;
+}) {
+  const ref = POSTFLOP_REFERENCE[referenceProfile];
   // Tendência dos 4 headliners (faixa de destaque) — mesmo critério de
   // "não virar gráfico" do card de preflop.
   const cbetFlopTrend = useMemo(() => computeMetricTrend(rows, (chunk) => computePostflopMetrics(chunk).cbet_flop_pct), [rows]);
@@ -34,40 +43,45 @@ export function PostflopTab({ rows, metrics }: { rows: AnalysisHandRow[]; metric
     <Painel
       titulo="Tendências pós-flop"
       icone={<Flame size={14} className="icon-glow text-training" />}
-      action={<SampleBadge hands={metrics.hands} />}
+      action={
+        <div className="flex items-center gap-2">
+          <ReferenceProfileBadge profile={referenceProfile} />
+          <SampleBadge hands={metrics.hands} />
+        </div>
+      }
     >
       <HeroStrip
         items={[
           {
             label: "Flop C-Bet %",
             value: fmtPct(metrics.cbet_flop_pct),
-            tone: toneFromRange(metrics.cbet_flop_pct, 55, 75),
+            tone: toneFromRange(metrics.cbet_flop_pct, ref.cbetFlop.min, ref.cbetFlop.max),
             trend: cbetFlopTrend,
-            bar: statBar(metrics.cbet_flop_pct, 55, 75, 100),
+            bar: statBar(metrics.cbet_flop_pct, ref.cbetFlop.min, ref.cbetFlop.max, 100),
             hint: "Frequência de apostar no flop quando você foi o último agressor no preflop.",
           },
           {
             label: "Fold to Flop C-Bet %",
             value: fmtPct(metrics.fold_to_cbet_flop_pct),
-            tone: toneFromRange(metrics.fold_to_cbet_flop_pct, 40, 55),
+            tone: toneFromRange(metrics.fold_to_cbet_flop_pct, ref.foldToCbetFlop.min, ref.foldToCbetFlop.max),
             trend: foldCbetFlopTrend,
-            bar: statBar(metrics.fold_to_cbet_flop_pct, 40, 55, 100),
+            bar: statBar(metrics.fold_to_cbet_flop_pct, ref.foldToCbetFlop.min, ref.foldToCbetFlop.max, 100),
             hint: "Frequência que você desiste diante de um c-bet de flop adversário.",
           },
           {
             label: "Aggression Factor",
             value: fmtRatio(metrics.aggression_factor),
-            tone: toneFromRange(metrics.aggression_factor, 2, 4),
+            tone: toneFromRange(metrics.aggression_factor, ref.aggFactor.min, ref.aggFactor.max),
             trend: aggFactorTrend,
-            bar: statBar(metrics.aggression_factor, 2, 4, 8, ""),
+            bar: statBar(metrics.aggression_factor, ref.aggFactor.min, ref.aggFactor.max, 8, ""),
             hint: "(Bet + Raise) / Call pós-flop — quão agressivo você é quando participa da mão.",
           },
           {
             label: "Aggression Freq. %",
             value: fmtPct(metrics.aggression_frequency_pct),
-            tone: toneFromRange(metrics.aggression_frequency_pct, 35, 50),
+            tone: toneFromRange(metrics.aggression_frequency_pct, ref.aggFreq.min, ref.aggFreq.max),
             trend: aggFreqTrend,
-            bar: statBar(metrics.aggression_frequency_pct, 35, 50, 100),
+            bar: statBar(metrics.aggression_frequency_pct, ref.aggFreq.min, ref.aggFreq.max, 100),
             hint: "% das suas ações pós-flop que são bet ou raise, em vez de call ou fold.",
           },
         ]}

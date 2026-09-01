@@ -4,11 +4,22 @@ import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { AnimatePresence, motion } from "framer-motion";
 import { Target, Flame, MapPin, Grid3x3, CornerUpLeft, Zap, Layers, ArrowUpRight, Shuffle } from "lucide-react";
-import { Painel, StatCardGrid, HeroStrip, SubHeader, EmptyState, SampleBadge, toneFromRange, statBar, revisorHandsHref } from "@/components/analysis/shared";
+import {
+  Painel,
+  StatCardGrid,
+  HeroStrip,
+  SubHeader,
+  EmptyState,
+  SampleBadge,
+  ReferenceProfileBadge,
+  toneFromRange,
+  statBar,
+  revisorHandsHref,
+} from "@/components/analysis/shared";
 import { TabNav } from "@/components/ui/tab-nav";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
-import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown } from "@/lib/services/analysis-service";
-import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics } from "@/types/analysis";
+import { computeHandMatrix, computePreflopMetrics, computeMetricTrend, computeMatchupBreakdown, PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
+import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, PostflopMetrics, ReferenceProfile } from "@/types/analysis";
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v.toFixed(1)}%`;
@@ -34,13 +45,16 @@ export function PreflopTab({
   metrics,
   byPosition,
   postflopMetrics,
+  referenceProfile,
 }: {
   rows: AnalysisHandRow[];
   metrics: PreflopMetrics;
   byPosition: PreflopMetricsByPosition[];
   postflopMetrics: PostflopMetrics;
+  referenceProfile: ReferenceProfile;
 }) {
   const [subTab, setSubTab] = useState<SubTab>("preflop");
+  const ref = PREFLOP_REFERENCE[referenceProfile];
   const matrix = useMemo(() => computeHandMatrix(rows), [rows]);
   // Maior volume primeiro — mais útil pra achar rápido onde a amostra é
   // grande o suficiente pra confiar no número, em vez da ordem canônica
@@ -71,39 +85,48 @@ export function PreflopTab({
           className="mt-4"
         >
           {subTab === "preflop" && (
-            <Painel titulo="Frequências pré-flop" icone={<Target size={14} className="icon-glow text-training" />} action={<SampleBadge hands={metrics.hands} />}>
+            <Painel
+              titulo="Frequências pré-flop"
+              icone={<Target size={14} className="icon-glow text-training" />}
+              action={
+                <div className="flex items-center gap-2">
+                  <ReferenceProfileBadge profile={referenceProfile} />
+                  <SampleBadge hands={metrics.hands} />
+                </div>
+              }
+            >
               <HeroStrip
                 items={[
                   {
                     label: "VPIP",
                     value: fmtPct(metrics.vpip_pct),
-                    tone: toneFromRange(metrics.vpip_pct, 20, 28),
+                    tone: toneFromRange(metrics.vpip_pct, ref.vpip.min, ref.vpip.max),
                     trend: vpipTrend,
-                    bar: statBar(metrics.vpip_pct, 20, 28, 100),
+                    bar: statBar(metrics.vpip_pct, ref.vpip.min, ref.vpip.max, 100),
                     hint: "Frequência que você entra na mão voluntariamente (call ou raise), sem contar blinds forçados.",
                   },
                   {
                     label: "PFR",
                     value: fmtPct(metrics.pfr_pct),
-                    tone: toneFromRange(metrics.pfr_pct, 15, 24),
+                    tone: toneFromRange(metrics.pfr_pct, ref.pfr.min, ref.pfr.max),
                     trend: pfrTrend,
-                    bar: statBar(metrics.pfr_pct, 15, 24, 100),
+                    bar: statBar(metrics.pfr_pct, ref.pfr.min, ref.pfr.max, 100),
                     hint: "Frequência que você sobe (raise) no preflop — está sempre dentro do VPIP.",
                   },
                   {
                     label: "3-Bet %",
                     value: fmtPct(metrics.three_bet_pct),
-                    tone: toneFromRange(metrics.three_bet_pct, 6, 10),
+                    tone: toneFromRange(metrics.three_bet_pct, ref.threeBet.min, ref.threeBet.max),
                     trend: threeBetTrend,
-                    bar: statBar(metrics.three_bet_pct, 6, 10, 100),
+                    bar: statBar(metrics.three_bet_pct, ref.threeBet.min, ref.threeBet.max, 100),
                     hint: "Frequência de re-raise no preflop diante de um raise anterior.",
                   },
                   {
                     label: "Steal %",
                     value: fmtPct(metrics.steal_pct),
-                    tone: toneFromRange(metrics.steal_pct, 35, 55),
+                    tone: toneFromRange(metrics.steal_pct, ref.steal.min, ref.steal.max),
                     trend: stealTrend,
-                    bar: statBar(metrics.steal_pct, 35, 55, 100),
+                    bar: statBar(metrics.steal_pct, ref.steal.min, ref.steal.max, 100),
                     hint: "Frequência de open-raise a partir de CO/BTN/SB quando a ação chega foldada até você.",
                   },
                 ]}
@@ -116,8 +139,8 @@ export function PreflopTab({
                     label: "Fold to 3-Bet %",
                     value: fmtPct(metrics.fold_to_3bet_pct),
                     icon: CornerUpLeft,
-                    tone: toneFromRange(metrics.fold_to_3bet_pct, 55, 65),
-                    bar: statBar(metrics.fold_to_3bet_pct, 55, 65, 100),
+                    tone: toneFromRange(metrics.fold_to_3bet_pct, ref.foldTo3bet.min, ref.foldTo3bet.max),
+                    bar: statBar(metrics.fold_to_3bet_pct, ref.foldTo3bet.min, ref.foldTo3bet.max, 100),
                     hint: "Frequência que você desiste depois de ser 3-betado, quando você tinha aberto o pote.",
                   },
                   { label: "4-Bet %", value: fmtPct(metrics.four_bet_pct), icon: Zap, hint: "Frequência de re-raise diante de um 3-bet adversário." },
@@ -166,7 +189,7 @@ export function PreflopTab({
             </Painel>
           )}
 
-          {subTab === "postflop" && <PostflopTab rows={rows} metrics={postflopMetrics} />}
+          {subTab === "postflop" && <PostflopTab rows={rows} metrics={postflopMetrics} referenceProfile={referenceProfile} />}
 
           {subTab === "posicao" && (
             <Painel titulo="Por posição" icone={<MapPin size={14} className="icon-glow text-evolution" />}>

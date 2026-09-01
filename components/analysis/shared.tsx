@@ -3,6 +3,7 @@
 import { useId } from "react";
 import { motion } from "framer-motion";
 import { Lock, type LucideIcon } from "lucide-react";
+import { REFERENCE_PROFILE_LABEL, type ReferenceProfile } from "@/types/analysis";
 
 // Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
 // (rounded-xl border-hairline bg-surface) que app/performance/page.tsx já
@@ -310,6 +311,20 @@ export function SampleBadge({ hands }: { hands: number }) {
   return (
     <span className="text-[10.5px] font-semibold text-muted/70">
       {hands} {hands === 1 ? "mão" : "mãos"}
+    </span>
+  );
+}
+
+// Transparência sobre de onde vem a faixa "ideal" mostrada nos cards —
+// escolhida automaticamente pelo formato predominante nas mãos filtradas
+// (ver computeReferenceProfile em analysis-service.ts), nunca à mão.
+export function ReferenceProfileBadge({ profile }: { profile: ReferenceProfile }) {
+  return (
+    <span
+      className="rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted/70"
+      title="Perfil de referência usado nas faixas ideais desta tela — escolhido automaticamente pelo formato predominante nas mãos filtradas."
+    >
+      ref. {REFERENCE_PROFILE_LABEL[profile]}
     </span>
   );
 }

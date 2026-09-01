@@ -18,9 +18,74 @@ import {
   type Leak,
   type LeakHandForReview,
   type TournamentMetrics,
+  type ReferenceProfile,
   HERO_POSITION_ORDER,
   PREFLOP_ACTION_TO_POT_TYPE,
 } from "@/types/analysis";
+
+// ============================================================
+// Faixas de referência (heurística de população, não output do motor
+// GTO) — duas mesas diferentes, dois perfis diferentes. MTT joga cheio
+// (8-9 handed) até encurtar nas fases finais, então frequências
+// preflop/postflop saudáveis são mais apertadas que num 6-max de cash
+// (menos jogadores atrás = menos gente pra 3-bet/roubar/vs. c-bet).
+// Fonte: consenso comum de HUD (HM3/PT4/GTO Wizard population stats),
+// mesmo espírito de "contexto, não veredito" do resto do produto —
+// nunca um número saído do solver.
+// ============================================================
+export type MetricRange = { min: number; max: number };
+
+export const PREFLOP_REFERENCE: Record<
+  ReferenceProfile,
+  { vpip: MetricRange; pfr: MetricRange; threeBet: MetricRange; steal: MetricRange; foldTo3bet: MetricRange }
+> = {
+  cash6max: {
+    vpip: { min: 20, max: 28 },
+    pfr: { min: 15, max: 24 },
+    threeBet: { min: 6, max: 10 },
+    steal: { min: 35, max: 55 },
+    foldTo3bet: { min: 55, max: 65 },
+  },
+  mtt8max: {
+    vpip: { min: 14, max: 20 },
+    pfr: { min: 11, max: 17 },
+    threeBet: { min: 4, max: 7 },
+    steal: { min: 30, max: 45 },
+    foldTo3bet: { min: 60, max: 70 },
+  },
+};
+
+export const POSTFLOP_REFERENCE: Record<
+  ReferenceProfile,
+  { cbetFlop: MetricRange; foldToCbetFlop: MetricRange; aggFactor: MetricRange; aggFreq: MetricRange }
+> = {
+  cash6max: {
+    cbetFlop: { min: 55, max: 75 },
+    foldToCbetFlop: { min: 40, max: 55 },
+    aggFactor: { min: 2, max: 4 },
+    aggFreq: { min: 35, max: 50 },
+  },
+  mtt8max: {
+    cbetFlop: { min: 50, max: 70 },
+    foldToCbetFlop: { min: 45, max: 60 },
+    aggFactor: { min: 1.5, max: 3.5 },
+    aggFreq: { min: 30, max: 45 },
+  },
+};
+
+// Perfil de referência a partir do formato predominante nas mãos já
+// filtradas — maioria "mtt" usa a faixa de torneio 8-max; qualquer
+// outra maioria (cash/spin/sng) ou base sem formato dominante fica no
+// perfil cash 6-max, que já era a única faixa que o produto tinha.
+export function computeReferenceProfile(rows: AnalysisHandRow[]): ReferenceProfile {
+  let mtt = 0;
+  let other = 0;
+  for (const r of rows) {
+    if (r.format === "mtt") mtt++;
+    else if (r.format !== null) other++;
+  }
+  return mtt > other ? "mtt8max" : "cash6max";
+}
 
 // ============================================================
 // Fonte crua: hand_tags (uma linha por mão, já classificada pelo trigger
@@ -355,89 +420,106 @@ export function computeHandMatrix(rows: AnalysisHandRow[]): HandCell[] {
 // ============================================================
 // Leak Finder
 // ============================================================
-// Faixas de referência (mesmo espírito do REF em performance-service.ts):
-// contexto, não veredito — variam por formato/mesa e nunca viram "erro"
-// sozinhas, só entram como leak quando a amostra já é razoável.
+// Faixa de cada leak vem de PREFLOP_REFERENCE/POSTFLOP_REFERENCE (mesma
+// faixa mostrada nos cards de Preflop/Postflop) em vez de números soltos
+// aqui — assim o leak dispara exatamente quando o card já pintou de
+// vermelho/âmbar, sem um segundo padrão "invisível" só pro alerta, e
+// escala junto com o perfil (cash 6-max vs MTT 8-max, ver
+// computeReferenceProfile). `direction` decide se o leak é "abaixo do
+// mínimo" ou "acima do máximo" da faixa.
 const LEAK_THRESHOLDS: {
   id: string;
   title: string;
   category: Leak["category"];
   metric: (pf: PreflopMetrics, po: PostflopMetrics) => number | null;
-  min?: number;
-  max?: number;
+  range: (profile: ReferenceProfile) => MetricRange;
+  direction: "low" | "high";
   minSample: number;
   sample: (pf: PreflopMetrics, po: PostflopMetrics) => number;
-  describe: (v: number) => string;
+  describe: (v: number, range: MetricRange) => string;
 }[] = [
   {
     id: "low-cbet-flop",
     title: "C-Bet Flop muito baixo",
     category: "postflop",
     metric: (_pf, po) => po.cbet_flop_pct,
-    min: 45,
+    range: (p) => POSTFLOP_REFERENCE[p].cbetFlop,
+    direction: "low",
     minSample: 15,
     sample: (_pf, po) => po.hands,
-    describe: (v) => `Você faz c-bet no flop em apenas ${v}% das vezes como agressor pré-flop — abaixo do comum (55–75%). Está deixando fold equity na mesa.`,
+    describe: (v, r) =>
+      `Você faz c-bet no flop em apenas ${v}% das vezes como agressor pré-flop — abaixo da faixa comum (${r.min}–${r.max}%). Está deixando fold equity na mesa.`,
   },
   {
     id: "high-fold-cbet-flop",
     title: "Fold to C-Bet Flop muito alto",
     category: "postflop",
     metric: (_pf, po) => po.fold_to_cbet_flop_pct,
-    max: 65,
+    range: (p) => POSTFLOP_REFERENCE[p].foldToCbetFlop,
+    direction: "high",
     minSample: 10,
     sample: (_pf, po) => po.hands,
-    describe: (v) => `Você foldou ${v}% das vezes que enfrentou c-bet no flop — acima do comum (40–60%). Pode estar sendo explorado por barrels leves.`,
+    describe: (v, r) =>
+      `Você foldou ${v}% das vezes que enfrentou c-bet no flop — acima da faixa comum (${r.min}–${r.max}%). Pode estar sendo explorado por barrels leves.`,
   },
   {
     id: "low-3bet",
     title: "3-Bet % muito baixo",
     category: "preflop",
     metric: (pf) => pf.three_bet_pct,
-    min: 4,
+    range: (p) => PREFLOP_REFERENCE[p].threeBet,
+    direction: "low",
     minSample: 40,
     sample: (pf) => pf.hands,
-    describe: (v) => `Sua taxa de 3-bet está em ${v}% — abaixo da faixa comum (5–10%). Range preflop provavelmente passivo demais.`,
+    describe: (v, r) => `Sua taxa de 3-bet está em ${v}% — abaixo da faixa comum (${r.min}–${r.max}%). Range preflop provavelmente passivo demais.`,
   },
   {
     id: "high-fold-3bet",
     title: "Fold to 3-Bet muito alto",
     category: "preflop",
     metric: (pf) => pf.fold_to_3bet_pct,
-    max: 65,
+    range: (p) => PREFLOP_REFERENCE[p].foldTo3bet,
+    direction: "high",
     minSample: 8,
     sample: (pf) => pf.hands,
-    describe: (v) => `Você foldou para 3-bet em ${v}% das vezes — acima do comum (35–55%). Está aberto para squeeze e 3-bet bluff.`,
+    describe: (v, r) => `Você foldou para 3-bet em ${v}% das vezes — acima da faixa comum (${r.min}–${r.max}%). Está aberto para squeeze e 3-bet bluff.`,
   },
   {
     id: "low-steal",
     title: "Steal % muito baixo",
     category: "preflop",
     metric: (pf) => pf.steal_pct,
-    min: 25,
+    range: (p) => PREFLOP_REFERENCE[p].steal,
+    direction: "low",
     minSample: 20,
     sample: (pf) => pf.hands,
-    describe: (v) => `Você tenta roubar o pote em apenas ${v}% das suas chances (CO/BTN/SB) — abaixo do comum (35–55%). Está deixando dinheiro fácil na mesa.`,
+    describe: (v, r) =>
+      `Você tenta roubar o pote em apenas ${v}% das suas chances (CO/BTN/SB) — abaixo da faixa comum (${r.min}–${r.max}%). Está deixando dinheiro fácil na mesa.`,
   },
 ];
 
-export function computeLeaks(preflop: PreflopMetrics, postflop: PostflopMetrics): Leak[] {
+export function computeLeaks(preflop: PreflopMetrics, postflop: PostflopMetrics, profile: ReferenceProfile): Leak[] {
   const leaks: Leak[] = [];
   for (const t of LEAK_THRESHOLDS) {
     const value = t.metric(preflop, postflop);
     const sample = t.sample(preflop, postflop);
     if (value === null || sample < t.minSample) continue;
-    const below = t.min !== undefined && value < t.min;
-    const above = t.max !== undefined && value > t.max;
+    const range = t.range(profile);
+    const below = t.direction === "low" && value < range.min;
+    const above = t.direction === "high" && value > range.max;
     if (!below && !above) continue;
+    // Severidade proporcional à largura da própria faixa (não um offset
+    // fixo em pp) — assim escala igual pro perfil MTT 8-max, que tem
+    // faixas mais estreitas que o cash 6-max.
+    const span = range.max - range.min || 1;
     const severity: Leak["severity"] =
-      (below && value < t.min! - 8) || (above && value > t.max! + 15) ? "critical" : "warning";
+      (below && value < range.min - span * 0.6) || (above && value > range.max + span) ? "critical" : "warning";
     leaks.push({
       id: t.id,
       title: t.title,
-      description: t.describe(value),
+      description: t.describe(value, range),
       metricValue: value,
-      benchmarkRange: t.min !== undefined || t.max !== undefined ? { min: t.min ?? 0, max: t.max ?? 100 } : null,
+      benchmarkRange: range,
       severity,
       category: t.category,
       sampleSize: sample,
