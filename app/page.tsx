@@ -6,10 +6,18 @@ import { createClient } from "@/lib/supabase/server";
 // (placeholder do bootstrap do projeto), que ficou exposta no dominio
 // principal depois do corte de DNS.
 export default async function Home() {
-  const supabase = await createClient();
-  const {
-    data: { user },
-  } = await supabase.auth.getUser();
+  let hasUser = false;
 
-  redirect(user ? "/modulos" : "/login");
+  try {
+    const supabase = await createClient();
+    const {
+      data: { user },
+    } = await supabase.auth.getUser();
+    hasUser = Boolean(user);
+  } catch {
+    // O preview pode renderizar antes das variáveis do Supabase serem injetadas.
+    // Nesse caso, encaminha para login em vez de derrubar a aplicação inteira.
+  }
+
+  redirect(hasUser ? "/modulos" : "/login");
 }
