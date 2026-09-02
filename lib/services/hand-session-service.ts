@@ -211,6 +211,22 @@ export async function listSessionsWithCount(userId: string): Promise<HandSession
   return (data ?? []) as HandSessionWithCount[];
 }
 
+// Exclui o torneio/sessao de maos importadas e todas as maos anexadas a
+// ele. Chamado quando a sessao de banca correspondente e' excluida (ver
+// handleRemove em app/banca/page.tsx) — sem isso, o FK
+// bankroll_sessions.imported_hand_session_id so' faz SET NULL e o torneio
+// (e suas maos) fica orfao, sumindo da banca mas continuando na fila do
+// Revisor. hand_reviews.hand_session_id tambem e' SET NULL, entao as maos
+// precisam ser apagadas explicitamente antes — mesma logica de
+// deleteReview() em hand-review-service.ts, so' que em lote.
+export async function deleteHandSession(sessionId: string) {
+  const supabase = createClient();
+  const { error: reviewsError } = await supabase.from("hand_reviews").delete().eq("hand_session_id", sessionId);
+  if (reviewsError) throw reviewsError;
+  const { error } = await supabase.from("hand_sessions").delete().eq("id", sessionId);
+  if (error) throw error;
+}
+
 export async function updateSessionBounty(sessionId: string, bountyCurrent: number | null) {
   const supabase = createClient();
   const { error } = await supabase
