@@ -23,24 +23,24 @@ export type SeatLayoutSlot = {
   playerName?: string;
 };
 
-// FIX (2026-08): os assentos da metade de baixo estavam colados demais na
-// borda inferior do oval (hero em y=92). Como o bloco do assento e'
-// posicionado com translate(-50%,-50%) e o do hero e' o mais alto da mesa
-// (cartas + chip de posicao + chip nome/stack + area de badge), metade
-// dele caia fora do container, que tem overflow:hidden — era o "hero
-// cortado" reportado, tanto no Treino quanto no Replayer. Os tres slots
-// de baixo subiram (92→82 no hero, 84→76 nos vizinhos) e os de cima
-// desceram um pouco (12→16), redistribuindo a folga sem achatar o anel.
-const RING_COORDS: { x: number; y: number; cardSide: CardSide }[] = [
-  { x: 13, y: 32, cardSide: "right" },
-  { x: 34, y: 16, cardSide: "below" },
-  { x: 66, y: 16, cardSide: "below" },
-  { x: 87, y: 32, cardSide: "left" },
-  { x: 92, y: 60, cardSide: "left" },
-  { x: 74, y: 76, cardSide: "above" },
-  { x: 50, y: 82, cardSide: "above" }, // slot do hero — sempre embaixo, centralizado
-  { x: 26, y: 76, cardSide: "above" },
-];
+// Expoente da superelipse usada tanto pro anel estilizado (RING_COORDS)
+// quanto pro anel real (ellipseSeatCoords, mais abaixo) — precisa estar
+// inicializado AQUI EM CIMA porque RING_COORDS chama ellipseSeatCoords
+// no carregamento do modulo, antes de qualquer `const` mais abaixo no
+// arquivo existir (erro de TDZ do JS se ficasse perto da funcao).
+const SUPERELLIPSE_EXPONENT = 4;
+
+// FIX (2026-09): as coordenadas do anel eram "chutadas" a mao (valores
+// fixos por assento), sem seguir uma elipse de verdade — cada uma podia
+// ficar mais perto ou mais longe da borda do feltro de forma inconsistente.
+// Bug reportado: "desalinhamento dos seats na borda das mesas" — o assento
+// de CO (direita), por exemplo, tinha as cartas ultrapassando o feltro,
+// enquanto o espelho dele (UTG+1, esquerda) tinha folga de sobra. Agora as
+// 8 posicoes vem da MESMA formula parametrica de elipse usada no Replay
+// (ellipseSeatCoords, mais abaixo neste arquivo) — ja validada visualmente
+// ali sem nenhum assento vazando pra fora do feltro. Isso tambem elimina a
+// duplicacao de "duas fontes de posicionamento" pro mesmo desenho de mesa.
+const RING_COORDS: { x: number; y: number; cardSide: CardSide }[] = ellipseSeatCoords(8);
 
 // FIX (2026-08): a ordem anterior era ["UTG","UTG+1","MP","HJ","CO","BB",
 // "BTN","SB"], que colocava BB antes do BTN e o SB depois — invertendo os
@@ -51,7 +51,9 @@ const RING_COORDS: { x: number; y: number; cardSide: CardSide }[] = [
 // RING_COORDS acima (que tambem percorre o anel em sentido horario).
 const RING_ORDER_8MAX = ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "HJ", "CO"];
 
-const HERO_SLOT_INDEX = 6;
+// RING_COORDS[0] e' sempre o slot de baixo-centro (ver ellipseSeatCoords) —
+// e' nele que o hero cai, mesma convencao do modo Replay.
+const HERO_SLOT_INDEX = 0;
 
 export class UnknownHeroPositionError extends Error {
   constructor(position: string) {
@@ -129,6 +131,18 @@ function clockwiseOccupiedSeats(seats: ParsedSeat[], buttonSeatNumber: number, m
 // Primeira versao algoritmica — o anel estilizado do Treino foi ajustado
 // a mao visualmente; esse aqui deve passar pelo mesmo tipo de ajuste
 // fino depois de testado no navegador com mesas de tamanhos diferentes.
+//
+// FIX (2026-09): mesa trocou de oval pra retangular com cantos
+// arredondados (pedido explicito: "mesa mais retangular com as bordas
+// redondas, como o gtowizard faz"). Uma elipse comum (expoente 2 na
+// equacao |x/a|^p + |y/b|^p = 1) nao serve mais pra distribuir os
+// assentos — colocaria gente flutuando longe da borda reta dos lados
+// compridos. Com expoente mais alto (SUPERELLIPSE_EXPONENT, definido no
+// topo do arquivo) a curva "estica" pros lados retos e so' arredonda
+// perto dos cantos — a mesma familia de curva (superelipse/squircle)
+// usada pra desenhar o proprio contorno da mesa logo abaixo em
+// PokerTable, entao os assentos acompanham a borda de verdade em vez de
+// "flutuar" pra dentro ou pra fora dela.
 function ellipseSeatCoords(n: number): { x: number; y: number; cardSide: CardSide }[] {
   const centerX = 50;
   // FIX (2026-08): centro subiu de 50 para 46 e radiusY caiu de 36 para
@@ -142,6 +156,16 @@ function ellipseSeatCoords(n: number): { x: number; y: number; cardSide: CardSid
   // ao hero (topo da mesa, em mesas com n par) quase saia do feltro —
   // confirmado visualmente num render de teste antes de mudar isso.
   const radiusY = 32;
+  // FIX (2026-09): agora que as cartas ficam SEMPRE em cima do nome (pedido
+  // explicito, ver Seat/CardFan em poker-table.tsx), os assentos da fileira
+  // de CIMA da mesa (sin<0) empurram o bloco de cartas ainda mais pra cima —
+  // ou seja, na direcao da borda de que eles ja estao mais perto. Nas fotos
+  // de teste em varias telas ("me mostre como ficou no celular e em outras
+  // telas"), esses assentos vazavam a carta pra fora do contorno arredondado.
+  // Os assentos de BAIXO nao tem esse problema (cartas "em cima do nome"
+  // pra eles apontam pro CENTRO da mesa, lado oposto da borda), entao so' a
+  // metade de cima ganha um raio vertical menor (mais afastado da borda).
+  const radiusYTop = 26;
   const coords: { x: number; y: number; cardSide: CardSide }[] = [];
 
   for (let i = 0; i < n; i++) {
@@ -149,8 +173,15 @@ function ellipseSeatCoords(n: number): { x: number; y: number; cardSide: CardSid
     const angleRad = (angleDeg * Math.PI) / 180;
     const cos = Math.cos(angleRad);
     const sin = Math.sin(angleRad);
-    const x = centerX + radiusX * cos;
-    const y = centerY + radiusY * sin;
+    // Parametrizacao de superelipse: em vez de x=cos, y=sin (elipse
+    // normal), eleva cada um a 2/expoente mantendo o sinal — quanto
+    // maior o expoente, mais a curva "achata" nos lados e concentra a
+    // curvatura nos cantos (formato de retangulo arredondado).
+    const p = 2 / SUPERELLIPSE_EXPONENT;
+    const cosP = Math.sign(cos) * Math.abs(cos) ** p;
+    const sinP = Math.sign(sin) * Math.abs(sin) ** p;
+    const x = centerX + radiusX * cosP;
+    const y = centerY + (sin < 0 ? radiusYTop : radiusY) * sinP;
 
     let cardSide: CardSide;
     if (Math.abs(cos) < 0.35) {
