@@ -228,6 +228,28 @@ export async function markAttendance(eventId: string, playerId: string, attended
   if (error) throw error;
 }
 
+// Link "adicionar ao Google Agenda" (pedido explicito) -- template URL
+// publica do Google Calendar, sem OAuth nem integracao de verdade: so'
+// abre o Google Agenda do proprio jogador com o evento pre-preenchido
+// pra ele confirmar e salvar. Datas em UTC formato YYYYMMDDTHHMMSSZ,
+// exigido pelo parametro `dates` desse endpoint.
+function toGoogleDate(iso: string): string {
+  return new Date(iso).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}/, "");
+}
+
+export function googleCalendarUrl(event: Pick<TeamEvent, "title" | "description" | "locationUrl" | "startsAt" | "endsAt">): string {
+  const start = toGoogleDate(event.startsAt);
+  const end = toGoogleDate(event.endsAt ?? new Date(new Date(event.startsAt).getTime() + 60 * 60 * 1000).toISOString());
+  const params = new URLSearchParams({
+    action: "TEMPLATE",
+    text: event.title,
+    dates: `${start}/${end}`,
+  });
+  if (event.description) params.set("details", event.description);
+  if (event.locationUrl) params.set("location", event.locationUrl);
+  return `https://calendar.google.com/calendar/render?${params.toString()}`;
+}
+
 export function traduzErroCalendario(err: unknown): string {
   const msg = err instanceof Error ? err.message : String(err);
   if (msg.includes("NAO_AUTENTICADO")) return "Sua sessão expirou. Entre novamente.";

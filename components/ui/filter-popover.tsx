@@ -1,22 +1,27 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Search } from "lucide-react";
+import { Search, type LucideIcon } from "lucide-react";
 
-// Agrupa varios controles de filtro atras de um unico icone de lupa --
-// usado quando os filtros nao cabem numa linha so' (ex: Sessoes recentes
-// na Gestao de Banca, com 4 selects) ou quando sao usados com pouca
+// Agrupa varios controles de filtro atras de um unico icone -- usado
+// quando os filtros nao cabem numa linha so' (ex: Sessoes recentes na
+// Gestao de Banca, com 4 selects) ou quando sao usados com pouca
 // frequencia (ex: plataforma). Bolinha no icone acende quando algum
 // filtro dentro do painel esta fora do valor padrao, pra nao esconder
-// que a lista esta filtrada.
+// que a lista esta filtrada. `icon` default (lupa) faz sentido quando o
+// painel É a busca; call sites com busca de texto separada (ex: Funil)
+// devem passar um icone de filtro (SlidersHorizontal) pra nao duplicar
+// visualmente o botao de busca.
 export function FilterPopover({
   active,
   children,
   label = "Filtros",
+  icon: Icon = Search,
 }: {
   active?: boolean;
   children: React.ReactNode;
   label?: string;
+  icon?: LucideIcon;
 }) {
   const [open, setOpen] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
@@ -40,7 +45,7 @@ export function FilterPopover({
           open ? "border-training bg-training/15 text-training" : "border-hairline text-muted hover:border-training/50 hover:text-training"
         }`}
       >
-        <Search size={13} />
+        <Icon size={13} />
         {active && !open && <span className="absolute -right-0.5 -top-0.5 size-1.5 rounded-full bg-training" />}
       </button>
       {open && (
