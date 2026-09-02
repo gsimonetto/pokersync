@@ -7,6 +7,7 @@ import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod,
 import { aggregate, evolutionSeries, drawdownSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
+import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds, fetchLinkedTournamentHandSessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
@@ -2118,8 +2119,11 @@ function EvolutionChart({
   const min = Math.min(...points),
     max = Math.max(...points);
   const spread = max - min || 1;
-  const yMin = min - spread * 0.08;
-  const yMax = max + spread * 0.08;
+  // Marcas do eixo em números redondos (ex: R$500, não R$417,24) -- o
+  // yMin/yMax do plot se ajusta pra sempre caber a primeira/última marca.
+  const yTicks = niceTicks(min, max, Y_TICKS);
+  const yMin = Math.min(min - spread * 0.08, yTicks[0]);
+  const yMax = Math.max(max + spread * 0.08, yTicks[yTicks.length - 1]);
   const yRange = yMax - yMin || 1;
 
   const xAt = (i: number) => padL + (series.length === 1 ? 0 : (i / (series.length - 1)) * plotW);
@@ -2135,8 +2139,6 @@ function EvolutionChart({
   const lastPoint = coords[coords.length - 1];
   const gradId = "bankrollLedFill";
   const glowId = "bankrollLedGlow";
-
-  const yTicks = Array.from({ length: Y_TICKS + 1 }, (_, i) => yMin + (yRange * i) / Y_TICKS);
 
   const xTickCount = Math.min(6, series.length);
   const xTickIdx = Array.from({ length: xTickCount }, (_, i) =>
