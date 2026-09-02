@@ -2,11 +2,11 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart } from "lucide-react";
+import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
-import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
+import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
@@ -108,10 +108,6 @@ async function getUsdBrlRate(): Promise<number | null> {
 // Vocabulario do formulario por formato: "reentradas" e' termo de torneio;
 // em cash o jogador recompra/recarrega o stack. Mesmo campo, o nome que ele
 // usa de verdade em cada formato.
-// Mesmo stack curto que a dica de leak do Treino ja aplica -- a acao rapida
-// so' encurta o caminho, nao inventa um alvo diferente.
-const LEAK_SHORT_STACK_BB = 15;
-
 const REENTRY_LABEL: Record<string, string> = {
   MTT: "Reentradas",
   SNG: "Reentradas",
@@ -451,7 +447,6 @@ export default function BankrollPage() {
     () => brmReading(sessions, nw.playingBankroll, brmThresholds),
     [sessions, nw.playingBankroll, brmThresholds]
   );
-  const leakStats = useMemo(() => groupStats(platformSessions, "format"), [platformSessions]);
   const tiltStats = useMemo(() => tiltImpact(platformSessions), [platformSessions]);
   const rate = useMemo(() => hourlyRate(platformSessions), [platformSessions]);
   const activity = useMemo(() => dailyActivity(platformSessions), [platformSessions]);
@@ -1088,84 +1083,25 @@ export default function BankrollPage() {
             </button>
           </div>
 
-          <div className="mt-5 border-t border-hairline pt-4">
-            <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Leaks recorrentes por formato</p>
-
-            {leakStats.length === 0 ? (
-              <p className="mt-3 text-sm text-muted">Registre sessoes pra ver seus leaks aqui.</p>
-            ) : (
-              <div className="mt-3 flex flex-col gap-1.5">
-                {leakStats.map((g: GroupStat) => {
-                  const negative = g.net < 0;
-                  const lowSample = g.n < 5;
-                  return (
-                    <div key={g.key} className="grid grid-cols-[minmax(0,1fr)_auto_auto] items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-                      <div className="min-w-0">
-                        <p className="truncate text-sm font-semibold">{g.key}</p>
-                        <p className="text-[10.5px] text-muted">
-                          {g.n} {g.n === 1 ? "sessao" : "sessoes"} · ROI {fmtPct(g.roi)}
-                          {lowSample && <span className="ml-1 text-evolution">· amostra pequena</span>}
-                        </p>
-                      </div>
-                      <span className={`text-xs font-bold tabular-nums ${negative ? "text-negative" : "text-positive"}`}>
-                        {fmtSigned(g.net)}
-                      </span>
-                      {/* Acoes rapidas: so' em fatia que esta perdendo -- num grupo
-                          positivo elas seriam ruido. "Treinar" so' aparece onde o
-                          estoque de spots casa com a fatia (motor e' ICM de
-                          torneio), senao levaria a um treino sem relacao com o
-                          leak. "Registrar mao" vale pra qualquer fatia: e' o
-                          primeiro passo de investigar o proprio erro. */}
-                      <div className="flex items-center gap-1">
-                        {negative && TOURNEY_FORMATS.has(g.key) && (
-                          <Link
-                            href={`/treino?stack=${LEAK_SHORT_STACK_BB}`}
-                            title={`Treinar stack curto (${LEAK_SHORT_STACK_BB}bb) — onde esse leak costuma doer`}
-                            aria-label={`Treinar ${g.key}`}
-                            className="flex items-center gap-1 rounded-lg border border-training/40 px-2 py-1 text-[10.5px] font-semibold text-training transition-colors hover:bg-training/10"
-                          >
-                            <PlayCircle size={13} />
-                            Treinar
-                          </Link>
-                        )}
-                        {negative && (
-                          <Link
-                            href="/revisor?nova=1"
-                            title="Registrar uma mao desse leak pra revisar"
-                            aria-label={`Registrar mao de ${g.key}`}
-                            className="flex items-center gap-1 rounded-lg border border-review/40 px-2 py-1 text-[10.5px] font-semibold text-review transition-colors hover:bg-review/10"
-                          >
-                            <NotebookPen size={13} />
-                            Registrar mao
-                          </Link>
-                        )}
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            )}
-
-            {tiltStats && tiltStats.tiltN > 0 && (
-              <div className="mt-3 rounded-lg border border-hairline bg-elevated p-3">
-                <p className="text-xs font-semibold text-muted">Sessoes com tilt vs demais</p>
-                <div className="mt-2 grid grid-cols-2 gap-3">
-                  <div>
-                    <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
-                    <p className={`text-sm font-bold ${tiltStats.tiltNet >= 0 ? "text-positive" : "text-negative"}`}>
-                      {fmtSigned(tiltStats.tiltNet)} · ROI {fmtPct(tiltStats.tiltRoi)}
-                    </p>
-                  </div>
-                  <div>
-                    <p className="text-[11px] text-muted">Demais ({tiltStats.otherN})</p>
-                    <p className={`text-sm font-bold ${tiltStats.otherNet >= 0 ? "text-positive" : "text-negative"}`}>
-                      {fmtSigned(tiltStats.otherNet)} · ROI {fmtPct(tiltStats.otherRoi)}
-                    </p>
-                  </div>
+          {tiltStats && tiltStats.tiltN > 0 && (
+            <div className="mt-5 border-t border-hairline pt-4">
+              <p className="text-xs font-semibold text-muted">Sessoes com tilt vs demais</p>
+              <div className="mt-2 grid grid-cols-2 gap-3">
+                <div>
+                  <p className="text-[11px] text-muted">Tilt ({tiltStats.tiltN})</p>
+                  <p className={`text-sm font-bold ${tiltStats.tiltNet >= 0 ? "text-positive" : "text-negative"}`}>
+                    {fmtSigned(tiltStats.tiltNet)} · ROI {fmtPct(tiltStats.tiltRoi)}
+                  </p>
+                </div>
+                <div>
+                  <p className="text-[11px] text-muted">Demais ({tiltStats.otherN})</p>
+                  <p className={`text-sm font-bold ${tiltStats.otherNet >= 0 ? "text-positive" : "text-negative"}`}>
+                    {fmtSigned(tiltStats.otherNet)} · ROI {fmtPct(tiltStats.otherRoi)}
+                  </p>
                 </div>
               </div>
-            )}
-          </div>
+            </div>
+          )}
         </Painel>
 
         <Painel
@@ -1224,6 +1160,7 @@ export default function BankrollPage() {
           titulo={`Sessões recentes (${historyFiltered.length})`}
           icone={<History size={14} className="icon-glow text-training" />}
           hint="Suas últimas sessões registradas. Use os filtros pra achar um período ou faixa de buy-in específica."
+          divisor
           className="flex h-[260px] flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
@@ -1349,6 +1286,7 @@ export default function BankrollPage() {
           titulo="Histórico de transações"
           icone={<Wallet size={14} className="icon-glow text-training" />}
           hint="Depósitos, saques e caixinha — não entra no resultado de jogo, só o dinheiro que entrou/saiu da banca."
+          divisor
           className="flex h-[260px] flex-col"
         >
           {recentTx.length === 0 ? (
@@ -1394,6 +1332,7 @@ export default function BankrollPage() {
           icone={<FileBarChart size={14} className="icon-glow text-training" />}
           hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
           className="flex h-[260px] flex-col"
+          divisor
           acao={
             yearlyReport.length > 0 && (
               <button
@@ -1409,29 +1348,29 @@ export default function BankrollPage() {
           {yearlyReport.length === 0 ? (
             <p className="mt-4 text-sm text-muted">Registre sessões pra ver o fechamento por ano.</p>
           ) : (
-            <div className="mt-4 overflow-x-auto">
-              <table className="w-full min-w-[560px] text-sm">
+            <div className="mt-4">
+              <table className="w-full table-fixed text-[11px]">
                 <thead>
-                  <tr className="border-b border-hairline text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">
-                    <th className="py-2 pr-3">Ano</th>
-                    <th className="px-3 py-2">Sessões</th>
-                    <th className="px-3 py-2">Investido</th>
-                    <th className="px-3 py-2">Lucro</th>
-                    <th className="px-3 py-2">ROI</th>
-                    <th className="px-3 py-2">ITM</th>
+                  <tr className="border-b border-hairline text-left text-[9px] font-bold uppercase tracking-[0.06em] text-muted/80">
+                    <th className="py-1.5 pr-1.5">Ano</th>
+                    <th className="px-1.5 py-1.5">Sessões</th>
+                    <th className="px-1.5 py-1.5">Investido</th>
+                    <th className="px-1.5 py-1.5">Lucro</th>
+                    <th className="px-1.5 py-1.5">ROI</th>
+                    <th className="px-1.5 py-1.5">ITM</th>
                   </tr>
                 </thead>
                 <tbody>
                   {yearlyReport.map((y, i) => (
                     <tr key={y.year} className={i < yearlyReport.length - 1 ? "border-b border-hairline" : ""}>
-                      <td className="py-2.5 pr-3 font-semibold">{y.year}</td>
-                      <td className="px-3 py-2.5 text-muted">{y.n}</td>
-                      <td className="px-3 py-2.5 tabular-nums text-muted">{fmtMoneyIn(y.totalInvested, currencyFilter)}</td>
-                      <td className={`px-3 py-2.5 font-semibold tabular-nums ${y.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                      <td className="truncate py-2 pr-1.5 font-semibold">{y.year}</td>
+                      <td className="truncate px-1.5 py-2 tabular-nums text-muted">{y.n}</td>
+                      <td className="truncate px-1.5 py-2 tabular-nums text-muted">{fmtMoneyIn(y.totalInvested, currencyFilter)}</td>
+                      <td className={`truncate px-1.5 py-2 font-semibold tabular-nums ${y.profit >= 0 ? "text-positive" : "text-negative"}`}>
                         {fmtSignedMoneyIn(y.profit, currencyFilter)}
                       </td>
-                      <td className="px-3 py-2.5 tabular-nums text-muted">{fmtPct(y.roi)}</td>
-                      <td className="px-3 py-2.5 tabular-nums text-muted">{y.itm.toFixed(1)}%</td>
+                      <td className="truncate px-1.5 py-2 tabular-nums text-muted">{fmtPct(y.roi)}</td>
+                      <td className="truncate px-1.5 py-2 tabular-nums text-muted">{y.itm.toFixed(1)}%</td>
                     </tr>
                   ))}
                 </tbody>
@@ -1957,6 +1896,7 @@ function Painel({
   hint,
   className,
   children,
+  divisor,
 }: {
   titulo: string;
   icone: React.ReactNode;
@@ -1967,10 +1907,14 @@ function Painel({
   hint?: string;
   className?: string;
   children: React.ReactNode;
+  // Linha fina sob o cabeçalho, mesmo estilo do separador da tabela de
+  // Resumo Anual — usado nos cards de histórico/resumo, que sem ela
+  // pareciam blocos soltos sem conexão visual com o título.
+  divisor?: boolean;
 }) {
   return (
     <section className={`rounded-xl border border-hairline bg-surface p-5 ${className ?? ""}`}>
-      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
+      <div className={`mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2 ${divisor ? "border-b border-hairline pb-3" : ""}`}>
         <div className="flex items-center gap-1.5">
           {icone}
           <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">{titulo}</h2>
@@ -2382,9 +2326,9 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
 
   return (
     <div className="mt-3 w-full">
-      <div className="flex justify-center gap-[5px] overflow-x-auto pb-1">
+      <div className="flex justify-center gap-[8px] overflow-x-auto pb-1">
         {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[5px]">
+          <div key={wi} className="flex flex-col gap-[8px]">
             {week.map(({ date, d }) => {
               const a = activity[date];
               const future = d > today;
@@ -2393,7 +2337,7 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
                   key={date}
                   onMouseEnter={() => !future && setHoverKey(date)}
                   onMouseLeave={() => setHoverKey((k) => (k === date ? null : k))}
-                  className="size-[20px] rounded-[4px] transition-transform duration-100 hover:scale-110"
+                  className="size-[32px] rounded-[6px] transition-transform duration-100 hover:scale-110"
                   style={{ background: future ? "transparent" : cellColor(a) }}
                   title={a ? `${date} · ${a.n} sessão(ões) · ${fmtSigned(a.net)}` : date}
                 />
