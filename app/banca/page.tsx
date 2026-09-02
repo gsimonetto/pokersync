@@ -2,13 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, Target, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, Search, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info } from "lucide-react";
+import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Bot, Skull, Coins, FileBarChart } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, drawdownSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
-import { fetchReviewCountsBySessionIds } from "@/lib/services/hand-review-service";
+import { fetchReviewCountsBySessionIds, fetchLinkedTournamentHandSessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
+import type { HandSession } from "@/lib/services/hand-session-service";
+import { fetchTournamentSessions } from "@/lib/services/analysis-service";
+import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
@@ -52,6 +55,18 @@ const HISTORY_RANGE_LABELS: Record<RangeOption, string> = {
 const HISTORY_RANGES = [...RANGES]
   .sort((a, b) => (a.value === "all" ? -1 : b.value === "all" ? 1 : 0))
   .map((r) => ({ value: r.value, label: HISTORY_RANGE_LABELS[r.value] }));
+
+// Faixas de buy-in pro filtro de "Sessoes recentes" -- mesmos cortes do
+// filtro de buy-in do Player Evolution (types/analysis.ts BuyinBucket),
+// só que local aqui porque cobre todo tipo de sessão (cash e torneio),
+// não só torneio.
+const BUYIN_RANGES: { value: string; label: string; test: (v: number) => boolean }[] = [
+  { value: "all", label: "Qualquer buy-in", test: () => true },
+  { value: "0-10", label: "Até R$10", test: (v) => v > 0 && v <= 10 },
+  { value: "10-50", label: "R$10–50", test: (v) => v > 10 && v <= 50 },
+  { value: "50-200", label: "R$50–200", test: (v) => v > 50 && v <= 200 },
+  { value: "200+", label: "R$200+", test: (v) => v > 200 },
+];
 
 // Vocabulario do formulario por formato: "reentradas" e' termo de torneio;
 // em cash o jogador recompra/recarrega o stack. Mesmo campo, o nome que ele
@@ -119,12 +134,11 @@ export default function BankrollPage() {
   const [txVenueOther, setTxVenueOther] = useState("");
   const [txCurrency, setTxCurrency] = useState<string>("BRL");
 
-  const [historyOpen, setHistoryOpen] = useState(false);
-  const [historySearch, setHistorySearch] = useState("");
-  // Filtros dedicados do historico -- a busca livre resolve "achar aquela
-  // sessao", mas nao responde "como foi meu MTT nos ultimos 30 dias".
+  // Filtros de "Sessoes recentes" -- sempre visiveis no cabecalho do
+  // Painel, sem precisar abrir um historico separado pra filtrar.
   const [historyFormat, setHistoryFormat] = useState<string>("all");
   const [historyRange, setHistoryRange] = useState<RangeOption>("all");
+  const [historyBuyin, setHistoryBuyin] = useState<string>("all");
 
   const [goalType, setGoalType] = useState<GoalType>("volume");
   const [goalPeriod, setGoalPeriod] = useState<GoalPeriod>("semanal");
@@ -146,11 +160,20 @@ export default function BankrollPage() {
 
   const [compareOpen, setCompareOpen] = useState(false);
 
+  // Torneios que o agente desktop já capturou (hand_sessions) mas que
+  // ainda não viraram sessão de banca -- ver "Torneios do agente" abaixo.
+  const [agentTournaments, setAgentTournaments] = useState<HandSession[]>([]);
+  const [agentPayouts, setAgentPayouts] = useState<TournamentPayout[]>([]);
+  const [linkedHandSessionIds, setLinkedHandSessionIds] = useState<Set<string>>(new Set());
+  // Quando a sessão sendo registrada veio de uma sugestão do agente, guarda
+  // o id do hand_session pra vincular as mãos assim que a sessão salvar.
+  const [linkingHandSessionId, setLinkingHandSessionId] = useState<string | null>(null);
+
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
-        const [s, cfg, tx, gl, sl, brm, annos] = await Promise.all([
+        const [s, cfg, tx, gl, sl, brm, annos, agentTourn, payouts] = await Promise.all([
           fetchSessions(),
           fetchSettings(),
           fetchTransactions(),
@@ -158,6 +181,8 @@ export default function BankrollPage() {
           fetchStudyLogs(),
           fetchBrmThresholds(),
           fetchAnnotations(),
+          fetchTournamentSessions(),
+          fetchTournamentPayouts(),
         ]);
         if (!alive) return;
         setSessions(s);
@@ -167,6 +192,10 @@ export default function BankrollPage() {
         setStudyLogs(sl);
         setBrmThresholds(brm);
         setAnnotations(annos);
+        setAgentTournaments(agentTourn);
+        setAgentPayouts(payouts);
+        const linked = await fetchLinkedTournamentHandSessionIds(agentTourn.map((h) => h.id));
+        if (alive) setLinkedHandSessionIds(linked);
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : "Falha ao carregar sua banca.");
       } finally {
@@ -190,6 +219,39 @@ export default function BankrollPage() {
       setCurrencyFilter(currencies[0]);
     }
   }, [currencies, currencyFilter]);
+
+  // Taxas de câmbio pra consolidar as moedas numa visão só -- não puxamos
+  // cotação de nenhuma API (o produto não tem uma fonte confiável hoje),
+  // então o jogador digita manualmente quanto vale 1 unidade de cada moeda
+  // em BRL. Guardado só no navegador (localStorage): é uma conveniência de
+  // visualização, não um dado financeiro registrado no servidor.
+  const REFERENCE_CURRENCY = currencies.includes("BRL") ? "BRL" : currencies[0] ?? "BRL";
+  const [fxRates, setFxRates] = useState<Record<string, string>>({});
+  useEffect(() => {
+    try {
+      const raw = window.localStorage.getItem("pokersync:banca:fxRates");
+      if (raw) setFxRates(JSON.parse(raw));
+    } catch {
+      // localStorage indisponível (modo privado, etc.) -- consolidado cai
+      // pra taxa 1:1 e o jogador ainda pode digitar, só não persiste.
+    }
+  }, []);
+  function updateFxRate(currency: string, rate: string) {
+    setFxRates((prev) => {
+      const next = { ...prev, [currency]: rate };
+      try {
+        window.localStorage.setItem("pokersync:banca:fxRates", JSON.stringify(next));
+      } catch {
+        // idem — falha ao persistir não deve travar a edição.
+      }
+      return next;
+    });
+  }
+  function fxRateOf(currency: string): number {
+    if (currency === REFERENCE_CURRENCY) return 1;
+    const v = Number(fxRates[currency]);
+    return v > 0 ? v : 1;
+  }
   const fmt = (v: number) => fmtMoneyIn(v, currencyFilter);
   const fmtSigned = (v: number) => fmtSignedMoneyIn(v, currencyFilter);
   const currencySessions = useMemo(
@@ -235,6 +297,34 @@ export default function BankrollPage() {
     [currencyTransactions, platformFilter, isPlatformFiltered]
   );
 
+  // Saldo por moeda, pra consolidar tudo numa visão só (ver fxRates acima) —
+  // independe do currencyFilter selecionado, cada moeda entra com seu
+  // próprio saldo (banca inicial só soma na moeda de referência, mesma
+  // regra do `nw` abaixo).
+  // Torneios que o agente ja capturou e que ainda nao tem sessao de banca
+  // vinculada -- ver openAgentSuggestion/linkHandSessionReviews acima.
+  const unlinkedAgentTournaments = useMemo(
+    () => agentTournaments.filter((h) => !linkedHandSessionIds.has(h.id)),
+    [agentTournaments, linkedHandSessionIds]
+  );
+
+  const perCurrencyBalances = useMemo(
+    () =>
+      currencies.map((c) => {
+        const sess = sessions.filter((s) => (s.currency || "BRL") === c);
+        const tx = transactions.filter((t) => (t.currency || "BRL") === c);
+        const a = aggregate(sess);
+        const balance = netWorth(c === REFERENCE_CURRENCY ? base : 0, a.profit, tx).playingBankroll;
+        return { currency: c, balance };
+      }),
+    [currencies, sessions, transactions, base, REFERENCE_CURRENCY]
+  );
+  const consolidatedTotal = useMemo(
+    () => perCurrencyBalances.reduce((sum, p) => sum + p.balance * fxRateOf(p.currency), 0),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [perCurrencyBalances, fxRates]
+  );
+
   const agg = useMemo(() => aggregate(platformSessions), [platformSessions]);
   const nw = useMemo(
     () =>
@@ -251,6 +341,7 @@ export default function BankrollPage() {
     [platformSessions, isPlatformFiltered, base]
   );
   const filteredSeries = useMemo(() => filterSeriesByRange(series, range), [series, range]);
+  const drawdownChartSeries = useMemo(() => drawdownSeries(filteredSeries), [filteredSeries]);
   const tips = useMemo(
     () => buildCoachTips(sessions, { bankroll: nw.playingBankroll, brmThresholds }),
     [sessions, nw.playingBankroll, brmThresholds]
@@ -286,8 +377,24 @@ export default function BankrollPage() {
         : calcBuyInsCovered < calcThreshold.movedownBuyins
           ? "movedown"
           : "hold";
-  const recent = [...platformSessions].reverse().slice(0, 8);
-  const recentTx = [...platformTransactions].reverse().slice(0, 6);
+  // Resumo por ano -- respeita a moeda selecionada (misturar moedas na
+  // mesma linha do relatório daria um total sem sentido), mas ignora o
+  // filtro de plataforma (é uma visão de ano fechado, não de uma sala só).
+  const yearlyReport = useMemo(() => {
+    const byYear = new Map<string, Session[]>();
+    for (const s of currencySessions) {
+      const year = (s.date || "").slice(0, 4);
+      if (!year) continue;
+      const list = byYear.get(year) ?? [];
+      list.push(s);
+      byYear.set(year, list);
+    }
+    return [...byYear.entries()]
+      .sort(([a], [b]) => b.localeCompare(a))
+      .map(([year, list]) => ({ year, ...aggregate(list) }));
+  }, [currencySessions]);
+
+  const recentTx = [...platformTransactions].reverse();
   // O catalogo (FORMATS) e o que esta gravado nas sessoes nem sempre batem --
   // ha sessoes com formato "Torneio", que nao esta no seletor. Filtrar so'
   // pelo catalogo esconderia essas sessoes sem o jogador entender por que.
@@ -296,17 +403,20 @@ export default function BankrollPage() {
     [platformSessions]
   );
 
+  // "Sessoes recentes" mostra sempre a lista inteira (filtrada), com scroll
+  // interno pra ver mais alem das ~3 primeiras -- nao tem mais um estado
+  // "aberto/fechado" separado, os filtros (formato/periodo/buy-in) ficam
+  // sempre visiveis no cabecalho do Painel.
   const historyFiltered = useMemo(() => {
-    const q = historySearch.trim().toLowerCase();
     let base = platformSessions;
     if (historyFormat !== "all") base = base.filter((s) => s.format === historyFormat);
     if (historyRange !== "all") base = filterSessionsByRange(base, historyRange);
-    const list = [...base].reverse();
-    if (!q) return list;
-    return list.filter((s) =>
-      [s.format, s.date, s.stake, s.venue, s.notes, s.mood].filter(Boolean).some((f) => String(f).toLowerCase().includes(q))
-    );
-  }, [platformSessions, historySearch, historyFormat, historyRange]);
+    if (historyBuyin !== "all") {
+      const bucket = BUYIN_RANGES.find((r) => r.value === historyBuyin);
+      if (bucket) base = base.filter((s) => bucket.test(Number(s.buyIn) || 0));
+    }
+    return [...base].reverse();
+  }, [platformSessions, historyFormat, historyRange, historyBuyin]);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
 
   // Quantas maos foram revisadas por sessao -- antes o vinculo so existia
@@ -314,7 +424,7 @@ export default function BankrollPage() {
   // mostrava nada de volta. So busca pras sessoes realmente visiveis na
   // lista (nao a banca toda).
   const [reviewCounts, setReviewCounts] = useState<Record<string, number>>({});
-  const visibleSessionIds = (historyOpen ? historyFiltered : recent).map((s) => s.id).join(",");
+  const visibleSessionIds = historyFiltered.map((s) => s.id).join(",");
   useEffect(() => {
     const ids = visibleSessionIds ? visibleSessionIds.split(",") : [];
     if (ids.length === 0) return;
@@ -404,6 +514,27 @@ export default function BankrollPage() {
   function closeSessionModal() {
     setSessionModalOpen(false);
     if (editingSessionId) resetSessionForm();
+    setLinkingHandSessionId(null);
+  }
+
+  // Preenche o formulario de "Registrar sessao" com o que o agente desktop
+  // já capturou desse torneio (buy-in, premiação se já tiver, plataforma) —
+  // o jogador ainda confirma/ajusta antes de salvar, nunca grava sozinho.
+  function openAgentSuggestion(hs: HandSession) {
+    resetSessionForm();
+    setFormat("MTT");
+    setDate((hs.updated_at || hs.created_at || todayISO()).slice(0, 10));
+    setBuyIn(hs.buyin != null ? String(hs.buyin) : "");
+    const payout = agentPayouts.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
+    setCashout(payout?.heroPayoutAmount != null ? String(payout.heroPayoutAmount) : "0");
+    const rawVenue = (hs.label.split(" / ")[0] || "").trim();
+    const known = rawVenue !== "" && (PLATFORMS as readonly string[]).includes(rawVenue);
+    setVenue(known ? rawVenue : rawVenue ? OUTRO_PLATFORM : PLATFORMS[0]);
+    setVenueOther(known ? "" : rawVenue);
+    setNotes(`Torneio capturado pelo agente — ${hs.label}`);
+    setLinkingHandSessionId(hs.id);
+    setErr("");
+    setSessionModalOpen(true);
   }
 
   async function handleSaveSession() {
@@ -436,14 +567,28 @@ export default function BankrollPage() {
       backerName: backerName || undefined,
     };
     const editingId = editingSessionId;
+    const linkingId = linkingHandSessionId;
     const backup = sessions;
     setSessions((prev) => (editingId ? prev.map((x) => (x.id === editingId ? draft : x)) : [...prev, draft]));
     resetSessionForm();
+    setLinkingHandSessionId(null);
     setErr("");
     setSessionModalOpen(false);
     try {
       const saved = editingId ? await apiUpdateSession(editingId, draft) : await apiAddSession(draft);
       setSessions((prev) => prev.map((x) => (x.id === draft.id ? saved : x)));
+      // Sessao veio de uma sugestao do agente -- vincula as maos desse
+      // torneio à sessao recem-criada (fecha o ciclo: a sugestao some da
+      // lista e o badge "N mãos revisadas" passa a aparecer nela).
+      if (!editingId && linkingId) {
+        try {
+          await linkHandSessionReviews(linkingId, saved.id);
+          setLinkedHandSessionIds((prev) => new Set(prev).add(linkingId));
+        } catch {
+          // Sessao ja foi salva; só o vinculo com o torneio capturado
+          // falhou -- nao vale reverter a sessao por causa disso.
+        }
+      }
     } catch {
       // Edicao volta ao estado anterior; registro novo some da lista.
       setErr(editingId ? "Nao foi possivel salvar a edicao." : "Nao foi possivel salvar a sessao.");
@@ -583,6 +728,23 @@ export default function BankrollPage() {
     downloadCSV(`pokersync-sessoes-${range}-${todayISO()}.csv`, csv);
   }
 
+  function handleExportYearlyReport() {
+    const header = ["Ano", "Sessões", "Total investido", "Total devolvido", "Lucro", "ROI %", "Buy-in médio", "ITM %"];
+    const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+    const rows = yearlyReport.map((y) => [
+      y.year,
+      y.n,
+      y.totalInvested.toFixed(2),
+      y.totalCashout.toFixed(2),
+      y.profit.toFixed(2),
+      y.roi.toFixed(1),
+      y.avgBuyIn.toFixed(2),
+      y.itm.toFixed(1),
+    ]);
+    const csv = [header, ...rows].map((r) => r.map(esc).join(",")).join("\n");
+    downloadCSV(`pokersync-resumo-anual-${currencyFilter}-${todayISO()}.csv`, csv);
+  }
+
   if (loading) {
     return (
       <AppShell>
@@ -626,6 +788,7 @@ export default function BankrollPage() {
                 // Sempre entra em modo "registrar": se o modal foi usado pra
                 // editar antes, os campos preenchidos ficariam ali.
                 if (editingSessionId) resetSessionForm();
+                setLinkingHandSessionId(null);
                 setSessionModalOpen(true);
               }}
               aria-label="Registrar sessao"
@@ -671,15 +834,50 @@ export default function BankrollPage() {
             tone={!rate ? "neutro" : rate.value >= 0 ? "bom" : "ruim"}
             hint={!rate ? "Registre horas jogadas na sessão pra ver isso." : undefined}
           />
-          <HeroMetric label="Buy-in médio" value={fmt(agg.avgBuyIn)} tone="neutro" />
-          <HeroMetric label="ITM" value={`${agg.itm.toFixed(1)}%`} tone="neutro" />
+          <HeroMetric label="Buy-in médio" value={fmt(agg.avgBuyIn)} tone="neutro" hint="Média do valor de entrada das suas sessões." />
+          <HeroMetric
+            label="ITM"
+            value={`${agg.itm.toFixed(1)}%`}
+            tone="neutro"
+            hint="Em quantos torneios você ficou premiado (in the money)."
+          />
         </div>
       </section>
+
+      {unlinkedAgentTournaments.length > 0 && (
+        <Painel
+          titulo={`Torneios do agente (${unlinkedAgentTournaments.length})`}
+          icone={<Bot size={14} className="icon-glow text-evolution" />}
+          hint="O agente desktop já capturou as mãos desses torneios, mas eles ainda não viraram sessão de banca — clique pra registrar (você confirma os valores antes de salvar)."
+          className="mt-6"
+        >
+          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
+            {unlinkedAgentTournaments.map((hs) => {
+              const payout = agentPayouts.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
+              return (
+                <button
+                  key={hs.id}
+                  onClick={() => openAgentSuggestion(hs)}
+                  className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-colors hover:border-evolution/40"
+                >
+                  <p className="truncate text-sm font-semibold text-ink">{hs.label}</p>
+                  <p className="mt-1 text-[11px] text-muted">
+                    {hs.champion ? "🏆 Campeão" : hs.final_place != null ? `Top ${hs.final_place}` : hs.reached_ft ? "Mesa final" : "Concluído"}
+                    {payout?.heroPayoutAmount != null && ` · ${fmtMoneyIn(payout.heroPayoutAmount, "BRL")} de premiação`}
+                  </p>
+                  <p className="mt-1.5 text-[11px] font-semibold text-evolution">Registrar na banca →</p>
+                </button>
+              );
+            })}
+          </div>
+        </Painel>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Painel
           titulo="Evolução da banca"
-          icone={<LineChart size={14} className="text-evolution" />}
+          icone={<LineChart size={14} className="icon-glow text-evolution" />}
+          hint="Seu saldo acumulado ao longo do tempo, somando o resultado de cada sessão."
           className="flex h-full flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
@@ -762,7 +960,8 @@ export default function BankrollPage() {
 
         <Painel
           titulo="Consistência de volume"
-          icone={<CalendarDays size={14} className="text-evolution" />}
+          icone={<CalendarDays size={14} className="icon-glow text-evolution" />}
+          hint="Mostra em quais dias você mais jogou — quanto mais escuro, mais sessões naquele dia."
           className="flex h-full flex-col"
         >
           <div className="flex flex-1 items-center">
@@ -771,13 +970,83 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
+      {isMultiCurrency && (
+        <div className="mt-6">
+          <Painel
+            titulo="Patrimônio consolidado"
+            icone={<Coins size={14} className="icon-glow text-evolution" />}
+            hint="Soma o saldo de todas as moedas numa visão só, usando a taxa de câmbio que você digitar abaixo — é uma estimativa sua, não uma cotação ao vivo."
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
+              {perCurrencyBalances.map((p) => (
+                <div key={p.currency} className="rounded-lg border border-hairline bg-elevated p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{p.currency}</p>
+                  <p className="mt-1 text-lg font-bold tabular-nums text-ink">{fmtMoneyIn(p.balance, p.currency)}</p>
+                  {p.currency === REFERENCE_CURRENCY ? (
+                    <p className="mt-1.5 text-[10.5px] text-muted">Moeda de referência</p>
+                  ) : (
+                    <label className="mt-1.5 flex items-center gap-1.5 text-[10.5px] text-muted">
+                      1 {p.currency} =
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={fxRates[p.currency] ?? ""}
+                        onChange={(e) => updateFxRate(p.currency, e.target.value)}
+                        placeholder="1.00"
+                        className="w-16 rounded border border-hairline bg-surface px-1.5 py-0.5 text-[10.5px] text-ink outline-none focus:border-ink/40"
+                      />
+                      {REFERENCE_CURRENCY}
+                    </label>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Total consolidado (estimado)</p>
+              <p className={`mt-1 text-2xl font-bold tabular-nums ${consolidatedTotal < 0 ? "text-negative" : "text-ink"}`}>
+                {fmtMoneyIn(consolidatedTotal, REFERENCE_CURRENCY)}
+              </p>
+            </div>
+          </Painel>
+        </div>
+      )}
+
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
-        <Painel titulo="Risco" icone={<ShieldAlert size={14} className="text-negative" />}>
-          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-            <div className="rounded-lg border border-hairline bg-elevated p-4">
+        <Painel
+          titulo="Risco"
+          icone={<ShieldAlert size={14} className="icon-glow text-negative" />}
+          hint="Sinais de alerta pra sua banca: quanto você já perdeu do topo e se o stake atual ainda cabe no seu bankroll."
+        >
+          <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
+            <div
+              className="rounded-lg border border-hairline bg-elevated p-4"
+              title="Quanto sua banca já caiu desde o ponto mais alto, medido em buy-ins do seu stake médio."
+            >
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Drawdown atual</p>
               <p className={`mt-1 text-3xl font-bold tabular-nums ${currentDrawdown >= 15 ? "text-negative" : "text-ink"}`}>
                 {currentDrawdown > 0 ? `${currentDrawdown.toFixed(1)} BI` : "—"}
+              </p>
+              <p className="mt-1.5 text-[10.5px] text-muted">Queda desde o topo, em buy-ins</p>
+            </div>
+
+            <div
+              className="rounded-lg border border-hairline bg-elevated p-4"
+              title={
+                ruin
+                  ? `De ${ruin.simulations} simulações usando suas ${ruin.sampleSize} sessões reais, essa % zerou a banca antes de completar ${ruin.horizonSessions} sessões.`
+                  : `Precisa de pelo menos ${15} sessões registradas pra calcular.`
+              }
+            >
+              <div className="flex items-center gap-1.5">
+                <Skull size={12} className="text-negative" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Risco de ruína</p>
+              </div>
+              <p className={`mt-1 text-3xl font-bold tabular-nums ${ruin && ruin.ruinPct >= 20 ? "text-negative" : ruin && ruin.ruinPct >= 8 ? "text-evolution" : "text-ink"}`}>
+                {ruin ? `${ruin.ruinPct}%` : "—"}
+              </p>
+              <p className="mt-1.5 text-[10.5px] text-muted">
+                {ruin ? `Chance de zerar em ${ruin.horizonSessions} sessões` : "Registre mais sessões pra calcular"}
               </p>
             </div>
 
@@ -813,6 +1082,13 @@ export default function BankrollPage() {
               )}
             </button>
           </div>
+
+          {drawdownChartSeries.length >= 2 && (
+            <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3" title="Quanto sua banca ficou abaixo do maior valor já atingido, dia após dia.">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Curva de drawdown (queda do topo)</p>
+              <EvolutionChart series={drawdownChartSeries} currency={currencyFilter} />
+            </div>
+          )}
 
           <div className="mt-5 border-t border-hairline pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Leaks recorrentes por formato</p>
@@ -894,14 +1170,17 @@ export default function BankrollPage() {
           </div>
         </Painel>
 
-        <section className="rounded-xl border border-hairline bg-surface p-5">
-          <div className="flex items-center gap-2 text-[15px] font-semibold">
-            <Sparkles size={16} className="text-evolution" />
-            AI Coach
-            <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
-          </div>
-
-          <div className="mt-3 grid gap-3">
+        <Painel
+          titulo="AI Coach"
+          icone={<Sparkles size={14} className="icon-glow text-evolution" />}
+          hint="Dicas automáticas geradas a partir das suas sessões — leaks, tendências e alertas."
+          acao={
+            tipsVisiveis.length > 0 ? (
+              <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
+            ) : undefined
+          }
+        >
+          <div className="grid gap-3">
             {tipsVisiveis.length === 0 ? (
               <p className="text-sm text-muted">
                 Sem novidades por enquanto — volte amanhã ou registre mais sessões pra o coach analisar.
@@ -938,128 +1217,63 @@ export default function BankrollPage() {
               })
             )}
           </div>
-        </section>
+        </Painel>
       </div>
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Painel
-          titulo="Metas"
-          icone={<Target size={14} className="text-review" />}
-          acao={
-            <button
-              onClick={() => setGoalsModalOpen(true)}
-              className="text-[11px] font-semibold text-muted transition-colors hover:text-ink"
-              title="Clique pra criar ou ajustar metas"
-            >
-              + nova meta
-            </button>
-          }
-        >
-          {goalsProgress.length === 0 ? (
-            <button onClick={() => setGoalsModalOpen(true)} className="block text-left text-[11px] text-muted hover:text-ink">
-              Nenhuma meta ativa. Clique aqui pra criar.
-            </button>
-          ) : (
-            <div className="flex flex-col gap-3">
-              {goalsProgress.map(({ goal, current, pct }) => (
-                <div key={goal.id}>
-                  <div className="flex items-center justify-between">
-                    <p className="text-[13px] font-semibold capitalize">
-                      {goal.type === "volume" ? "Volume" : "Estudo"} · {goal.period}
-                    </p>
-                    <div className="flex items-center gap-1.5">
-                      <span className="text-[11px] text-muted">
-                        {current}/{goal.target}
-                      </span>
-                      <button onClick={() => handleRemoveGoal(goal.id)} className="text-muted transition-colors hover:text-negative">
-                        <Trash2 size={12} />
-                      </button>
-                    </div>
-                  </div>
-                  <div className="mt-1.5 h-1 w-full overflow-hidden rounded-full bg-void/40">
-                    <div
-                      className="h-full rounded-full bg-gradient-to-r from-review to-evolution transition-[width] duration-500 ease-out"
-                      style={{ width: `${pct}%` }}
-                    />
-                  </div>
-                  {goal.type === "estudo" && (
-                    <div className="mt-1.5 flex gap-1">
-                      {[30, 60, 90].map((m) => (
-                        <button
-                          key={m}
-                          onClick={() => handleQuickStudy(m)}
-                          className="rounded-md border border-hairline px-1.5 py-0.5 text-[9.5px] font-semibold text-muted transition-colors hover:border-evolution/50 hover:text-evolution"
-                        >
-                          +{m}min
-                        </button>
-                      ))}
-                    </div>
-                  )}
-                </div>
-              ))}
-            </div>
-          )}
-        </Painel>
-
-        <Painel
-          titulo={historyOpen ? `Historico de sessoes (${historyFiltered.length})` : "Sessoes recentes"}
-          icone={<History size={14} className="text-training" />}
+          titulo={`Sessões recentes (${historyFiltered.length})`}
+          icone={<History size={14} className="icon-glow text-training" />}
+          hint="Suas últimas sessões registradas. Use os filtros pra achar um período ou faixa de buy-in específica."
           acao={
             <div className="flex flex-wrap items-center gap-2">
-              {historyOpen && (
-                <>
-                  <select
-                    value={historyFormat}
-                    onChange={(e) => setHistoryFormat(e.target.value)}
-                    aria-label="Filtrar por formato"
-                    className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
-                  >
-                    <option value="all">Todos os formatos</option>
-                    {historyFormats.map((f) => (
-                      <option key={f} value={f}>
-                        {f}
-                      </option>
-                    ))}
-                  </select>
-                  <select
-                    value={historyRange}
-                    onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
-                    aria-label="Filtrar por periodo"
-                    className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
-                  >
-                    {HISTORY_RANGES.map((r) => (
-                      <option key={r.value} value={r.value}>
-                        {r.label}
-                      </option>
-                    ))}
-                  </select>
-                  <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
-                    <Search size={12} className="text-muted" />
-                    <input
-                      placeholder="Buscar..."
-                      value={historySearch}
-                      onChange={(e) => setHistorySearch(e.target.value)}
-                      className="w-32 bg-transparent text-[11px] text-ink outline-none placeholder:text-muted"
-                    />
-                  </div>
-                </>
-              )}
-              {platformSessions.length > 8 && (
-                <button
-                  onClick={() => setHistoryOpen((v) => !v)}
-                  className="text-[11px] font-semibold text-muted transition-colors hover:text-ink"
-                >
-                  {historyOpen ? "Mostrar recentes" : `Ver todas (${platformSessions.length})`}
-                </button>
-              )}
+              <select
+                value={historyFormat}
+                onChange={(e) => setHistoryFormat(e.target.value)}
+                aria-label="Filtrar por formato"
+                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+              >
+                <option value="all">Todos os formatos</option>
+                {historyFormats.map((f) => (
+                  <option key={f} value={f}>
+                    {f}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={historyRange}
+                onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
+                aria-label="Filtrar por periodo"
+                title="Filtrar por período"
+                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+              >
+                {HISTORY_RANGES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+              <select
+                value={historyBuyin}
+                onChange={(e) => setHistoryBuyin(e.target.value)}
+                aria-label="Filtrar por buy-in"
+                title="Filtrar por faixa de buy-in"
+                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+              >
+                {BUYIN_RANGES.map((r) => (
+                  <option key={r.value} value={r.value}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
             </div>
           }
         >
-          {recent.length === 0 ? (
-            <p className="mt-4 text-sm text-muted">Nenhuma sessao registrada.</p>
+          {historyFiltered.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">Nenhuma sessao encontrada com esses filtros.</p>
           ) : (
-            <div className={`mt-4 divide-y divide-hairline ${historyOpen ? "max-h-[520px] overflow-y-auto" : ""}`}>
-              {(historyOpen ? historyFiltered : recent).map((s) => {
+            <div className="mt-4 max-h-[13rem] divide-y divide-hairline overflow-y-auto">
+              {historyFiltered.map((s) => {
                 const result = net(s);
                 return (
                   <div
@@ -1111,7 +1325,101 @@ export default function BankrollPage() {
               </div>
             )}
         </Painel>
+
+        <Painel
+          titulo="Histórico de transações"
+          icone={<Wallet size={14} className="icon-glow text-training" />}
+          hint="Depósitos, saques e caixinha — não entra no resultado de jogo, só o dinheiro que entrou/saiu da banca."
+        >
+          {recentTx.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
+          ) : (
+            <div className="mt-4 max-h-[13rem] divide-y divide-hairline overflow-y-auto">
+              {recentTx.map((t) => (
+                <div
+                  key={t.id}
+                  className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
+                >
+                  <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-void/40">
+                    {t.type === "deposito" ? (
+                      <TrendingUp size={14} className="text-positive" />
+                    ) : t.type === "saque" ? (
+                      <TrendingDown size={14} className="text-negative" />
+                    ) : (
+                      <PiggyBank size={14} className="text-evolution" />
+                    )}
+                  </div>
+                  <div className="min-w-0 flex-1">
+                    <p className="truncate text-sm font-semibold">
+                      {TX_LABELS[t.type]} · {t.date}
+                      {t.venue ? ` · ${t.venue}` : ""}
+                    </p>
+                    {t.note && <p className="truncate text-xs text-muted">{t.note}</p>}
+                  </div>
+                  <span className={`text-sm font-bold ${t.type === "deposito" ? "text-positive" : "text-negative"}`}>
+                    {t.type === "deposito" ? "+" : "-"}
+                    {fmt(t.amount)}
+                  </span>
+                  <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-colors hover:text-negative">
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </Painel>
       </div>
+
+      <Painel
+        titulo="Resumo anual"
+        icone={<FileBarChart size={14} className="icon-glow text-training" />}
+        hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
+        className="mt-6"
+        acao={
+          yearlyReport.length > 0 && (
+            <button
+              onClick={handleExportYearlyReport}
+              title="Baixar o resumo anual em CSV"
+              className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[11px] font-semibold text-muted transition-colors hover:border-positive/50 hover:text-positive"
+            >
+              <Download size={13} /> Baixar CSV
+            </button>
+          )
+        }
+      >
+        {yearlyReport.length === 0 ? (
+          <p className="mt-4 text-sm text-muted">Registre sessões pra ver o fechamento por ano.</p>
+        ) : (
+          <div className="mt-4 overflow-x-auto">
+            <table className="w-full min-w-[560px] text-sm">
+              <thead>
+                <tr className="border-b border-hairline text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">
+                  <th className="py-2 pr-3">Ano</th>
+                  <th className="px-3 py-2">Sessões</th>
+                  <th className="px-3 py-2">Investido</th>
+                  <th className="px-3 py-2">Lucro</th>
+                  <th className="px-3 py-2">ROI</th>
+                  <th className="px-3 py-2">ITM</th>
+                </tr>
+              </thead>
+              <tbody>
+                {yearlyReport.map((y, i) => (
+                  <tr key={y.year} className={i < yearlyReport.length - 1 ? "border-b border-hairline" : ""}>
+                    <td className="py-2.5 pr-3 font-semibold">{y.year}</td>
+                    <td className="px-3 py-2.5 text-muted">{y.n}</td>
+                    <td className="px-3 py-2.5 tabular-nums text-muted">{fmtMoneyIn(y.totalInvested, currencyFilter)}</td>
+                    <td className={`px-3 py-2.5 font-semibold tabular-nums ${y.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                      {fmtSignedMoneyIn(y.profit, currencyFilter)}
+                    </td>
+                    <td className="px-3 py-2.5 tabular-nums text-muted">{fmtPct(y.roi)}</td>
+                    <td className="px-3 py-2.5 tabular-nums text-muted">{y.itm.toFixed(1)}%</td>
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+        )}
+      </Painel>
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
@@ -1311,18 +1619,18 @@ export default function BankrollPage() {
             onChange={(e) => setCashout(e.target.value)}
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
-          <div className="grid grid-cols-[1fr_64px] gap-2">
+          <div className="flex gap-2">
             <input
               placeholder="Stake"
               value={stake}
               onChange={(e) => setStake(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
+              className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
             <select
               value={currency}
               onChange={(e) => setCurrency(e.target.value)}
               title="Moeda da sessao"
-              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
+              className="w-[92px] shrink-0 rounded-lg border border-hairline bg-elevated px-2 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
             >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
@@ -1486,18 +1794,18 @@ export default function BankrollPage() {
             onChange={(e) => setTxDate(e.target.value)}
             className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
           />
-          <div className="grid grid-cols-[1fr_64px] gap-2">
+          <div className="flex gap-2">
             <input
               placeholder="Valor"
               value={txAmount}
               onChange={(e) => setTxAmount(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
+              className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm outline-none transition-colors focus:border-ink/40"
             />
             <select
               value={txCurrency}
               onChange={(e) => setTxCurrency(e.target.value)}
               title="Moeda"
-              className="rounded-lg border border-hairline bg-elevated px-1.5 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
+              className="w-[92px] shrink-0 rounded-lg border border-hairline bg-elevated px-2 py-2.5 text-xs text-muted outline-none transition-colors focus:border-ink/40"
             >
               {CURRENCIES.map((c) => (
                 <option key={c} value={c}>
@@ -1541,44 +1849,6 @@ export default function BankrollPage() {
         </button>
       </Modal>
 
-      <Painel titulo="Historico de transacoes" icone={<Wallet size={14} className="text-training" />} className="mt-6">
-        {recentTx.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
-        ) : (
-          <div className="mt-4 divide-y divide-hairline">
-            {recentTx.map((t) => (
-              <div
-                key={t.id}
-                className="flex items-center gap-3 px-1.5 py-2.5 transition-colors hover:bg-elevated"
-              >
-                <div className="grid h-8 w-8 shrink-0 place-items-center rounded-lg bg-void/40">
-                  {t.type === "deposito" ? (
-                    <TrendingUp size={14} className="text-positive" />
-                  ) : t.type === "saque" ? (
-                    <TrendingDown size={14} className="text-negative" />
-                  ) : (
-                    <PiggyBank size={14} className="text-evolution" />
-                  )}
-                </div>
-                <div className="min-w-0 flex-1">
-                  <p className="truncate text-sm font-semibold">
-                    {TX_LABELS[t.type]} · {t.date}
-                    {t.venue ? ` · ${t.venue}` : ""}
-                  </p>
-                  {t.note && <p className="truncate text-xs text-muted">{t.note}</p>}
-                </div>
-                <span className={`text-sm font-bold ${t.type === "deposito" ? "text-positive" : "text-negative"}`}>
-                  {t.type === "deposito" ? "+" : "-"}
-                  {fmt(t.amount)}
-                </span>
-                <button onClick={() => handleRemoveTransaction(t.id)} className="text-muted transition-colors hover:text-negative">
-                  <Trash2 size={15} />
-                </button>
-              </div>
-            ))}
-          </div>
-        )}
-      </Painel>
     </main>
     </AppShell>
   );
@@ -1621,12 +1891,17 @@ function Painel({
   titulo,
   icone,
   acao,
+  hint,
   className,
   children,
 }: {
   titulo: string;
   icone: React.ReactNode;
   acao?: React.ReactNode;
+  // Explicação simples em texto puro — aparece ao passar o mouse no
+  // título (mesmo mecanismo do `hint` do Player Evolution: title nativo
+  // do navegador, sem componente novo), pra quem não conhece o termo.
+  hint?: string;
   className?: string;
   children: React.ReactNode;
 }) {
@@ -1636,6 +1911,11 @@ function Painel({
         <div className="flex items-center gap-1.5">
           {icone}
           <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">{titulo}</h2>
+          {hint && (
+            <span title={hint} className="text-muted/60 hover:text-muted">
+              <Info size={11} />
+            </span>
+          )}
         </div>
         {acao}
       </div>

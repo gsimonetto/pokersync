@@ -604,6 +604,31 @@ export async function linkReviewToSession(reviewId: string, sessionId: string | 
   if (error) throw error;
 }
 
+// Quais torneios (hand_sessions) já têm pelo menos uma mão vinculada a uma
+// sessão de banca (hand_reviews.session_id preenchido) — usado pra Gestão de
+// Banca saber quais torneios capturados pelo agente ainda não viraram
+// sessão de banca, sem precisar de uma coluna nova de vínculo.
+export async function fetchLinkedTournamentHandSessionIds(handSessionIds: string[]): Promise<Set<string>> {
+  if (handSessionIds.length === 0) return new Set();
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("hand_reviews")
+    .select("hand_session_id, session_id")
+    .in("hand_session_id", handSessionIds)
+    .not("session_id", "is", null);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => (r as { hand_session_id: string | null }).hand_session_id).filter((id): id is string => id !== null));
+}
+
+// Vincula todas as mãos de um torneio (hand_session) de uma vez à sessão de
+// banca recém-criada — usado ao registrar na banca um torneio sugerido a
+// partir do que o agente desktop já capturou (ver app/banca/page.tsx).
+export async function linkHandSessionReviews(handSessionId: string, bankrollSessionId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("hand_reviews").update({ session_id: bankrollSessionId }).eq("hand_session_id", handSessionId);
+  if (error) throw error;
+}
+
 // Quantas maos ja foram revisadas por sessao de banca -- fecha o ciclo
 // no sentido banca->revisor (antes so' existia revisor->banca, o
 // vinculo nunca aparecia de volta na tela de banca).
