@@ -13,7 +13,7 @@ import {
   type PlayerPerformance,
   type PreflopSituation,
 } from "@/lib/services/performance-service";
-import { fetchTournamentMetrics } from "@/lib/services/analysis-service";
+import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
 import { StatCardGrid, statBar, toneFromRange } from "@/components/analysis/shared";
@@ -74,13 +74,13 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [profileRes, userRes, progressRes, perfRes, preflopRes, metricsRes, achievementsRes, payoutsRes] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, perfRes, preflopRes, tournSessionsRes, achievementsRes, payoutsRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchPlayerPerformance(),
         fetchPreflopSituations(),
-        fetchTournamentMetrics(),
+        fetchTournamentSessions(),
         fetchMyAchievements(),
         fetchTournamentPayouts(),
       ]);
@@ -90,19 +90,26 @@ export default function ModulosPage() {
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (perfRes.status === "fulfilled") setPerf(perfRes.value);
       if (preflopRes.status === "fulfilled") setPreflop(preflopRes.value);
-      // Buy-in medio: mesma fonte que a Gestao de Banca (fetchSessions,
-      // dentro de fetchTournamentMetrics) -- cobre torneio lancado manual
-      // e importado pelo agente desktop, sem distincao.
-      if (metricsRes.status === "fulfilled") setAvgBuyin(metricsRes.value.avg_buyin);
       if (achievementsRes.status === "fulfilled") setAchievements(achievementsRes.value);
-      // Ganhos totais: soma BRUTA de heroPayoutAmount em tournament_payouts
-      // (torneio lancado manual ou importado pelo agente) -- pedido
-      // explicito pra NAO subtrair nada (buy-in, saque etc.), diferente
-      // do "Lucro total" liquido que ja existe na Gestao de Banca.
-      if (payoutsRes.status === "fulfilled") {
-        const payouts = payoutsRes.value;
-        const withPayout = payouts.filter((p) => p.heroPayoutAmount != null);
-        setTotalGanhos(withPayout.length > 0 ? withPayout.reduce((acc, p) => acc + (p.heroPayoutAmount ?? 0), 0) : null);
+
+      // Buy-in médio / Ganhos totais: SÓ das mãos importadas (hand_sessions
+      // + tournament_payouts, mesma fonte do Revisor), nunca de
+      // bankroll_sessions (Gestão de Banca) -- excluir uma sessão na Banca
+      // não pode mudar esses números. Ganhos totais é soma BRUTA do que
+      // cada torneio pagou (sem subtrair buy-in nem saque, diferente do
+      // "Lucro total" líquido que já existe na Banca).
+      if (tournSessionsRes.status === "fulfilled") {
+        const tournSessions = tournSessionsRes.value;
+        const buyins = tournSessions.map((s) => s.buyin).filter((b): b is number => b != null);
+        setAvgBuyin(buyins.length > 0 ? buyins.reduce((a, b) => a + b, 0) / buyins.length : null);
+
+        if (payoutsRes.status === "fulfilled") {
+          const payoutByTournament = new Map(payoutsRes.value.map((p) => [p.tournamentIdPs, p]));
+          const ganhos = tournSessions
+            .map((s) => (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null))
+            .filter((v): v is number => v != null);
+          setTotalGanhos(ganhos.length > 0 ? ganhos.reduce((a, b) => a + b, 0) : null);
+        }
       }
 
       // Time: precisa do user.id da chamada de auth acima -- RLS de
@@ -139,11 +146,13 @@ export default function ModulosPage() {
       <main className="flex flex-1 flex-col gap-4 px-4 py-6 md:px-6">
         {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
             + metricas mais relevantes (coluna 3), mesma ordem/estilo de
-            linha -- estrutura pedida pelo usuario. Buy-in medio vem de
-            fetchTournamentMetrics (mesma fonte da Gestao de Banca) --
-            cobre torneio lancado manual e importado pelo agente desktop
-            sem distincao, por isso trocou o lugar de "Ganhos totais"
-            (que nunca teve fonte de dado real nessa tela). */}
+            linha -- estrutura pedida pelo usuario. Buy-in medio e Ganhos
+            totais vem de hand_sessions + tournament_payouts (mesma fonte
+            do Revisor de Maos/Player Evolution), NUNCA de bankroll_sessions
+            (Gestao de Banca) -- cada modulo trata a mesma mao importada do
+            seu proprio jeito (ver handleRemove em app/banca/page.tsx e o
+            comentario equivalente em StatisticsTab.tsx), entao excluir uma
+            sessao na Banca nao muda esses dois numeros aqui. */}
         <section className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface transition-all duration-300 hover:border-white/15 hover:shadow-[0_0_40px_-12px_rgba(255,255,255,0.18)] sm:flex-row">
           <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center overflow-hidden bg-elevated p-4 sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
             <Avatar
@@ -181,7 +190,7 @@ export default function ModulosPage() {
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Buy-in médio</span>
-                  <MetricValue href="/banca" mono>
+                  <MetricValue href="/performance" mono>
                     {avgBuyin != null ? BRL.format(avgBuyin) : "—"}
                   </MetricValue>
                 </div>

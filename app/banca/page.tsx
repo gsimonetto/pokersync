@@ -10,7 +10,7 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, CURRENCIES, todayISO, se
 import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
-import { deleteHandSession, type HandSession } from "@/lib/services/hand-session-service";
+import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
@@ -675,14 +675,18 @@ export default function BankrollPage() {
     }
   }
 
+  // Excluir sessao da banca NUNCA apaga o torneio/maos correspondente no
+  // Revisor (pedido explicito): sao dois sistemas com fontes de verdade
+  // diferentes -- Banca trata o resultado liquido (buyIn/cashout), Revisor
+  // e' o historico de maos jogadas, que continua existindo mesmo que o
+  // jogador tire aquele torneio da contabilidade da banca. So' apaga a
+  // linha de bankroll_sessions; hand_sessions (e suas maos) fica intacta,
+  // so perde o vinculo (FK SET NULL) -- reaparece como orfa se algum dia
+  // for reimportada.
   async function handleRemove(id: string) {
     const backup = sessions;
-    const removed = sessions.find((s) => s.id === id);
     setSessions((prev) => prev.filter((x) => x.id !== id));
     try {
-      if (removed?.importedHandSessionId) {
-        await deleteHandSession(removed.importedHandSessionId);
-      }
       await apiDeleteSession(id);
     } catch {
       setErr("Nao foi possivel excluir. Restaurando.");
