@@ -123,6 +123,26 @@ export function StatisticsTab({
     if (focusPendingPayout) setPremiacaoOpen(true);
   }, [focusPendingPayout]);
   const payoutByTournament = useMemo(() => new Map(payouts.map((p) => [p.tournamentIdPs, p])), [payouts]);
+
+  // Buy-ins investidos / Ganhos (premiação) / Torneios: pedido explícito
+  // pra vir SÓ das mãos importadas (hand_sessions + tournament_payouts),
+  // nunca de bankroll_sessions (Gestão de Banca) — são fontes de verdade
+  // separadas de propósito, e excluir uma sessão na Banca não pode apagar
+  // (nem mudar) esses números aqui. Por isso soma bruta (nunca subtrai
+  // buy-in do ganho, ao contrário do lucro líquido que a Banca calcula).
+  const totalBuyinImportado = useMemo(
+    () => filteredSessions.reduce((acc, s) => acc + (s.buyin ?? 0), 0),
+    [filteredSessions]
+  );
+  const totalGanhosImportado = useMemo(
+    () =>
+      filteredSessions.reduce((acc, s) => {
+        const p = s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps) : undefined;
+        return acc + (p?.heroPayoutAmount ?? 0);
+      }, 0),
+    [filteredSessions, payoutByTournament]
+  );
+
   const payoutRegisteredCount = useMemo(
     () =>
       filteredSessions.filter((s) => {
@@ -162,13 +182,17 @@ export function StatisticsTab({
       <Painel titulo="Resumo financeiro" icone={<Wallet size={14} className="icon-glow text-evolution" />}>
         <StatList
           items={[
-            { label: "Buy-ins investidos", value: fmtMoneyPlain(metrics.total_invested), icon: ArrowDownToLine },
-            { label: "Torneios", value: metrics.total_games > 0 ? String(metrics.total_games) : null, icon: Hash },
+            {
+              label: "Buy-ins investidos",
+              value: filteredSessions.length > 0 ? fmtMoneyPlain(totalBuyinImportado) : null,
+              icon: ArrowDownToLine,
+            },
+            { label: "Torneios", value: filteredSessions.length > 0 ? String(filteredSessions.length) : null, icon: Hash },
             {
               label: "Ganhos (premiação)",
-              value: fmtMoneyPlain(metrics.total_cashout),
+              value: filteredSessions.length > 0 ? fmtMoneyPlain(totalGanhosImportado) : null,
               icon: Trophy,
-              tone: metrics.total_cashout === null ? undefined : "bom",
+              tone: totalGanhosImportado > 0 ? "bom" : undefined,
             },
             { label: "Jogando desde", value: fmtSince(metrics.since), icon: CalendarClock },
             { label: "Último torneio", value: fmtSince(metrics.until), icon: CalendarCheck },

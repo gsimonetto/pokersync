@@ -2,17 +2,30 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Target, Trophy, Medal, Star, Award } from "lucide-react";
+import { ArrowRight, Target, Trophy, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/client";
-import { fetchProfile, DIA_SEMANA_LABEL, type Profile } from "@/lib/services/profile-service";
+import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import {
   fetchPlayerPerformance,
   fetchPreflopSituations,
   type PlayerPerformance,
   type PreflopSituation,
 } from "@/lib/services/performance-service";
+import { fetchTournamentSessions } from "@/lib/services/analysis-service";
+import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
+import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
+import { StatCardGrid, statBar, toneFromRange } from "@/components/analysis/shared";
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+// Icone por conquista do catalogo (ver migracao achievements) --
+// fallback Trophy pra qualquer conquista futura sem icone proprio
+// mapeado aqui ainda.
+const ACHIEVEMENT_ICON: Record<string, LucideIcon> = {
+  founder: Trophy,
+};
 
 // Mesmas faixas de referencia de app/performance/page.tsx (funcao
 // Frequencia) -- contexto visual, nunca veredito de certo/errado.
@@ -44,6 +57,9 @@ export default function ModulosPage() {
   const [team, setTeam] = useState<{ name: string; accent: string } | null>(null);
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
+  const [avgBuyin, setAvgBuyin] = useState<number | null>(null);
+  const [totalGanhos, setTotalGanhos] = useState<number | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -58,12 +74,15 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [profileRes, userRes, progressRes, perfRes, preflopRes] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, perfRes, preflopRes, tournSessionsRes, achievementsRes, payoutsRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchPlayerPerformance(),
         fetchPreflopSituations(),
+        fetchTournamentSessions(),
+        fetchMyAchievements(),
+        fetchTournamentPayouts(),
       ]);
       if (!alive) return;
 
@@ -71,6 +90,27 @@ export default function ModulosPage() {
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (perfRes.status === "fulfilled") setPerf(perfRes.value);
       if (preflopRes.status === "fulfilled") setPreflop(preflopRes.value);
+      if (achievementsRes.status === "fulfilled") setAchievements(achievementsRes.value);
+
+      // Buy-in médio / Ganhos totais: SÓ das mãos importadas (hand_sessions
+      // + tournament_payouts, mesma fonte do Revisor), nunca de
+      // bankroll_sessions (Gestão de Banca) -- excluir uma sessão na Banca
+      // não pode mudar esses números. Ganhos totais é soma BRUTA do que
+      // cada torneio pagou (sem subtrair buy-in nem saque, diferente do
+      // "Lucro total" líquido que já existe na Banca).
+      if (tournSessionsRes.status === "fulfilled") {
+        const tournSessions = tournSessionsRes.value;
+        const buyins = tournSessions.map((s) => s.buyin).filter((b): b is number => b != null);
+        setAvgBuyin(buyins.length > 0 ? buyins.reduce((a, b) => a + b, 0) / buyins.length : null);
+
+        if (payoutsRes.status === "fulfilled") {
+          const payoutByTournament = new Map(payoutsRes.value.map((p) => [p.tournamentIdPs, p]));
+          const ganhos = tournSessions
+            .map((s) => (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null))
+            .filter((v): v is number => v != null);
+          setTotalGanhos(ganhos.length > 0 ? ganhos.reduce((a, b) => a + b, 0) : null);
+        }
+      }
 
       // Time: precisa do user.id da chamada de auth acima -- RLS de
       // team_members libera todo membro do mesmo time, entao o filtro por
@@ -101,24 +141,18 @@ export default function ModulosPage() {
   const foldTo3bet = preflop.find((p) => p.label === "Fold para 3-Bet");
   const blindDefense = preflop.find((p) => p.label === "Defesa de Blinds");
 
-  const diasTreino = (profile?.dias_treino_semana ?? [])
-    .map((d) => DIA_SEMANA_LABEL[d])
-    .join(", ");
-  const horasTreino =
-    profile?.horas_treino_dia != null
-      ? `${profile.horas_treino_dia}h/dia${diasTreino ? ` · ${diasTreino}` : ""}`
-      : "—";
-
   return (
     <AppShell>
       <main className="flex flex-1 flex-col gap-4 px-4 py-6 md:px-6">
         {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
             + metricas mais relevantes (coluna 3), mesma ordem/estilo de
-            linha -- estrutura pedida pelo usuario. Ganhos totais ainda
-            nao tem fonte de dado real (chega com o agente desktop
-            importando HH/torneios), entao aparece como "—", igual ao
-            padrao ja usado em ITM aproximado na tela de Performance --
-            nunca numero inventado. */}
+            linha -- estrutura pedida pelo usuario. Buy-in medio e Ganhos
+            totais vem de hand_sessions + tournament_payouts (mesma fonte
+            do Revisor de Maos/Player Evolution), NUNCA de bankroll_sessions
+            (Gestao de Banca) -- cada modulo trata a mesma mao importada do
+            seu proprio jeito (ver handleRemove em app/banca/page.tsx e o
+            comentario equivalente em StatisticsTab.tsx), entao excluir uma
+            sessao na Banca nao muda esses dois numeros aqui. */}
         <section className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface transition-all duration-300 hover:border-white/15 hover:shadow-[0_0_40px_-12px_rgba(255,255,255,0.18)] sm:flex-row">
           <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center overflow-hidden bg-elevated p-4 sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
             <Avatar
@@ -150,11 +184,15 @@ export default function ModulosPage() {
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
-                  <span className="text-sm text-muted">—</span>
+                  <MetricValue href="/performance" mono>
+                    {totalGanhos != null ? BRL.format(totalGanhos) : "—"}
+                  </MetricValue>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas de treino</span>
-                  <span className="text-sm tabular-nums text-ink">{horasTreino}</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Buy-in médio</span>
+                  <MetricValue href="/performance" mono>
+                    {avgBuyin != null ? BRL.format(avgBuyin) : "—"}
+                  </MetricValue>
                 </div>
               </div>
 
@@ -218,31 +256,38 @@ export default function ModulosPage() {
               </div>
             </div>
 
-            {/* Conquistas: emblemas/trofeus do PokerSync. Sem dados reais
-                ainda (nenhum sistema de conquistas no backend), entao os
-                emblemas ficam bloqueados/apagados ate a primeira ser
-                desbloqueada -- nunca um numero ou selo inventado. */}
+            {/* Conquistas PokerSync: pedido explicito pra NAO mostrar
+                nenhum selo/placeholder bloqueado enquanto o jogador nao
+                tem nenhuma conquista real -- so' o titulo e o espaco
+                reservado (min-h), sem numero nem icone inventado. Quando
+                achievements vier preenchido (ver achievements-service.ts),
+                os selos desbloqueados aparecem aqui, cada um com o icone
+                do proprio catalogo (ACHIEVEMENT_ICON, fallback Trophy). */}
             <div className="mt-3 border-t border-hairline pt-3">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas</p>
-              <div className="flex flex-wrap gap-2">
-                {[Trophy, Medal, Star, Award].map((Icon, i) => (
-                  <div
-                    key={i}
-                    title="Conquista bloqueada"
-                    className="grid size-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted/40"
-                  >
-                    <Icon size={16} strokeWidth={1.75} />
-                  </div>
-                ))}
-                <p className="ml-1 self-center text-[11px] text-muted/70">Suas conquistas aparecerão aqui.</p>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas PokerSync</p>
+              <div className="flex min-h-9 flex-wrap gap-2">
+                {achievements.map((a) => {
+                  const Icon = ACHIEVEMENT_ICON[a.code] ?? Trophy;
+                  return (
+                    <div
+                      key={a.code}
+                      title={a.description}
+                      className="grid size-9 place-items-center rounded-lg border border-evolution/40 bg-evolution/10 text-evolution shadow-[0_0_10px_rgba(245,158,11,.3)]"
+                    >
+                      <Icon size={16} strokeWidth={1.75} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
         </section>
 
-        {/* Frequências pré-flop: mesmo componente-régua de
-            app/performance/page.tsx (funcao Frequencia). Fold p/ 3-Bet
-            e Defesa de Blinds vem de fetchPreflopSituations, mesma fonte
+        {/* Frequências pré-flop: mesmo StatCardGrid (régua + marcador com
+            glow) do Player Evolution (components/analysis/shared.tsx),
+            pedido explícito -- antes essa tela tinha uma régua própria
+            (FreqCard/FreqSimples) com visual diferente. Fold p/ 3-Bet e
+            Defesa de Blinds vêm de fetchPreflopSituations, mesma fonte
             real usada na aba "Situações pré-flop" da Performance. */}
         <section className="flex shrink-0 flex-col rounded-xl border border-hairline bg-surface p-4">
           <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
@@ -255,13 +300,38 @@ export default function ModulosPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-            <FreqCard label="VPIP" valor={perf?.vpip_pct ?? null} referencia={REF.vpip} />
-            <FreqCard label="PFR" valor={perf?.pfr_pct ?? null} referencia={REF.pfr} />
-            <FreqCard label="3-Bet" valor={perf?.three_bet_pct ?? null} referencia={REF.threeBet} />
-            <FreqSimples label="Fold p/ 3-Bet" pct={foldTo3bet?.pct ?? null} sample={foldTo3bet?.sample ?? null} />
-            <FreqSimples label="Defesa de Blinds" pct={blindDefense?.pct ?? null} sample={blindDefense?.sample ?? null} />
-          </div>
+          <StatCardGrid
+            items={[
+              {
+                label: "VPIP",
+                value: perf?.vpip_pct != null ? `${Number(perf.vpip_pct).toFixed(1)}%` : null,
+                tone: toneFromRange(perf?.vpip_pct ?? null, REF.vpip.min, REF.vpip.max),
+                bar: statBar(perf?.vpip_pct ?? null, REF.vpip.min, REF.vpip.max, REF.vpip.escala),
+              },
+              {
+                label: "PFR",
+                value: perf?.pfr_pct != null ? `${Number(perf.pfr_pct).toFixed(1)}%` : null,
+                tone: toneFromRange(perf?.pfr_pct ?? null, REF.pfr.min, REF.pfr.max),
+                bar: statBar(perf?.pfr_pct ?? null, REF.pfr.min, REF.pfr.max, REF.pfr.escala),
+              },
+              {
+                label: "3-Bet",
+                value: perf?.three_bet_pct != null ? `${Number(perf.three_bet_pct).toFixed(1)}%` : null,
+                tone: toneFromRange(perf?.three_bet_pct ?? null, REF.threeBet.min, REF.threeBet.max),
+                bar: statBar(perf?.three_bet_pct ?? null, REF.threeBet.min, REF.threeBet.max, REF.threeBet.escala),
+              },
+              {
+                label: "Fold p/ 3-Bet",
+                value: foldTo3bet?.pct != null ? `${foldTo3bet.pct}%` : null,
+                hint: foldTo3bet?.sample != null ? `sobre ${foldTo3bet.sample} mãos` : undefined,
+              },
+              {
+                label: "Defesa de Blinds",
+                value: blindDefense?.pct != null ? `${blindDefense.pct}%` : null,
+                hint: blindDefense?.sample != null ? `sobre ${blindDefense.sample} mãos` : undefined,
+              },
+            ]}
+          />
 
           <p className="mt-2.5 shrink-0 text-[11px] text-muted/70">
             Calculado sobre <strong className="text-ink/85">{perf?.maos_com_dados_frequencia ?? 0}</strong> mãos com
@@ -286,62 +356,3 @@ function MetricValue({ href, mono, children }: { href?: string; mono?: boolean; 
   );
 }
 
-// Card com regua (faixa de referencia + marcador) -- copia visual exata
-// da funcao Frequencia em app/performance/page.tsx, so que compacta pro
-// espaco desta tela.
-function FreqCard({
-  label,
-  valor,
-  referencia,
-}: {
-  label: string;
-  valor: number | null;
-  referencia: { min: number; max: number; escala: number };
-}) {
-  const v = valor === null || valor === undefined ? null : Number(valor);
-  const pos = v === null ? 0 : Math.min(Math.max((v / referencia.escala) * 100, 0), 100);
-  const refLeft = (referencia.min / referencia.escala) * 100;
-  const refWidth = ((referencia.max - referencia.min) / referencia.escala) * 100;
-
-  return (
-    <div className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-      <p className="truncate text-[9px] font-bold uppercase tracking-wider text-muted/80">{label}</p>
-      <p className={`mt-0.5 text-lg font-bold leading-none tabular-nums ${v === null ? "text-muted/30" : "text-ink"}`}>
-        {v === null ? "—" : `${v.toFixed(1)}%`}
-      </p>
-      <div className="relative mt-2.5 h-[3px] w-full rounded-full bg-void/60">
-        <div
-          aria-hidden="true"
-          className="absolute inset-y-0 rounded-full bg-ink/15"
-          style={{ left: `${refLeft}%`, width: `${refWidth}%` }}
-        />
-        {v !== null && (
-          <span
-            className="absolute top-1/2 h-[11px] w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-training shadow-[0_0_6px_rgba(59,130,246,.6)]"
-            style={{ left: `${pos}%` }}
-          />
-        )}
-      </div>
-      <p className="mt-1.5 text-[9.5px] leading-tight text-muted/65">
-        ref. {referencia.min}–{referencia.max}%
-      </p>
-    </div>
-  );
-}
-
-// Card sem regua (nao ha faixa de referencia definida pro produto pra
-// essas duas) -- mesmo valor/contagem que ja aparece em "Situacoes
-// pre-flop" na Performance, so' que compacto.
-function FreqSimples({ label, pct, sample }: { label: string; pct: number | null; sample: number | null }) {
-  return (
-    <div className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-      <p className="truncate text-[9px] font-bold uppercase tracking-wider text-muted/80">{label}</p>
-      <p className={`mt-0.5 text-lg font-bold leading-none tabular-nums ${pct === null ? "text-muted/30" : "text-ink"}`}>
-        {pct === null ? "—" : `${pct}%`}
-      </p>
-      <p className="mt-[26px] text-[9.5px] leading-tight text-muted/65">
-        {sample !== null ? `sobre ${sample} mãos` : "sem amostra"}
-      </p>
-    </div>
-  );
-}
