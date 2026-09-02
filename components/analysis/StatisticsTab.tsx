@@ -19,12 +19,10 @@ import {
   Flame,
   Snowflake,
   ChevronDown,
-  type LucideIcon,
 } from "lucide-react";
 import { Painel, StatList, Bloqueado } from "@/components/analysis/shared";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { TournamentPayoutsPanel } from "@/components/analysis/TournamentPayoutsPanel";
-import { EvolutionChart } from "@/components/time/evolution-chart";
 import { buyinBucketOf } from "@/lib/services/analysis-service";
 import { fetchEligibleHandReviewIds, computeHandEvBatch } from "@/lib/services/hand-ev-service";
 import { BUYIN_BUCKET_LABEL, type BuyinBucket, type TournamentMetrics } from "@/types/analysis";
@@ -62,7 +60,6 @@ function fmtSince(iso: string | null): string | null {
 // novo no topo, ver app/performance/page.tsx.
 export function StatisticsTab({
   metrics,
-  financialSeries,
   tournamentSessions,
   payouts,
   onPayoutsChanged,
@@ -162,32 +159,17 @@ export function StatisticsTab({
 
   return (
     <div className="space-y-4">
-      {/* Estilo SharkScope: os 3 totais que definem o resultado (quanto
-          entrou, quantos torneios, quanto voltou) ficam coladas no
-          gráfico, num card só, em vez de repetidos lá em cima no Resumo
-          financeiro e de novo aqui embaixo do gráfico gigante. O gráfico
-          em si encolhe pra caber na coluna [1fr] ao lado da lista — antes
-          era full-width e dominava a tela sozinho. */}
-      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[200px_1fr]">
-        <div className="flex flex-col justify-center gap-4 lg:pl-1">
-          <TotalStat label="Buy-ins investidos" value={fmtMoneyPlain(metrics.total_invested)} icon={ArrowDownToLine} />
-          <TotalStat label="Torneios" value={metrics.total_games > 0 ? String(metrics.total_games) : null} icon={Hash} />
-          <TotalStat
-            label="Ganhos (premiação)"
-            value={fmtMoneyPlain(metrics.total_cashout)}
-            icon={Trophy}
-            tone={metrics.total_cashout === null ? undefined : "bom"}
-          />
-          {metrics.total_games === 0 && (
-            <p className="text-xs text-muted">Nenhuma sessão de torneio registrada na Gestão de Banca ainda.</p>
-          )}
-        </div>
-        <EvolutionChart dados={financialSeries} titulo="Evolução do resultado" />
-      </div>
-
       <Painel titulo="Resumo financeiro" icone={<Wallet size={14} className="icon-glow text-evolution" />}>
         <StatList
           items={[
+            { label: "Buy-ins investidos", value: fmtMoneyPlain(metrics.total_invested), icon: ArrowDownToLine },
+            { label: "Torneios", value: metrics.total_games > 0 ? String(metrics.total_games) : null, icon: Hash },
+            {
+              label: "Ganhos (premiação)",
+              value: fmtMoneyPlain(metrics.total_cashout),
+              icon: Trophy,
+              tone: metrics.total_cashout === null ? undefined : "bom",
+            },
             { label: "Jogando desde", value: fmtSince(metrics.since), icon: CalendarClock },
             { label: "Último torneio", value: fmtSince(metrics.until), icon: CalendarCheck },
             {
@@ -370,33 +352,6 @@ export function StatisticsTab({
           <Bloqueado titulo="Situações de ICM (bolha, mesa final)" texto="tournament_phase e icm_pressure existem no schema, mas o parser ainda não os preenche." />
         </div>
       </Painel>
-    </div>
-  );
-}
-
-// Numero grande estilo SharkScope, ao lado do grafico de evolucao —
-// so' os 3 totais que respondem "quanto entrou, em quantos torneios,
-// quanto voltou" de cara, sem precisar ler o Resumo financeiro abaixo.
-function TotalStat({
-  label,
-  value,
-  icon: Icon,
-  tone,
-}: {
-  label: string;
-  value: string | null;
-  icon: LucideIcon;
-  tone?: "bom";
-}) {
-  return (
-    <div>
-      <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted/80">
-        <Icon size={12} className="icon-glow shrink-0" />
-        {label}
-      </p>
-      <p className={`mt-1 text-2xl font-bold tabular-nums ${value ? (tone === "bom" ? "text-positive" : "text-ink") : "text-muted/30"}`}>
-        {value ?? "—"}
-      </p>
     </div>
   );
 }
