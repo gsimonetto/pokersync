@@ -1021,7 +1021,7 @@ export default function BankrollPage() {
           titulo="Risco"
           icone={<ShieldAlert size={14} className="icon-glow text-negative" />}
           hint="Sinais de alerta pra sua banca: quanto você já perdeu do topo e se o stake atual ainda cabe no seu bankroll."
-          className="flex min-h-[220px] flex-col"
+          className="flex h-[260px] flex-col"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div
@@ -1172,7 +1172,7 @@ export default function BankrollPage() {
           titulo="AI Coach"
           icone={<Sparkles size={14} className="icon-glow text-evolution" />}
           hint="Dicas automáticas geradas a partir das suas sessões — leaks, tendências e alertas."
-          className="flex min-h-[220px] flex-col"
+          className="flex h-[260px] flex-col"
           acao={
             tipsVisiveis.length > 0 ? (
               <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
@@ -1224,7 +1224,7 @@ export default function BankrollPage() {
           titulo={`Sessões recentes (${historyFiltered.length})`}
           icone={<History size={14} className="icon-glow text-training" />}
           hint="Suas últimas sessões registradas. Use os filtros pra achar um período ou faixa de buy-in específica."
-          className="flex min-h-[220px] flex-col"
+          className="flex h-[260px] flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
               <select
@@ -1283,7 +1283,7 @@ export default function BankrollPage() {
           {historyFiltered.length === 0 ? (
             <p className="mt-4 text-sm text-muted">Nenhuma sessao encontrada com esses filtros.</p>
           ) : (
-            <div className="mt-4 max-h-[13rem] divide-y divide-hairline overflow-y-auto">
+            <div className="mt-4 divide-y divide-hairline">
               {historyFiltered.map((s) => {
                 const result = net(s);
                 return (
@@ -1349,12 +1349,12 @@ export default function BankrollPage() {
           titulo="Histórico de transações"
           icone={<Wallet size={14} className="icon-glow text-training" />}
           hint="Depósitos, saques e caixinha — não entra no resultado de jogo, só o dinheiro que entrou/saiu da banca."
-          className="flex min-h-[150px] flex-col"
+          className="flex h-[260px] flex-col"
         >
           {recentTx.length === 0 ? (
             <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
           ) : (
-            <div className="mt-4 max-h-[13rem] divide-y divide-hairline overflow-y-auto">
+            <div className="mt-4 divide-y divide-hairline">
               {recentTx.map((t) => (
                 <div
                   key={t.id}
@@ -1396,7 +1396,7 @@ export default function BankrollPage() {
             titulo="Patrimônio consolidado"
             icone={<Coins size={14} className="icon-glow text-evolution" />}
             hint="Soma o saldo de todas as moedas numa visão só, usando a taxa de câmbio que você digitar abaixo — é uma estimativa sua, não uma cotação ao vivo."
-            className="flex min-h-[220px] flex-col"
+            className="flex h-[260px] flex-col"
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
               {perCurrencyBalances.map((p) => (
@@ -1436,7 +1436,7 @@ export default function BankrollPage() {
         titulo="Resumo anual"
         icone={<FileBarChart size={14} className="icon-glow text-training" />}
         hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
-        className={`flex min-h-[220px] flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
+        className={`flex h-[260px] flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
         acao={
           yearlyReport.length > 0 && (
             <button
@@ -1970,7 +1970,7 @@ function Painel({
 }) {
   return (
     <section className={`rounded-xl border border-hairline bg-surface p-5 ${className ?? ""}`}>
-      <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+      <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {icone}
           <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">{titulo}</h2>
@@ -1982,7 +1982,7 @@ function Painel({
         </div>
         {acao}
       </div>
-      {children}
+      <div className="min-h-0 flex-1 overflow-y-auto">{children}</div>
     </section>
   );
 }
