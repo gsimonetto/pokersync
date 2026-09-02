@@ -444,15 +444,8 @@ export function RevisorFila({
               <Trophy size={32} className="text-elevated" />
               <p className="mt-3 text-muted">Nenhum torneio ou sessão de cash ainda.</p>
               <p className="mt-1 text-xs text-muted">
-                Cole uma hand history em &quot;Nova mão&quot; — o torneio é criado automaticamente.
+                Cole uma hand history em &quot;Nova mão&quot; (botão acima) — o torneio é criado automaticamente.
               </p>
-              <button
-                onClick={onNova}
-                className="mt-3 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
-              >
-                <Plus size={16} />
-                Importar primeira mão
-              </button>
             </div>
           ) : filteredSessions.length === 0 ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
@@ -564,13 +557,6 @@ export function RevisorFila({
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center">
               <BookOpen size={32} className="text-elevated" />
               <p className="mt-3 text-muted">Nenhuma mão avulsa aqui ainda.</p>
-              <button
-                onClick={onNova}
-                className="mt-2 inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
-              >
-                <Plus size={16} />
-                Registrar primeira mão
-              </button>
             </div>
           ) : (
             <ul className="flex flex-col gap-2.5">
@@ -696,7 +682,7 @@ function SummaryStat({
   return (
     <div className="rounded-lg border border-hairline bg-surface p-2.5">
       <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-        <Icon size={11} style={{ color: accent }} />
+        <Icon size={11} className="icon-glow" style={{ color: accent }} />
         {label}
       </p>
       <p className="mt-1 text-lg font-bold text-ink">{value}</p>

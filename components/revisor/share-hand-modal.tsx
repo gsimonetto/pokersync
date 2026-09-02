@@ -8,9 +8,13 @@ import {
   suggestGuidedQuestions,
   saveAnswers,
   fetchTeamCoaches,
+  fetchStreetEvals,
   shareReviewWithCoach,
+  STREETS,
+  RATINGS,
   type ReviewAnswer,
   type TeamCoach,
+  type StreetEval,
 } from "@/lib/services/hand-review-service";
 
 // Modal de compartilhamento (pedido explicito, 2026-08): "ao clicar no
@@ -27,11 +31,12 @@ import {
 // abre a MESMA tela (RevisorDetalhe) da mao compartilhada, que ja
 // carrega qas/tags/learning_note normalmente.
 //
-// Perguntas obrigatorias vs opcionais: as primeiras REQUIRED_COUNT
-// perguntas (mesmo criterio de GUIDED_CLICKABLE_COUNT em
-// revisor-detalhe.tsx) precisam estar respondidas antes de habilitar o
-// botao de compartilhar; o resto e' aprofundamento livre.
-const REQUIRED_COUNT = 2;
+// Obrigatorio vs opcional (pedido explicito, revisado): a autoavaliacao
+// por street (pre-flop/flop/turn/river, ver STREETS) e' a UNICA coisa
+// obrigatoria pra enviar -- mesmo requisito usado pelo botao "Enviar ao
+// coach" no rodape do RevisorDetalhe. As perguntas guiadas abaixo sao
+// sempre opcionais (o jogador pode compartilhar so' com as streets
+// avaliadas, sem escrever nada extra).
 
 export function ShareHandModal({
   open,
@@ -49,6 +54,7 @@ export function ShareHandModal({
   const [userId, setUserId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [qas, setQas] = useState<ReviewAnswer[]>([]);
+  const [streetEvals, setStreetEvals] = useState<StreetEval[]>([]);
   const [title, setTitle] = useState("Mão sem título");
   const [coaches, setCoaches] = useState<TeamCoach[]>([]);
   const [saving, setSaving] = useState(false);
@@ -85,6 +91,12 @@ export function ShareHandModal({
             ).map((q) => ({ question: q, answer: "" }));
         setQas(questions);
 
+        const evals = await fetchStreetEvals(reviewId).catch(() => []);
+        if (cancelled) return;
+        setStreetEvals(
+          STREETS.map((s) => evals.find((e) => e.street === s) ?? { street: s, self_rating: "", reason_code: "", notes: "" })
+        );
+
         if (uid) {
           const cs = await fetchTeamCoaches(uid).catch(() => []);
           if (!cancelled) setCoaches(cs);
@@ -113,10 +125,10 @@ export function ShareHandModal({
     setQas((prev) => prev.map((q, i) => (i === idx ? { ...q, answer: val } : q)));
   }
 
-  const requiredMissing = qas.slice(0, REQUIRED_COUNT).some((q) => !q.answer.trim());
+  const allStreetsRated = streetEvals.length === STREETS.length && streetEvals.every((e) => e.self_rating);
 
   async function handleShare(coach: TeamCoach) {
-    if (!userId || requiredMissing) return;
+    if (!userId || !allStreetsRated) return;
     setSaving(true);
     setError("");
     try {
@@ -155,42 +167,52 @@ export function ShareHandModal({
           </div>
         ) : (
           <div className="mt-4 flex flex-col gap-4">
+            {/* Resumo das streets (obrigatorio) -- a avaliacao em si e'
+                feita em "Analisar mao" (fica "do jeito que esta", sem
+                duplicar essa UI aqui); a modal so' mostra o status e
+                trava o envio se faltar alguma. */}
             <div className="flex flex-col gap-2">
-              <p className="text-[11px] uppercase tracking-wide text-muted">Obrigatórias</p>
-              {qas.slice(0, REQUIRED_COUNT).map((q, i) => (
-                <div key={i}>
-                  <p className="text-[12.5px] font-semibold text-ink/90">{q.question}</p>
-                  <textarea
-                    value={q.answer}
-                    onChange={(e) => updateAnswer(i, e.target.value)}
-                    rows={2}
-                    placeholder="Sua análise…"
-                    className={`mt-1 w-full resize-y rounded-lg border bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40 ${
-                      !q.answer.trim() ? "border-negative/40" : "border-hairline"
-                    }`}
-                  />
-                </div>
-              ))}
-            </div>
-
-            {qas.length > REQUIRED_COUNT && (
-              <div className="flex flex-col gap-2 border-t border-hairline pt-3">
-                <p className="text-[11px] uppercase tracking-wide text-muted">Opcionais</p>
-                {qas.slice(REQUIRED_COUNT).map((q, i) => {
-                  const idx = i + REQUIRED_COUNT;
+              <p className="text-[11px] uppercase tracking-wide text-muted">Avaliação por street (obrigatória)</p>
+              <div className="flex flex-wrap gap-1.5">
+                {streetEvals.map((ev) => {
+                  const rating = RATINGS.find((r) => r.code === ev.self_rating);
                   return (
-                    <div key={idx}>
-                      <p className="text-[12.5px] font-semibold text-ink/90">{q.question}</p>
-                      <textarea
-                        value={q.answer}
-                        onChange={(e) => updateAnswer(idx, e.target.value)}
-                        rows={2}
-                        placeholder="Sua análise (opcional)…"
-                        className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
-                      />
-                    </div>
+                    <span
+                      key={ev.street}
+                      className="flex items-center gap-1.5 rounded-md border border-hairline bg-void px-2 py-1 text-[11px]"
+                    >
+                      <span className="uppercase text-ink/70">{ev.street}</span>
+                      {rating ? (
+                        <span className="rounded px-1.5 py-0.5 text-[10px] font-semibold" style={{ background: rating.color, color: "#000" }}>
+                          {rating.label}
+                        </span>
+                      ) : (
+                        <span className="text-negative">pendente</span>
+                      )}
+                    </span>
                   );
                 })}
+              </div>
+              {!allStreetsRated && (
+                <p className="text-[11.5px] text-negative">Avalie as 4 streets em &quot;Analisar mão&quot; antes de enviar.</p>
+              )}
+            </div>
+
+            {qas.length > 0 && (
+              <div className="flex flex-col gap-2 border-t border-hairline pt-3">
+                <p className="text-[11px] uppercase tracking-wide text-muted">Perguntas guiadas (opcional)</p>
+                {qas.map((q, idx) => (
+                  <div key={idx}>
+                    <p className="text-[12.5px] font-semibold text-ink/90">{q.question}</p>
+                    <textarea
+                      value={q.answer}
+                      onChange={(e) => updateAnswer(idx, e.target.value)}
+                      rows={2}
+                      placeholder="Sua análise (opcional)…"
+                      className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
+                    />
+                  </div>
+                ))}
               </div>
             )}
 
@@ -203,14 +225,11 @@ export function ShareHandModal({
                 <p className="text-[12.5px] text-positive">Mão compartilhada com {sentTo}!</p>
               ) : (
                 <div className="flex flex-col gap-2">
-                  {requiredMissing && (
-                    <p className="text-[11.5px] text-negative">Responda as perguntas obrigatórias antes de compartilhar.</p>
-                  )}
                   {coaches.map((c) => (
                     <button
                       key={c.userId}
                       onClick={() => handleShare(c)}
-                      disabled={saving || requiredMissing}
+                      disabled={saving || !allStreetsRated}
                       className="flex items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
                     >
                       {saving ? <Loader2 size={16} className="animate-spin" /> : <Users size={16} />}

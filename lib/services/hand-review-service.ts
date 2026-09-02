@@ -871,3 +871,76 @@ export async function addShareComment(
     isMine: true,
   };
 }
+
+// ============================================================
+// Maos recebidas (aba do coach no Painel do Time)
+// ============================================================
+// Todas as maos que jogadores do time compartilharam com o coach logado
+// (hand_review_shares.shared_with = eu), nao so' a de um reviewId
+// especifico como fetchShareThreads. Consultas separadas (nao embed do
+// PostgREST) pelo mesmo motivo de fetchTeamCoaches acima: sem FK
+// declarada entre hand_review_shares/hand_reviews/profiles no schema
+// cache. tournamentLabel vem de hand_sessions via hr.hand_session_id --
+// so' funciona depois da policy hand_sessions_select_shared (o coach nao
+// tem acesso a hand_sessions de outro usuario fora desse caso).
+
+export interface ReceivedShare {
+  shareId: string;
+  reviewId: string;
+  reviewTitle: string;
+  reviewStatus: string;
+  playerId: string;
+  playerName: string;
+  tournamentLabel: string | null;
+  createdAt: string;
+  viewedAt: string | null;
+}
+
+export async function fetchReceivedShares(): Promise<ReceivedShare[]> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const meId = userData.user?.id;
+  if (!meId) return [];
+
+  const { data: shares, error: sErr } = await supabase
+    .from("hand_review_shares")
+    .select("id, review_id, shared_by, created_at, viewed_at")
+    .eq("shared_with", meId)
+    .order("created_at", { ascending: false });
+  if (sErr) throw sErr;
+  if (!shares || shares.length === 0) return [];
+
+  const reviewIds = [...new Set(shares.map((s) => s.review_id))];
+  const playerIds = [...new Set(shares.map((s) => s.shared_by))];
+
+  const [{ data: reviews, error: rErr }, { data: profiles, error: pErr }] = await Promise.all([
+    supabase.from("hand_reviews").select("id, title, status, hand_session_id").in("id", reviewIds),
+    supabase.from("profiles").select("id, nome, apelido").in("id", playerIds),
+  ]);
+  if (rErr) throw rErr;
+  if (pErr) throw pErr;
+
+  const sessionIds = [...new Set((reviews ?? []).map((r) => r.hand_session_id).filter((id): id is string => !!id))];
+  const { data: sessions, error: hsErr } =
+    sessionIds.length > 0
+      ? await supabase.from("hand_sessions").select("id, label").in("id", sessionIds)
+      : { data: [] as { id: string; label: string }[], error: null };
+  if (hsErr) throw hsErr;
+
+  return shares.map((s) => {
+    const r = (reviews ?? []).find((x) => x.id === s.review_id);
+    const p = (profiles ?? []).find((x) => x.id === s.shared_by);
+    const session = r?.hand_session_id ? (sessions ?? []).find((x) => x.id === r.hand_session_id) : undefined;
+    return {
+      shareId: s.id,
+      reviewId: s.review_id,
+      reviewTitle: r?.title || "Mão sem título",
+      reviewStatus: r?.status || "pendente",
+      playerId: s.shared_by,
+      playerName: p?.apelido || p?.nome || "Jogador",
+      tournamentLabel: session?.label ?? null,
+      createdAt: s.created_at,
+      viewedAt: s.viewed_at,
+    };
+  });
+}
