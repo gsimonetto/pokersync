@@ -10,7 +10,7 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENC
 import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
-import type { HandSession } from "@/lib/services/hand-session-service";
+import { deleteHandSession, type HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { AppShell } from "@/components/app-shell";
@@ -658,8 +658,12 @@ export default function BankrollPage() {
 
   async function handleRemove(id: string) {
     const backup = sessions;
+    const removed = sessions.find((s) => s.id === id);
     setSessions((prev) => prev.filter((x) => x.id !== id));
     try {
+      if (removed?.importedHandSessionId) {
+        await deleteHandSession(removed.importedHandSessionId);
+      }
       await apiDeleteSession(id);
     } catch {
       setErr("Nao foi possivel excluir. Restaurando.");
@@ -1012,12 +1016,12 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <Painel
           titulo="Risco"
           icone={<ShieldAlert size={14} className="icon-glow text-negative" />}
           hint="Sinais de alerta pra sua banca: quanto você já perdeu do topo e se o stake atual ainda cabe no seu bankroll."
-          className="flex h-full min-h-[260px] flex-col"
+          className="flex flex-col"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div
@@ -1168,7 +1172,7 @@ export default function BankrollPage() {
           titulo="AI Coach"
           icone={<Sparkles size={14} className="icon-glow text-evolution" />}
           hint="Dicas automáticas geradas a partir das suas sessões — leaks, tendências e alertas."
-          className="flex h-full min-h-[260px] flex-col"
+          className="flex flex-col"
           acao={
             tipsVisiveis.length > 0 ? (
               <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
@@ -1215,12 +1219,12 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <Painel
           titulo={`Sessões recentes (${historyFiltered.length})`}
           icone={<History size={14} className="icon-glow text-training" />}
           hint="Suas últimas sessões registradas. Use os filtros pra achar um período ou faixa de buy-in específica."
-          className="flex h-full min-h-[260px] flex-col"
+          className="flex flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
               <select
@@ -1345,7 +1349,7 @@ export default function BankrollPage() {
           titulo="Histórico de transações"
           icone={<Wallet size={14} className="icon-glow text-training" />}
           hint="Depósitos, saques e caixinha — não entra no resultado de jogo, só o dinheiro que entrou/saiu da banca."
-          className="flex h-auto min-h-[200px] flex-col self-start"
+          className="flex flex-col"
         >
           {recentTx.length === 0 ? (
             <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
@@ -1386,13 +1390,13 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         {isMultiCurrency && (
           <Painel
             titulo="Patrimônio consolidado"
             icone={<Coins size={14} className="icon-glow text-evolution" />}
             hint="Soma o saldo de todas as moedas numa visão só, usando a taxa de câmbio que você digitar abaixo — é uma estimativa sua, não uma cotação ao vivo."
-            className="flex h-full min-h-[260px] flex-col"
+            className="flex flex-col"
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
               {perCurrencyBalances.map((p) => (
@@ -1432,7 +1436,7 @@ export default function BankrollPage() {
         titulo="Resumo anual"
         icone={<FileBarChart size={14} className="icon-glow text-training" />}
         hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
-        className={`flex h-full min-h-[260px] flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
+        className={`flex flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
         acao={
           yearlyReport.length > 0 && (
             <button
@@ -2208,7 +2212,22 @@ function EvolutionChart({
   // bolinha solta no topo, chamativo demais pra uma nota opcional.
   const plottedAnnotations = annotations
     .map((a) => {
-      const idx = series.findIndex((p) => p.date === a.date);
+      // Antes so' plotava com data identica a uma sessao — se o dia
+      // anotado nao tinha sessao registrada (comum: anotacao feita num
+      // dia sem jogo), a nota sumia do grafico sem aviso. Agora cai no
+      // ponto da curva com a data mais proxima, sempre visivel.
+      let idx = series.findIndex((p) => p.date === a.date);
+      if (idx === -1) {
+        const target = new Date(a.date).getTime();
+        let bestDiff = Infinity;
+        series.forEach((p, i) => {
+          const diff = Math.abs(new Date(p.date).getTime() - target);
+          if (diff < bestDiff) {
+            bestDiff = diff;
+            idx = i;
+          }
+        });
+      }
       return idx === -1 ? null : { ...a, x: xAt(idx), y: yAt(points[idx]) };
     })
     .filter((a): a is Annotation & { x: number; y: number } => a !== null);
