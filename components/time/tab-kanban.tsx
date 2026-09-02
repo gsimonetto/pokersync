@@ -960,6 +960,7 @@ function AbaInteracoes({
   const [historicoFases, setHistoricoFases] = useState<CardPhaseHistoryEntry[]>([]);
   const [conquistas, setConquistas] = useState<PlayerAchievement[] | null>(null);
   const [carregando, setCarregando] = useState(true);
+  const [historicoAberto, setHistoricoAberto] = useState(false);
 
   async function recarregarComentarios() {
     try {
@@ -991,24 +992,40 @@ function AbaInteracoes({
   return (
     <div className="space-y-5 rounded-xl border border-hairline bg-elevated/40 p-4">
       <div>
-        <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-          <MessageSquare size={12} /> Linha do tempo
-        </label>
+        <div className="mb-2 flex items-center justify-between gap-2">
+          <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+            <MessageSquare size={12} /> Linha do tempo
+          </label>
+          {/* Historico de fases sai da rolagem principal (pedido explicito:
+              "esta muito ruim") e vira um icone que abre modal a parte --
+              a linha do tempo de notas e' o que o coach usa toda hora,
+              movimentacao de funil e' consulta ocasional. */}
+          <button
+            type="button"
+            onClick={() => setHistoricoAberto(true)}
+            title="Ver histórico de fases"
+            aria-label="Ver histórico de fases"
+            className="grid h-7 w-7 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          >
+            <Clock3 size={13} />
+          </button>
+        </div>
+
         {carregando ? (
           <p className="text-[12.5px] text-muted">Carregando…</p>
         ) : comentarios.length === 0 ? (
           <p className="text-[12.5px] text-muted">Nenhuma interação registrada ainda.</p>
         ) : (
-          <ul className="mb-2 max-h-56 space-y-2 overflow-y-auto pr-1">
+          <ul className="mb-3 max-h-[52vh] space-y-2 overflow-y-auto pr-1">
             {comentarios.map((c) => (
-              <li key={c.id} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2">
+              <li key={c.id} className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold text-ink">{c.authorName}</span>
                   <span className="text-[10px] text-muted">
                     {new Date(c.createdAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit", hour: "2-digit", minute: "2-digit" })}
                   </span>
                 </div>
-                {c.body && <p className="mt-0.5 whitespace-pre-wrap text-[12.5px] text-ink/85">{c.body}</p>}
+                {c.body && <p className="mt-1 whitespace-pre-wrap text-[13px] leading-relaxed text-ink/85">{c.body}</p>}
                 {c.attachmentUrl && (
                   <AnexoInteracao path={c.attachmentUrl} name={c.attachmentName} type={c.attachmentType} />
                 )}
@@ -1022,29 +1039,9 @@ function AbaInteracoes({
         </p>
       </div>
 
-      {historicoFases.length > 0 && (
-        <div className="border-t border-hairline pt-4">
-          <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-            <Clock3 size={12} /> Histórico de fases
-          </label>
-          <ul className="space-y-1.5">
-            {historicoFases.map((h, i) => (
-              <li key={`${h.phaseId}-${h.enteredAt}-${i}`} className="flex items-center gap-2 text-[12px] text-ink/85">
-                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: h.phaseColor }} />
-                <span className="min-w-0 flex-1 truncate">{h.phaseName}</span>
-                <span className="shrink-0 text-[10.5px] text-muted">
-                  {new Date(h.enteredAt).toLocaleDateString("pt-BR")}
-                  {h.leftAt ? ` – ${new Date(h.leftAt).toLocaleDateString("pt-BR")}` : " (atual)"}
-                </span>
-              </li>
-            ))}
-          </ul>
-        </div>
-      )}
-
       <div className="border-t border-hairline pt-4">
         <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-          <Trophy size={12} /> Linha do tempo — conquistas e evolução
+          <Trophy size={12} /> Conquistas e evolução
         </label>
         {conquistas === null ? (
           <p className="text-[12.5px] text-muted">Carregando…</p>
@@ -1061,6 +1058,69 @@ function AbaInteracoes({
                     +{a.xpReward} XP · {new Date(a.completedAt).toLocaleDateString("pt-BR")}
                   </p>
                 </div>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+
+      {historicoAberto && (
+        <ModalHistoricoFases historico={historicoFases} onFechar={() => setHistoricoAberto(false)} />
+      )}
+    </div>
+  );
+}
+
+// Junta entradas adjacentes da MESMA fase em um so' periodo -- o bug de
+// move_player_card (corrigido no banco) deixou card antigo com varias
+// entradas identicas, minutos ou segundos entre si, sem mudanca real de
+// fase (ver historico de migracoes). Sem isso a lista fica poluida com
+// "Prospecção" repetido dezenas de vezes no mesmo dia.
+function mesclarHistoricoFases(entradas: CardPhaseHistoryEntry[]): CardPhaseHistoryEntry[] {
+  const mescladas: CardPhaseHistoryEntry[] = [];
+  for (const e of entradas) {
+    const ultima = mescladas[mescladas.length - 1];
+    if (ultima && ultima.phaseId === e.phaseId) {
+      ultima.enteredAt = e.enteredAt;
+    } else {
+      mescladas.push({ ...e });
+    }
+  }
+  return mescladas;
+}
+
+// Modal a parte pro historico de movimentacao entre fases do funil
+// (pedido explicito) -- consulta ocasional, nao compete espaco com a
+// linha do tempo de notas/interacoes do dia a dia.
+function ModalHistoricoFases({ historico, onFechar }: { historico: CardPhaseHistoryEntry[]; onFechar: () => void }) {
+  const mesclado = useMemo(() => mesclarHistoricoFases(historico), [historico]);
+  return (
+    <div className="fixed inset-0 z-[60] grid place-items-center bg-void/70 p-4" onClick={onFechar}>
+      <div
+        className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-xl border border-hairline bg-surface p-5"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="mb-3 flex items-center justify-between gap-2">
+          <h3 className="flex items-center gap-1.5 text-sm font-semibold text-ink">
+            <Clock3 size={14} /> Histórico de fases
+          </h3>
+          <button onClick={onFechar} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
+            <X size={16} />
+          </button>
+        </div>
+
+        {mesclado.length === 0 ? (
+          <p className="text-[12.5px] text-muted">Nenhuma movimentação registrada ainda.</p>
+        ) : (
+          <ul className="space-y-1.5">
+            {mesclado.map((h, i) => (
+              <li key={`${h.phaseId}-${h.enteredAt}-${i}`} className="flex items-center gap-2 text-[12.5px] text-ink/85">
+                <span className="h-2 w-2 shrink-0 rounded-full" style={{ backgroundColor: h.phaseColor }} />
+                <span className="min-w-0 flex-1 truncate font-medium">{h.phaseName}</span>
+                <span className="shrink-0 text-[11px] text-muted">
+                  {new Date(h.enteredAt).toLocaleDateString("pt-BR")}
+                  {h.leftAt ? ` – ${new Date(h.leftAt).toLocaleDateString("pt-BR")}` : " (atual)"}
+                </span>
               </li>
             ))}
           </ul>
@@ -1113,40 +1173,51 @@ function ComposerInteracao({
           </button>
         </div>
       )}
-      <div className="flex gap-2">
-        <EmojiPickerButton
-          onPick={(emoji) => setTexto((t) => t + emoji)}
-          className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
-        />
-        <input
-          value={texto}
-          onChange={(e) => setTexto(e.target.value)}
-          onKeyDown={(e) => e.key === "Enter" && !enviando && (e.preventDefault(), enviar())}
-          placeholder="Registrar uma interação…"
-          className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
-        />
-        <input
-          ref={fileRef}
-          type="file"
-          accept="image/*,.pdf,.doc,.docx"
-          className="hidden"
-          onChange={(e) => e.target.files?.[0] && setArquivo(e.target.files[0])}
-        />
-        <button
-          type="button"
-          onClick={() => fileRef.current?.click()}
-          title="Anexar print ou arquivo"
-          className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
-        >
-          <Paperclip size={14} />
-        </button>
+      {/* Textarea grande (pedido explicito: "muito pequena") -- registrar
+          uma interacao de verdade (o que foi conversado, combinado)
+          precisa de espaco pra escrever igual o CRM de exemplo, nao um
+          campo de uma linha so'. Ctrl/Cmd+Enter envia -- Enter sozinho
+          quebra linha, senao escrever mais de uma frase vira briga com
+          o atalho. */}
+      <textarea
+        value={texto}
+        onChange={(e) => setTexto(e.target.value)}
+        onKeyDown={(e) => (e.key === "Enter" && (e.metaKey || e.ctrlKey)) && !enviando && (e.preventDefault(), enviar())}
+        placeholder="Registrar uma interação… (o que foi conversado, combinado, próximos passos)"
+        rows={4}
+        className="w-full resize-y rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-[13.5px] leading-relaxed text-ink outline-none placeholder:text-muted/50 focus:border-training/50"
+      />
+      <div className="flex items-center justify-between gap-2">
+        <div className="flex gap-1.5">
+          <EmojiPickerButton
+            onPick={(emoji) => setTexto((t) => t + emoji)}
+            className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          />
+          <input
+            ref={fileRef}
+            type="file"
+            accept="image/*,.pdf,.doc,.docx"
+            className="hidden"
+            onChange={(e) => e.target.files?.[0] && setArquivo(e.target.files[0])}
+          />
+          <button
+            type="button"
+            onClick={() => fileRef.current?.click()}
+            title="Anexar print ou arquivo"
+            className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          >
+            <Paperclip size={14} />
+          </button>
+        </div>
         <button
           type="button"
           onClick={enviar}
           disabled={enviando || (!texto.trim() && !arquivo)}
-          className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40"
+          title="Ctrl/Cmd + Enter"
+          className="flex shrink-0 items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void transition-opacity disabled:opacity-40"
         >
           {enviando ? <Loader2 size={14} className="animate-spin" /> : <MessageSquare size={14} />}
+          Registrar
         </button>
       </div>
     </div>
