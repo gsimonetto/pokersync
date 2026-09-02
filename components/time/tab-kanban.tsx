@@ -2,11 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, Clock3, GripVertical, ListChecks, Loader2, MessageSquare, Paperclip, Plus, Search, Settings2, Sparkles, Tag, Trash2, Trophy, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, Clock3, GripVertical, ListChecks, Loader2, MessageSquare, Paperclip, Plus, Search, Settings2, SlidersHorizontal, Sparkles, Tag, Trash2, Trophy, UserPlus, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
 import { EmojiPickerButton } from "@/components/emoji-picker";
+import { FilterPopover } from "@/components/ui/filter-popover";
 import {
   addCardComment,
   addChecklistItem,
@@ -175,6 +176,11 @@ export function TabKanban({
     return jogadores.filter((j) => !comCard.has(j.userId));
   }, [jogadores, cards]);
 
+  // Acende a bolinha do FilterPopover quando qualquer filtro de dentro
+  // dele estiver fora do padrão (a busca por texto tem o próprio
+  // indicador, no botão da lupa).
+  const filtrosAtivos = filtroLabel !== "todas" || filtroCoach !== "todos" || soTarefasPendentes || soMetasConcluidas;
+
   const cardsFiltrados = useMemo(() => {
     return cards.filter((c) => {
       if (filtroLabel !== "todas") {
@@ -244,7 +250,7 @@ export function TabKanban({
   }
 
   return (
-    <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+    <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {backHref && (
           <Link
@@ -296,42 +302,73 @@ export function TabKanban({
               />
             )}
 
-            <select
-              value={filtroLabel}
-              onChange={(e) => setFiltroLabel(e.target.value)}
-              className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
-            >
-              <option value="todas">Todas as etiquetas</option>
-              {labelsDoTime.map((l) => (
-                <option key={l.id} value={l.id}>{l.name}</option>
-              ))}
-            </select>
+            {/* Etiqueta/coach/tarefas/metas atrás de um único botão de
+                filtros (pedido explicito: "os filtros precisam ser
+                melhor encaixados") -- mesmo padrão de CRMs/pipelines
+                (Pipedrive, HubSpot): um ponto de entrada só, com bolinha
+                acesa quando algo está fora do padrão, em vez de vários
+                selects e chips competindo espaço na mesma linha. */}
+            <FilterPopover label="Filtros" icon={SlidersHorizontal} active={filtrosAtivos}>
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted/70">Etiqueta</label>
+                <select
+                  value={filtroLabel}
+                  onChange={(e) => setFiltroLabel(e.target.value)}
+                  className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
+                >
+                  <option value="todas">Todas as etiquetas</option>
+                  {labelsDoTime.map((l) => (
+                    <option key={l.id} value={l.id}>{l.name}</option>
+                  ))}
+                </select>
+              </div>
 
-            {coaches.length > 0 && (
-              <select
-                value={filtroCoach}
-                onChange={(e) => setFiltroCoach(e.target.value)}
-                className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
-              >
-                <option value="todos">Todos os coaches</option>
-                {coaches.map((c) => (
-                  <option key={c.userId} value={c.userId}>{c.nome}</option>
-                ))}
-              </select>
-            )}
+              {coaches.length > 0 && (
+                <div>
+                  <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted/70">Coach</label>
+                  <select
+                    value={filtroCoach}
+                    onChange={(e) => setFiltroCoach(e.target.value)}
+                    className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none"
+                  >
+                    <option value="todos">Todos os coaches</option>
+                    {coaches.map((c) => (
+                      <option key={c.userId} value={c.userId}>{c.nome}</option>
+                    ))}
+                  </select>
+                </div>
+              )}
 
-            <FilterChip
-              label="Com tarefas pendentes"
-              icon={<CheckSquare size={13} />}
-              active={soTarefasPendentes}
-              onClick={() => setSoTarefasPendentes((v) => !v)}
-            />
-            <FilterChip
-              label="Metas concluídas"
-              icon={<CheckCircle2 size={13} />}
-              active={soMetasConcluidas}
-              onClick={() => setSoMetasConcluidas((v) => !v)}
-            />
+              <div className="flex flex-col gap-1.5 border-t border-hairline pt-2">
+                <FilterChip
+                  label="Com tarefas pendentes"
+                  icon={<CheckSquare size={13} />}
+                  active={soTarefasPendentes}
+                  onClick={() => setSoTarefasPendentes((v) => !v)}
+                />
+                <FilterChip
+                  label="Metas concluídas"
+                  icon={<CheckCircle2 size={13} />}
+                  active={soMetasConcluidas}
+                  onClick={() => setSoMetasConcluidas((v) => !v)}
+                />
+              </div>
+
+              {filtrosAtivos && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setFiltroLabel("todas");
+                    setFiltroCoach("todos");
+                    setSoTarefasPendentes(false);
+                    setSoMetasConcluidas(false);
+                  }}
+                  className="self-start text-[11px] font-semibold text-muted hover:text-ink"
+                >
+                  Limpar filtros
+                </button>
+              )}
+            </FilterPopover>
           </>
         )}
 
@@ -368,18 +405,19 @@ export function TabKanban({
           onErro={onErro}
         />
       ) : (
-      /* Altura fixa pro board inteiro (mesmo raciocinio do Modo Treino:
-         um bloco de tamanho estavel, nao uma pilha que cresce com a
-         quantidade de cards) -- a barra de rolagem horizontal fica
-         sempre na mesma posicao, no rodape deste bloco, em vez de
-         flutuar dependendo de quantos cards cada fase tem. Cada fase
-         agora e' um bloco com borda propria (pedido explicito: "os
-         funis serem divididos por bordas... parece que esta tudo
-         junto") que ocupa a altura toda -- o alvo de soltar o card
-         (onDrop) e' o bloco inteiro, nao so' a area onde ha cards, entao
-         soltar num espaco vazio da fase funciona igual soltar em cima
-         de um card (igual outros CRMs). */
-      <div className="flex h-[560px] gap-4 overflow-x-auto pb-3">
+      /* Board ocupa o resto da altura disponivel (flex-1, min-h-[420px]
+         de piso pra viewport curta) em vez de altura fixa -- pedido
+         explicito: a barra de rolagem horizontal precisa cair sempre na
+         borda inferior da tela, nao flutuar no meio dela sobrando vazio
+         embaixo. Mesmo raciocinio de bloco estavel de antes (mesmo
+         numero de cards nao muda a altura do board), so' que agora a
+         altura em si acompanha a tela. Cada fase e' um bloco com borda
+         propria (pedido explicito: "os funis serem divididos por
+         bordas... parece que esta tudo junto") que ocupa a altura toda
+         -- o alvo de soltar o card (onDrop) e' o bloco inteiro, nao so'
+         a area onde ha cards, entao soltar num espaco vazio da fase
+         funciona igual soltar em cima de um card (igual outros CRMs). */
+      <div className="flex min-h-[420px] flex-1 gap-4 overflow-x-auto pb-3">
         {fases.map((fase, faseIdx) => {
           const lista = (cardsPorFase.get(fase.id) ?? []).sort((a, b) => a.movedAt.localeCompare(b.movedAt));
           const recebendoDrop = faseArrastando === fase.id;

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { Cake, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
+import { Cake, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, ExternalLink, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
@@ -11,6 +11,7 @@ import {
   createRecurringTeamEvents,
   createTeamEvent,
   fetchTeamBirthdays,
+  googleCalendarUrl,
   markAttendance,
   traduzErroCalendario,
   type EventType,
@@ -121,6 +122,16 @@ export function TabCalendario({
                     {ev.endsAt ? ` – ${fmtHora(ev.endsAt)}` : ""}
                   </p>
                 </div>
+                <a
+                  href={googleCalendarUrl(ev)}
+                  target="_blank"
+                  rel="noreferrer"
+                  aria-label="Adicionar ao Google Agenda"
+                  title="Adicionar ao Google Agenda"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                >
+                  <ExternalLink size={15} />
+                </a>
               </li>
             ))}
           </ul>
@@ -377,15 +388,27 @@ function ModalCalendarioCompleto({
                       )}
                     </div>
 
-                    {podeCriar && (
-                      <button
-                        onClick={() => cancelar(ev)}
-                        aria-label="Cancelar evento"
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-negative/50 hover:text-negative"
+                    <div className="flex shrink-0 items-center gap-1.5">
+                      <a
+                        href={googleCalendarUrl(ev)}
+                        target="_blank"
+                        rel="noreferrer"
+                        aria-label="Adicionar ao Google Agenda"
+                        title="Adicionar ao Google Agenda"
+                        className="grid h-8 w-8 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
                       >
-                        <Trash2 size={15} />
-                      </button>
-                    )}
+                        <ExternalLink size={15} />
+                      </a>
+                      {podeCriar && (
+                        <button
+                          onClick={() => cancelar(ev)}
+                          aria-label="Cancelar evento"
+                          className="grid h-8 w-8 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-negative/50 hover:text-negative"
+                        >
+                          <Trash2 size={15} />
+                        </button>
+                      )}
+                    </div>
                   </li>
                 ))}
               </ul>
