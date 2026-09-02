@@ -127,6 +127,19 @@ export function evolutionSeries(sessions: Session[], start = 0): SeriesPoint[] {
   });
 }
 
+// Curva "underwater" — quanto a banca está abaixo do pico mais alto já
+// atingido, em cada ponto da série. 0 = no topo (recuperado); negativo =
+// quanto falta pra voltar ao topo. Reusa o mesmo formato de SeriesPoint
+// pra poder desenhar com o mesmo EvolutionChart do gráfico principal, só
+// com os valores invertidos (sempre <= 0).
+export function drawdownSeries(series: SeriesPoint[]): SeriesPoint[] {
+  let peak = -Infinity;
+  return series.map((p) => {
+    peak = Math.max(peak, p.value);
+    return { ...p, value: +(p.value - peak).toFixed(2) };
+  });
+}
+
 function groupKey(s: Session, dimension: "format" | "weekday" | "time") {
   if (dimension === "format") return s.format || "—";
   if (dimension === "weekday") return weekdayName(s.date);
