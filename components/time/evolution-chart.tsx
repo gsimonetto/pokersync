@@ -162,14 +162,17 @@ function ChartSvg({
         <g pointerEvents="none">
           <line x1={hoverPoint.x} y1={padT} x2={hoverPoint.x} y2={padT + plotH} stroke="var(--color-hairline)" strokeWidth={1} strokeDasharray="2,2" />
           <circle cx={hoverPoint.x} cy={hoverPoint.y} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
-          <g transform={`translate(${Math.min(Math.max(hoverPoint.x - 46, padL), w - padR - 92)}, ${Math.max(hoverPoint.y - 46, padT)})`}>
-            <rect width={92} height={34} rx={6} fill="var(--color-elevated)" stroke="var(--color-hairline)" strokeWidth={1} />
-            <text x={8} y={14} fontSize={9} fill="var(--color-muted)">
+          <g transform={`translate(${Math.min(Math.max(hoverPoint.x - 58, padL), w - padR - 124)}, ${Math.max(hoverPoint.y - 54, padT)})`}>
+            <rect width={124} height={46} rx={6} fill="var(--color-elevated)" stroke="var(--color-hairline)" strokeWidth={1} />
+            <text x={9} y={16} fontSize={9} fill="var(--color-muted)">
               {new Date(hoverData.dia).toLocaleDateString("pt-BR")}
             </text>
-            <text x={8} y={26} fontSize={10.5} fontWeight={700} fill={hoverData.resultado >= 0 ? "#22c55e" : "#e0555a"}>
-              {BRL.format(hoverData.acumulado)} ({hoverData.resultado >= 0 ? "+" : ""}
-              {BRL.format(hoverData.resultado)})
+            <text x={9} y={30} fontSize={11} fontWeight={700} fill="var(--color-ink)">
+              {BRL.format(hoverData.acumulado)}
+            </text>
+            <text x={9} y={41} fontSize={9.5} fontWeight={600} fill={hoverData.resultado >= 0 ? "#22c55e" : "#e0555a"}>
+              {hoverData.resultado >= 0 ? "+" : ""}
+              {BRL.format(hoverData.resultado)}
             </text>
           </g>
         </g>

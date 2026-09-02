@@ -2,17 +2,16 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Bot, Skull, Coins, FileBarChart } from "lucide-react";
+import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, drawdownSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
-import { fetchReviewCountsBySessionIds, fetchLinkedTournamentHandSessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
-import type { HandSession } from "@/lib/services/hand-session-service";
+import { fetchReviewCountsBySessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
-import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
+import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
@@ -140,6 +139,7 @@ export default function BankrollPage() {
   const [historyFormat, setHistoryFormat] = useState<string>("all");
   const [historyRange, setHistoryRange] = useState<RangeOption>("all");
   const [historyBuyin, setHistoryBuyin] = useState<string>("all");
+  const [historyImported, setHistoryImported] = useState<"all" | "yes" | "no">("all");
 
   const [goalType, setGoalType] = useState<GoalType>("volume");
   const [goalPeriod, setGoalPeriod] = useState<GoalPeriod>("semanal");
@@ -161,15 +161,6 @@ export default function BankrollPage() {
 
   const [compareOpen, setCompareOpen] = useState(false);
 
-  // Torneios que o agente desktop já capturou (hand_sessions) mas que
-  // ainda não viraram sessão de banca -- ver "Torneios do agente" abaixo.
-  const [agentTournaments, setAgentTournaments] = useState<HandSession[]>([]);
-  const [agentPayouts, setAgentPayouts] = useState<TournamentPayout[]>([]);
-  const [linkedHandSessionIds, setLinkedHandSessionIds] = useState<Set<string>>(new Set());
-  // Quando a sessão sendo registrada veio de uma sugestão do agente, guarda
-  // o id do hand_session pra vincular as mãos assim que a sessão salvar.
-  const [linkingHandSessionId, setLinkingHandSessionId] = useState<string | null>(null);
-
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -186,17 +177,45 @@ export default function BankrollPage() {
           fetchTournamentPayouts(),
         ]);
         if (!alive) return;
-        setSessions(s);
         setBankroll(cfg.bankroll);
         setTransactions(tx);
         setGoals(gl);
         setStudyLogs(sl);
         setBrmThresholds(brm);
         setAnnotations(annos);
-        setAgentTournaments(agentTourn);
-        setAgentPayouts(payouts);
-        const linked = await fetchLinkedTournamentHandSessionIds(agentTourn.map((h) => h.id));
-        if (alive) setLinkedHandSessionIds(linked);
+
+        // Importa direto na banca os torneios que o agente desktop já
+        // capturou e que ainda não têm sessão vinculada -- sem card de
+        // confirmação, só a tag "Importada" (ver filtro em "Sessões
+        // recentes"). Vincula as mãos do torneio à sessão criada, mesmo
+        // ciclo que já existia pra edição manual (linkHandSessionReviews).
+        const alreadyImported = new Set(s.map((x) => x.importedHandSessionId).filter((id): id is string => Boolean(id)));
+        const toImport = agentTourn.filter((h) => !alreadyImported.has(h.id));
+        const imported: Session[] = [];
+        for (const hs of toImport) {
+          try {
+            const payout = payouts.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
+            const rawVenue = (hs.label.split(" / ")[0] || "").trim();
+            const saved = await apiAddSession({
+              date: (hs.updated_at || hs.created_at || todayISO()).slice(0, 10),
+              format: "MTT",
+              buyIn: hs.buyin ?? 0,
+              reentries: 0,
+              cashout: payout?.heroPayoutAmount ?? 0,
+              stake: "",
+              venue: rawVenue || undefined,
+              currency: "BRL",
+              notes: `Importado do agente — ${hs.label}`,
+              importedHandSessionId: hs.id,
+            });
+            await linkHandSessionReviews(hs.id, saved.id);
+            imported.push(saved);
+          } catch (e) {
+            console.error("Falha ao importar torneio do agente:", hs.id, e);
+          }
+        }
+        if (!alive) return;
+        setSessions(imported.length > 0 ? [...s, ...imported] : s);
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : "Falha ao carregar sua banca.");
       } finally {
@@ -302,13 +321,6 @@ export default function BankrollPage() {
   // independe do currencyFilter selecionado, cada moeda entra com seu
   // próprio saldo (banca inicial só soma na moeda de referência, mesma
   // regra do `nw` abaixo).
-  // Torneios que o agente ja capturou e que ainda nao tem sessao de banca
-  // vinculada -- ver openAgentSuggestion/linkHandSessionReviews acima.
-  const unlinkedAgentTournaments = useMemo(
-    () => agentTournaments.filter((h) => !linkedHandSessionIds.has(h.id)),
-    [agentTournaments, linkedHandSessionIds]
-  );
-
   const perCurrencyBalances = useMemo(
     () =>
       currencies.map((c) => {
@@ -416,8 +428,11 @@ export default function BankrollPage() {
       const bucket = BUYIN_RANGES.find((r) => r.value === historyBuyin);
       if (bucket) base = base.filter((s) => bucket.test(Number(s.buyIn) || 0));
     }
+    if (historyImported !== "all") {
+      base = base.filter((s) => (historyImported === "yes" ? Boolean(s.importedHandSessionId) : !s.importedHandSessionId));
+    }
     return [...base].reverse();
-  }, [platformSessions, historyFormat, historyRange, historyBuyin]);
+  }, [platformSessions, historyFormat, historyRange, historyBuyin, historyImported]);
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
 
   // Quantas maos foram revisadas por sessao -- antes o vinculo so existia
@@ -515,27 +530,6 @@ export default function BankrollPage() {
   function closeSessionModal() {
     setSessionModalOpen(false);
     if (editingSessionId) resetSessionForm();
-    setLinkingHandSessionId(null);
-  }
-
-  // Preenche o formulario de "Registrar sessao" com o que o agente desktop
-  // já capturou desse torneio (buy-in, premiação se já tiver, plataforma) —
-  // o jogador ainda confirma/ajusta antes de salvar, nunca grava sozinho.
-  function openAgentSuggestion(hs: HandSession) {
-    resetSessionForm();
-    setFormat("MTT");
-    setDate((hs.updated_at || hs.created_at || todayISO()).slice(0, 10));
-    setBuyIn(hs.buyin != null ? String(hs.buyin) : "");
-    const payout = agentPayouts.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
-    setCashout(payout?.heroPayoutAmount != null ? String(payout.heroPayoutAmount) : "0");
-    const rawVenue = (hs.label.split(" / ")[0] || "").trim();
-    const known = rawVenue !== "" && (PLATFORMS as readonly string[]).includes(rawVenue);
-    setVenue(known ? rawVenue : rawVenue ? OUTRO_PLATFORM : PLATFORMS[0]);
-    setVenueOther(known ? "" : rawVenue);
-    setNotes(`Torneio capturado pelo agente — ${hs.label}`);
-    setLinkingHandSessionId(hs.id);
-    setErr("");
-    setSessionModalOpen(true);
   }
 
   async function handleSaveSession() {
@@ -568,28 +562,14 @@ export default function BankrollPage() {
       backerName: backerName || undefined,
     };
     const editingId = editingSessionId;
-    const linkingId = linkingHandSessionId;
     const backup = sessions;
     setSessions((prev) => (editingId ? prev.map((x) => (x.id === editingId ? draft : x)) : [...prev, draft]));
     resetSessionForm();
-    setLinkingHandSessionId(null);
     setErr("");
     setSessionModalOpen(false);
     try {
       const saved = editingId ? await apiUpdateSession(editingId, draft) : await apiAddSession(draft);
       setSessions((prev) => prev.map((x) => (x.id === draft.id ? saved : x)));
-      // Sessao veio de uma sugestao do agente -- vincula as maos desse
-      // torneio à sessao recem-criada (fecha o ciclo: a sugestao some da
-      // lista e o badge "N mãos revisadas" passa a aparecer nela).
-      if (!editingId && linkingId) {
-        try {
-          await linkHandSessionReviews(linkingId, saved.id);
-          setLinkedHandSessionIds((prev) => new Set(prev).add(linkingId));
-        } catch {
-          // Sessao ja foi salva; só o vinculo com o torneio capturado
-          // falhou -- nao vale reverter a sessao por causa disso.
-        }
-      }
     } catch {
       // Edicao volta ao estado anterior; registro novo some da lista.
       setErr(editingId ? "Nao foi possivel salvar a edicao." : "Nao foi possivel salvar a sessao.");
@@ -789,7 +769,6 @@ export default function BankrollPage() {
                 // Sempre entra em modo "registrar": se o modal foi usado pra
                 // editar antes, os campos preenchidos ficariam ali.
                 if (editingSessionId) resetSessionForm();
-                setLinkingHandSessionId(null);
                 setSessionModalOpen(true);
               }}
               aria-label="Registrar sessao"
@@ -845,41 +824,12 @@ export default function BankrollPage() {
         </div>
       </section>
 
-      {unlinkedAgentTournaments.length > 0 && (
-        <Painel
-          titulo={`Torneios do agente (${unlinkedAgentTournaments.length})`}
-          icone={<Bot size={14} className="icon-glow text-evolution" />}
-          hint="O agente desktop já capturou as mãos desses torneios, mas eles ainda não viraram sessão de banca — clique pra registrar (você confirma os valores antes de salvar)."
-          className="mt-6"
-        >
-          <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-            {unlinkedAgentTournaments.map((hs) => {
-              const payout = agentPayouts.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
-              return (
-                <button
-                  key={hs.id}
-                  onClick={() => openAgentSuggestion(hs)}
-                  className="rounded-lg border border-hairline bg-elevated p-3 text-left transition-colors hover:border-evolution/40"
-                >
-                  <p className="truncate text-sm font-semibold text-ink">{hs.label}</p>
-                  <p className="mt-1 text-[11px] text-muted">
-                    {hs.champion ? "🏆 Campeão" : hs.final_place != null ? `Top ${hs.final_place}` : hs.reached_ft ? "Mesa final" : "Concluído"}
-                    {payout?.heroPayoutAmount != null && ` · ${fmtMoneyIn(payout.heroPayoutAmount, "BRL")} de premiação`}
-                  </p>
-                  <p className="mt-1.5 text-[11px] font-semibold text-evolution">Registrar na banca →</p>
-                </button>
-              );
-            })}
-          </div>
-        </Painel>
-      )}
-
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Painel
           titulo="Evolução da banca"
           icone={<LineChart size={14} className="icon-glow text-evolution" />}
           hint="Seu saldo acumulado ao longo do tempo, somando o resultado de cada sessão."
-          className="flex h-full flex-col"
+          className="flex h-full min-h-[380px] flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
               <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
@@ -963,7 +913,7 @@ export default function BankrollPage() {
           titulo="Consistência de volume"
           icone={<CalendarDays size={14} className="icon-glow text-evolution" />}
           hint="Mostra em quais dias você mais jogou — quanto mais escuro, mais sessões naquele dia."
-          className="flex h-full flex-col"
+          className="flex h-full min-h-[380px] flex-col"
         >
           <div className="flex flex-1 items-center">
             <VolumeHeatmap activity={activity} currency={currencyFilter} />
@@ -971,53 +921,12 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      {isMultiCurrency && (
-        <div className="mt-6">
-          <Painel
-            titulo="Patrimônio consolidado"
-            icone={<Coins size={14} className="icon-glow text-evolution" />}
-            hint="Soma o saldo de todas as moedas numa visão só, usando a taxa de câmbio que você digitar abaixo — é uma estimativa sua, não uma cotação ao vivo."
-          >
-            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
-              {perCurrencyBalances.map((p) => (
-                <div key={p.currency} className="rounded-lg border border-hairline bg-elevated p-3">
-                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{p.currency}</p>
-                  <p className="mt-1 text-lg font-bold tabular-nums text-ink">{fmtMoneyIn(p.balance, p.currency)}</p>
-                  {p.currency === REFERENCE_CURRENCY ? (
-                    <p className="mt-1.5 text-[10.5px] text-muted">Moeda de referência</p>
-                  ) : (
-                    <label className="mt-1.5 flex items-center gap-1.5 text-[10.5px] text-muted">
-                      1 {p.currency} =
-                      <input
-                        type="number"
-                        step="0.01"
-                        min="0"
-                        value={fxRates[p.currency] ?? ""}
-                        onChange={(e) => updateFxRate(p.currency, e.target.value)}
-                        placeholder="1.00"
-                        className="w-16 rounded border border-hairline bg-surface px-1.5 py-0.5 text-[10.5px] text-ink outline-none focus:border-ink/40"
-                      />
-                      {REFERENCE_CURRENCY}
-                    </label>
-                  )}
-                </div>
-              ))}
-            </div>
-            <div className="mt-3 border-t border-hairline pt-3">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Total consolidado (estimado)</p>
-              <p className={`mt-1 text-2xl font-bold tabular-nums ${consolidatedTotal < 0 ? "text-negative" : "text-ink"}`}>
-                {fmtMoneyIn(consolidatedTotal, REFERENCE_CURRENCY)}
-              </p>
-            </div>
-          </Painel>
-        </div>
-      )}
-
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Painel
           titulo="Risco"
           icone={<ShieldAlert size={14} className="icon-glow text-negative" />}
           hint="Sinais de alerta pra sua banca: quanto você já perdeu do topo e se o stake atual ainda cabe no seu bankroll."
+          className="flex h-full min-h-[380px] flex-col"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div
@@ -1175,6 +1084,7 @@ export default function BankrollPage() {
           titulo="AI Coach"
           icone={<Sparkles size={14} className="icon-glow text-evolution" />}
           hint="Dicas automáticas geradas a partir das suas sessões — leaks, tendências e alertas."
+          className="flex h-full min-h-[380px] flex-col"
           acao={
             tipsVisiveis.length > 0 ? (
               <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
@@ -1226,6 +1136,7 @@ export default function BankrollPage() {
           titulo={`Sessões recentes (${historyFiltered.length})`}
           icone={<History size={14} className="icon-glow text-training" />}
           hint="Suas últimas sessões registradas. Use os filtros pra achar um período ou faixa de buy-in específica."
+          className="flex h-full min-h-[380px] flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
               <select
@@ -1267,6 +1178,17 @@ export default function BankrollPage() {
                   </option>
                 ))}
               </select>
+              <select
+                value={historyImported}
+                onChange={(e) => setHistoryImported(e.target.value as "all" | "yes" | "no")}
+                aria-label="Filtrar por origem"
+                title="Filtrar por origem: importada do agente ou lançada à mão"
+                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+              >
+                <option value="all">Importadas e manuais</option>
+                <option value="yes">Só importadas</option>
+                <option value="no">Só manuais</option>
+              </select>
             </div>
           }
         >
@@ -1298,6 +1220,14 @@ export default function BankrollPage() {
                             >
                               <BookOpen size={9} /> {reviewCounts[s.id]}
                             </Link>
+                          )}
+                          {s.importedHandSessionId && (
+                            <span
+                              title="Importada automaticamente de um torneio que o agente desktop já tinha capturado"
+                              className="shrink-0 rounded border border-evolution/30 bg-evolution/[0.12] px-1 py-0.5 text-[9px] font-bold uppercase tracking-[0.04em] text-evolution"
+                            >
+                              Importada
+                            </span>
                           )}
                         </p>
                         <p className="truncate text-xs text-muted">
@@ -1331,6 +1261,7 @@ export default function BankrollPage() {
           titulo="Histórico de transações"
           icone={<Wallet size={14} className="icon-glow text-training" />}
           hint="Depósitos, saques e caixinha — não entra no resultado de jogo, só o dinheiro que entrou/saiu da banca."
+          className="flex h-full min-h-[380px] flex-col"
         >
           {recentTx.length === 0 ? (
             <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
@@ -1371,11 +1302,53 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      <Painel
+      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+        {isMultiCurrency && (
+          <Painel
+            titulo="Patrimônio consolidado"
+            icone={<Coins size={14} className="icon-glow text-evolution" />}
+            hint="Soma o saldo de todas as moedas numa visão só, usando a taxa de câmbio que você digitar abaixo — é uma estimativa sua, não uma cotação ao vivo."
+            className="flex h-full min-h-[380px] flex-col"
+          >
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
+              {perCurrencyBalances.map((p) => (
+                <div key={p.currency} className="rounded-lg border border-hairline bg-elevated p-3">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">{p.currency}</p>
+                  <p className="mt-1 text-lg font-bold tabular-nums text-ink">{fmtMoneyIn(p.balance, p.currency)}</p>
+                  {p.currency === REFERENCE_CURRENCY ? (
+                    <p className="mt-1.5 text-[10.5px] text-muted">Moeda de referência</p>
+                  ) : (
+                    <label className="mt-1.5 flex items-center gap-1.5 text-[10.5px] text-muted">
+                      1 {p.currency} =
+                      <input
+                        type="number"
+                        step="0.01"
+                        min="0"
+                        value={fxRates[p.currency] ?? ""}
+                        onChange={(e) => updateFxRate(p.currency, e.target.value)}
+                        placeholder="1.00"
+                        className="w-16 rounded border border-hairline bg-surface px-1.5 py-0.5 text-[10.5px] text-ink outline-none focus:border-ink/40"
+                      />
+                      {REFERENCE_CURRENCY}
+                    </label>
+                  )}
+                </div>
+              ))}
+            </div>
+            <div className="mt-3 border-t border-hairline pt-3">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Total consolidado (estimado)</p>
+              <p className={`mt-1 text-2xl font-bold tabular-nums ${consolidatedTotal < 0 ? "text-negative" : "text-ink"}`}>
+                {fmtMoneyIn(consolidatedTotal, REFERENCE_CURRENCY)}
+              </p>
+            </div>
+          </Painel>
+        )}
+
+        <Painel
         titulo="Resumo anual"
         icone={<FileBarChart size={14} className="icon-glow text-training" />}
         hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
-        className="mt-6"
+        className={`flex h-full min-h-[380px] flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
         acao={
           yearlyReport.length > 0 && (
             <button
@@ -1420,7 +1393,8 @@ export default function BankrollPage() {
             </table>
           </div>
         )}
-      </Painel>
+        </Painel>
+      </div>
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
@@ -2145,12 +2119,15 @@ function EvolutionChart({
     xTickCount === 1 ? 0 : Math.round((i / (xTickCount - 1)) * (series.length - 1))
   );
 
+  // Marca sutil (bolinha roxa) em cima da própria curva, na data em que o
+  // jogador anotou algo -- antes era uma linha tracejada vertical inteira +
+  // bolinha solta no topo, chamativo demais pra uma nota opcional.
   const plottedAnnotations = annotations
     .map((a) => {
       const idx = series.findIndex((p) => p.date === a.date);
-      return idx === -1 ? null : { ...a, x: xAt(idx) };
+      return idx === -1 ? null : { ...a, x: xAt(idx), y: yAt(points[idx]) };
     })
-    .filter((a): a is Annotation & { x: number } => a !== null);
+    .filter((a): a is Annotation & { x: number; y: number } => a !== null);
 
   const hoverPoint = hoverIdx != null ? coords[hoverIdx] : null;
   const hoverData = hoverIdx != null ? series[hoverIdx] : null;
@@ -2217,24 +2194,6 @@ function EvolutionChart({
         </text>
       ))}
 
-      {plottedAnnotations.map((a) => (
-        <g key={a.id}>
-          <line
-            x1={a.x}
-            y1={padT}
-            x2={a.x}
-            y2={padT + plotH}
-            stroke="var(--color-review)"
-            strokeWidth={1}
-            strokeDasharray="3,3"
-            opacity={0.45}
-          />
-          <circle cx={a.x} cy={padT + 6} r={3.5} fill="var(--color-review)">
-            <title>{`${a.date} · ${a.note}`}</title>
-          </circle>
-        </g>
-      ))}
-
       <path d={areaPath} fill={`url(#${gradId})`} stroke="none" />
       <path d={path} fill="none" stroke={color} strokeWidth={2.25} filter={`url(#${glowId})`} strokeLinecap="round" strokeLinejoin="round" />
       <circle cx={lastPoint.x} cy={lastPoint.y} r={5} fill={color} filter={`url(#${glowId})`} opacity={0.9}>
@@ -2243,18 +2202,27 @@ function EvolutionChart({
       </circle>
       <circle cx={lastPoint.x} cy={lastPoint.y} r={2.5} fill="#fff" />
 
+      {plottedAnnotations.map((a) => (
+        <circle key={a.id} cx={a.x} cy={a.y} r={3} fill="var(--color-review)" stroke="var(--color-surface)" strokeWidth={1.5} opacity={0.85}>
+          <title>{`${a.date} · ${a.note}`}</title>
+        </circle>
+      ))}
+
       {hoverPoint && hoverData && (
         <g pointerEvents="none">
           <line x1={hoverPoint.x} y1={padT} x2={hoverPoint.x} y2={padT + plotH} stroke="var(--color-hairline)" strokeWidth={1} strokeDasharray="2,2" />
           <circle cx={hoverPoint.x} cy={hoverPoint.y} r={4} fill={color} stroke="#fff" strokeWidth={1.5} />
-          <g transform={`translate(${Math.min(Math.max(hoverPoint.x - 46, padL), w - padR - 92)}, ${Math.max(hoverPoint.y - 46, padT)})`}>
-            <rect width={92} height={34} rx={6} fill="var(--color-elevated)" stroke="var(--color-hairline)" strokeWidth={1} />
-            <text x={8} y={14} fontSize={9} fill="var(--color-muted)">
+          <g transform={`translate(${Math.min(Math.max(hoverPoint.x - 58, padL), w - padR - 124)}, ${Math.max(hoverPoint.y - 54, padT)})`}>
+            <rect width={124} height={46} rx={6} fill="var(--color-elevated)" stroke="var(--color-hairline)" strokeWidth={1} />
+            <text x={9} y={16} fontSize={9} fill="var(--color-muted)">
               {hoverData.date}
             </text>
-            <text x={8} y={26} fontSize={10.5} fontWeight={700} fill={hoverData.net >= 0 ? "#22c55e" : "#e0555a"}>
-              {fmt(hoverData.value)} ({hoverData.net >= 0 ? "+" : ""}
-              {fmt(hoverData.net)})
+            <text x={9} y={30} fontSize={11} fontWeight={700} fill="var(--color-ink)">
+              {fmt(hoverData.value)}
+            </text>
+            <text x={9} y={41} fontSize={9.5} fontWeight={600} fill={hoverData.net >= 0 ? "#22c55e" : "#e0555a"}>
+              {hoverData.net >= 0 ? "+" : ""}
+              {fmt(hoverData.net)}
             </text>
           </g>
         </g>
