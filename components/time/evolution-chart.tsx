@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import type { FinancialDay } from "@/lib/services/team-service";
-import { BRL, BRL_CURTO } from "@/lib/format";
+import { BRL, BRL_CURTO, niceTicks } from "@/lib/format";
 
 // Mesmo grafico de evolucao do Gestor de Banca (linha com area em
 // degrade, glow no ponto atual, tooltip ao passar o mouse) -- porta pra
@@ -72,8 +72,11 @@ function ChartSvg({
   const min = Math.min(...points);
   const max = Math.max(...points);
   const spread = max - min || 1;
-  const yMin = min - spread * 0.08;
-  const yMax = max + spread * 0.08;
+  // Marcas do eixo em números redondos (ex: R$500, não R$417,24) -- o
+  // yMin/yMax do plot se ajusta pra sempre caber a primeira/última marca.
+  const yTicks = niceTicks(min, max, Y_TICKS);
+  const yMin = Math.min(min - spread * 0.08, yTicks[0]);
+  const yMax = Math.max(max + spread * 0.08, yTicks[yTicks.length - 1]);
   const yRange = yMax - yMin || 1;
 
   const xAt = (i: number) => padL + (dados.length === 1 ? 0 : (i / (dados.length - 1)) * plotW);
@@ -90,7 +93,6 @@ function ChartSvg({
   const gradId = "teamEvolutionFill";
   const glowId = "teamEvolutionGlow";
 
-  const yTicks = Array.from({ length: Y_TICKS + 1 }, (_, i) => yMin + (yRange * i) / Y_TICKS);
   const xTickCount = Math.min(6, dados.length);
   const xTickIdx = Array.from({ length: xTickCount }, (_, i) =>
     xTickCount === 1 ? 0 : Math.round((i / (xTickCount - 1)) * (dados.length - 1))
