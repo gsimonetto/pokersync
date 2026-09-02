@@ -3,7 +3,6 @@
 import { useId, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
-import { REFERENCE_PROFILE_LABEL, type ReferenceProfile } from "@/types/analysis";
 
 // Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
 // (rounded-xl border-hairline bg-surface) que app/performance/page.tsx já
@@ -333,6 +332,44 @@ export function StatCardGrid({
   );
 }
 
+// Variante em lista densa do StatCardGrid — usada na aba Estatísticas
+// (StatisticsTab), que tem muito mais métricas heterogêneas (datas,
+// contagens, dinheiro, %) do que Preflop/Postflop/Por posição, onde o
+// grid de cards com altura variável ficava com um visual "bagunçado"
+// (cada card com tamanho diferente, sem alinhamento entre colunas).
+// Lista de 2 colunas com linha fina entre itens lê melhor uma sequência
+// grande de pares rótulo/valor — mesmo padrão já usado no Resumo Anual
+// da Gestão de Banca.
+export function StatList({
+  items,
+}: {
+  items: {
+    label: string;
+    value: string | null;
+    icon?: LucideIcon;
+    tone?: Tone;
+    hint?: string;
+  }[];
+}) {
+  return (
+    <div className="grid grid-cols-1 gap-x-6 sm:grid-cols-2">
+      {items.map((it) => {
+        const cor = it.tone ? TONE_TEXT_CLASS[it.tone] : "text-ink";
+        const Icon = it.icon;
+        return (
+          <div key={it.label} className="flex items-center justify-between gap-3 border-b border-hairline py-2" title={it.hint}>
+            <span className="flex min-w-0 items-center gap-1.5 text-[12.5px] text-muted">
+              {Icon && <Icon size={12} className="shrink-0 text-muted/70" />}
+              <span className="truncate">{it.label}</span>
+            </span>
+            <span className={`shrink-0 text-sm font-bold tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
 function StatCard({
   label,
   value,
@@ -539,20 +576,6 @@ export function SampleBadge({ hands }: { hands: number }) {
   return (
     <span className="text-[10.5px] font-semibold text-muted/70">
       {hands} {hands === 1 ? "mão" : "mãos"}
-    </span>
-  );
-}
-
-// Transparência sobre de onde vem a faixa "ideal" mostrada nos cards —
-// escolhida automaticamente pelo formato predominante nas mãos filtradas
-// (ver computeReferenceProfile em analysis-service.ts), nunca à mão.
-export function ReferenceProfileBadge({ profile }: { profile: ReferenceProfile }) {
-  return (
-    <span
-      className="rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold uppercase tracking-[0.06em] text-muted/70"
-      title="Perfil de referência usado nas faixas ideais desta tela — escolhido automaticamente pelo formato predominante nas mãos filtradas."
-    >
-      ref. {REFERENCE_PROFILE_LABEL[profile]}
     </span>
   );
 }

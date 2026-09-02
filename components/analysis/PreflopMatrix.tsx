@@ -11,7 +11,6 @@ import {
   SubHeader,
   EmptyState,
   SampleBadge,
-  ReferenceProfileBadge,
   CategoryLegend,
   toneFromRange,
   toneTextClass,
@@ -53,12 +52,7 @@ export function PreflopPanel({
     <Painel
               titulo="Frequências pré-flop"
               icone={<Target size={14} className="icon-glow text-training" />}
-              action={
-                <div className="flex items-center gap-2">
-                  <ReferenceProfileBadge profile={referenceProfile} />
-                  <SampleBadge hands={metrics.hands} />
-                </div>
-              }
+              action={<SampleBadge hands={metrics.hands} />}
             >
               <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
                 {/* Todas as métricas de preflop que têm faixa de referência
@@ -241,11 +235,7 @@ export function PositionPanel({
   const byPositionSorted = useMemo(() => [...byPosition].sort((a, b) => b.hands - a.hands), [byPosition]);
 
   return (
-    <Painel
-      titulo="Por posição"
-      icone={<MapPin size={14} className="icon-glow text-evolution" />}
-      action={<ReferenceProfileBadge profile={referenceProfile} />}
-    >
+    <Painel titulo="Por posição" icone={<MapPin size={14} className="icon-glow text-evolution" />}>
       {byPosition.length === 0 ? (
         <EmptyState texto="Sem mãos suficientes com posição identificada." />
       ) : (

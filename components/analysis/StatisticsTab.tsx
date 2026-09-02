@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Trophy,
   Layers,
@@ -18,8 +18,10 @@ import {
   Flag,
   Flame,
   Snowflake,
+  ChevronDown,
+  type LucideIcon,
 } from "lucide-react";
-import { Painel, StatCardGrid, Bloqueado } from "@/components/analysis/shared";
+import { Painel, StatList, Bloqueado } from "@/components/analysis/shared";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { TournamentPayoutsPanel } from "@/components/analysis/TournamentPayoutsPanel";
 import { EvolutionChart } from "@/components/time/evolution-chart";
@@ -112,6 +114,28 @@ export function StatisticsTab({
     onBuyinFilterChange(buyinFilter.includes(b) ? buyinFilter.filter((x) => x !== b) : [...buyinFilter, b]);
   }
 
+  // Estrutura de premiação: por padrão só mostra a contagem
+  // (registradas/pendentes) em vez do grid com 1 card por torneio — o
+  // grid pesa muito nessa aba pra quem já tem dezenas de torneios
+  // importados. Clicar num dos números expande e revela a lista de
+  // verdade (mesmo componente TournamentPayoutsPanel, intacto). Expande
+  // sozinho quando vem do fluxo "Importar → Torneio" (focusPendingPayout),
+  // senão o alvo do scroll automático do painel nunca chega a existir no DOM.
+  const [premiacaoOpen, setPremiacaoOpen] = useState(!!focusPendingPayout);
+  useEffect(() => {
+    if (focusPendingPayout) setPremiacaoOpen(true);
+  }, [focusPendingPayout]);
+  const payoutByTournament = useMemo(() => new Map(payouts.map((p) => [p.tournamentIdPs, p])), [payouts]);
+  const payoutRegisteredCount = useMemo(
+    () =>
+      filteredSessions.filter((s) => {
+        const p = s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps) : undefined;
+        return p != null && (p.heroPayoutAmount != null || p.places.length > 0);
+      }).length,
+    [filteredSessions, payoutByTournament]
+  );
+  const payoutPendingCount = filteredSessions.length - payoutRegisteredCount;
+
   async function handleCompute() {
     if (computing) return;
     setComputing(true);
@@ -138,19 +162,34 @@ export function StatisticsTab({
 
   return (
     <div className="space-y-4">
+      {/* Estilo SharkScope: os 3 totais que definem o resultado (quanto
+          entrou, quantos torneios, quanto voltou) ficam coladas no
+          gráfico, num card só, em vez de repetidos lá em cima no Resumo
+          financeiro e de novo aqui embaixo do gráfico gigante. O gráfico
+          em si encolhe pra caber na coluna [1fr] ao lado da lista — antes
+          era full-width e dominava a tela sozinho. */}
+      <div className="grid grid-cols-1 gap-4 lg:grid-cols-[200px_1fr]">
+        <div className="flex flex-col justify-center gap-4 lg:pl-1">
+          <TotalStat label="Buy-ins investidos" value={fmtMoneyPlain(metrics.total_invested)} icon={ArrowDownToLine} />
+          <TotalStat label="Torneios" value={metrics.total_games > 0 ? String(metrics.total_games) : null} icon={Hash} />
+          <TotalStat
+            label="Ganhos (premiação)"
+            value={fmtMoneyPlain(metrics.total_cashout)}
+            icon={Trophy}
+            tone={metrics.total_cashout === null ? undefined : "bom"}
+          />
+          {metrics.total_games === 0 && (
+            <p className="text-xs text-muted">Nenhuma sessão de torneio registrada na Gestão de Banca ainda.</p>
+          )}
+        </div>
+        <EvolutionChart dados={financialSeries} titulo="Evolução do resultado" />
+      </div>
+
       <Painel titulo="Resumo financeiro" icone={<Wallet size={14} className="icon-glow text-evolution" />}>
-        <StatCardGrid
+        <StatList
           items={[
             { label: "Jogando desde", value: fmtSince(metrics.since), icon: CalendarClock },
             { label: "Último torneio", value: fmtSince(metrics.until), icon: CalendarCheck },
-            { label: "Total de torneios", value: metrics.total_games > 0 ? String(metrics.total_games) : null, icon: Hash },
-            { label: "Total investido (buy-ins)", value: fmtMoneyPlain(metrics.total_invested), icon: ArrowDownToLine },
-            {
-              label: "Ganhos totais (premiação)",
-              value: fmtMoneyPlain(metrics.total_cashout),
-              icon: Trophy,
-              tone: metrics.total_cashout === null ? undefined : "bom",
-            },
             {
               label: "Lucro total",
               value: fmtMoney(metrics.total_profit),
@@ -179,18 +218,10 @@ export function StatisticsTab({
             { label: "ITM %", value: fmtPct(metrics.itm_pct), icon: CheckCircle2 },
           ]}
         />
-        {metrics.total_games === 0 && (
-          <p className="mt-3 text-xs text-muted">
-            Nenhuma sessão de torneio registrada na Gestão de Banca ainda — todos os números acima vêm de lá (buy-in, re-entries e
-            cashout).
-          </p>
-        )}
       </Painel>
 
-      <EvolutionChart dados={financialSeries} titulo="Evolução do resultado" />
-
       <Painel titulo="Ritmo & sequências" icone={<Flag size={14} className="icon-glow text-review" />}>
-        <StatCardGrid
+        <StatList
           items={[
             { label: "Dias ativos", value: metrics.active_days > 0 ? String(metrics.active_days) : null, icon: CalendarCheck },
             { label: "Torneios / dia", value: metrics.games_per_day !== null ? metrics.games_per_day.toFixed(1) : null, icon: Hash },
@@ -248,13 +279,39 @@ export function StatisticsTab({
           decisão "deveria" valer em $. Hoje é só manual; quando o agente desktop buscar isso sozinho, aparece aqui do mesmo jeito
           (mesmo torneio, sem tela nova).
         </p>
-        <TournamentPayoutsPanel
-          sessions={filteredSessions}
-          payouts={payouts}
-          onChanged={onPayoutsChanged}
-          focusPending={focusPendingPayout}
-          onFocusConsumed={onFocusPendingPayoutConsumed}
-        />
+
+        <div className="flex flex-wrap items-center gap-5">
+          <button type="button" onClick={() => setPremiacaoOpen(true)} className="text-left">
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">Registradas</p>
+            <p className="mt-0.5 text-xl font-bold tabular-nums text-positive">{payoutRegisteredCount}</p>
+          </button>
+          <button type="button" onClick={() => setPremiacaoOpen(true)} className="text-left" disabled={payoutPendingCount === 0}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">Pendentes</p>
+            <p className={`mt-0.5 text-xl font-bold tabular-nums ${payoutPendingCount > 0 ? "text-evolution" : "text-muted/30"}`}>
+              {payoutPendingCount}
+            </p>
+          </button>
+          <button
+            type="button"
+            onClick={() => setPremiacaoOpen((v) => !v)}
+            className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-muted hover:text-ink"
+          >
+            {premiacaoOpen ? "Recolher" : "Ver torneios"}
+            <ChevronDown size={13} className={`transition-transform ${premiacaoOpen ? "rotate-180" : ""}`} />
+          </button>
+        </div>
+
+        {premiacaoOpen && (
+          <div className="mt-3 border-t border-hairline pt-3">
+            <TournamentPayoutsPanel
+              sessions={filteredSessions}
+              payouts={payouts}
+              onChanged={onPayoutsChanged}
+              focusPending={focusPendingPayout}
+              onFocusConsumed={onFocusPendingPayoutConsumed}
+            />
+          </div>
+        )}
       </Painel>
 
       <Painel
@@ -313,6 +370,33 @@ export function StatisticsTab({
           <Bloqueado titulo="Situações de ICM (bolha, mesa final)" texto="tournament_phase e icm_pressure existem no schema, mas o parser ainda não os preenche." />
         </div>
       </Painel>
+    </div>
+  );
+}
+
+// Numero grande estilo SharkScope, ao lado do grafico de evolucao —
+// so' os 3 totais que respondem "quanto entrou, em quantos torneios,
+// quanto voltou" de cara, sem precisar ler o Resumo financeiro abaixo.
+function TotalStat({
+  label,
+  value,
+  icon: Icon,
+  tone,
+}: {
+  label: string;
+  value: string | null;
+  icon: LucideIcon;
+  tone?: "bom";
+}) {
+  return (
+    <div>
+      <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted/80">
+        <Icon size={12} className="icon-glow shrink-0" />
+        {label}
+      </p>
+      <p className={`mt-1 text-2xl font-bold tabular-nums ${value ? (tone === "bom" ? "text-positive" : "text-ink") : "text-muted/30"}`}>
+        {value ?? "—"}
+      </p>
     </div>
   );
 }

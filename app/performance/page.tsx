@@ -28,7 +28,6 @@ import {
   EMPTY_ANALYSIS_FILTERS,
   type AnalysisFilters as Filters,
   type AnalysisHandRow,
-  type GameFormat,
   type StackDepthBucket,
   type HeroPosition,
   type TournamentMetrics,
@@ -120,7 +119,6 @@ export default function PerformancePage() {
   // formato predominante nas mãos já filtradas (ver computeReferenceProfile).
   const referenceProfile = useMemo(() => computeReferenceProfile(filteredRows), [filteredRows]);
 
-  const availableFormats = useMemo(() => new Set(rows.map((r) => r.format).filter((f): f is GameFormat => f !== null)), [rows]);
   const availableStackDepths = useMemo(
     () => new Set(rows.map((r) => r.stackDepthBucket).filter((s): s is StackDepthBucket => s !== null)),
     [rows]
@@ -151,20 +149,24 @@ export default function PerformancePage() {
           // Construtor de Ranges, Comparar, Equidade, Árvores), em vez de
           // caixas separadas competindo por hierarquia visual.
           <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-            <AnalysisFilters
-              filters={filters}
-              onChange={setFilters}
-              availableFormats={availableFormats}
-              availableStackDepths={availableStackDepths}
-              availablePositions={availablePositions}
-              onImported={loadAll}
-              onSelectTournamentImport={() => {
-                setTab("estatisticas");
-                setFocusPendingPayout(true);
-              }}
+            <TabNav
+              value={tab}
+              onChange={setTab}
+              options={TABS}
+              trailing={
+                <AnalysisFilters
+                  filters={filters}
+                  onChange={setFilters}
+                  availableStackDepths={availableStackDepths}
+                  availablePositions={availablePositions}
+                  onImported={loadAll}
+                  onSelectTournamentImport={() => {
+                    setTab("estatisticas");
+                    setFocusPendingPayout(true);
+                  }}
+                />
+              }
             />
-
-            <TabNav className="mt-4" value={tab} onChange={setTab} options={TABS} />
 
             <div className="mt-4">
               {rows.length === 0 ? (
