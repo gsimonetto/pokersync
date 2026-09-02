@@ -529,7 +529,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
-            <Scale size={15} className="text-review" />
+            <Scale size={15} className="icon-glow text-review" />
             <h3 className="m-0 text-sm font-semibold text-ink">Avaliação por street</h3>
           </div>
           {qas.length > 0 && (
@@ -679,24 +679,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           </div>
         )}
 
-        {/* Enviar ao coach: sempre disponivel (nao trava por streets sem
-            nota -- decisao revertida, ver historico) -- abre a MESMA modal
-            que o botao "Compartilhar" do Hand Replayer ja usa (perguntas
-            guiadas obrigatorias/opcionais, todas editaveis). Assim so
-            existe UM jeito de compartilhar mao com o coach no produto
-            inteiro, nao dois padroes parecidos disputando espaco. */}
-        {teamCoaches.length > 0 && (
-          <div className="mt-3 border-t border-hairline pt-3">
-            <button
-              type="button"
-              onClick={() => setShareModalOpen(true)}
-              className="flex items-center gap-1.5 rounded-lg border border-training/40 bg-training/10 px-2.5 py-1.5 text-[12px] font-semibold text-training transition-colors hover:bg-training/20"
-            >
-              <Users size={13} />
-              Enviar ao coach
-            </button>
-          </div>
-        )}
       </section>
 
       <ShareHandModal
@@ -713,7 +695,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
 
       <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
-          <Lightbulb size={15} className="text-review" />
+          <Lightbulb size={15} className="icon-glow text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Registro de aprendizado</h3>
         </div>
         <textarea
@@ -727,7 +709,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
 
       <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
         <div className="mb-2 flex items-center gap-2">
-          <Target size={15} className="text-review" />
+          <Target size={15} className="icon-glow text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Sugestão de drill</h3>
         </div>
         <textarea
@@ -745,23 +727,44 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </div>
       )}
 
-      <footer className="mt-4 flex gap-2.5">
-        <button
-          onClick={() => persist("em_revisao")}
-          disabled={saving}
-          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border border-hairline px-4 py-3 text-sm text-ink disabled:opacity-50"
-        >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-          Salvar rascunho
-        </button>
-        <button
-          onClick={() => persist("concluida")}
-          disabled={saving || !canConclude}
-          className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
-        >
-          {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-          Concluir revisão
-        </button>
+      <footer className="mt-4 flex flex-col gap-2.5">
+        <div className="flex gap-2.5">
+          <button
+            onClick={() => persist("em_revisao")}
+            disabled={saving}
+            className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border border-hairline px-4 py-3 text-sm text-ink disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Salvar rascunho
+          </button>
+          <button
+            onClick={() => persist("concluida")}
+            disabled={saving || !canConclude}
+            className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+            Concluir revisão
+          </button>
+        </div>
+
+        {/* Enviar ao coach: acao final do fluxo (pedido explicito), so'
+            habilita depois que as 4 streets tem nota -- essa e' a unica
+            parte obrigatoria; tags, aprendizado, drill e as perguntas
+            guiadas continuam opcionais. Abre a MESMA modal que o botao
+            "Compartilhar" da mesa ja usa, pra so existir um jeito de
+            compartilhar mao com o coach no produto inteiro. */}
+        {teamCoaches.length > 0 && (
+          <button
+            type="button"
+            onClick={() => setShareModalOpen(true)}
+            disabled={!allStreetsRated}
+            title={allStreetsRated ? undefined : "Avalie as 4 streets (pré-flop/flop/turn/river) acima pra liberar o envio"}
+            className="flex items-center justify-center gap-2 rounded-[10px] border border-training/40 bg-training/10 px-4 py-3 text-sm font-semibold text-training transition-colors hover:bg-training/20 disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            <Users size={16} />
+            Enviar ao coach
+          </button>
+        )}
       </footer>
     </>
   );

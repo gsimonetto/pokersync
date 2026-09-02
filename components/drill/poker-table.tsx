@@ -483,21 +483,17 @@ function SprBadge({ spr }: { spr: number }) {
 export function PokerTable({
   hand,
   seats,
-  onStreetClick,
   chipAnimation,
   streetCommitments,
   variant = "replay",
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
-  onStreetClick?: (streetIndex: number) => void;
   chipAnimation?: { fromPosLabel: string; amount: number; key: string | number } | null;
   streetCommitments?: Record<string, number>;
   variant?: TableVariant;
 }) {
   const active = !!hand;
-  const history = hand?.history || [];
-  const hasHistory = history.length > 0;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
   const felt = FELT_PALETTES[variant];
@@ -518,78 +514,11 @@ export function PokerTable({
 
       {/* SPR agora é renderizado no bloco central, acima do board. */}
 
-      {/* Caixa de ruas ("Nenhuma ação ainda" + histórico por rua) só faz
-          sentido no Replayer, que tem ação real pra mostrar. No Modo
-          Treino ela sempre ficava vazia (pedido explícito: "retire
-          aquele quadrado... no modo treino") — a mesa ganha o espaço
-          vertical que essa caixa ocupava. */}
-      {active && variant === "replay" && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            gap: 3,
-            marginBottom: 8,
-            padding: "6px 10px",
-            borderRadius: 12,
-            border: "1px solid rgba(255,255,255,0.08)",
-            flexShrink: 0,
-            background: "rgba(255,255,255,0.03)",
-            minHeight: 108,
-          }}
-        >
-          {hasHistory ? (
-            history.map((h, i) => (
-              <div key={i} style={{ display: "flex", alignItems: "center", gap: 8, minHeight: 20 }}>
-                <span
-                  onClick={onStreetClick ? () => onStreetClick(i) : undefined}
-                  style={{
-                    fontFamily: F,
-                    fontSize: 9,
-                    fontWeight: 700,
-                    letterSpacing: 1,
-                    color: h.current ? TEXT.critical : TEXT.decorative,
-                    whiteSpace: "nowrap",
-                    width: 34,
-                    flexShrink: 0,
-                    cursor: onStreetClick ? "pointer" : "default",
-                  }}
-                >
-                  {h.street}
-                </span>
-                <div style={{ display: "flex", gap: 5, overflowX: "auto", flex: 1, minWidth: 0 }}>
-                  {h.actions.length === 0 ? (
-                    <span style={{ fontFamily: F, fontSize: 10, color: TEXT.disabled }}>—</span>
-                  ) : (
-                    h.actions.map((a, j) => (
-                      <span
-                        key={j}
-                        style={{
-                          fontFamily: F,
-                          fontSize: 10,
-                          fontWeight: 500,
-                          whiteSpace: "nowrap",
-                          color: POS[a.pos]?.glow,
-                          opacity: h.current ? 1 : 0.65,
-                          padding: "1px 6px",
-                          borderRadius: 999,
-                          background: `${POS[a.pos]?.base}1F`,
-                          border: `1px solid ${POS[a.pos]?.base}55`,
-                          ...num,
-                        }}
-                      >
-                        {a.pos} {a.label}
-                      </span>
-                    ))
-                  )}
-                </div>
-              </div>
-            ))
-          ) : (
-            <span style={{ fontFamily: F, fontSize: 11, color: TEXT.decorative }}>Nenhuma ação ainda</span>
-          )}
-        </div>
-      )}
+      {/* Caixa de ruas removida (pedido explícito: "na mesa, tirar as
+          ruas — aquilo está mais atrapalhando do que ajudando"). A
+          navegação passo a passo continua pelos controles de
+          anterior/play/próximo abaixo da mesa — só o histórico textual
+          por rua saiu, igual já tinha sido feito no Modo Treino. */}
 
       {/* aspectRatio fixo -- antes a mesa era so' "flex:1; width:100%",
           esticando pra qualquer proporcao que a caixa disponivel tivesse

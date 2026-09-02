@@ -2,17 +2,16 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Bookmark, ListChecks, PieChart } from "lucide-react";
+import { ArrowLeft, Bookmark, ListChecks } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { TabNav } from "@/components/ui/tab-nav";
 import { RevisorFila } from "@/components/revisor/revisor-fila";
 import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
 import { RevisorSessao } from "@/components/revisor/revisor-sessao";
-import { AderenciaRange } from "@/components/revisor/aderencia-range";
 import { RevisorSpotsSalvos } from "@/components/revisor/revisor-spots-salvos";
 
-type Screen = "fila" | "salvos" | "nova" | "sessao" | "detalhe" | "aderencia";
+type Screen = "fila" | "salvos" | "nova" | "sessao" | "detalhe";
 
 // Navegacao interna do Revisor de Maos (2026-08 v2): agora inclui a tela
 // "sessao" (master-detail de torneio/cash). Fluxo esperado:
@@ -109,15 +108,14 @@ function RevisorPageInner() {
           conteudo moram dentro da MESMA caixa, em vez de boiar soltos
           contra o fundo. Sem AppHeader (barra sticky) de proposito. */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-        {(screen === "fila" || screen === "salvos" || screen === "aderencia") && (
+        {(screen === "fila" || screen === "salvos") && (
           <TabNav
             className="mb-4"
             value={screen}
-            onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : setScreen("aderencia"))}
+            onChange={(s) => (s === "fila" ? goFila() : goSalvos())}
             options={[
               { value: "fila", label: "Fila", icon: ListChecks },
               { value: "salvos", label: "Salvos", icon: Bookmark },
-              { value: "aderencia", label: "Aderência a Range", icon: PieChart },
             ]}
           />
         )}
@@ -142,7 +140,6 @@ function RevisorPageInner() {
           />
         )}
         {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
-        {screen === "aderencia" && <AderenciaRange />}
         {screen === "nova" && (
           <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
         )}

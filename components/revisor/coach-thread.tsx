@@ -89,7 +89,7 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
     <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="m-0 flex items-center gap-1.5 text-sm font-semibold text-ink">
-          <MessageSquare size={14} className="text-training" />
+          <MessageSquare size={14} className="icon-glow text-training" />
           {ativo.iAmCoach ? `Análise para ${ativo.counterpartName}` : "Conversa com o coach"}
         </h3>
 

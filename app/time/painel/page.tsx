@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight, IdCard, BarChart3 } from "lucide-react";
+import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight, IdCard, BarChart3, Inbox } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import {
   fetchFinancialSeries,
@@ -39,6 +39,7 @@ import { TabJogadores } from "@/components/time/tab-jogadores";
 import { TabConvites } from "@/components/time/tab-convites";
 import { TabTime } from "@/components/time/tab-time";
 import { TabCalendario } from "@/components/time/tab-calendario";
+import { TabMaosRecebidas } from "@/components/time/tab-maos-recebidas";
 import { TeamPrintStyles } from "@/components/time/print-styles";
 import { useConfirm } from "@/components/confirm-dialog";
 import { MobileTabsMenu } from "@/components/ui/mobile-tabs-menu";
@@ -54,15 +55,18 @@ const PERIODOS = [
   { label: "90d", days: 90 },
 ];
 
-type Aba = "perfil" | "estatisticas" | "jogadores" | "convites" | "calendario" | "time";
+type Aba = "perfil" | "estatisticas" | "jogadores" | "maos" | "convites" | "calendario" | "time";
 
 // Convites por ultimo: e' a aba menos relevante no dia a dia (pedido
 // pendente/gerar link e' acao esporadica) -- o resto e' o que o coach
-// acompanha toda vez que abre o painel.
-const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard }[] = [
+// acompanha toda vez que abre o painel. "Maos recebidas" (pedido
+// explicito) so' faz sentido pra quem pode receber mao compartilhada de
+// aluno -- filtrada fora do array pra quem e' player (ver abasVisiveis).
+const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard; soCoach?: boolean }[] = [
   { key: "perfil", label: "Perfil do time", icon: IdCard },
   { key: "estatisticas", label: "Estatísticas", icon: BarChart3 },
   { key: "jogadores", label: "Jogadores", icon: UserRound },
+  { key: "maos", label: "Mãos recebidas", icon: Inbox, soCoach: true },
   { key: "calendario", label: "Calendário", icon: CalendarDays },
   { key: "time", label: "Time", icon: Settings2 },
   { key: "convites", label: "Convites", icon: Mail },
@@ -202,6 +206,7 @@ function PainelConteudo() {
   );
   const isAdmin = time?.role === "admin";
   const podeEditarTime = time?.role !== "player";
+  const abasVisiveis = useMemo(() => ABAS.filter((a) => !a.soCoach || podeEditarTime), [podeEditarTime]);
 
   return (
     <AppShell>
@@ -221,7 +226,7 @@ function PainelConteudo() {
             sm a barra cabe inteira, entao continua igual sempre foi. */}
         <div className="rounded-2xl border border-hairline bg-surface p-5 sm:p-6 print:border-0 print:bg-transparent print:p-0">
           <nav className="relative mb-4 hidden justify-center gap-1 overflow-x-auto border-b border-hairline sm:flex print:hidden">
-            {ABAS.map((a) => {
+            {abasVisiveis.map((a) => {
               const Icon = a.icon;
               const pend = a.key === "convites" ? pendentes.length : 0;
               return (
@@ -251,7 +256,7 @@ function PainelConteudo() {
               title="Meu Time"
               activeKey={aba}
               items={[
-                ...ABAS.map((a) => ({
+                ...abasVisiveis.map((a) => ({
                   key: a.key,
                   label: a.label,
                   icon: a.icon,
@@ -298,6 +303,7 @@ function PainelConteudo() {
                   onAtribuido={carregar}
                   onChange={carregar} onErro={setErro} />
               )}
+              {aba === "maos" && podeEditarTime && <TabMaosRecebidas />}
               {aba === "convites" && time && (
                 <TabConvites pendentes={pendentes} invites={invites} isAdmin={Boolean(isAdmin)} meuPapel={time.role}
                   onChange={carregar} onErro={setErro} />
