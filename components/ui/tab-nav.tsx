@@ -20,14 +20,21 @@ export function TabNav<T extends string>({
   onChange,
   options,
   className,
+  trailing,
 }: {
   value: T;
   onChange: (v: T) => void;
   options: { value: T; label: string; icon: LucideIcon; badge?: number; href?: string }[];
   className?: string;
+  // Conteudo alinhado na mesma linha das abas, empurrado pra ponta direita
+  // (ml-auto absorve o espaco livre antes dele, entao funciona mesmo com
+  // justify-center herdado) -- usado pela Performance pra colocar os
+  // controles de filtro/importar no mesmo eixo das abas, em vez de uma
+  // segunda linha separada com espaco em branco entre as duas.
+  trailing?: React.ReactNode;
 }) {
   return (
-    <nav className={`relative flex justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center ${className ?? ""}`}>
+    <nav className={`relative flex items-center justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center ${className ?? ""}`}>
       {options.map((o) => {
         const Icon = o.icon;
         const active = !o.href && value === o.value;
@@ -53,6 +60,7 @@ export function TabNav<T extends string>({
           </button>
         );
       })}
+      {trailing && <div className="ml-auto flex shrink-0 items-center gap-2 pb-1.5">{trailing}</div>}
     </nav>
   );
 }

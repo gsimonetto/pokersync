@@ -9,7 +9,6 @@ import {
   HealthGauge,
   SubHeader,
   SampleBadge,
-  ReferenceProfileBadge,
   CategoryLegend,
   toneFromRange,
   rangeCoaching,
@@ -55,12 +54,7 @@ export function PostflopTab({
     <Painel
       titulo="Tendências pós-flop"
       icone={<Flame size={14} className="icon-glow text-training" />}
-      action={
-        <div className="flex items-center gap-2">
-          <ReferenceProfileBadge profile={referenceProfile} />
-          <SampleBadge hands={metrics.hands} />
-        </div>
-      }
+      action={<SampleBadge hands={metrics.hands} />}
     >
       <div className="grid gap-3 lg:grid-cols-[220px_1fr]">
         {/* Todas as métricas de postflop que têm faixa de referência entram
