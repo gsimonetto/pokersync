@@ -33,34 +33,56 @@ export function TabNav<T extends string>({
   // segunda linha separada com espaco em branco entre as duas.
   trailing?: React.ReactNode;
 }) {
+  const tabs = options.map((o) => {
+    const Icon = o.icon;
+    const active = !o.href && value === o.value;
+    const itemClassName = `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
+      active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
+    }`;
+    const content = (
+      <>
+        <Icon size={15} />
+        {o.label}
+        {o.badge != null && o.badge > 0 && (
+          <span className="rounded-full bg-evolution px-1.5 text-[10px] font-bold leading-4 text-void">{o.badge}</span>
+        )}
+      </>
+    );
+    return o.href ? (
+      <Link key={o.value} href={o.href} className={itemClassName}>
+        {content}
+      </Link>
+    ) : (
+      <button key={o.value} onClick={() => onChange(o.value)} className={itemClassName}>
+        {content}
+      </button>
+    );
+  });
+
+  // Com `trailing`, um simples `flex justify-center` centralizaria as
+  // abas + o trailing juntos (empurrando as abas pra esquerda do centro
+  // real). Grid de 3 colunas com uma coluna fantasma do mesmo tamanho da
+  // do trailing resolve: as abas ficam centralizadas na tela de verdade,
+  // igual aos outros modulos que nao tem trailing nenhum.
+  if (trailing) {
+    // minmax(0, 1fr) nas duas pontas (em vez de 1fr puro) -- sem isso a
+    // ponta direita (que carrega os controles de verdade) nunca fica do
+    // mesmo tamanho da ponta esquerda (vazia), porque o minimo automatico
+    // de uma faixa "1fr" ainda respeita o conteudo dela. Com minmax(0, 1fr)
+    // as duas faixas dividem o espaço livre em partes iguais de fato,
+    // centralizando as abas na largura real da tela.
+    return (
+      <nav className={`relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-hairline ${className ?? ""}`}>
+        <div />
+        <div className="flex justify-center gap-1 overflow-x-auto">{tabs}</div>
+        <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 pb-1.5">{trailing}</div>
+      </nav>
+    );
+  }
+
   return (
-    <nav className={`relative flex items-center justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center ${className ?? ""}`}>
-      {options.map((o) => {
-        const Icon = o.icon;
-        const active = !o.href && value === o.value;
-        const itemClassName = `-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-          active ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
-        }`;
-        const content = (
-          <>
-            <Icon size={15} />
-            {o.label}
-            {o.badge != null && o.badge > 0 && (
-              <span className="rounded-full bg-evolution px-1.5 text-[10px] font-bold leading-4 text-void">{o.badge}</span>
-            )}
-          </>
-        );
-        return o.href ? (
-          <Link key={o.value} href={o.href} className={itemClassName}>
-            {content}
-          </Link>
-        ) : (
-          <button key={o.value} onClick={() => onChange(o.value)} className={itemClassName}>
-            {content}
-          </button>
-        );
-      })}
-      {trailing && <div className="ml-auto flex shrink-0 items-center gap-2 pb-1.5">{trailing}</div>}
+    <nav className={`relative flex justify-start gap-1 overflow-x-auto border-b border-hairline sm:justify-center ${className ?? ""}`}>
+      {tabs}
     </nav>
   );
 }

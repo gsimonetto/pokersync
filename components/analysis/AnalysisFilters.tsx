@@ -28,11 +28,11 @@ type ModalityValue = "all" | "mtt" | "cash";
 
 // Barra de filtros globais do modulo de Analise. Reformulada (2026-09)
 // pra caber na mesma linha do TabNav (ver `trailing` em tab-nav.tsx) em
-// vez de empilhar duas linhas com espaco em branco entre elas: o
-// "Filtros" e' agora um popover ancorado (mesmo padrao de
-// components/ui/filter-popover.tsx da Gestao de Banca) em vez de um
-// bloco full-width que empurrava o conteudo pra baixo, e "Importar ->
-// Hand history" virou modal em vez de painel inline, pelo mesmo motivo.
+// vez de empilhar duas linhas com espaco em branco entre elas: "Filtros"
+// e' so' um icone (com bolinha de contagem) em vez de botao com rotulo,
+// e tanto ele quanto "Importar -> Hand history" abrem em modal central
+// (ModalPortal) em vez de um bloco full-width que empurrava o conteudo
+// pra baixo ou um dropdown ancorado no botao.
 //
 // Modalidade (MTT/Cash) sai do grupo generico de chips e vira um
 // segmented control proprio, sempre visivel -- e' o filtro que decide
@@ -77,88 +77,88 @@ export function AnalysisFilters({
         ]}
       />
 
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setMoreOpen((v) => !v)}
-          className={`inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
-            moreOpen ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-muted hover:border-ink/40 hover:text-ink"
-          }`}
-        >
-          <SlidersHorizontal size={13} />
-          Filtros
-          {activeCount > 0 && (
-            <span className="grid h-4 w-4 place-items-center rounded-full bg-evolution text-[10px] font-bold text-void">{activeCount}</span>
-          )}
-          <ChevronDown size={13} className={`transition-transform ${moreOpen ? "rotate-180" : ""}`} />
-        </button>
-
-        {moreOpen && (
-          <div className="absolute right-0 top-full z-20 mt-2 w-[min(92vw,380px)] rounded-lg border border-hairline bg-surface p-3 shadow-lg">
-            <div className="space-y-3">
-              <FilterGroup label="Profundidade de stack">
-                {(Object.keys(STACK_DEPTH_LABEL) as StackDepthBucket[]).map((s) => (
-                  <FilterChip
-                    key={s}
-                    label={STACK_DEPTH_LABEL[s]}
-                    active={filters.stackDepths.includes(s)}
-                    disabled={!availableStackDepths.has(s)}
-                    disabledReason="Sem mãos nessa faixa de stack ainda"
-                    onClick={() => onChange({ ...filters, stackDepths: toggle(filters.stackDepths, s) })}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup label="Estágio do torneio">
-                {(Object.keys(TOURNAMENT_STAGE_LABEL) as TournamentStage[]).map((s) => (
-                  <FilterChip
-                    key={s}
-                    label={TOURNAMENT_STAGE_LABEL[s]}
-                    active={filters.stages.includes(s)}
-                    disabled
-                    disabledReason="Depende do motor de ICM, que ainda não roda no pipeline (ver backlog)"
-                    onClick={() => onChange({ ...filters, stages: toggle(filters.stages, s) })}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup label="Posição do herói">
-                {HERO_POSITION_ORDER.map((p) => (
-                  <FilterChip
-                    key={p}
-                    label={HERO_POSITION_LABEL[p]}
-                    active={filters.positions.includes(p)}
-                    disabled={!availablePositions.has(p)}
-                    disabledReason="Sem mãos identificadas nessa posição ainda"
-                    onClick={() => onChange({ ...filters, positions: toggle(filters.positions, p) })}
-                  />
-                ))}
-              </FilterGroup>
-
-              <FilterGroup label="Ação preflop">
-                {(Object.keys(PREFLOP_ACTION_LABEL) as PreflopActionType[]).map((a) => (
-                  <FilterChip
-                    key={a}
-                    label={PREFLOP_ACTION_LABEL[a]}
-                    active={filters.preflopActions.includes(a)}
-                    onClick={() => onChange({ ...filters, preflopActions: toggle(filters.preflopActions, a) })}
-                  />
-                ))}
-              </FilterGroup>
-
-              {activeCount > 0 && (
-                <button
-                  type="button"
-                  onClick={() => onChange({ ...filters, stackDepths: [], stages: [], positions: [], preflopActions: [] })}
-                  className="text-[11.5px] font-semibold text-muted hover:text-ink"
-                >
-                  Limpar filtros
-                </button>
-              )}
-            </div>
-          </div>
+      <button
+        type="button"
+        onClick={() => setMoreOpen(true)}
+        title="Mais filtros"
+        aria-label="Mais filtros"
+        className={`relative grid h-7 w-7 place-items-center rounded-md border transition-colors ${
+          moreOpen ? "border-ink bg-ink text-void" : "border-hairline text-muted hover:border-ink/40 hover:text-ink"
+        }`}
+      >
+        <SlidersHorizontal size={13} />
+        {activeCount > 0 && (
+          <span className="absolute -right-1 -top-1 grid h-4 w-4 place-items-center rounded-full bg-evolution text-[10px] font-bold text-void">
+            {activeCount}
+          </span>
         )}
-      </div>
+      </button>
+
+      {moreOpen && (
+        <MoreFiltersModal onClose={() => setMoreOpen(false)}>
+          <div className="space-y-3">
+            <FilterGroup label="Profundidade de stack">
+              {(Object.keys(STACK_DEPTH_LABEL) as StackDepthBucket[]).map((s) => (
+                <FilterChip
+                  key={s}
+                  label={STACK_DEPTH_LABEL[s]}
+                  active={filters.stackDepths.includes(s)}
+                  disabled={!availableStackDepths.has(s)}
+                  disabledReason="Sem mãos nessa faixa de stack ainda"
+                  onClick={() => onChange({ ...filters, stackDepths: toggle(filters.stackDepths, s) })}
+                />
+              ))}
+            </FilterGroup>
+
+            <FilterGroup label="Estágio do torneio">
+              {(Object.keys(TOURNAMENT_STAGE_LABEL) as TournamentStage[]).map((s) => (
+                <FilterChip
+                  key={s}
+                  label={TOURNAMENT_STAGE_LABEL[s]}
+                  active={filters.stages.includes(s)}
+                  disabled
+                  disabledReason="Depende do motor de ICM, que ainda não roda no pipeline (ver backlog)"
+                  onClick={() => onChange({ ...filters, stages: toggle(filters.stages, s) })}
+                />
+              ))}
+            </FilterGroup>
+
+            <FilterGroup label="Posição do herói">
+              {HERO_POSITION_ORDER.map((p) => (
+                <FilterChip
+                  key={p}
+                  label={HERO_POSITION_LABEL[p]}
+                  active={filters.positions.includes(p)}
+                  disabled={!availablePositions.has(p)}
+                  disabledReason="Sem mãos identificadas nessa posição ainda"
+                  onClick={() => onChange({ ...filters, positions: toggle(filters.positions, p) })}
+                />
+              ))}
+            </FilterGroup>
+
+            <FilterGroup label="Ação preflop">
+              {(Object.keys(PREFLOP_ACTION_LABEL) as PreflopActionType[]).map((a) => (
+                <FilterChip
+                  key={a}
+                  label={PREFLOP_ACTION_LABEL[a]}
+                  active={filters.preflopActions.includes(a)}
+                  onClick={() => onChange({ ...filters, preflopActions: toggle(filters.preflopActions, a) })}
+                />
+              ))}
+            </FilterGroup>
+
+            {activeCount > 0 && (
+              <button
+                type="button"
+                onClick={() => onChange({ ...filters, stackDepths: [], stages: [], positions: [], preflopActions: [] })}
+                className="text-[11.5px] font-semibold text-muted hover:text-ink"
+              >
+                Limpar filtros
+              </button>
+            )}
+          </div>
+        </MoreFiltersModal>
+      )}
 
       <div className="relative">
         <button
@@ -211,6 +211,25 @@ export function AnalysisFilters({
         />
       )}
     </div>
+  );
+}
+
+function MoreFiltersModal({ onClose, children }: { onClose: () => void; children: React.ReactNode }) {
+  useEscapeToClose(onClose);
+  return (
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 p-4 pt-10" onClick={onClose}>
+        <div className="w-full max-w-md rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+          <div className="mb-3 flex items-center justify-between gap-2">
+            <h3 className="text-[15px] font-semibold">Mais filtros</h3>
+            <button onClick={onClose} className="text-muted hover:text-ink" aria-label="Fechar">
+              <X size={16} />
+            </button>
+          </div>
+          {children}
+        </div>
+      </div>
+    </ModalPortal>
   );
 }
 
