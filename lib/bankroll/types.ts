@@ -37,6 +37,11 @@ export interface Session {
   ownPct?: number;
   markup?: number;
   backerName?: string;
+  // Preenchido quando a sessão veio de um torneio que o agente desktop já
+  // tinha capturado (id do hand_sessions de origem) -- alimenta a tag
+  // "Importada" e o filtro de importadas na Gestão de Banca. null/undefined
+  // = lançada à mão pelo jogador.
+  importedHandSessionId?: string | null;
 }
 
 export type TransactionType = "deposito" | "saque" | "caixinha";

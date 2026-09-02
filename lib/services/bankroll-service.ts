@@ -26,6 +26,7 @@ function rowToSession(r: any): Session {
     ownPct: r.own_pct != null ? Number(r.own_pct) : undefined,
     markup: r.markup != null ? Number(r.markup) : undefined,
     backerName: r.backer_name || undefined,
+    importedHandSessionId: r.imported_hand_session_id || null,
   };
 }
 
@@ -52,6 +53,7 @@ function sessionToRow(s: Partial<Session>, userId: string) {
     own_pct: s.ownPct != null && String(s.ownPct) !== "" ? Number(s.ownPct) : null,
     markup: s.markup != null && String(s.markup) !== "" ? Number(s.markup) : null,
     backer_name: s.backerName || null,
+    imported_hand_session_id: s.importedHandSessionId || null,
   };
 }
 
