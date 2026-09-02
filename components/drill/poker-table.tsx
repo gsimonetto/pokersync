@@ -1,8 +1,44 @@
 "use client";
 
+import { useEffect, useRef, useState } from "react";
 import { Card } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
+
+// FIX (2026-09): "me mostre como ficou no celular e em outras telas"
+// revelou que cartas, placas de nome e badges de aposta (todos com
+// tamanho fixo em pixel) nao cabem mais numa mesa estreita — a caixa da
+// mesa trava em aspectRatio 8/5, entao numa tela de celular ela fica bem
+// baixa, e tudo comecava a se sobrepor. Em vez de reescrever cada
+// tamanho de fonte/padding em unidades responsivas (haveria dezenas
+// espalhados pelo Seat), mede-se a largura REAL da mesa renderizada
+// (ResizeObserver, direto no navegador) e aplica-se um unico fator de
+// escala visual (transform:scale) em cada assento/bloco central, em
+// torno do proprio centro — encolhe tudo dentro do assento junto (carta,
+// placa, texto) sem mover o PONTO de ancoragem dele na mesa.
+// BASE_TABLE_WIDTH_PX: largura em que 1 = tamanho "normal" (o desenho foi
+// ajustado visualmente numa mesa desktop ~1400px de largura).
+// MIN_SEAT_SCALE: piso de encolhimento — abaixo disso o texto vira
+// ilegivel, entao a mesa aceita ficar um pouco mais apertada em vez de
+// continuar encolhendo.
+const BASE_TABLE_WIDTH_PX = 900;
+const MIN_SEAT_SCALE = 0.4;
+
+function useSeatScale(ref: React.RefObject<HTMLElement | null>) {
+  const [scale, setScale] = useState(1);
+  useEffect(() => {
+    const el = ref.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (!width) return;
+      setScale(Math.min(1, Math.max(MIN_SEAT_SCALE, width / BASE_TABLE_WIDTH_PX)));
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, [ref]);
+  return scale;
+}
 
 export interface SeatState {
   status: "empty" | "live" | "acting" | "folded";
@@ -161,6 +197,16 @@ function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: numbe
 
 const MIN_COMMITTED_TO_SHOW = 0.5;
 
+// Mesa retangular com cantos arredondados (pedido explicito: "mesa mais
+// retangular com as bordas redondas, como o gtowizard faz") — antes era
+// um oval puro (borderRadius:"50%" em todas as camadas). "50%" faria uma
+// elipse achatada de novo; com raio pequeno e assimetrico entre os eixos
+// (container tem aspectRatio 8/5, entao raio horizontal < vertical pra o
+// canto parecer igualmente arredondado nos dois eixos) fica um retangulo
+// com cantos suaves. Reaproveitado em todas as camadas do desenho da mesa
+// (moldura, feltro, marca d'agua) pra nao dessincronizar contornos.
+const TABLE_CORNER_RADIUS = "10% / 16%";
+
 const TABLE_CENTER = { x: 50, y: 44 };
 const COMMITTED_OFFSET_PX = 56;
 const HERO_COMMITTED_OFFSET_PX = 104;
@@ -191,23 +237,28 @@ function CommittedPill({ amount }: { amount: number }) {
   );
 }
 
-function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number }) {
+function CommittedChip({ seat, amount, scale }: { seat: SeatLayoutSlot; amount: number; scale: number }) {
   const dx = TABLE_CENTER.x - seat.x;
   const dy = TABLE_CENTER.y - seat.y;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
   const ux = dx / len;
   const uy = dy / len;
-  let offsetPx = seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX;
-  if (!seat.isHero && seat.cardSide === "above") {
-    offsetPx += ABOVE_SEAT_EXTRA_OFFSET_PX;
-  }
+  // Cartas ficam sempre acima do nome agora (nenhum seat usa mais layout
+  // lateral) — a folga extra que so' valia pra cardSide "above" passa a
+  // valer pra todo mundo que nao e' o hero (que ja tem seu proprio offset
+  // maior, HERO_COMMITTED_OFFSET_PX).
+  // offsetPx tambem escala junto (pedido explicito: "nao deixe nada
+  // fixo") — numa mesa encolhida o assento fica menor, entao a distancia
+  // ate a ficha precisa encolher na mesma proporcao, senao a ficha fica
+  // "flutuando" longe demais do assento minusculo.
+  const offsetPx = ((seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX) + (seat.isHero ? 0 : ABOVE_SEAT_EXTRA_OFFSET_PX)) * scale;
   return (
     <div
       style={{
         position: "absolute",
         left: `${seat.x}%`,
         top: `${seat.y}%`,
-        transform: `translate(-50%,-50%) translate(${ux * offsetPx}px, ${uy * offsetPx}px)`,
+        transform: `translate(-50%,-50%) translate(${ux * offsetPx}px, ${uy * offsetPx}px) scale(${scale})`,
         zIndex: 3,
         pointerEvents: "none",
       }}
@@ -217,13 +268,59 @@ function CommittedChip({ seat, amount }: { seat: SeatLayoutSlot; amount: number 
   );
 }
 
+// Cartas sobrepostas (uma quase em cima da outra), como GGPoker e a
+// maioria dos apps mobile fazem — em vez do padrao antigo lado a lado
+// com espaco entre elas. A segunda carta cobre boa parte da primeira
+// (overlapPx negativo) e cada carta ganha uma leve rotacao em leque, pra
+// nao parecer um bloco unico colado.
+//
+// FIX (2026-09): rotacao pedida explicitamente igual ao GGPoker — a
+// PRIMEIRA carta deitada pra ESQUERDA, a SEGUNDA deitada pra DIREITA
+// (leque abrindo pros dois lados a partir do centro). A formula abaixo
+// ja fazia isso matematicamente (indice mais baixo = rotacao negativa =
+// gira sentido anti-horario = topo da carta pende pra esquerda), mas o
+// angulo total (6deg pra 2 cartas = 3deg pra cada lado) era sutil demais
+// pra ficar perceptivel — subiu pra 10deg (5deg por carta em duplas).
+const CARD_OVERLAP_PX: Record<Size, number> = { board: 30, hero: 44, mini: 20 } as const;
+type Size = "board" | "hero" | "mini";
+
+function CardFan({ cards, size, fanDeg = 10 }: { cards: (string | null)[]; size: Size; fanDeg?: number }) {
+  const overlap = CARD_OVERLAP_PX[size];
+  return (
+    <div style={{ display: "flex" }}>
+      {cards.map((c, i) => (
+        // Dois wrappers separados de proposito: a animacao de entrada
+        // (fadeInUp) tambem mexe em `transform` (translateY), e uma
+        // unica div com os dois (rotate estatico + animacao) faz o
+        // keyframe da animacao GANHAR e apagar a rotacao assim que ela
+        // roda — a carta ficava sempre reta, mesmo com o angulo certo no
+        // codigo. Separando, cada div cuida de UM transform só.
+        <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - (cards.length - 1) / 2) * fanDeg}deg)` }}>
+          <div style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+            <Card card={c} size={size} />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
+// Empurra o bloco de cartas por baixo/por tras da placa de nome+stack do
+// seat (pedido explicito: "cartas precisam ficar um pouco atras do nome
+// do seat") — a placa fica com zIndex maior, entao cobre uma fatia das
+// cartas em vez de so ficar espremida do lado. Cartas ficam sempre ACIMA
+// do nome agora (nao ha mais layout lateral), entao so existe a direcao
+// "empurra pra baixo, por tras da placa".
+const CARD_BEHIND_NAME_TRANSFORM = { above: "translateY(16px)" } as const;
+
 function Seat({
-  seat, state, isDealer, pot,
+  seat, state, isDealer, pot, scale,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
   isDealer?: boolean;
   pot: number;
+  scale: number;
 }) {
   const posCol = POS[seat.posLabel];
   const { status = "empty", stack, action, cards } = state;
@@ -235,16 +332,16 @@ function Seat({
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = SEAT_OPACITY[status];
 
-  const layout: React.CSSProperties = hero
-    ? { flexDirection: "column", alignItems: "center", gap: 6 }
-    : (
-        {
-          below: { flexDirection: "column", gap: 4 },
-          above: { flexDirection: "column", gap: 0 },
-          left: { flexDirection: "row-reverse", alignItems: "center", gap: 12 },
-          right: { flexDirection: "row", alignItems: "center", gap: 12 },
-        } as const
-      )[seat.cardSide];
+  // Cartas sempre EM CIMA do nome do seat, pra todas as posicoes da mesa
+  // (pedido explicito: "as cartas de todas as posicoes precisam ficar em
+  // cima do seat, a dos viloes esta do lado, quero igual ao ggpoker" — no
+  // GGPoker nao existe carta "do lado" do nome, o layout e' sempre coluna
+  // vertical com as cartas por cima). Antes o layout mudava por cardSide
+  // (linha horizontal pros seats dos lados esquerdo/direito da mesa) —
+  // essa distincao de layout saiu; cardSide continua existindo so' pra
+  // decidir a direcao do deslocamento "atras do nome" (CARD_BEHIND_NAME_
+  // TRANSFORM) e da ficha de aposta (CommittedChip).
+  const layout: React.CSSProperties = { flexDirection: "column", alignItems: "center", gap: hero ? 6 : 0 };
 
   const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
@@ -355,10 +452,15 @@ function Seat({
         position: "absolute",
         left: `${seat.x}%`,
         top: `${seat.y}%`,
-        transform: "translate(-50%,-50%)",
+        // scale() depois do translate: primeiro centraliza a caixa do
+        // assento no ponto de ancoragem (x%,y%), so' DEPOIS encolhe em
+        // torno do proprio centro (transform-origin default) — o ponto
+        // de ancoragem na mesa nunca se move, so' o conteudo do assento
+        // (carta+placa+texto) fica menor quando a mesa e' estreita.
+        transform: `translate(-50%,-50%) scale(${scale})`,
         opacity,
         filter: status === "folded" ? "grayscale(0.5)" : "none",
-        transition: "opacity 220ms ease, filter 220ms ease",
+        transition: "opacity 220ms ease, filter 220ms ease, transform 150ms ease",
         zIndex: acting ? 5 : 2,
         animation: acting ? "seatPulse 2s ease-in-out infinite" : "none",
       }}
@@ -367,45 +469,26 @@ function Seat({
         {hero ? (
           <>
             {cards && cards.length > 0 && (
-              <div
-                style={{
-                  position: "relative",
-                  display: "flex",
-                  gap: 5,
-                }}
-              >
-                {cards.map((c, i) => (
-                  <div key={i} style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
-                    <Card card={c} size="board" />
-                  </div>
-                ))}
+              <div style={{ position: "relative", zIndex: 1, transform: CARD_BEHIND_NAME_TRANSFORM.above }}>
+                <CardFan cards={cards} size="board" />
               </div>
             )}
-            {seatInfo}
+            <div style={{ position: "relative", zIndex: 2 }}>{seatInfo}</div>
           </>
         ) : (
           (() => {
             const cardsBlock = revealedVillainCards ? (
-              <div style={{ display: "flex", gap: 5 }}>
-                {cards!.map((c, i) => (
-                  <div key={i} style={{ transform: `rotate(${i ? 4 : -4}deg)`, animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
-                    <Card card={c} size="board" />
-                  </div>
-                ))}
+              <div style={{ position: "relative", zIndex: 1, transform: CARD_BEHIND_NAME_TRANSFORM.above }}>
+                <CardFan cards={cards!} size="board" />
               </div>
             ) : null;
-            if (seat.cardSide === "above") {
-              return (
-                <>
-                  {cardsBlock}
-                  {seatInfo}
-                </>
-              );
-            }
+            const seatInfoLayered = <div style={{ position: "relative", zIndex: 2 }}>{seatInfo}</div>;
+            // Cartas sempre antes (em cima) do bloco de nome/stack,
+            // independente de onde o seat fica na mesa.
             return (
               <>
-                {seatInfo}
                 {cardsBlock}
+                {seatInfoLayered}
               </>
             );
           })()
@@ -419,33 +502,49 @@ function ChipAnimation({
   fromSeat,
   amount,
   animKey,
+  scale,
 }: {
   fromSeat: SeatLayoutSlot;
   amount: number;
   animKey: string | number;
+  scale: number;
 }) {
   const dx = TABLE_CENTER.x - fromSeat.x;
   const dy = TABLE_CENTER.y - fromSeat.y;
   return (
+    // Dois niveis, mesmo motivo do CardFan: a animacao chipTravel ja mexe
+    // em `transform` (translate+scale) nos seus proprios keyframes — numa
+    // unica div, esse `scale(seatScale)` estatico seria apagado assim que
+    // a animacao comeca a rodar. O externo (sem tamanho proprio, so' o
+    // ponto de ancoragem) fica com a posicao + escala da mesa; o interno
+    // fica com a animacao de viagem da ficha, sem mudar nada nela.
     <div
       key={animKey}
       style={{
         position: "absolute",
         left: `${fromSeat.x}%`,
         top: `${fromSeat.y}%`,
-        transform: "translate(-50%,-50%)",
+        transform: `scale(${scale})`,
         zIndex: 4,
         pointerEvents: "none",
         ["--chip-dx" as string]: `${dx}%`,
         ["--chip-dy" as string]: `${dy}%`,
-        animation: "chipTravel 600ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
       }}
     >
-      <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-        <ChipStackIcon size={13} />
-        <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 500, color: TEXT.critical, ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-          +{amount}bb
-        </span>
+      <div
+        style={{
+          position: "absolute",
+          left: 0,
+          top: 0,
+          animation: "chipTravel 600ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
+        }}
+      >
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <ChipStackIcon size={13} />
+          <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 500, color: TEXT.critical, ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
+            +{amount}bb
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -497,6 +596,8 @@ export function PokerTable({
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
   const felt = FELT_PALETTES[variant];
+  const tableBoxRef = useRef<HTMLDivElement>(null);
+  const seatScale = useSeatScale(tableBoxRef);
 
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -535,14 +636,15 @@ export function PokerTable({
           aspectRatio: "8 / 5",
           margin: "auto",
           overflow: "hidden",
-          borderRadius: "50%",
+          borderRadius: TABLE_CORNER_RADIUS,
         }}
+        ref={tableBoxRef}
       >
         <div
           style={{
             position: "absolute",
             inset: "2% 1.5%",
-            borderRadius: "50%",
+            borderRadius: TABLE_CORNER_RADIUS,
             pointerEvents: "none",
             background: "conic-gradient(from 200deg, #4A4E55, #8A8F98, #3A3D42, #6E727A, #4A4E55)",
             opacity: 0.9,
@@ -552,7 +654,7 @@ export function PokerTable({
           style={{
             position: "absolute",
             inset: "3.4% 2.6%",
-            borderRadius: "50%",
+            borderRadius: TABLE_CORNER_RADIUS,
             pointerEvents: "none",
             background: [
               "repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 4px)",
@@ -566,7 +668,7 @@ export function PokerTable({
           style={{
             position: "absolute",
             inset: "3.4% 2.6%",
-            borderRadius: "50%",
+            borderRadius: TABLE_CORNER_RADIUS,
             pointerEvents: "none",
             display: "flex",
             alignItems: "center",
@@ -594,7 +696,7 @@ export function PokerTable({
           style={{
             position: "absolute",
             inset: "2.8% 2%",
-            borderRadius: "50%",
+            borderRadius: TABLE_CORNER_RADIUS,
             background: felt.background,
             border: "2px solid #000000",
             boxShadow: [
@@ -611,15 +713,21 @@ export function PokerTable({
             style={{
               position: "absolute",
               inset: 0,
-              borderRadius: "50%",
+              borderRadius: TABLE_CORNER_RADIUS,
               pointerEvents: "none",
               background: "radial-gradient(55% 35% at 50% 25%, rgba(255,255,255,.09), transparent 70%)",
             }}
           />
-          <div style={{ position: "absolute", inset: "3%", borderRadius: "50%", pointerEvents: "none", border: "1px solid rgba(255,255,255,.06)" }} />
+          <div style={{ position: "absolute", inset: "3%", borderRadius: TABLE_CORNER_RADIUS, pointerEvents: "none", border: "1px solid rgba(255,255,255,.06)" }} />
         </div>
 
-        <div style={{ position: "absolute", left: "50%", top: "44%", transform: "translate(-50%,-50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 10, zIndex: 3 }}>
+        {/* FIX (2026-09): desceu de 44% pra 48% — com cartas SEMPRE em cima
+            do nome (mudanca recente), o assento que cai bem no topo-centro
+            da mesa (BB-max com n par: UTG+1 no 8-max, CO no 6-max) tinha o
+            bloco de cartas+nome colidindo com o badge de SPR, que ficava
+            colado logo abaixo desse ponto. Descer o bloco central da mesa
+            um pouco abre esse respiro sem precisar encolher as cartas. */}
+        <div style={{ position: "absolute", left: "50%", top: "53%", transform: `translate(-50%,-50%) scale(${seatScale})`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, zIndex: 3 }}>
           {active && hand ? (
             <>
               {hand.spr != null && <SprBadge spr={hand.spr} />}
@@ -672,17 +780,18 @@ export function PokerTable({
             state={seatData(s.posLabel)}
             isDealer={s.posLabel === "BTN"}
             pot={hand?.pot ?? 0}
+            scale={seatScale}
           />
         ))}
 
         {seats.map((s) => {
           const amt = streetCommitments?.[s.posLabel];
           if (!amt || amt < MIN_COMMITTED_TO_SHOW) return null;
-          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} />;
+          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} scale={seatScale} />;
         })}
 
         {chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
-          <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} />
+          <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} scale={seatScale} />
         )}
       </div>
     </div>
