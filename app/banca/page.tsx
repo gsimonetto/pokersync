@@ -15,6 +15,7 @@ import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { FilterPopover } from "@/components/ui/filter-popover";
 import {
   fetchSessions,
   fetchSettings,
@@ -922,22 +923,24 @@ export default function BankrollPage() {
           className="flex h-full min-h-[380px] flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
-              <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
-                <Landmark size={12} className="text-muted" />
-                <select
-                  value={platformFilter}
-                  onChange={(e) => setPlatformFilter(e.target.value)}
-                  title="Filtrar por plataforma"
-                  className="bg-transparent text-[11px] font-semibold text-ink outline-none"
-                >
-                  <option value="todas">Todas as plataformas</option>
-                  {platformNames.map((p) => (
-                    <option key={p} value={p}>
-                      {p}
-                    </option>
-                  ))}
-                </select>
-              </div>
+              <FilterPopover label="Filtrar por plataforma" active={isPlatformFiltered}>
+                <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1">
+                  <Landmark size={12} className="shrink-0 text-muted" />
+                  <select
+                    value={platformFilter}
+                    onChange={(e) => setPlatformFilter(e.target.value)}
+                    title="Filtrar por plataforma"
+                    className="w-full bg-transparent text-[11px] font-semibold text-ink outline-none"
+                  >
+                    <option value="todas">Todas as plataformas</option>
+                    {platformNames.map((p) => (
+                      <option key={p} value={p}>
+                        {p}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              </FilterPopover>
               <SegmentedControl value={range} onChange={setRange} options={RANGES} />
               <button
                 onClick={() => setAnnoModalOpen(true)}
@@ -1018,6 +1021,7 @@ export default function BankrollPage() {
           hint="Sinais de alerta pra sua banca: quanto você já perdeu do topo e se o stake atual ainda cabe no seu bankroll."
           className="flex h-[260px] flex-col"
         >
+          <div className="flex h-full flex-col justify-center">
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div
               className="rounded-lg border border-hairline bg-elevated p-4"
@@ -1102,6 +1106,7 @@ export default function BankrollPage() {
               </div>
             </div>
           )}
+          </div>
         </Painel>
 
         <Painel
@@ -1163,12 +1168,15 @@ export default function BankrollPage() {
           divisor
           className="flex h-[260px] flex-col"
           acao={
-            <div className="flex flex-wrap items-center gap-2">
+            <FilterPopover
+              label="Filtrar sessões"
+              active={historyFormat !== "all" || historyRange !== "all" || historyBuyin !== "all" || historyImported !== "all"}
+            >
               <select
                 value={historyFormat}
                 onChange={(e) => setHistoryFormat(e.target.value)}
                 aria-label="Filtrar por formato"
-                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+                className="w-full rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
               >
                 <option value="all">Todos os formatos</option>
                 {historyFormats.map((f) => (
@@ -1182,7 +1190,7 @@ export default function BankrollPage() {
                 onChange={(e) => setHistoryRange(e.target.value as RangeOption)}
                 aria-label="Filtrar por periodo"
                 title="Filtrar por período"
-                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+                className="w-full rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
               >
                 {HISTORY_RANGES.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -1195,7 +1203,7 @@ export default function BankrollPage() {
                 onChange={(e) => setHistoryBuyin(e.target.value)}
                 aria-label="Filtrar por buy-in"
                 title="Filtrar por faixa de buy-in"
-                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+                className="w-full rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
               >
                 {BUYIN_RANGES.map((r) => (
                   <option key={r.value} value={r.value}>
@@ -1208,13 +1216,13 @@ export default function BankrollPage() {
                 onChange={(e) => setHistoryImported(e.target.value as "all" | "yes" | "no")}
                 aria-label="Filtrar por origem"
                 title="Filtrar por origem: importada do agente ou lançada à mão"
-                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
+                className="w-full rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[11px] text-ink outline-none transition-colors focus:border-ink/40"
               >
                 <option value="all">Importadas e manuais</option>
                 <option value="yes">Só importadas</option>
                 <option value="no">Só manuais</option>
               </select>
-            </div>
+            </FilterPopover>
           }
         >
           {historyFiltered.length === 0 ? (
