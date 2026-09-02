@@ -1219,7 +1219,7 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-3">
         <Painel
           titulo={`Sessões recentes (${historyFiltered.length})`}
           icone={<History size={14} className="icon-glow text-training" />}
@@ -1388,10 +1388,61 @@ export default function BankrollPage() {
             </div>
           )}
         </Painel>
+
+        <Painel
+          titulo="Resumo anual"
+          icone={<FileBarChart size={14} className="icon-glow text-training" />}
+          hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
+          className="flex h-[260px] flex-col"
+          acao={
+            yearlyReport.length > 0 && (
+              <button
+                onClick={handleExportYearlyReport}
+                title="Baixar o resumo anual em CSV"
+                className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[11px] font-semibold text-muted transition-colors hover:border-positive/50 hover:text-positive"
+              >
+                <Download size={13} /> Baixar CSV
+              </button>
+            )
+          }
+        >
+          {yearlyReport.length === 0 ? (
+            <p className="mt-4 text-sm text-muted">Registre sessões pra ver o fechamento por ano.</p>
+          ) : (
+            <div className="mt-4 overflow-x-auto">
+              <table className="w-full min-w-[560px] text-sm">
+                <thead>
+                  <tr className="border-b border-hairline text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">
+                    <th className="py-2 pr-3">Ano</th>
+                    <th className="px-3 py-2">Sessões</th>
+                    <th className="px-3 py-2">Investido</th>
+                    <th className="px-3 py-2">Lucro</th>
+                    <th className="px-3 py-2">ROI</th>
+                    <th className="px-3 py-2">ITM</th>
+                  </tr>
+                </thead>
+                <tbody>
+                  {yearlyReport.map((y, i) => (
+                    <tr key={y.year} className={i < yearlyReport.length - 1 ? "border-b border-hairline" : ""}>
+                      <td className="py-2.5 pr-3 font-semibold">{y.year}</td>
+                      <td className="px-3 py-2.5 text-muted">{y.n}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted">{fmtMoneyIn(y.totalInvested, currencyFilter)}</td>
+                      <td className={`px-3 py-2.5 font-semibold tabular-nums ${y.profit >= 0 ? "text-positive" : "text-negative"}`}>
+                        {fmtSignedMoneyIn(y.profit, currencyFilter)}
+                      </td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted">{fmtPct(y.roi)}</td>
+                      <td className="px-3 py-2.5 tabular-nums text-muted">{y.itm.toFixed(1)}%</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            </div>
+          )}
+        </Painel>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
-        {isMultiCurrency && (
+      {isMultiCurrency && (
+        <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
           <Painel
             titulo="Patrimônio consolidado"
             icone={<Coins size={14} className="icon-glow text-evolution" />}
@@ -1430,59 +1481,8 @@ export default function BankrollPage() {
               </p>
             </div>
           </Painel>
-        )}
-
-        <Painel
-        titulo="Resumo anual"
-        icone={<FileBarChart size={14} className="icon-glow text-training" />}
-        hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
-        className={`flex h-[260px] flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
-        acao={
-          yearlyReport.length > 0 && (
-            <button
-              onClick={handleExportYearlyReport}
-              title="Baixar o resumo anual em CSV"
-              className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[11px] font-semibold text-muted transition-colors hover:border-positive/50 hover:text-positive"
-            >
-              <Download size={13} /> Baixar CSV
-            </button>
-          )
-        }
-      >
-        {yearlyReport.length === 0 ? (
-          <p className="mt-4 text-sm text-muted">Registre sessões pra ver o fechamento por ano.</p>
-        ) : (
-          <div className="mt-4 overflow-x-auto">
-            <table className="w-full min-w-[560px] text-sm">
-              <thead>
-                <tr className="border-b border-hairline text-left text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">
-                  <th className="py-2 pr-3">Ano</th>
-                  <th className="px-3 py-2">Sessões</th>
-                  <th className="px-3 py-2">Investido</th>
-                  <th className="px-3 py-2">Lucro</th>
-                  <th className="px-3 py-2">ROI</th>
-                  <th className="px-3 py-2">ITM</th>
-                </tr>
-              </thead>
-              <tbody>
-                {yearlyReport.map((y, i) => (
-                  <tr key={y.year} className={i < yearlyReport.length - 1 ? "border-b border-hairline" : ""}>
-                    <td className="py-2.5 pr-3 font-semibold">{y.year}</td>
-                    <td className="px-3 py-2.5 text-muted">{y.n}</td>
-                    <td className="px-3 py-2.5 tabular-nums text-muted">{fmtMoneyIn(y.totalInvested, currencyFilter)}</td>
-                    <td className={`px-3 py-2.5 font-semibold tabular-nums ${y.profit >= 0 ? "text-positive" : "text-negative"}`}>
-                      {fmtSignedMoneyIn(y.profit, currencyFilter)}
-                    </td>
-                    <td className="px-3 py-2.5 tabular-nums text-muted">{fmtPct(y.roi)}</td>
-                    <td className="px-3 py-2.5 tabular-nums text-muted">{y.itm.toFixed(1)}%</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
-          </div>
-        )}
-        </Painel>
-      </div>
+        </div>
+      )}
 
       <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
         <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
