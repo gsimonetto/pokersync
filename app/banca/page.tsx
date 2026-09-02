@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Pencil, PlayCircle, NotebookPen, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, drawdownSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
+import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, groupStats, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type GroupStat, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { niceTicks } from "@/lib/format";
@@ -434,7 +434,6 @@ export default function BankrollPage() {
     [platformSessions, isPlatformFiltered, base]
   );
   const filteredSeries = useMemo(() => filterSeriesByRange(series, range), [series, range]);
-  const drawdownChartSeries = useMemo(() => drawdownSeries(filteredSeries), [filteredSeries]);
   const tips = useMemo(
     () => buildCoachTips(sessions, { bankroll: nw.playingBankroll, brmThresholds }),
     [sessions, nw.playingBankroll, brmThresholds]
@@ -1018,7 +1017,7 @@ export default function BankrollPage() {
           titulo="Risco"
           icone={<ShieldAlert size={14} className="icon-glow text-negative" />}
           hint="Sinais de alerta pra sua banca: quanto você já perdeu do topo e se o stake atual ainda cabe no seu bankroll."
-          className="flex h-full min-h-[380px] flex-col"
+          className="flex h-full min-h-[260px] flex-col"
         >
           <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
             <div
@@ -1084,13 +1083,6 @@ export default function BankrollPage() {
               )}
             </button>
           </div>
-
-          {drawdownChartSeries.length >= 2 && (
-            <div className="mt-4 rounded-lg border border-hairline bg-elevated p-3" title="Quanto sua banca ficou abaixo do maior valor já atingido, dia após dia.">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Curva de drawdown (queda do topo)</p>
-              <EvolutionChart series={drawdownChartSeries} currency={currencyFilter} />
-            </div>
-          )}
 
           <div className="mt-5 border-t border-hairline pt-4">
             <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Leaks recorrentes por formato</p>
@@ -1176,7 +1168,7 @@ export default function BankrollPage() {
           titulo="AI Coach"
           icone={<Sparkles size={14} className="icon-glow text-evolution" />}
           hint="Dicas automáticas geradas a partir das suas sessões — leaks, tendências e alertas."
-          className="flex h-full min-h-[380px] flex-col"
+          className="flex h-full min-h-[260px] flex-col"
           acao={
             tipsVisiveis.length > 0 ? (
               <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
@@ -1228,7 +1220,7 @@ export default function BankrollPage() {
           titulo={`Sessões recentes (${historyFiltered.length})`}
           icone={<History size={14} className="icon-glow text-training" />}
           hint="Suas últimas sessões registradas. Use os filtros pra achar um período ou faixa de buy-in específica."
-          className="flex h-full min-h-[380px] flex-col"
+          className="flex h-full min-h-[260px] flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
               <select
@@ -1353,7 +1345,7 @@ export default function BankrollPage() {
           titulo="Histórico de transações"
           icone={<Wallet size={14} className="icon-glow text-training" />}
           hint="Depósitos, saques e caixinha — não entra no resultado de jogo, só o dinheiro que entrou/saiu da banca."
-          className="flex h-full min-h-[380px] flex-col"
+          className="flex h-auto min-h-[200px] flex-col self-start"
         >
           {recentTx.length === 0 ? (
             <p className="mt-4 text-sm text-muted">Nenhuma transacao registrada.</p>
@@ -1400,7 +1392,7 @@ export default function BankrollPage() {
             titulo="Patrimônio consolidado"
             icone={<Coins size={14} className="icon-glow text-evolution" />}
             hint="Soma o saldo de todas as moedas numa visão só, usando a taxa de câmbio que você digitar abaixo — é uma estimativa sua, não uma cotação ao vivo."
-            className="flex h-full min-h-[380px] flex-col"
+            className="flex h-full min-h-[260px] flex-col"
           >
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-[repeat(auto-fit,minmax(180px,1fr))]">
               {perCurrencyBalances.map((p) => (
@@ -1440,7 +1432,7 @@ export default function BankrollPage() {
         titulo="Resumo anual"
         icone={<FileBarChart size={14} className="icon-glow text-training" />}
         hint="Fechamento de cada ano — útil pra imposto de renda ou pra ver a evolução ano a ano, sem precisar somar sessão por sessão."
-        className={`flex h-full min-h-[380px] flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
+        className={`flex h-full min-h-[260px] flex-col ${isMultiCurrency ? "" : "lg:col-span-2"}`}
         acao={
           yearlyReport.length > 0 && (
             <button
