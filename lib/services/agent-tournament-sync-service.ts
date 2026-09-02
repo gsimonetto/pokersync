@@ -89,6 +89,7 @@ export async function processAgentTournamentSync(
         user_id: userId,
         tournament_id_ps: parsed.tournamentIdPs,
         source: "agent",
+        poker_room: input.pokerRoom,
         total_entrants: parsed.totalEntrants,
         prize_pool: parsed.prizePool,
         places: existing?.places ?? [],

@@ -4,9 +4,10 @@ import { createClient } from "@/lib/supabase/client";
 // PayoutStructureRow). Linkada por tournament_id_ps, a mesma chave que já
 // une hand_reviews/hand_sessions de torneio (ver hand-session-service.ts) —
 // de propósito, pra não virar uma segunda fonte de verdade sobre "qual
-// torneio é esse". Suporta as duas origens desde o início: 'agent' (agente
-// desktop busca automático — ainda não implementado do lado do agente) e
-// 'manual' (jogador preenche).
+// torneio é esse". Suporta as duas origens: 'agent' (agente desktop busca
+// automático — ver agent-tournament-sync-service.ts, que também preenche
+// `pokerRoom`) e 'manual' (jogador preenche; pokerRoom fica null porque o
+// formulário nunca perguntou isso).
 
 export type PayoutSource = "agent" | "manual";
 
@@ -19,6 +20,7 @@ export interface TournamentPayout {
   id: string;
   tournamentIdPs: string;
   source: PayoutSource;
+  pokerRoom: string | null;
   totalEntrants: number | null;
   prizePool: number | null;
   places: PayoutPlace[];
@@ -34,6 +36,7 @@ function rowToPayout(r: any): TournamentPayout {
     id: r.id,
     tournamentIdPs: r.tournament_id_ps,
     source: r.source,
+    pokerRoom: r.poker_room ?? null,
     totalEntrants: r.total_entrants,
     prizePool: r.prize_pool,
     places: (r.places ?? []) as PayoutPlace[],
