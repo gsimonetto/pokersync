@@ -10,8 +10,9 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, TOURNEY_FORMATS, CURRENC
 import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
+import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
-import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
+import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import {
@@ -161,6 +162,14 @@ export default function BankrollPage() {
 
   const [compareOpen, setCompareOpen] = useState(false);
 
+  // Torneios que o agente desktop já capturou (buy-in/premiação sempre em
+  // USD — o parser só extrai esses números quando a mão diz "USD" no
+  // cabeçalho) e que ainda não viraram sessão de banca -- ver
+  // pendingAgentTournaments/importAgentTournaments mais abaixo.
+  const [agentTournaments, setAgentTournaments] = useState<HandSession[]>([]);
+  const [agentPayouts, setAgentPayouts] = useState<TournamentPayout[]>([]);
+  const [importingAgent, setImportingAgent] = useState(false);
+
   useEffect(() => {
     let alive = true;
     (async () => {
@@ -177,45 +186,15 @@ export default function BankrollPage() {
           fetchTournamentPayouts(),
         ]);
         if (!alive) return;
+        setSessions(s);
         setBankroll(cfg.bankroll);
         setTransactions(tx);
         setGoals(gl);
         setStudyLogs(sl);
         setBrmThresholds(brm);
         setAnnotations(annos);
-
-        // Importa direto na banca os torneios que o agente desktop já
-        // capturou e que ainda não têm sessão vinculada -- sem card de
-        // confirmação, só a tag "Importada" (ver filtro em "Sessões
-        // recentes"). Vincula as mãos do torneio à sessão criada, mesmo
-        // ciclo que já existia pra edição manual (linkHandSessionReviews).
-        const alreadyImported = new Set(s.map((x) => x.importedHandSessionId).filter((id): id is string => Boolean(id)));
-        const toImport = agentTourn.filter((h) => !alreadyImported.has(h.id));
-        const imported: Session[] = [];
-        for (const hs of toImport) {
-          try {
-            const payout = payouts.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
-            const rawVenue = (hs.label.split(" / ")[0] || "").trim();
-            const saved = await apiAddSession({
-              date: (hs.updated_at || hs.created_at || todayISO()).slice(0, 10),
-              format: "MTT",
-              buyIn: hs.buyin ?? 0,
-              reentries: 0,
-              cashout: payout?.heroPayoutAmount ?? 0,
-              stake: "",
-              venue: rawVenue || undefined,
-              currency: "BRL",
-              notes: `Importado do agente — ${hs.label}`,
-              importedHandSessionId: hs.id,
-            });
-            await linkHandSessionReviews(hs.id, saved.id);
-            imported.push(saved);
-          } catch (e) {
-            console.error("Falha ao importar torneio do agente:", hs.id, e);
-          }
-        }
-        if (!alive) return;
-        setSessions(imported.length > 0 ? [...s, ...imported] : s);
+        setAgentTournaments(agentTourn);
+        setAgentPayouts(payouts);
       } catch (e) {
         if (alive) setErr(e instanceof Error ? e.message : "Falha ao carregar sua banca.");
       } finally {
@@ -273,6 +252,60 @@ export default function BankrollPage() {
     return v > 0 ? v : 1;
   }
   const fmt = (v: number) => fmtMoneyIn(v, currencyFilter);
+
+  // Torneios do agente ainda sem sessão de banca -- buy-in/premiação vêm
+  // sempre em USD (ver comentário na declaração de agentTournaments), então
+  // só importamos de fato quando o jogador tiver informado quanto vale 1
+  // USD em BRL (fxRates.USD) — sem isso a gente estaria gravando US$ 1 =
+  // R$ 1 na banca, exatamente o bug que gerou esse pedido.
+  const usdRateRaw = Number(fxRates.USD);
+  const usdRate = usdRateRaw > 0 ? usdRateRaw : null;
+  const pendingAgentTournaments = useMemo(
+    () => agentTournaments.filter((h) => !sessions.some((s) => s.importedHandSessionId === h.id)),
+    [agentTournaments, sessions]
+  );
+
+  async function importAgentTournaments(rate: number) {
+    if (pendingAgentTournaments.length === 0 || rate <= 0) return;
+    setImportingAgent(true);
+    const imported: Session[] = [];
+    for (const hs of pendingAgentTournaments) {
+      try {
+        const payout = agentPayouts.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
+        const buyInUsd = hs.buyin ?? 0;
+        const cashoutUsd = payout?.heroPayoutAmount ?? 0;
+        const rawVenue = (hs.label.split(" / ")[0] || "").trim();
+        const saved = await apiAddSession({
+          date: (hs.updated_at || hs.created_at || todayISO()).slice(0, 10),
+          format: "MTT",
+          buyIn: +(buyInUsd * rate).toFixed(2),
+          reentries: 0,
+          cashout: +(cashoutUsd * rate).toFixed(2),
+          stake: "",
+          venue: rawVenue || undefined,
+          currency: "BRL",
+          notes: `Importado do agente — ${hs.label} (US$ ${buyInUsd.toFixed(2)} × ${rate.toFixed(2)})`,
+          importedHandSessionId: hs.id,
+        });
+        await linkHandSessionReviews(hs.id, saved.id);
+        imported.push(saved);
+      } catch (e) {
+        console.error("Falha ao importar torneio do agente:", hs.id, e);
+      }
+    }
+    if (imported.length > 0) setSessions((prev) => [...prev, ...imported]);
+    setImportingAgent(false);
+  }
+
+  // Assim que a cotação já está salva (de uma visita anterior, por
+  // exemplo), importa sozinho — o jogador só precisa confirmar a taxa uma
+  // vez pra torneios futuros entrarem direto, sem clique nenhum.
+  useEffect(() => {
+    if (!loading && usdRate && pendingAgentTournaments.length > 0 && !importingAgent) {
+      importAgentTournaments(usdRate);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, usdRate, pendingAgentTournaments.length]);
   const fmtSigned = (v: number) => fmtSignedMoneyIn(v, currencyFilter);
   const currencySessions = useMemo(
     () => (isMultiCurrency ? sessions.filter((s) => (s.currency || "BRL") === currencyFilter) : sessions),
@@ -823,6 +856,40 @@ export default function BankrollPage() {
           />
         </div>
       </section>
+
+      {pendingAgentTournaments.length > 0 && !usdRate && (
+        <div className="mt-6 rounded-xl border border-training/30 bg-training/[0.06] p-4">
+          <p className="text-sm font-semibold text-ink">
+            {pendingAgentTournaments.length} torneio{pendingAgentTournaments.length === 1 ? "" : "s"} do agente aguardando cotação
+          </p>
+          <p className="mt-1 text-xs text-muted">
+            O buy-in e a premiação vêm em dólar (é assim que o PokerStars grava a mão) — informe quanto vale 1 USD hoje pra
+            importar direto na banca já em reais. Só precisa fazer isso uma vez: torneios futuros entram sozinhos.
+          </p>
+          <div className="mt-3 flex flex-wrap items-center gap-2">
+            <label className="flex items-center gap-1.5 text-[12px] text-muted">
+              1 USD =
+              <input
+                type="number"
+                step="0.01"
+                min="0"
+                value={fxRates.USD ?? ""}
+                onChange={(e) => updateFxRate("USD", e.target.value)}
+                placeholder="5,30"
+                className="w-20 rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-sm text-ink outline-none focus:border-ink/40"
+              />
+              BRL
+            </label>
+            <button
+              onClick={() => importAgentTournaments(Number(fxRates.USD))}
+              disabled={!(Number(fxRates.USD) > 0) || importingAgent}
+              className="rounded-lg bg-ink px-3 py-1.5 text-[12px] font-semibold text-void transition-colors hover:opacity-90 disabled:opacity-40"
+            >
+              {importingAgent ? "Importando…" : "Importar agora"}
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
         <Painel
