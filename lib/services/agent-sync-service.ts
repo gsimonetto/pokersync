@@ -48,7 +48,11 @@ function buildTitle(parsed: ParsedHand | null, pokerRoom: string): string {
   );
 }
 
-async function upsertDevice(
+// Exportado: reaproveitado por agent-tournament-sync-service.ts (mesmo
+// dispositivo, mesma tabela hand_sync_devices — o sync de torneio também
+// deve atualizar "última vez visto", só não cria um hand_sync_batches
+// próprio, ver comentário lá).
+export async function upsertDevice(
   supabase: SupabaseClient,
   userId: string,
   device: AgentDeviceInfo
