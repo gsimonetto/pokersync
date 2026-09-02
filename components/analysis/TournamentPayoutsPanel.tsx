@@ -8,6 +8,16 @@ import { EmptyState } from "@/components/analysis/shared";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
+// Mesmos slugs que o agente desktop manda em `pokerRoom` (ver PokerRoom em
+// pokersync-agent/crates/scanner/src/room.rs) — só rótulo de exibição.
+const ROOM_LABEL: Record<string, string> = {
+  pokerstars: "PokerStars",
+  ggpoker: "GGPoker",
+  partypoker: "PartyPoker",
+  "888poker": "888poker",
+  acr: "ACR",
+};
+
 // Parseia "1 500\n2 300\n3 200" (ou "1º $500" etc — só extrai os 2 números
 // de cada linha, na ordem) pra PayoutPlace[]. Formato livre de propósito:
 // pedir que o jogador cole exatamente como está na tabela de premiação do
@@ -28,12 +38,25 @@ function placesToText(places: PayoutPlace[]): string {
   return places.map((p) => `${p.place} ${p.amount}`).join("\n");
 }
 
+// Uma linha da grade — normalmente vem de uma hand_sessions (torneio com
+// mão importada), mas quando o agente sincroniza SÓ o resumo de torneio
+// (sem mão nenhuma anexada ainda) não existe hand_sessions nenhuma pra
+// esse tournament_id_ps. Sem esse fallback, esse torneio simplesmente não
+// aparecia em lugar nenhum da tela — sincronizava e sumia.
+interface TournamentRowData {
+  key: string;
+  tournamentIdPs: string;
+  label: string;
+  buyin: number | null;
+  payout?: TournamentPayout;
+}
+
 // Painel de estrutura de premiação — vive dentro da aba Torneios da
-// Análise (não é tela separada). Cada torneio já listado (hand_sessions)
-// aparece com o status de premiação; falta = formulário inline pra
-// registrar manualmente. `source: "agent"` fica pronto pro dia em que o
-// agente desktop buscar isso sozinho — a mesma linha aceita as duas
-// origens, só troca quem escreveu por último.
+// Análise (não é tela separada). Cada torneio já listado (hand_sessions,
+// ou só o resumo de premiação quando não há mão anexada) aparece com o
+// status de premiação; falta = formulário inline pra registrar
+// manualmente. `source: "agent"` é o agente desktop buscando sozinho — a
+// mesma linha aceita as duas origens, só troca quem escreveu por último.
 export function TournamentPayoutsPanel({
   sessions,
   payouts,
@@ -49,22 +72,41 @@ export function TournamentPayoutsPanel({
 }) {
   const byTournament = new Map(payouts.map((p) => [p.tournamentIdPs, p]));
 
-  function hasPayoutFor(s: HandSession): boolean {
-    const p = s.tournament_id_ps ? byTournament.get(s.tournament_id_ps) : undefined;
-    return p != null && (p.heroPayoutAmount != null || p.places.length > 0);
+  const sessionTournamentIds = new Set(sessions.map((s) => s.tournament_id_ps).filter((id): id is string => !!id));
+  const orphanPayouts = payouts.filter((p) => !sessionTournamentIds.has(p.tournamentIdPs));
+
+  const rows: TournamentRowData[] = [
+    ...sessions.map((s) => ({
+      key: s.id,
+      tournamentIdPs: s.tournament_id_ps ?? s.id,
+      label: s.label,
+      buyin: s.buyin,
+      payout: s.tournament_id_ps ? byTournament.get(s.tournament_id_ps) : undefined,
+    })),
+    ...orphanPayouts.map((p) => ({
+      key: p.id,
+      tournamentIdPs: p.tournamentIdPs,
+      label: p.pokerRoom ? `${ROOM_LABEL[p.pokerRoom] ?? p.pokerRoom} · Torneio #${p.tournamentIdPs}` : `Torneio #${p.tournamentIdPs}`,
+      buyin: null,
+      payout: p,
+    })),
+  ];
+
+  function hasPayoutFor(row: TournamentRowData): boolean {
+    return row.payout != null && (row.payout.heroPayoutAmount != null || row.payout.places.length > 0);
   }
 
   // Veio do botão "Importar → Torneio": abre e rola direto pro primeiro
   // torneio sem premiação, em vez de deixar o jogador procurar na lista.
   // Consome a flag uma vez (no mount) pra não repetir em toda troca de aba.
-  const pendingSession = focusPending ? sessions.find((s) => !hasPayoutFor(s)) : undefined;
+  const pendingRow = focusPending ? rows.find((r) => !hasPayoutFor(r)) : undefined;
   useEffect(() => {
     if (focusPending) onFocusConsumed?.();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [focusPending]);
 
-  if (sessions.length === 0) {
-    return <EmptyState texto="Nenhum torneio importado ainda — a estrutura de premiação aparece aqui assim que houver mãos de torneio." />;
+  if (rows.length === 0) {
+    return <EmptyState texto="Nenhum torneio importado ainda — a estrutura de premiação aparece aqui assim que houver mãos ou resumo de torneio." />;
   }
 
   // Grid em vez de lista full-width (linha esticada com nome numa ponta e
@@ -73,30 +115,23 @@ export function TournamentPayoutsPanel({
   // aberto ocupa a largura toda pro formulário caber sem espremer.
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
-      {sessions.map((s) => (
-        <TournamentRow
-          key={s.id}
-          session={s}
-          payout={s.tournament_id_ps ? byTournament.get(s.tournament_id_ps) : undefined}
-          onChanged={onChanged}
-          highlight={pendingSession?.id === s.id}
-        />
+      {rows.map((row) => (
+        <TournamentRow key={row.key} row={row} onChanged={onChanged} highlight={pendingRow?.key === row.key} />
       ))}
     </div>
   );
 }
 
 function TournamentRow({
-  session,
-  payout,
+  row,
   onChanged,
   highlight,
 }: {
-  session: HandSession;
-  payout?: TournamentPayout;
+  row: TournamentRowData;
   onChanged: () => void;
   highlight?: boolean;
 }) {
+  const payout = row.payout;
   const [open, setOpen] = useState(!!highlight);
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -111,12 +146,12 @@ function TournamentRow({
   const [error, setError] = useState("");
 
   async function handleSave() {
-    if (!session.tournament_id_ps || saving) return;
+    if (!row.tournamentIdPs || saving) return;
     setSaving(true);
     setError("");
     try {
       await upsertTournamentPayout({
-        tournamentIdPs: session.tournament_id_ps,
+        tournamentIdPs: row.tournamentIdPs,
         source: "manual",
         heroFinishPlace: heroFinishPlace.trim() ? Number(heroFinishPlace) : null,
         heroPayoutAmount: heroPayoutAmount.trim() ? Number(heroPayoutAmount) : null,
@@ -143,9 +178,9 @@ function TournamentRow({
     >
       <button type="button" onClick={() => setOpen((v) => !v)} className="flex w-full items-start justify-between gap-2 p-3 text-left">
         <div className="min-w-0">
-          <p className="truncate text-sm font-medium text-ink">{session.label}</p>
+          <p className="truncate text-sm font-medium text-ink">{row.label}</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-            {session.buyin != null ? BRL.format(session.buyin) : "buy-in não identificado"}
+            {row.buyin != null ? BRL.format(row.buyin) : "buy-in não identificado"}
             {payout?.heroFinishPlace != null && <> · {payout.heroFinishPlace}º lugar</>}
             {payout?.heroPayoutAmount != null && <> · {BRL.format(payout.heroPayoutAmount)}</>}
           </p>

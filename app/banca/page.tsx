@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart } from "lucide-react";
+import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart, Bot } from "lucide-react";
 import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
@@ -13,6 +13,7 @@ import { fetchReviewCountsBySessionIds, linkHandSessionReviews } from "@/lib/ser
 import { deleteHandSession, type HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
+import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { FilterPopover } from "@/components/ui/filter-popover";
@@ -104,6 +105,18 @@ async function getUsdBrlRate(): Promise<number | null> {
   } catch {
     return null;
   }
+}
+
+// "Há X min/h/d" pro card de status do agente — só isso, sem lib externa.
+function timeAgo(iso: string): string {
+  const diffMs = Date.now() - new Date(iso).getTime();
+  const minutes = Math.floor(diffMs / 60000);
+  if (minutes < 1) return "agora mesmo";
+  if (minutes < 60) return `há ${minutes} min`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `há ${hours}h`;
+  const days = Math.floor(hours / 24);
+  return `há ${days}d`;
 }
 
 // Vocabulario do formulario por formato: "reentradas" e' termo de torneio;
@@ -202,6 +215,7 @@ export default function BankrollPage() {
   const [agentTournaments, setAgentTournaments] = useState<HandSession[]>([]);
   const [agentPayouts, setAgentPayouts] = useState<TournamentPayout[]>([]);
   const [importingAgent, setImportingAgent] = useState(false);
+  const [agentDevice, setAgentDevice] = useState<AgentDeviceStatus | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -237,6 +251,15 @@ export default function BankrollPage() {
     return () => {
       alive = false;
     };
+  }, []);
+
+  // Independente do carregamento principal — status do PokerSync Agent é
+  // só um complemento informativo, não pode derrubar a tela inteira se a
+  // consulta falhar.
+  useEffect(() => {
+    fetchMostRecentAgentDevice()
+      .then(setAgentDevice)
+      .catch(() => setAgentDevice(null));
   }, []);
 
   const base = Number(bankroll) || 0;
@@ -1383,6 +1406,52 @@ export default function BankrollPage() {
                   ))}
                 </tbody>
               </table>
+            </div>
+          )}
+        </Painel>
+      </div>
+
+      <div className="mt-6">
+        <Painel
+          titulo="Importação automática"
+          icone={<Bot size={14} className="icon-glow text-training" />}
+          hint="Mãos e torneios chegam sozinhos aqui pelo PokerSync Agent, rodando no seu computador — sem precisar colar hand history nem clicar em importar."
+          divisor
+          className="flex h-[140px] flex-col"
+        >
+          {agentDevice ? (
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+              <div className="flex min-w-0 flex-1 items-center gap-3">
+                <span className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-positive/15 text-positive">
+                  <Bot size={16} />
+                </span>
+                <div className="min-w-0">
+                  <p className="truncate text-sm font-semibold text-ink">{agentDevice.deviceName}</p>
+                  <p className="text-[11.5px] text-muted">Última sincronização {timeAgo(agentDevice.lastSyncAt)}</p>
+                </div>
+              </div>
+              <div className="grid shrink-0 grid-cols-2 gap-2">
+                <div className="rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">Mãos</p>
+                  <p className="text-[11px] font-semibold text-positive">Automático</p>
+                </div>
+                <div className="rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-center">
+                  <p className="text-[10px] font-bold uppercase tracking-[0.08em] text-muted/80">Torneios</p>
+                  <p className="text-[11px] font-semibold text-positive">Automático</p>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div>
+              <p className="text-sm text-ink">Nenhum agente sincronizando ainda.</p>
+              <p className="mt-1 text-[11.5px] text-muted">
+                Instale o PokerSync Agent no seu computador pra importar mãos e torneios automaticamente — hoje o
+                único jeito de trazer dados pra cá sem ele é colar hand history na mão em{" "}
+                <Link href="/performance" className="text-training hover:underline">
+                  Player Evolution → Importar
+                </Link>
+                .
+              </p>
             </div>
           )}
         </Painel>
