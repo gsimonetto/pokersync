@@ -646,7 +646,6 @@ function ModalCard({
   const [statAlvo, setStatAlvo] = useState<number | "">(card.statTarget ?? "");
   const [salvando, setSalvando] = useState(false);
 
-  const [aba, setAba] = useState<"detalhes" | "interacoes">("detalhes");
   const [labelsAtivas, setLabelsAtivas] = useState<Set<string>>(new Set());
   const [checklist, setChecklist] = useState<ChecklistItem[]>([]);
   const [novoItem, setNovoItem] = useState("");
@@ -756,7 +755,7 @@ function ModalCard({
 
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
-      <div className="max-h-[90vh] w-full max-w-2xl overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+      <div className="max-h-[90vh] w-full max-w-5xl overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center gap-3">
           <Avatar id={jogador?.avatarId ?? 1} url={jogador?.avatarUrl} size={36} />
           <div className="min-w-0 flex-1">
@@ -768,21 +767,14 @@ function ModalCard({
           </button>
         </div>
 
-        <div className="mt-4">
-          <SegmentedControl
-            value={aba}
-            onChange={setAba}
-            options={[
-              { value: "detalhes", label: "Detalhes" },
-              { value: "interacoes", label: <><MessageSquare size={13} /> Interações</> },
-            ]}
-          />
-        </div>
-
-        {aba === "interacoes" ? (
-          <AbaInteracoes cardId={card.cardId} playerId={card.playerId} onErro={onErro} />
-        ) : (
-        <div className="mt-4 space-y-4">
+        {/* Duas colunas lado a lado (pedido explicito, com exemplo de
+            CRM): informacoes do card a esquerda, linha do tempo de
+            interacoes sempre visivel a direita -- em vez de abas
+            alternadas, pra registrar uma nota sem perder de vista o
+            resto do card. Empilha em telas estreitas (a linha do tempo
+            some pra baixo, ainda inteira, so' nao cabe do lado). */}
+        <div className="mt-4 grid grid-cols-1 gap-5 lg:grid-cols-[1fr_380px] lg:items-start">
+        <div className="space-y-4">
           <Campo label="Fase">
             <select value={fase} onChange={(e) => setFase(e.target.value)}
               className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none">
@@ -939,7 +931,11 @@ function ModalCard({
             )}
           </div>
         </div>
-        )}
+
+        <div className="lg:sticky lg:top-0">
+          <AbaInteracoes cardId={card.cardId} playerId={card.playerId} onErro={onErro} />
+        </div>
+        </div>
       </div>
     </div>
   );
@@ -993,10 +989,10 @@ function AbaInteracoes({
   }, [cardId, playerId]);
 
   return (
-    <div className="mt-4 space-y-5">
+    <div className="space-y-5 rounded-xl border border-hairline bg-elevated/40 p-4">
       <div>
         <label className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-          <MessageSquare size={12} /> Histórico de interações
+          <MessageSquare size={12} /> Linha do tempo
         </label>
         {carregando ? (
           <p className="text-[12.5px] text-muted">Carregando…</p>
