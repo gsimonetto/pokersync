@@ -7,6 +7,7 @@
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { splitHands, parseHand, type ParsedHand } from "@/lib/poker/hand-parser";
+import { extractTournamentInfo } from "@/lib/services/hand-session-service";
 
 export interface AgentDeviceInfo {
   deviceId: string;
@@ -46,6 +47,85 @@ function buildTitle(parsed: ParsedHand | null, pokerRoom: string): string {
     [parsed.format, parsed.stakes, parsed.heroPosition].filter(Boolean).join(" · ") ||
     `Mão importada (${pokerRoom})`
   );
+}
+
+// Resolve (ou cria) a hand_sessions de torneio pra um tournament_id_ps —
+// mesmo agrupamento que o fluxo manual de colar mão faz via
+// findExistingTournamentSession/createTournamentSession (hand-session-
+// service.ts), só que usando o client já autenticado da rota (RLS por
+// bearer token do agente) em vez do client de browser que aquelas funções
+// usam. Sem isso, mãos importadas pelo agente ficavam "avulsas" — nenhum
+// jogador joga uma mão só de torneio isolada, elas precisam aparecer
+// agrupadas no mesmo torneio no Revisor, igual ao que já acontece quando
+// o próprio jogador cola a mão manualmente.
+async function resolveTournamentSessionId(
+  supabase: SupabaseClient,
+  userId: string,
+  info: ReturnType<typeof extractTournamentInfo>
+): Promise<string> {
+  const tournamentIdPs = info.tournamentIdPs as string;
+  const { data: existing, error: eSel } = await supabase
+    .from("hand_sessions")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("kind", "tournament")
+    .eq("tournament_id_ps", tournamentIdPs)
+    .limit(1)
+    .maybeSingle();
+  if (eSel) throw eSel;
+  if (existing) return existing.id;
+
+  const label = info.tournamentName ?? `Torneio #${tournamentIdPs}`;
+  const formatType = info.looksLikeBounty ? "pko" : "regular";
+  const { data: created, error: eIns } = await supabase
+    .from("hand_sessions")
+    .insert({
+      user_id: userId,
+      kind: "tournament",
+      label,
+      tournament_id_ps: tournamentIdPs,
+      format_type: formatType,
+      bounty_current: info.heroBountyFromHand,
+      buyin: info.buyin,
+      stakes: null,
+    })
+    .select("id")
+    .single();
+  if (eIns) throw eIns;
+  return created.id;
+}
+
+// Mesma lógica de sinais automáticos (campeão / 2º-3º lugar / FT) que
+// attachReviewsToSession (hand-session-service.ts) aplica no fluxo manual,
+// reaproveitada aqui pro fluxo automático do agente — só promove pra
+// true/preenchido, nunca reverte.
+async function applyTournamentSignals(supabase: SupabaseClient, sessionId: string, hands: ParsedHand[]) {
+  const isChampion = hands.some((h) => h.wonTournament && !!h.heroName && h.winner === h.heroName);
+  if (isChampion) {
+    const { error } = await supabase.from("hand_sessions").update({ champion: true }).eq("id", sessionId);
+    if (error) throw error;
+  }
+
+  const finishHand = hands.find((h) => h.heroFinishPlace != null);
+  if (finishHand?.heroFinishPlace != null && !isChampion) {
+    const place = finishHand.heroFinishPlace;
+    const patch =
+      place === 2 || place === 3
+        ? { final_place: place }
+        : finishHand.maxSeats != null && place <= finishHand.maxSeats
+          ? { reached_ft: true }
+          : null;
+    if (patch) {
+      const { error } = await supabase.from("hand_sessions").update(patch).eq("id", sessionId);
+      if (error) throw error;
+    }
+  }
+
+  const { error: eTouch } = await supabase
+    .from("hand_sessions")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", sessionId);
+  if (eTouch) throw eTouch;
 }
 
 // Exportado: reaproveitado por agent-tournament-sync-service.ts (mesmo
@@ -166,6 +246,7 @@ export async function processAgentSync(
     const existingIds = new Set((existingRows ?? []).map((r) => r.external_hand_id as string));
 
     const seenThisBatch = new Set<string>();
+    const sessionIdByTournament = new Map<string, string>();
     const rowsToInsert = [];
     for (const c of candidates) {
       if (existingIds.has(c.externalHandId) || seenThisBatch.has(c.externalHandId)) {
@@ -173,6 +254,20 @@ export async function processAgentSync(
         continue;
       }
       seenThisBatch.add(c.externalHandId);
+
+      // Agrupa a mão no torneio correspondente (mesma chave tournament_id_ps
+      // do fluxo manual) em vez de deixá-la avulsa — um jogador nunca joga
+      // uma mão só de torneio isolada.
+      let handSessionId: string | null = null;
+      if (c.parsed) {
+        const info = extractTournamentInfo(c.parsed);
+        if (info.tournamentIdPs) {
+          const cached = sessionIdByTournament.get(info.tournamentIdPs);
+          handSessionId = cached ?? (await resolveTournamentSessionId(supabase, userId, info));
+          sessionIdByTournament.set(info.tournamentIdPs, handSessionId);
+        }
+      }
+
       rowsToInsert.push({
         user_id: userId,
         title: buildTitle(c.parsed, input.pokerRoom),
@@ -187,6 +282,7 @@ export async function processAgentSync(
         agent_version: input.device.agentVersion,
         device_id: input.device.deviceId,
         sync_batch_id: batchId,
+        hand_session_id: handSessionId,
       });
     }
 
@@ -194,6 +290,15 @@ export async function processAgentSync(
       const { error: eIns } = await supabase.from("hand_reviews").insert(rowsToInsert);
       if (eIns) throw eIns;
       imported = rowsToInsert.length;
+
+      // Sinais automáticos (campeão / 2º-3º lugar / FT) por torneio afetado
+      // neste batch, mesma lógica do fluxo manual (attachReviewsToSession).
+      for (const [tournamentIdPs, sessionId] of sessionIdByTournament) {
+        const hands = candidates
+          .filter((c) => c.parsed && extractTournamentInfo(c.parsed).tournamentIdPs === tournamentIdPs)
+          .map((c) => c.parsed as ParsedHand);
+        await applyTournamentSignals(supabase, sessionId, hands);
+      }
     }
   }
 
