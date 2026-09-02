@@ -6,7 +6,7 @@ import { ArrowRight, Target, Trophy, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/client";
-import { fetchProfile, DIA_SEMANA_LABEL, type Profile } from "@/lib/services/profile-service";
+import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import {
   fetchPlayerPerformance,
   fetchPreflopSituations,
@@ -14,7 +14,9 @@ import {
   type PreflopSituation,
 } from "@/lib/services/performance-service";
 import { fetchTournamentMetrics } from "@/lib/services/analysis-service";
+import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
+import { StatCardGrid, statBar, toneFromRange } from "@/components/analysis/shared";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -56,6 +58,7 @@ export default function ModulosPage() {
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
   const [avgBuyin, setAvgBuyin] = useState<number | null>(null);
+  const [totalGanhos, setTotalGanhos] = useState<number | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
@@ -71,7 +74,7 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [profileRes, userRes, progressRes, perfRes, preflopRes, metricsRes, achievementsRes] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, perfRes, preflopRes, metricsRes, achievementsRes, payoutsRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
@@ -79,6 +82,7 @@ export default function ModulosPage() {
         fetchPreflopSituations(),
         fetchTournamentMetrics(),
         fetchMyAchievements(),
+        fetchTournamentPayouts(),
       ]);
       if (!alive) return;
 
@@ -91,6 +95,15 @@ export default function ModulosPage() {
       // e importado pelo agente desktop, sem distincao.
       if (metricsRes.status === "fulfilled") setAvgBuyin(metricsRes.value.avg_buyin);
       if (achievementsRes.status === "fulfilled") setAchievements(achievementsRes.value);
+      // Ganhos totais: soma BRUTA de heroPayoutAmount em tournament_payouts
+      // (torneio lancado manual ou importado pelo agente) -- pedido
+      // explicito pra NAO subtrair nada (buy-in, saque etc.), diferente
+      // do "Lucro total" liquido que ja existe na Gestao de Banca.
+      if (payoutsRes.status === "fulfilled") {
+        const payouts = payoutsRes.value;
+        const withPayout = payouts.filter((p) => p.heroPayoutAmount != null);
+        setTotalGanhos(withPayout.length > 0 ? withPayout.reduce((acc, p) => acc + (p.heroPayoutAmount ?? 0), 0) : null);
+      }
 
       // Time: precisa do user.id da chamada de auth acima -- RLS de
       // team_members libera todo membro do mesmo time, entao o filtro por
@@ -120,14 +133,6 @@ export default function ModulosPage() {
 
   const foldTo3bet = preflop.find((p) => p.label === "Fold para 3-Bet");
   const blindDefense = preflop.find((p) => p.label === "Defesa de Blinds");
-
-  const diasTreino = (profile?.dias_treino_semana ?? [])
-    .map((d) => DIA_SEMANA_LABEL[d])
-    .join(", ");
-  const horasTreino =
-    profile?.horas_treino_dia != null
-      ? `${profile.horas_treino_dia}h/dia${diasTreino ? ` · ${diasTreino}` : ""}`
-      : "—";
 
   return (
     <AppShell>
@@ -169,14 +174,16 @@ export default function ModulosPage() {
                   <MetricValue href={team ? "/time" : undefined}>{team?.name ?? "Sem time"}</MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
+                  <MetricValue href="/performance" mono>
+                    {totalGanhos != null ? BRL.format(totalGanhos) : "—"}
+                  </MetricValue>
+                </div>
+                <div className="flex justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Buy-in médio</span>
                   <MetricValue href="/banca" mono>
                     {avgBuyin != null ? BRL.format(avgBuyin) : "—"}
                   </MetricValue>
-                </div>
-                <div className="flex justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas de treino</span>
-                  <span className="text-sm tabular-nums text-ink">{horasTreino}</span>
                 </div>
               </div>
 
@@ -267,9 +274,11 @@ export default function ModulosPage() {
           </div>
         </section>
 
-        {/* Frequências pré-flop: mesmo componente-régua de
-            app/performance/page.tsx (funcao Frequencia). Fold p/ 3-Bet
-            e Defesa de Blinds vem de fetchPreflopSituations, mesma fonte
+        {/* Frequências pré-flop: mesmo StatCardGrid (régua + marcador com
+            glow) do Player Evolution (components/analysis/shared.tsx),
+            pedido explícito -- antes essa tela tinha uma régua própria
+            (FreqCard/FreqSimples) com visual diferente. Fold p/ 3-Bet e
+            Defesa de Blinds vêm de fetchPreflopSituations, mesma fonte
             real usada na aba "Situações pré-flop" da Performance. */}
         <section className="flex shrink-0 flex-col rounded-xl border border-hairline bg-surface p-4">
           <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
@@ -282,13 +291,38 @@ export default function ModulosPage() {
             </Link>
           </div>
 
-          <div className="grid grid-cols-2 gap-2.5 sm:grid-cols-3 lg:grid-cols-5">
-            <FreqCard label="VPIP" valor={perf?.vpip_pct ?? null} referencia={REF.vpip} />
-            <FreqCard label="PFR" valor={perf?.pfr_pct ?? null} referencia={REF.pfr} />
-            <FreqCard label="3-Bet" valor={perf?.three_bet_pct ?? null} referencia={REF.threeBet} />
-            <FreqSimples label="Fold p/ 3-Bet" pct={foldTo3bet?.pct ?? null} sample={foldTo3bet?.sample ?? null} />
-            <FreqSimples label="Defesa de Blinds" pct={blindDefense?.pct ?? null} sample={blindDefense?.sample ?? null} />
-          </div>
+          <StatCardGrid
+            items={[
+              {
+                label: "VPIP",
+                value: perf?.vpip_pct != null ? `${Number(perf.vpip_pct).toFixed(1)}%` : null,
+                tone: toneFromRange(perf?.vpip_pct ?? null, REF.vpip.min, REF.vpip.max),
+                bar: statBar(perf?.vpip_pct ?? null, REF.vpip.min, REF.vpip.max, REF.vpip.escala),
+              },
+              {
+                label: "PFR",
+                value: perf?.pfr_pct != null ? `${Number(perf.pfr_pct).toFixed(1)}%` : null,
+                tone: toneFromRange(perf?.pfr_pct ?? null, REF.pfr.min, REF.pfr.max),
+                bar: statBar(perf?.pfr_pct ?? null, REF.pfr.min, REF.pfr.max, REF.pfr.escala),
+              },
+              {
+                label: "3-Bet",
+                value: perf?.three_bet_pct != null ? `${Number(perf.three_bet_pct).toFixed(1)}%` : null,
+                tone: toneFromRange(perf?.three_bet_pct ?? null, REF.threeBet.min, REF.threeBet.max),
+                bar: statBar(perf?.three_bet_pct ?? null, REF.threeBet.min, REF.threeBet.max, REF.threeBet.escala),
+              },
+              {
+                label: "Fold p/ 3-Bet",
+                value: foldTo3bet?.pct != null ? `${foldTo3bet.pct}%` : null,
+                hint: foldTo3bet?.sample != null ? `sobre ${foldTo3bet.sample} mãos` : undefined,
+              },
+              {
+                label: "Defesa de Blinds",
+                value: blindDefense?.pct != null ? `${blindDefense.pct}%` : null,
+                hint: blindDefense?.sample != null ? `sobre ${blindDefense.sample} mãos` : undefined,
+              },
+            ]}
+          />
 
           <p className="mt-2.5 shrink-0 text-[11px] text-muted/70">
             Calculado sobre <strong className="text-ink/85">{perf?.maos_com_dados_frequencia ?? 0}</strong> mãos com
@@ -313,62 +347,3 @@ function MetricValue({ href, mono, children }: { href?: string; mono?: boolean; 
   );
 }
 
-// Card com regua (faixa de referencia + marcador) -- copia visual exata
-// da funcao Frequencia em app/performance/page.tsx, so que compacta pro
-// espaco desta tela.
-function FreqCard({
-  label,
-  valor,
-  referencia,
-}: {
-  label: string;
-  valor: number | null;
-  referencia: { min: number; max: number; escala: number };
-}) {
-  const v = valor === null || valor === undefined ? null : Number(valor);
-  const pos = v === null ? 0 : Math.min(Math.max((v / referencia.escala) * 100, 0), 100);
-  const refLeft = (referencia.min / referencia.escala) * 100;
-  const refWidth = ((referencia.max - referencia.min) / referencia.escala) * 100;
-
-  return (
-    <div className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-      <p className="truncate text-[9px] font-bold uppercase tracking-wider text-muted/80">{label}</p>
-      <p className={`mt-0.5 text-lg font-bold leading-none tabular-nums ${v === null ? "text-muted/30" : "text-ink"}`}>
-        {v === null ? "—" : `${v.toFixed(1)}%`}
-      </p>
-      <div className="relative mt-2.5 h-[3px] w-full rounded-full bg-void/60">
-        <div
-          aria-hidden="true"
-          className="absolute inset-y-0 rounded-full bg-ink/15"
-          style={{ left: `${refLeft}%`, width: `${refWidth}%` }}
-        />
-        {v !== null && (
-          <span
-            className="absolute top-1/2 h-[11px] w-[2px] -translate-x-1/2 -translate-y-1/2 rounded-full bg-training shadow-[0_0_6px_rgba(59,130,246,.6)]"
-            style={{ left: `${pos}%` }}
-          />
-        )}
-      </div>
-      <p className="mt-1.5 text-[9.5px] leading-tight text-muted/65">
-        ref. {referencia.min}–{referencia.max}%
-      </p>
-    </div>
-  );
-}
-
-// Card sem regua (nao ha faixa de referencia definida pro produto pra
-// essas duas) -- mesmo valor/contagem que ja aparece em "Situacoes
-// pre-flop" na Performance, so' que compacto.
-function FreqSimples({ label, pct, sample }: { label: string; pct: number | null; sample: number | null }) {
-  return (
-    <div className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-      <p className="truncate text-[9px] font-bold uppercase tracking-wider text-muted/80">{label}</p>
-      <p className={`mt-0.5 text-lg font-bold leading-none tabular-nums ${pct === null ? "text-muted/30" : "text-ink"}`}>
-        {pct === null ? "—" : `${pct}%`}
-      </p>
-      <p className="mt-[26px] text-[9.5px] leading-tight text-muted/65">
-        {sample !== null ? `sobre ${sample} mãos` : "sem amostra"}
-      </p>
-    </div>
-  );
-}
