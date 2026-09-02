@@ -103,7 +103,6 @@ export function TabKanban({
   const [filtroCoach, setFiltroCoach] = useState<string>("todos");
   const [soTarefasPendentes, setSoTarefasPendentes] = useState(false);
   const [soMetasConcluidas, setSoMetasConcluidas] = useState(false);
-  const [buscaAberta, setBuscaAberta] = useState(false);
   const [busca, setBusca] = useState("");
 
   const [modo, setModo] = useState<"board" | "arquivados">("board");
@@ -179,7 +178,8 @@ export function TabKanban({
   // Acende a bolinha do FilterPopover quando qualquer filtro de dentro
   // dele estiver fora do padrão (a busca por texto tem o próprio
   // indicador, no botão da lupa).
-  const filtrosAtivos = filtroLabel !== "todas" || filtroCoach !== "todos" || soTarefasPendentes || soMetasConcluidas;
+  const filtrosAtivos =
+    busca.trim() !== "" || filtroLabel !== "todas" || filtroCoach !== "todos" || soTarefasPendentes || soMetasConcluidas;
 
   const cardsFiltrados = useMemo(() => {
     return cards.filter((c) => {
@@ -273,42 +273,27 @@ export function TabKanban({
 
         {modo === "board" && (
           <>
-            {/* Lupa: busca por texto (nome, anotacao, etiqueta) que
-                combina com os demais filtros abaixo -- pedido explicito
-                pra achar qualquer jogador quando a lista crescer, e
-                mesclar com "metas concluidas", coach, etc. */}
-            <button
-              type="button"
-              onClick={() => {
-                setBuscaAberta((v) => !v);
-                if (buscaAberta) setBusca("");
-              }}
-              aria-label={buscaAberta ? "Fechar busca" : "Buscar jogador"}
-              title="Buscar jogador"
-              className={`grid h-9 w-9 shrink-0 place-items-center rounded-lg border transition-colors ${
-                buscaAberta || busca ? "border-ink/40 bg-elevated text-ink" : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
-              }`}
-            >
-              <Search size={15} />
-            </button>
-            {buscaAberta && (
-              <input
-                autoFocus
-                value={busca}
-                onChange={(e) => setBusca(e.target.value)}
-                onKeyDown={(e) => e.key === "Escape" && (setBuscaAberta(false), setBusca(""))}
-                placeholder="Nome, anotação, etiqueta…"
-                className="w-44 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none placeholder:text-muted/50"
-              />
-            )}
-
-            {/* Etiqueta/coach/tarefas/metas atrás de um único botão de
-                filtros (pedido explicito: "os filtros precisam ser
-                melhor encaixados") -- mesmo padrão de CRMs/pipelines
-                (Pipedrive, HubSpot): um ponto de entrada só, com bolinha
-                acesa quando algo está fora do padrão, em vez de vários
-                selects e chips competindo espaço na mesma linha. */}
+            {/* Um unico botao de filtros (pedido explicito: "tem dois
+                icones de filtro, precisa juntar" + "a lupa deve se
+                juntar aos outros") -- busca por texto, etiqueta, coach
+                e os 2 chips ficam todos atras do mesmo ponto de entrada,
+                mesmo padrao de CRMs/pipelines (Pipedrive, HubSpot): uma
+                bolinha acesa quando algo esta fora do padrao, em vez de
+                varios icones/campos competindo espaco na barra. */}
             <FilterPopover label="Filtros" icon={SlidersHorizontal} active={filtrosAtivos}>
+              <div>
+                <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted/70">Buscar</label>
+                <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1.5">
+                  <Search size={12} className="shrink-0 text-muted" />
+                  <input
+                    value={busca}
+                    onChange={(e) => setBusca(e.target.value)}
+                    placeholder="Nome, anotação, etiqueta…"
+                    className="w-full bg-transparent text-[12px] text-ink outline-none placeholder:text-muted/50"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted/70">Etiqueta</label>
                 <select
@@ -358,6 +343,7 @@ export function TabKanban({
                 <button
                   type="button"
                   onClick={() => {
+                    setBusca("");
                     setFiltroLabel("todas");
                     setFiltroCoach("todos");
                     setSoTarefasPendentes(false);
@@ -385,10 +371,11 @@ export function TabKanban({
           )}
           <button
             onClick={() => setModalAdicionar(true)}
-            className="flex items-center gap-2 rounded-xl border border-hairline bg-elevated px-3 py-2 text-[13px] font-medium text-ink transition-colors hover:border-ink/40"
+            className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
+            aria-label="Adicionar ao funil"
+            title="Adicionar ao funil"
           >
             <UserPlus size={15} />
-            Adicionar ao funil
           </button>
         </div>
       </div>
