@@ -69,6 +69,42 @@ const BUYIN_RANGES: { value: string; label: string; test: (v: number) => boolean
   { value: "200+", label: "R$200+", test: (v) => v > 200 },
 ];
 
+// Cotação USD→BRL pra converter torneios do agente automaticamente (ver
+// importAgentTournaments) — API pública gratuita, sem chave (AwesomeAPI,
+// mantida pelo mesmo pessoal por trás do dólar hoje em vários apps
+// brasileiros). Cacheada 12h no navegador: não precisa bater na API a
+// cada carregamento de página, e uma falha pontual da API não trava a
+// importação por muito tempo.
+const USD_BRL_CACHE_KEY = "pokersync:banca:usdBrlRate";
+const USD_BRL_TTL_MS = 12 * 60 * 60 * 1000;
+
+async function getUsdBrlRate(): Promise<number | null> {
+  try {
+    const raw = window.localStorage.getItem(USD_BRL_CACHE_KEY);
+    if (raw) {
+      const cached = JSON.parse(raw) as { rate: number; fetchedAt: number };
+      if (cached.rate > 0 && Date.now() - cached.fetchedAt < USD_BRL_TTL_MS) return cached.rate;
+    }
+  } catch {
+    // cache indisponível/corrompido -- segue pra buscar fresco
+  }
+  try {
+    const res = await fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL");
+    if (!res.ok) return null;
+    const data = await res.json();
+    const rate = Number(data?.USDBRL?.bid);
+    if (!(rate > 0)) return null;
+    try {
+      window.localStorage.setItem(USD_BRL_CACHE_KEY, JSON.stringify({ rate, fetchedAt: Date.now() }));
+    } catch {
+      // falha ao cachear não impede de usar a cotação que acabou de vir
+    }
+    return rate;
+  } catch {
+    return null;
+  }
+}
+
 // Vocabulario do formulario por formato: "reentradas" e' termo de torneio;
 // em cash o jogador recompra/recarrega o stack. Mesmo campo, o nome que ele
 // usa de verdade em cada formato.
@@ -255,15 +291,15 @@ export default function BankrollPage() {
 
   // Torneios do agente ainda sem sessão de banca -- buy-in/premiação vêm
   // sempre em USD (ver comentário na declaração de agentTournaments), então
-  // só importamos de fato quando o jogador tiver informado quanto vale 1
-  // USD em BRL (fxRates.USD) — sem isso a gente estaria gravando US$ 1 =
-  // R$ 1 na banca, exatamente o bug que gerou esse pedido.
-  const usdRateRaw = Number(fxRates.USD);
-  const usdRate = usdRateRaw > 0 ? usdRateRaw : null;
+  // a importação busca sozinha a cotação USD→BRL do dia (API pública, sem
+  // chave) antes de gravar — sem isso a gente estaria tratando US$ 1 como
+  // R$ 1 na banca, o bug que gerou esse pedido. Cacheado 12h no navegador
+  // pra não bater na API a cada carregamento de página.
   const pendingAgentTournaments = useMemo(
     () => agentTournaments.filter((h) => !sessions.some((s) => s.importedHandSessionId === h.id)),
     [agentTournaments, sessions]
   );
+  const [usdRateError, setUsdRateError] = useState(false);
 
   async function importAgentTournaments(rate: number) {
     if (pendingAgentTournaments.length === 0 || rate <= 0) return;
@@ -297,15 +333,26 @@ export default function BankrollPage() {
     setImportingAgent(false);
   }
 
-  // Assim que a cotação já está salva (de uma visita anterior, por
-  // exemplo), importa sozinho — o jogador só precisa confirmar a taxa uma
-  // vez pra torneios futuros entrarem direto, sem clique nenhum.
+  // Assim que existe torneio pendente, busca a cotação e importa sozinho —
+  // nenhum passo manual do jogador.
   useEffect(() => {
-    if (!loading && usdRate && pendingAgentTournaments.length > 0 && !importingAgent) {
-      importAgentTournaments(usdRate);
-    }
+    if (loading || pendingAgentTournaments.length === 0 || importingAgent) return;
+    let alive = true;
+    (async () => {
+      const rate = await getUsdBrlRate();
+      if (!alive) return;
+      if (rate) {
+        setUsdRateError(false);
+        importAgentTournaments(rate);
+      } else {
+        setUsdRateError(true);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [loading, usdRate, pendingAgentTournaments.length]);
+  }, [loading, pendingAgentTournaments.length]);
   const fmtSigned = (v: number) => fmtSignedMoneyIn(v, currencyFilter);
   const currencySessions = useMemo(
     () => (isMultiCurrency ? sessions.filter((s) => (s.currency || "BRL") === currencyFilter) : sessions),
@@ -857,37 +904,15 @@ export default function BankrollPage() {
         </div>
       </section>
 
-      {pendingAgentTournaments.length > 0 && !usdRate && (
-        <div className="mt-6 rounded-xl border border-training/30 bg-training/[0.06] p-4">
+      {pendingAgentTournaments.length > 0 && usdRateError && (
+        <div className="mt-6 rounded-xl border border-negative/30 bg-negative/[0.06] p-4">
           <p className="text-sm font-semibold text-ink">
-            {pendingAgentTournaments.length} torneio{pendingAgentTournaments.length === 1 ? "" : "s"} do agente aguardando cotação
+            Não consegui buscar a cotação do dólar agora pra importar {pendingAgentTournaments.length} torneio
+            {pendingAgentTournaments.length === 1 ? "" : "s"} do agente
           </p>
           <p className="mt-1 text-xs text-muted">
-            O buy-in e a premiação vêm em dólar (é assim que o PokerStars grava a mão) — informe quanto vale 1 USD hoje pra
-            importar direto na banca já em reais. Só precisa fazer isso uma vez: torneios futuros entram sozinhos.
+            A conversão USD→BRL é automática — deve funcionar sozinha na próxima vez que você abrir essa tela.
           </p>
-          <div className="mt-3 flex flex-wrap items-center gap-2">
-            <label className="flex items-center gap-1.5 text-[12px] text-muted">
-              1 USD =
-              <input
-                type="number"
-                step="0.01"
-                min="0"
-                value={fxRates.USD ?? ""}
-                onChange={(e) => updateFxRate("USD", e.target.value)}
-                placeholder="5,30"
-                className="w-20 rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-sm text-ink outline-none focus:border-ink/40"
-              />
-              BRL
-            </label>
-            <button
-              onClick={() => importAgentTournaments(Number(fxRates.USD))}
-              disabled={!(Number(fxRates.USD) > 0) || importingAgent}
-              className="rounded-lg bg-ink px-3 py-1.5 text-[12px] font-semibold text-void transition-colors hover:opacity-90 disabled:opacity-40"
-            >
-              {importingAgent ? "Importando…" : "Importar agora"}
-            </button>
-          </div>
         </div>
       )}
 
