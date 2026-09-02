@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Target, Trophy, Medal, Star, Award } from "lucide-react";
+import { ArrowRight, Target, Trophy, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/client";
@@ -13,6 +13,17 @@ import {
   type PlayerPerformance,
   type PreflopSituation,
 } from "@/lib/services/performance-service";
+import { fetchTournamentMetrics } from "@/lib/services/analysis-service";
+import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
+
+const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+
+// Icone por conquista do catalogo (ver migracao achievements) --
+// fallback Trophy pra qualquer conquista futura sem icone proprio
+// mapeado aqui ainda.
+const ACHIEVEMENT_ICON: Record<string, LucideIcon> = {
+  founder: Trophy,
+};
 
 // Mesmas faixas de referencia de app/performance/page.tsx (funcao
 // Frequencia) -- contexto visual, nunca veredito de certo/errado.
@@ -44,6 +55,8 @@ export default function ModulosPage() {
   const [team, setTeam] = useState<{ name: string; accent: string } | null>(null);
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
+  const [avgBuyin, setAvgBuyin] = useState<number | null>(null);
+  const [achievements, setAchievements] = useState<Achievement[]>([]);
 
   useEffect(() => {
     let alive = true;
@@ -58,12 +71,14 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [profileRes, userRes, progressRes, perfRes, preflopRes] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, perfRes, preflopRes, metricsRes, achievementsRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchPlayerPerformance(),
         fetchPreflopSituations(),
+        fetchTournamentMetrics(),
+        fetchMyAchievements(),
       ]);
       if (!alive) return;
 
@@ -71,6 +86,11 @@ export default function ModulosPage() {
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (perfRes.status === "fulfilled") setPerf(perfRes.value);
       if (preflopRes.status === "fulfilled") setPreflop(preflopRes.value);
+      // Buy-in medio: mesma fonte que a Gestao de Banca (fetchSessions,
+      // dentro de fetchTournamentMetrics) -- cobre torneio lancado manual
+      // e importado pelo agente desktop, sem distincao.
+      if (metricsRes.status === "fulfilled") setAvgBuyin(metricsRes.value.avg_buyin);
+      if (achievementsRes.status === "fulfilled") setAchievements(achievementsRes.value);
 
       // Time: precisa do user.id da chamada de auth acima -- RLS de
       // team_members libera todo membro do mesmo time, entao o filtro por
@@ -114,11 +134,11 @@ export default function ModulosPage() {
       <main className="flex flex-1 flex-col gap-4 px-4 py-6 md:px-6">
         {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
             + metricas mais relevantes (coluna 3), mesma ordem/estilo de
-            linha -- estrutura pedida pelo usuario. Ganhos totais ainda
-            nao tem fonte de dado real (chega com o agente desktop
-            importando HH/torneios), entao aparece como "—", igual ao
-            padrao ja usado em ITM aproximado na tela de Performance --
-            nunca numero inventado. */}
+            linha -- estrutura pedida pelo usuario. Buy-in medio vem de
+            fetchTournamentMetrics (mesma fonte da Gestao de Banca) --
+            cobre torneio lancado manual e importado pelo agente desktop
+            sem distincao, por isso trocou o lugar de "Ganhos totais"
+            (que nunca teve fonte de dado real nessa tela). */}
         <section className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface transition-all duration-300 hover:border-white/15 hover:shadow-[0_0_40px_-12px_rgba(255,255,255,0.18)] sm:flex-row">
           <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center overflow-hidden bg-elevated p-4 sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
             <Avatar
@@ -149,8 +169,10 @@ export default function ModulosPage() {
                   <MetricValue href={team ? "/time" : undefined}>{team?.name ?? "Sem time"}</MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
-                  <span className="text-sm text-muted">—</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Buy-in médio</span>
+                  <MetricValue href="/banca" mono>
+                    {avgBuyin != null ? BRL.format(avgBuyin) : "—"}
+                  </MetricValue>
                 </div>
                 <div className="flex justify-between">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas de treino</span>
@@ -218,23 +240,28 @@ export default function ModulosPage() {
               </div>
             </div>
 
-            {/* Conquistas: emblemas/trofeus do PokerSync. Sem dados reais
-                ainda (nenhum sistema de conquistas no backend), entao os
-                emblemas ficam bloqueados/apagados ate a primeira ser
-                desbloqueada -- nunca um numero ou selo inventado. */}
+            {/* Conquistas PokerSync: pedido explicito pra NAO mostrar
+                nenhum selo/placeholder bloqueado enquanto o jogador nao
+                tem nenhuma conquista real -- so' o titulo e o espaco
+                reservado (min-h), sem numero nem icone inventado. Quando
+                achievements vier preenchido (ver achievements-service.ts),
+                os selos desbloqueados aparecem aqui, cada um com o icone
+                do proprio catalogo (ACHIEVEMENT_ICON, fallback Trophy). */}
             <div className="mt-3 border-t border-hairline pt-3">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas</p>
-              <div className="flex flex-wrap gap-2">
-                {[Trophy, Medal, Star, Award].map((Icon, i) => (
-                  <div
-                    key={i}
-                    title="Conquista bloqueada"
-                    className="grid size-9 place-items-center rounded-lg border border-hairline bg-elevated text-muted/40"
-                  >
-                    <Icon size={16} strokeWidth={1.75} />
-                  </div>
-                ))}
-                <p className="ml-1 self-center text-[11px] text-muted/70">Suas conquistas aparecerão aqui.</p>
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas PokerSync</p>
+              <div className="flex min-h-9 flex-wrap gap-2">
+                {achievements.map((a) => {
+                  const Icon = ACHIEVEMENT_ICON[a.code] ?? Trophy;
+                  return (
+                    <div
+                      key={a.code}
+                      title={a.description}
+                      className="grid size-9 place-items-center rounded-lg border border-evolution/40 bg-evolution/10 text-evolution shadow-[0_0_10px_rgba(245,158,11,.3)]"
+                    >
+                      <Icon size={16} strokeWidth={1.75} />
+                    </div>
+                  );
+                })}
               </div>
             </div>
           </div>
