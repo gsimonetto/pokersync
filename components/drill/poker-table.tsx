@@ -438,8 +438,45 @@ function Seat({
     </div>
   );
 
+  // Chip de HUD com o perfil do oponente -- pedido explicito: "acima do
+  // nick", como os trackers de mercado fazem (HM3/PT4 flutuam o HUD por
+  // cima do assento, separado da placa de nome). Clicavel (leva pra
+  // modal com o perfil completo); o icone de info fica dentro do proprio
+  // chip, que ja e' o sinal visual principal de "tem mais informacao".
+  // Contraste alto de proposito (texto quase branco, fundo solido) --
+  // versao anterior (numeros dentro da placa de nome) ficou apagada
+  // demais pra ler de relance.
+  const opponentHudChip =
+    !hero && opponentStats ? (
+      <div
+        onClick={onOpponentClick ? () => onOpponentClick(seat.playerName!) : undefined}
+        title={`VPIP / PFR / 3-Bet — clique pro perfil completo de ${seat.playerName}`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 4,
+          padding: "3px 9px",
+          borderRadius: 999,
+          fontFamily: F,
+          fontSize: 11,
+          fontWeight: 700,
+          color: "#FFFFFF",
+          background: "rgba(10,10,12,0.88)",
+          border: "1px solid rgba(255,255,255,0.28)",
+          boxShadow: "0 3px 8px rgba(0,0,0,.55)",
+          cursor: onOpponentClick ? "pointer" : "default",
+          whiteSpace: "nowrap",
+          ...num,
+        }}
+      >
+        {opponentStats.vpipPct ?? "—"}/{opponentStats.pfrPct ?? "—"}/{opponentStats.threeBetPct ?? "—"}
+        <Info size={10} style={{ opacity: 0.75, flexShrink: 0 }} />
+      </div>
+    ) : null;
+
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      {opponentHudChip}
       <div style={{ position: "relative" }}>
         {isDealer && (
           <div
@@ -511,42 +548,12 @@ function Seat({
         >
           {seat.playerName && (
             <>
-              {(() => {
-                // Clicavel so' quando ja existe perfil pra mostrar --
-                // sem isso o icone/clique nao levaria a lugar nenhum.
-                const clickable = !hero && !!opponentStats && !!onOpponentClick;
-                return (
-                  <span
-                    onClick={clickable ? () => onOpponentClick!(seat.playerName!) : undefined}
-                    title={clickable ? `Ver estatísticas completas de ${seat.playerName}` : seat.playerName}
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 3,
-                      cursor: clickable ? "pointer" : "default",
-                      maxWidth: 110,
-                    }}
-                  >
-                    <span style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                      {truncateName(seat.playerName)}
-                    </span>
-                    {/* Icone discreto so' pra sinalizar "isso e' clicavel /
-                        tem mais informacao" -- pedido explicito ("precisa
-                        ter um icone bem sutil"), opacidade baixa de proposito. */}
-                    {clickable && <Info size={9} style={{ opacity: 0.5, flexShrink: 0 }} />}
-                  </span>
-                );
-              })()}
-              {/* Trio compacto VPIP/PFR/3-Bet -- pedido explicito ("nao
-                  ficar apertado", so' 3 numeros na tela principal; o
-                  resto das estatisticas fica na modal do clique). Mesma
-                  notacao "38/22/8" usada por trackers de mercado
-                  (Hold'em Manager/PokerTracker). */}
-              {!hero && opponentStats && (
-                <span style={{ fontSize: 9.5, color: "rgba(255,255,255,.55)", ...num }} title="VPIP / PFR / 3-Bet">
-                  {opponentStats.vpipPct ?? "—"}/{opponentStats.pfrPct ?? "—"}/{opponentStats.threeBetPct ?? "—"}
-                </span>
-              )}
+              <span
+                style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}
+                title={seat.playerName}
+              >
+                {truncateName(seat.playerName)}
+              </span>
               <div
                 style={{
                   width: "100%",
