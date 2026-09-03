@@ -19,6 +19,7 @@ import {
   Flame,
   Snowflake,
   ChevronDown,
+  Monitor,
 } from "lucide-react";
 import { Painel, StatList, Bloqueado } from "@/components/analysis/shared";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -335,10 +336,26 @@ export function StatisticsTab({
         }
       >
         <p className="mb-3 text-xs leading-relaxed text-muted">
-          Cobre só all-in heads-up no preflop com as duas mãos mostradas no showdown, em torneios com premiação cadastrada acima —
-          é o único caso que o motor GTO valida hoje (ver <code className="text-ink/70">pokersync-solver/engine/hand_cev.py</code>).
-          Não é uma estimativa do torneio inteiro, é a soma exata dessas mãos específicas.
+          Cobre all-in no preflop com TODAS as mãos envolvidas mostradas no showdown (heads-up ou multiway), em torneios com
+          premiação cadastrada acima — é o único caso que o motor GTO valida hoje (ver{" "}
+          <code className="text-ink/70">pokersync-solver/engine/hand_cev.py</code>). Não é uma estimativa do torneio inteiro,
+          é a soma exata dessas mãos específicas.
         </p>
+
+        {/* Aviso não-bloqueante (pedido explícito): entrada manual continua
+            funcionando normalmente (mão importada aqui já vincula ao
+            torneio sozinha) -- isso só avisa que a experiência completa do
+            Player Evolution (sincronização automática, sem precisar colar
+            hand history) depende do agente desktop, sem tirar a opção
+            manual de ninguém. */}
+        <div className="mb-3 flex items-start gap-2 rounded-lg border border-hairline bg-elevated/60 p-2.5 text-[11.5px] leading-relaxed text-muted">
+          <Monitor size={14} className="mt-0.5 shrink-0 text-muted/70" />
+          <span>
+            Colar hand history manualmente já é suficiente pra calcular cEV. Pra ter a experiência completa do Player
+            Evolution — sincronização automática, sem precisar importar nada na mão — instale o{" "}
+            <span className="text-ink/80 font-semibold">agente desktop</span>.
+          </span>
+        </div>
 
         {computeError && <p className="mb-3 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{computeError}</p>}
         {summary && !computeError && (
