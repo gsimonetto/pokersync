@@ -224,7 +224,7 @@ const MIN_COMMITTED_TO_SHOW = 0.5;
 // comentario do parametro.
 
 const TABLE_CENTER = { x: 50, y: 44 };
-const COMMITTED_OFFSET_PX = 56;
+const COMMITTED_OFFSET_PX = 96;
 const HERO_COMMITTED_OFFSET_PX = 104;
 const ABOVE_SEAT_EXTRA_OFFSET_PX = 14;
 
