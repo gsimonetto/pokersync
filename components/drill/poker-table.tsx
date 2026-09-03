@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { Card } from "./card";
-import { F, POS, ACT, T, num } from "@/lib/poker/drill-theme";
+import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
-import { classifyStatLevel, type OpponentStats, type StatLevel } from "@/lib/services/opponent-stats-service";
+import type { OpponentStats } from "@/lib/services/opponent-stats-service";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -438,23 +438,12 @@ function Seat({
     </div>
   );
 
-  // Cor POR ESTATISTICA (pedido explicito: "a cor de cada estatistica...
-  // e nao o todo" -- veio no lugar da versao anterior, que coloria o
-  // chip inteiro por um unico estilo geral). Cada numero do trio (VPIP/
-  // PFR/3-Bet) e' classificado na sua propria faixa -- ver
-  // classifyStatLevel/STAT_RANGE em opponent-stats-service.ts.
-  const STAT_LEVEL_COLOR: Record<StatLevel, string> = { aggressive: T.bad, passive: T.warn, balanced: T.ok };
-  const statColor = (stat: "vpip" | "pfr" | "threeBet", value: number | null) => {
-    const level = classifyStatLevel(stat, value);
-    return level ? STAT_LEVEL_COLOR[level] : "rgba(255,255,255,.5)";
-  };
-
-  // Chip de HUD com o perfil do oponente -- pedido explicito: entre a
-  // tag de posicao e a placa de nome (nao em cima da posicao). Clicavel
-  // (leva pra modal com o perfil completo); o icone de info fica dentro
-  // do proprio chip, que ja e' o sinal visual principal de "tem mais
-  // informacao". Container fica neutro (glow branco) -- a cor mora em
-  // CADA numero, nao no chip inteiro.
+  // Chip de HUD com o perfil do oponente -- entre a tag de posicao e a
+  // placa de nome. Clicavel (leva pra modal com o perfil completo); o
+  // icone de info fica dentro do proprio chip, que ja e' o sinal visual
+  // principal de "tem mais informacao". Sem cor por faixa de proposito
+  // (pedido explicito): so' o numero cru, sem juizo de valor embutido --
+  // quem decide o que "38/22/8" significa e' o jogador, nao o produto.
   const opponentHudChip =
     !hero && opponentStats ? (
       <div
@@ -469,6 +458,7 @@ function Seat({
           fontFamily: F,
           fontSize: 11,
           fontWeight: 700,
+          color: "#FFFFFF",
           background: "rgba(10,10,12,0.88)",
           border: "1px solid rgba(255,255,255,0.28)",
           boxShadow: "0 0 8px rgba(255,255,255,.18), 0 3px 8px rgba(0,0,0,.55)",
@@ -477,12 +467,8 @@ function Seat({
           ...num,
         }}
       >
-        <span style={{ color: statColor("vpip", opponentStats.vpipPct) }}>{opponentStats.vpipPct ?? "—"}</span>
-        <span style={{ color: "rgba(255,255,255,.35)" }}>/</span>
-        <span style={{ color: statColor("pfr", opponentStats.pfrPct) }}>{opponentStats.pfrPct ?? "—"}</span>
-        <span style={{ color: "rgba(255,255,255,.35)" }}>/</span>
-        <span style={{ color: statColor("threeBet", opponentStats.threeBetPct) }}>{opponentStats.threeBetPct ?? "—"}</span>
-        <Info size={10} style={{ opacity: 0.7, flexShrink: 0, marginLeft: 2, color: "rgba(255,255,255,.7)" }} />
+        {opponentStats.vpipPct ?? "—"}/{opponentStats.pfrPct ?? "—"}/{opponentStats.threeBetPct ?? "—"}
+        <Info size={10} style={{ opacity: 0.7, flexShrink: 0, marginLeft: 2 }} />
       </div>
     ) : null;
 

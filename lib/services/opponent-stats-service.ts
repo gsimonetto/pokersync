@@ -34,32 +34,6 @@ export function isSmallSample(stats: Pick<OpponentStats, "handsCount">): boolean
   return stats.handsCount < MIN_RELIABLE_HANDS;
 }
 
-// Classificacao POR ESTATISTICA (pedido explicito: "a cor de cada
-// estatistica... e nao o todo" -- veio no lugar de uma classificacao
-// unica pro oponente inteiro que existia antes). Cada stat tem sua
-// propria faixa "dentro do esperado" -- fora dela pra cima e' leitura
-// agressiva/solta, pra baixo e' passiva/apertada. Faixas sao os cortes
-// aproximados de mercado pra regulars de MTT/6-max (Hold'em Manager/
-// PokerTracker citam algo nessa vizinhanca) -- ajustavel, nao e' lei.
-export type StatLevel = "aggressive" | "balanced" | "passive";
-
-const STAT_RANGE: Record<"vpip" | "pfr" | "threeBet", { passiveBelow: number; aggressiveAbove: number }> = {
-  vpip: { passiveBelow: 15, aggressiveAbove: 30 },
-  pfr: { passiveBelow: 12, aggressiveAbove: 24 },
-  threeBet: { passiveBelow: 4, aggressiveAbove: 10 },
-};
-
-// null quando nao ha valor pra classificar (amostra sem oportunidade
-// daquele spot) -- sem isso o chip coloriria um "—" com uma cor que nao
-// significa nada.
-export function classifyStatLevel(stat: keyof typeof STAT_RANGE, value: number | null): StatLevel | null {
-  if (value == null) return null;
-  const range = STAT_RANGE[stat];
-  if (value > range.aggressiveAbove) return "aggressive";
-  if (value < range.passiveBelow) return "passive";
-  return "balanced";
-}
-
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRow(row: any): OpponentStats {
   return {

@@ -2,42 +2,17 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { isSmallSample, classifyStatLevel, type OpponentStats, type StatLevel } from "@/lib/services/opponent-stats-service";
-
-// Mesma classificacao por estatistica do chip na mesa (ver
-// poker-table.tsx) -- consistencia entre onde o jogador primeiro ve o
-// dado (chip) e onde ve o detalhe (aqui). Tailwind nao tem token de
-// amarelo no design system geral (so' positive/negative), entao
-// "passivo" usa amber-400 direto, mesmo tom ja usado no aviso de
-// amostra pequena logo abaixo.
-const STAT_LEVEL_CLASS: Record<StatLevel, string> = {
-  aggressive: "text-negative",
-  passive: "text-amber-400",
-  balanced: "text-positive",
-};
+import { isSmallSample, type OpponentStats } from "@/lib/services/opponent-stats-service";
 
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v}%`;
 }
 
-function StatRow({
-  label,
-  value,
-  hint,
-  colorClass,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  // Presente so' nas 3 estatisticas classificaveis (VPIP/PFR/3-Bet) --
-  // pedido explicito: cor POR estatistica, nao um estilo geral pro
-  // oponente inteiro. O resto da lista fica neutro.
-  colorClass?: string;
-}) {
+function StatRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
   return (
     <div className="flex items-center justify-between border-b border-hairline/50 py-1.5 last:border-0" title={hint}>
       <span className="text-[11px] text-muted">{label}</span>
-      <span className={`text-[12.5px] font-semibold tabular-nums ${colorClass ?? "text-ink"}`}>{value}</span>
+      <span className="text-[12.5px] font-semibold tabular-nums text-ink">{value}</span>
     </div>
   );
 }
@@ -45,7 +20,9 @@ function StatRow({
 // Estatisticas completas de UM oponente -- abre ao clicar no nome dele
 // na mesa (icone de info sutil ao lado do nome sinaliza o clique). So'
 // as 3 mais usadas (VPIP/PFR/3-Bet) ficam visiveis direto no assento,
-// pra nao apertar a mesa -- pedido explicito.
+// pra nao apertar a mesa -- pedido explicito. Numeros crus, sem cor por
+// faixa (pedido explicito): o produto mostra o dado, quem le e' o
+// jogador.
 export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | null; onClose: () => void }) {
   useEffect(() => {
     if (!stats) return;
@@ -58,10 +35,6 @@ export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | 
 
   if (!stats) return null;
   const small = isSmallSample(stats);
-
-  const vpipLevel = classifyStatLevel("vpip", stats.vpipPct);
-  const pfrLevel = classifyStatLevel("pfr", stats.pfrPct);
-  const threeBetLevel = classifyStatLevel("threeBet", stats.threeBetPct);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/70 px-4 backdrop-blur-sm">
@@ -81,23 +54,9 @@ export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | 
         {small && <p className="mt-1.5 text-[11px] text-amber-400">Amostra pequena — leia com cautela.</p>}
 
         <div className="mt-3 flex flex-col">
-          <StatRow
-            label="VPIP"
-            value={fmtPct(stats.vpipPct)}
-            hint="Voluntarily Put money In Pot no preflop"
-            colorClass={vpipLevel ? STAT_LEVEL_CLASS[vpipLevel] : undefined}
-          />
-          <StatRow
-            label="PFR"
-            value={fmtPct(stats.pfrPct)}
-            hint="Preflop raise"
-            colorClass={pfrLevel ? STAT_LEVEL_CLASS[pfrLevel] : undefined}
-          />
-          <StatRow
-            label="3-Bet"
-            value={fmtPct(stats.threeBetPct)}
-            colorClass={threeBetLevel ? STAT_LEVEL_CLASS[threeBetLevel] : undefined}
-          />
+          <StatRow label="VPIP" value={fmtPct(stats.vpipPct)} hint="Voluntarily Put money In Pot no preflop" />
+          <StatRow label="PFR" value={fmtPct(stats.pfrPct)} hint="Preflop raise" />
+          <StatRow label="3-Bet" value={fmtPct(stats.threeBetPct)} />
           <StatRow label="Fold to 3-Bet" value={fmtPct(stats.foldTo3BetPct)} hint="Só conta mãos em que ele levou um 3-bet" />
           <StatRow label="C-Bet no flop" value={fmtPct(stats.cbetFlopPct)} hint="Só conta mãos em que ele foi o agressor pré-flop" />
           <StatRow label="Fold to C-Bet (flop)" value={fmtPct(stats.foldToCbetFlopPct)} />
