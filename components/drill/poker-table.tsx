@@ -211,9 +211,10 @@ const MIN_COMMITTED_TO_SHOW = 0.5;
 // elipse achatada de novo; com raio pequeno e assimetrico entre os eixos
 // (container tem aspectRatio 8/5, entao raio horizontal < vertical pra o
 // canto parecer igualmente arredondado nos dois eixos) fica um retangulo
-// com cantos suaves. Reaproveitado em todas as camadas do desenho da mesa
-// (moldura, feltro, marca d'agua) pra nao dessincronizar contornos.
-const TABLE_CORNER_RADIUS = "10% / 16%";
+// com cantos suaves. O valor de fato usado agora vem do parametro
+// `cornerRadius` de PokerTable (default "10% / 16%", ver props mais
+// abaixo) — cada aspectRatio precisa do proprio par calibrado, ver
+// comentario do parametro.
 
 const TABLE_CENTER = { x: 50, y: 44 };
 const COMMITTED_OFFSET_PX = 56;
@@ -245,7 +246,7 @@ function CommittedPill({ amount }: { amount: number }) {
   );
 }
 
-function CommittedChip({ seat, amount, scale }: { seat: SeatLayoutSlot; amount: number; scale: number }) {
+function CommittedChip({ seat, amount, scale, heroScale = 1 }: { seat: SeatLayoutSlot; amount: number; scale: number; heroScale?: number }) {
   const dx = TABLE_CENTER.x - seat.x;
   const dy = TABLE_CENTER.y - seat.y;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -259,7 +260,16 @@ function CommittedChip({ seat, amount, scale }: { seat: SeatLayoutSlot; amount: 
   // fixo") — numa mesa encolhida o assento fica menor, entao a distancia
   // ate a ficha precisa encolher na mesma proporcao, senao a ficha fica
   // "flutuando" longe demais do assento minusculo.
-  const offsetPx = ((seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX) + (seat.isHero ? 0 : ABOVE_SEAT_EXTRA_OFFSET_PX)) * scale;
+  //
+  // FIX (pedido explicito: "as cartas nao podem sobrepor a aposta") --
+  // faltava multiplicar por heroScale aqui: quando o heroi fica maior
+  // (heroScale>1, modo mesa-cheia), as cartas dele crescem mas esse
+  // offset continuava do tamanho normal, entao a ficha de aposta ficava
+  // perto demais e as cartas (agora maiores) cresciam por cima dela.
+  const offsetPx =
+    ((seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX) + (seat.isHero ? 0 : ABOVE_SEAT_EXTRA_OFFSET_PX)) *
+    scale *
+    (seat.isHero ? heroScale : 1);
   return (
     <div
       style={{
@@ -321,18 +331,74 @@ function CardFan({ cards, size, fanDeg = 10 }: { cards: (string | null)[]; size:
 // "empurra pra baixo, por tras da placa".
 const CARD_BEHIND_NAME_TRANSFORM = { above: "translateY(16px)" } as const;
 
+// Silhueta de carta virada (pedido explicito: "no vilao, aparecer a
+// silhueta das cartas viradas pra ele") -- so' um retangulo com contorno
+// fraco, sem naipe/rank (o Card de verdade exige uma carta real pra
+// desenhar). Representa "esse jogador tem mao, so' nao foi revelada"
+// pros assentos vivos sem showdown -- antes esses assentos nao mostravam
+// carta nenhuma, ficando ambiguo com "assento vazio".
+// FIX (pedido explicito: "a silhueta do vilao precisa sobrepor a borda
+// da mesa, nao pode aparecer a borda da mesa atras da carta") -- o fundo
+// era quase transparente (rgba branco .05/.015), entao o contorno do
+// feltro por baixo continuava visivel atraves da carta. Fundo agora e'
+// SOLIDO/opaco (gradiente escuro sem alpha), do jeito que o verso de
+// uma carta de baralho de verdade cobre 100% do que esta atras dele —
+// so' o tom neutro (sem cor de naipe) e' o que ainda deixa claro que
+// nao e' uma carta revelada.
+function CardSilhouette() {
+  return (
+    <div
+      style={{
+        width: 56,
+        height: 80,
+        borderRadius: 6,
+        border: "1.5px solid rgba(255,255,255,0.22)",
+        background: [
+          "repeating-linear-gradient(45deg, rgba(255,255,255,0.04) 0px, rgba(255,255,255,0.04) 1px, transparent 1px, transparent 5px)",
+          "linear-gradient(150deg, #2C303A, #171A21)",
+        ].join(", "),
+        boxShadow: "0 6px 14px rgba(0,0,0,.5)",
+      }}
+    />
+  );
+}
+
+// Mesmo leque/sobreposicao do CardFan, so' que com a silhueta acima em
+// vez de cartas reais -- reusa CARD_OVERLAP_PX.board pra ficar visualmente
+// identico ao par de cartas reveladas (mesmo tamanho, mesmo espacamento),
+// trocando so' o conteudo interno de cada carta.
+function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
+  const overlap = CARD_OVERLAP_PX.board;
+  return (
+    <div style={{ display: "flex" }}>
+      {[0, 1].map((i) => (
+        <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - 0.5) * fanDeg}deg)` }}>
+          <div style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+            <CardSilhouette />
+          </div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Seat({
-  seat, state, isDealer, pot, scale,
+  seat, state, isDealer, pot, scale, heroScale = 1,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
   isDealer?: boolean;
   pot: number;
   scale: number;
+  // Escala extra so' pro assento do heroi (pedido explicito: "o layout
+  // do hero pode ser um pouco maior") -- multiplica em cima do `scale`
+  // geral (responsivo por largura da mesa), nao o substitui.
+  heroScale?: number;
 }) {
   const posCol = POS[seat.posLabel];
   const { status = "empty", stack, action, cards } = state;
   const hero = seat.isHero;
+  const effectiveScale = hero ? scale * heroScale : scale;
   const acting = status === "acting";
   const empty = status === "empty";
   const revealedVillainCards = !hero && !!cards && cards.length > 0 && cards.every(Boolean);
@@ -465,7 +531,7 @@ function Seat({
         // torno do proprio centro (transform-origin default) — o ponto
         // de ancoragem na mesa nunca se move, so' o conteudo do assento
         // (carta+placa+texto) fica menor quando a mesa e' estreita.
-        transform: `translate(-50%,-50%) scale(${scale})`,
+        transform: `translate(-50%,-50%) scale(${effectiveScale})`,
         opacity,
         filter: status === "folded" ? "grayscale(0.5)" : "none",
         transition: "opacity 220ms ease, filter 220ms ease, transform 150ms ease",
@@ -485,9 +551,24 @@ function Seat({
           </>
         ) : (
           (() => {
+            // Silhueta de cartas viradas (pedido explicito) — qualquer
+            // assento vivo (nao vazio, nao folded) sem showdown ganha o
+            // "par de costas de carta" fraco, deixando claro que ele
+            // tem mao na jogada em vez de sumir sem carta nenhuma.
+            const showGhostCards = !revealedVillainCards && !empty && status !== "folded";
             const cardsBlock = revealedVillainCards ? (
               <div style={{ position: "relative", zIndex: 1, transform: CARD_BEHIND_NAME_TRANSFORM.above }}>
                 <CardFan cards={cards!} size="board" />
+              </div>
+            ) : showGhostCards ? (
+              // FIX (pedido explicito): sem opacity aqui -- opacity no
+              // wrapper deixava o FUNDO da carta (ja opaco, ver
+              // CardSilhouette) semitransparente de novo, voltando a
+              // mostrar a borda do feltro atras dela. O tom "apagado"
+              // vem so' das cores internas da silhueta, nao de
+              // transparencia no bloco inteiro.
+              <div style={{ position: "relative", zIndex: 1, transform: CARD_BEHIND_NAME_TRANSFORM.above }}>
+                <GhostCardFan />
               </div>
             ) : null;
             const seatInfoLayered = <div style={{ position: "relative", zIndex: 2 }}>{seatInfo}</div>;
@@ -604,6 +685,19 @@ export function PokerTable({
   // sao maioria, como o modo mesa-cheia do Treino (anel 8-max, so' hero e
   // vilao com conteudo de verdade).
   minSeatScale,
+  // Multiplicador extra so' pro assento do heroi -- ver Seat.heroScale.
+  heroScale = 1,
+  // FIX (pedido explicito: "melhorar formato da mesa, nao pode ter
+  // aquela 'ponta' em cima e embaixo") -- "10% / 16%" foi calibrado pro
+  // retangulo DEITADO (8/5): nessa proporcao, 10% da LARGURA e 16% da
+  // ALTURA dao o MESMO raio em pixel nos dois eixos (10*1.6=16), corner
+  // redondo de verdade. Aplicado direto num retangulo EM PE (3/5, bem
+  // mais alto que largo) o mesmo "16%" vira um raio vertical enorme em
+  // pixel — os 4 cantos quase se encontram no meio da borda de cima/
+  // baixo (que e' curta), formando aquele bico/ponta em vez de uma
+  // curva suave. Cada aspectRatio precisa do proprio par calibrado;
+  // culpa de quem desenha a mesa nessa proporcao passar o valor certo.
+  cornerRadius = "10% / 16%",
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
@@ -612,6 +706,8 @@ export function PokerTable({
   variant?: TableVariant;
   aspectRatio?: string;
   minSeatScale?: number;
+  heroScale?: number;
+  cornerRadius?: string;
 }) {
   const active = !!hand;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
@@ -657,7 +753,7 @@ export function PokerTable({
           aspectRatio,
           margin: "auto",
           overflow: "hidden",
-          borderRadius: TABLE_CORNER_RADIUS,
+          borderRadius: cornerRadius,
         }}
         ref={tableBoxRef}
       >
@@ -665,7 +761,7 @@ export function PokerTable({
           style={{
             position: "absolute",
             inset: "2% 1.5%",
-            borderRadius: TABLE_CORNER_RADIUS,
+            borderRadius: cornerRadius,
             pointerEvents: "none",
             background: "conic-gradient(from 200deg, #4A4E55, #8A8F98, #3A3D42, #6E727A, #4A4E55)",
             opacity: 0.9,
@@ -675,7 +771,7 @@ export function PokerTable({
           style={{
             position: "absolute",
             inset: "3.4% 2.6%",
-            borderRadius: TABLE_CORNER_RADIUS,
+            borderRadius: cornerRadius,
             pointerEvents: "none",
             background: [
               "repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 4px)",
@@ -689,7 +785,7 @@ export function PokerTable({
           style={{
             position: "absolute",
             inset: "3.4% 2.6%",
-            borderRadius: TABLE_CORNER_RADIUS,
+            borderRadius: cornerRadius,
             pointerEvents: "none",
             display: "flex",
             alignItems: "center",
@@ -717,7 +813,7 @@ export function PokerTable({
           style={{
             position: "absolute",
             inset: "2.8% 2%",
-            borderRadius: TABLE_CORNER_RADIUS,
+            borderRadius: cornerRadius,
             background: felt.background,
             border: "2px solid #000000",
             boxShadow: [
@@ -734,12 +830,12 @@ export function PokerTable({
             style={{
               position: "absolute",
               inset: 0,
-              borderRadius: TABLE_CORNER_RADIUS,
+              borderRadius: cornerRadius,
               pointerEvents: "none",
               background: "radial-gradient(55% 35% at 50% 25%, rgba(255,255,255,.09), transparent 70%)",
             }}
           />
-          <div style={{ position: "absolute", inset: "3%", borderRadius: TABLE_CORNER_RADIUS, pointerEvents: "none", border: "1px solid rgba(255,255,255,.06)" }} />
+          <div style={{ position: "absolute", inset: "3%", borderRadius: cornerRadius, pointerEvents: "none", border: "1px solid rgba(255,255,255,.06)" }} />
         </div>
 
         {/* FIX (2026-09): desceu de 44% pra 48% — com cartas SEMPRE em cima
@@ -802,13 +898,14 @@ export function PokerTable({
             isDealer={s.posLabel === "BTN"}
             pot={hand?.pot ?? 0}
             scale={seatScale}
+            heroScale={heroScale}
           />
         ))}
 
         {seats.map((s) => {
           const amt = streetCommitments?.[s.posLabel];
           if (!amt || amt < MIN_COMMITTED_TO_SHOW) return null;
-          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} scale={seatScale} />;
+          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} scale={seatScale} heroScale={heroScale} />;
         })}
 
         {chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
