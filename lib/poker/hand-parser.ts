@@ -185,13 +185,32 @@ function detectSite(text: string): PokerSite {
 // Divide um texto de sessao em blocos de maos individuais. Bilingue: aceita
 // o inicio de mao tanto em ingles ("PokerStars Hand #") quanto em portugues
 // ("Mão PokerStars #").
+// Sem flag global (so' usado com .test() abaixo) -- o split em si continua
+// usando a versao "gi" embutida no lookahead, como sempre foi.
+const HAND_START = /(?:PokerStars|GGPoker|Poker) Hand #|(?:Mão) (?:PokerStars|GGPoker|Poker) #/i;
+
 export function splitHands(text: string): string[] {
   const trimmed = text.trim();
   if (!trimmed) return [];
   const parts = trimmed
-    .split(/(?=(?:PokerStars|GGPoker|Poker) Hand #|(?:Mão) (?:PokerStars|GGPoker|Poker) #)/gi)
-    .map((p) => p.trim());
-  return parts.filter(Boolean);
+    .split(new RegExp(`(?=${HAND_START.source})`, "gi"))
+    .map((p) => p.trim())
+    .filter(Boolean);
+
+  // Bug reportado (2026-09): exportadores tipo PokerTracker/HM3 inserem
+  // um separador ANTES de cada mao ("*********** # 1 **************"),
+  // fora do padrao PokerStars/GGPoker. O split() so' corta no INICIO de
+  // cada mao real, entao esse separador que vem antes da PRIMEIRA mao
+  // do lote sobra como um pedaco fantasma no indice 0 -- sem "Mão
+  // PokerStars #"/"PokerStars Hand #" nenhum, vira uma "mao" vazia (sem
+  // heroName, sem streets, sem showdown) salva no banco sem servir pra
+  // nada. Os separadores ENTRE as maos nao tem esse problema -- ficam
+  // grudados no FIM do pedaco anterior, que ja tem conteudo de verdade.
+  if (parts.length > 0 && !HAND_START.test(parts[0])) {
+    parts.shift();
+  }
+
+  return parts;
 }
 
 function parseCards(segment: string): string[] {
