@@ -4,14 +4,31 @@ import { useState } from "react";
 import { Loader2, Upload, Check, ClipboardPaste } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { createImportBatch, importSelectedHands, deleteImportBatch, type ImportBatch } from "@/lib/services/hand-review-service";
+import {
+  extractTournamentInfo,
+  findExistingTournamentSession,
+  createTournamentSession,
+  findExistingCashSession,
+  createCashSession,
+  attachReviewsToSession,
+  updateSessionBounty,
+} from "@/lib/services/hand-session-service";
 
 // Versão compacta do import de hand history (mesmo motor de
 // components/revisor/revisor-nova-mao.tsx: createImportBatch +
-// importSelectedHands, hand_import_batches -> hand_reviews). O
-// agrupamento por torneio/cash (modal de sessão) fica só no Revisor —
-// aqui o objetivo é alimentar o Player Evolution rápido, sem sair da
-// tela de Análise; as mãos importadas continuam disponíveis pra
-// classificar em sessão depois, no Revisor.
+// importSelectedHands, hand_import_batches -> hand_reviews).
+//
+// FIX (bug reportado: "cEV sempre dá 0 mãos mesmo com mão elegível") --
+// até aqui, esse painel salvava as mãos SEM vincular a nenhuma sessão de
+// torneio (hand_session_id ficava null pra sempre) -- o cálculo de cEV
+// em app/api/hand-ev/compute/route.ts exige esse vínculo pra achar a
+// premiação. Agora, ao confirmar, o torneio/cash é detectado e
+// anexado/criado automaticamente (mesma lógica de
+// revisor-nova-mao.tsx::confirmImport, MAS sem o modal de
+// "anexar ou criar novo" -- esse painel é o "rápido", então resolve
+// sozinho com os valores lidos do próprio hand history; quem quiser
+// controlar tipo/bounty manualmente continua tendo o fluxo completo no
+// Revisor).
 export function ManualImportPanel({ onImported }: { onImported: () => void }) {
   const [text, setText] = useState("");
   const [batch, setBatch] = useState<ImportBatch | null>(null);
@@ -50,7 +67,48 @@ export function ManualImportPanel({ onImported }: { onImported: () => void }) {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
       if (!data.user) throw new Error("Sessão expirada — faça login novamente.");
-      await importSelectedHands(batch.id, data.user.id, selected);
+      const userId = data.user.id;
+      const ids = await importSelectedHands(batch.id, userId, selected);
+
+      // Torneio/buy-in vem da PRIMEIRA mão selecionada (constante durante
+      // o torneio inteiro); bounty do herói vem da ÚLTIMA (cresce mão a
+      // mão) -- mesmo critério de revisor-nova-mao.tsx.
+      const sortedSelected = [...selected].sort((a, b) => a - b);
+      const selectedParsedHands = sortedSelected.map((i) => batch.parsed_hands[i]);
+      const firstHand = selectedParsedHands[0];
+      const lastHand = selectedParsedHands[selectedParsedHands.length - 1];
+      const tournInfo = extractTournamentInfo(firstHand);
+      const suggestedBounty = extractTournamentInfo(lastHand).heroBountyFromHand ?? tournInfo.heroBountyFromHand;
+
+      if (tournInfo.tournamentIdPs) {
+        const existing = await findExistingTournamentSession(userId, tournInfo.tournamentIdPs);
+        if (existing) {
+          await attachReviewsToSession(ids, existing.id, selectedParsedHands);
+          if (suggestedBounty != null && (existing.bounty_current == null || suggestedBounty > existing.bounty_current)) {
+            await updateSessionBounty(existing.id, suggestedBounty).catch(() => {});
+          }
+        } else {
+          const formatType = tournInfo.looksLikeBounty ? "pko" : "regular";
+          const created = await createTournamentSession({
+            userId,
+            label: tournInfo.tournamentName ?? `Torneio #${tournInfo.tournamentIdPs}`,
+            tournamentIdPs: tournInfo.tournamentIdPs,
+            formatType,
+            bountyCurrent: formatType === "pko" ? suggestedBounty : null,
+            buyin: tournInfo.buyin,
+          });
+          await attachReviewsToSession(ids, created.id, selectedParsedHands);
+        }
+      } else if (firstHand.stakes) {
+        // Cash game (sem "Tournament #"): agrupa por stakes, sem premiação
+        // pra cadastrar (cEV/ICM não se aplica a cash -- ver decisão 012).
+        const existingCash = await findExistingCashSession(userId, firstHand.stakes);
+        const cashSession = existingCash ?? (await createCashSession({ userId, label: `Cash · ${firstHand.stakes}`, stakes: firstHand.stakes }));
+        await attachReviewsToSession(ids, cashSession.id);
+      }
+      // Sem "Tournament #" nem stakes identificados: mão fica salva solta
+      // mesmo (igual antes) -- não dá pra inventar um torneio sem dado.
+
       setText("");
       setBatch(null);
       setSelected([]);
