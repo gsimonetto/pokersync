@@ -11,17 +11,20 @@ import { PlayerDetailBody } from "@/components/time/player-detail-body";
 import { ModalPortal } from "@/components/modal-portal";
 import {
   calcularScore,
+  calcularTendencia,
   diasSemAtividade,
   fetchPlayerActivity,
   fetchPlayerAlerts,
   fetchPlayerDetail,
   fetchPlayerFinancialSeries,
   fetchPlayerLeaks,
+  fetchPlayerScoreHistory,
   fetchPlayerSharedHands,
   fetchPlayerStakingSessions,
   traduzErroTime,
   type FinancialDay,
   type PlayerActivityDay,
+  type PlayerScoreHistoryPoint,
   type TeamAlert,
   type PlayerDetail,
   type PlayerSharedHand,
@@ -61,12 +64,13 @@ export function PlayerDetailModal({
   const [alertas, setAlertas] = useState<TeamAlert[]>([]);
   const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
   const [staking, setStaking] = useState<PlayerStakingSession[]>([]);
+  const [historicoScore, setHistoricoScore] = useState<PlayerScoreHistoryPoint[]>([]);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, fin, stk] = await Promise.all([
+      const [d, a, l, m, al, fin, stk, hist] = await Promise.all([
         fetchPlayerDetail(playerId, dias),
         fetchPlayerActivity(playerId, dias),
         fetchPlayerLeaks(playerId, dias),
@@ -74,6 +78,7 @@ export function PlayerDetailModal({
         fetchPlayerAlerts(playerId).catch(() => []),
         fetchPlayerFinancialSeries(playerId, dias).catch(() => []),
         fetchPlayerStakingSessions(playerId).catch(() => []),
+        fetchPlayerScoreHistory(playerId, dias).catch(() => []),
       ]);
       setP(d);
       setAtividade(a);
@@ -82,6 +87,7 @@ export function PlayerDetailModal({
       setAlertas(al);
       setFinanceiro(fin);
       setStaking(stk);
+      setHistoricoScore(hist);
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -108,7 +114,7 @@ export function PlayerDetailModal({
               <p className="flex items-center gap-2 truncate text-[15px] font-semibold">
                 {p?.nome ?? (loading ? "Carregando…" : "Jogador")}
                 {p?.level != null && <RankChip level={p.level} />}
-                {p && <ScoreRing valor={calcularScore(p).valor} risco={calcularScore(p).risco} />}
+                {p && <ScoreRing valor={calcularScore(p).valor} risco={calcularScore(p).risco} tendencia={calcularTendencia(historicoScore)} />}
               </p>
               {p && (
                 <p className="truncate text-xs text-muted">
@@ -155,6 +161,7 @@ export function PlayerDetailModal({
                 alertas={alertas}
                 financeiro={financeiro}
                 staking={staking}
+                historicoScore={historicoScore}
                 podeGerenciarMetas={meuPapel === "admin" || (meuPapel === "coach" && p.coachId === meuUserId)}
                 hrefMaoCompartilhada={(reviewId) => `/revisor?shared=${reviewId}`}
               />

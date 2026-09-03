@@ -16,6 +16,7 @@ import {
   type PeriodComparison,
   type TeamActivityDay,
   type TeamDashboardRow,
+  type TeamScoreHistoryPoint,
 } from "@/lib/services/team-service";
 import type { TeamEvent } from "@/lib/services/team-calendar-service";
 import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-service";
@@ -43,6 +44,7 @@ export function TabVisaoGeral({
   financeiro,
   comparacao,
   eventos,
+  historicoScoreTime,
   pronto,
   dias,
   periodos,
@@ -56,6 +58,8 @@ export function TabVisaoGeral({
   financeiro: FinancialDay[];
   comparacao: PeriodComparison | null;
   eventos: TeamEvent[];
+  /** Série do RPC team_score_history -- vazio pra jogador (RPC é só admin/coach), aí o hint cai pro texto sem tendência. */
+  historicoScoreTime: TeamScoreHistoryPoint[];
   pronto: boolean;
   dias: number;
   periodos: { label: string; days: number }[];
@@ -72,6 +76,20 @@ export function TabVisaoGeral({
   const scoreMedio = scores.length > 0 ? Math.round(scores.reduce((a, s) => a + s.valor, 0) / scores.length) : null;
   const emRiscoAlto = scores.filter((s) => s.risco === "alto").length;
   const acertoPct = treinos > 0 ? Math.round((acertos / treinos) * 100) : null;
+
+  // Compara a média de hoje com a mais antiga disponível até 7 dias
+  // atrás -- mesma janela do selo individual (calcularTendencia), só
+  // que aqui é a média do time (historicoScoreTime vem de
+  // team_score_history, RPC que só admin/coach conseguem chamar).
+  const tendenciaTime = (() => {
+    if (scoreMedio === null || historicoScoreTime.length < 2) return null;
+    const hoje = historicoScoreTime[historicoScoreTime.length - 1];
+    const limite = Date.now() - 7 * 24 * 60 * 60 * 1000;
+    const referencia = historicoScoreTime.find((p) => new Date(p.dia).getTime() >= limite) ?? historicoScoreTime[0];
+    if (referencia === hoje || referencia.scoreMedio === hoje.scoreMedio) return null;
+    const diff = hoje.scoreMedio - referencia.scoreMedio;
+    return diff > 0 ? `+${diff} vs 7 dias atrás` : `${diff} vs 7 dias atrás`;
+  })();
 
   const varTreinos = variacao(comparacao?.treinosAtual, comparacao?.treinosAnterior);
   const varRevisadas = variacao(comparacao?.revisadasAtual, comparacao?.revisadasAnterior);
@@ -130,7 +148,13 @@ export function TabVisaoGeral({
             label="Score de evolução do time"
             value={scoreMedio === null ? "—" : String(scoreMedio)}
             tone={scoreMedio === null ? "neutro" : scoreMedio >= 70 ? "bom" : scoreMedio >= 40 ? "neutro" : "ruim"}
-            hint={emRiscoAlto > 0 ? `${emRiscoAlto} em risco alto` : "ninguém em risco alto"}
+            hint={
+              tendenciaTime
+                ? `${tendenciaTime} · ${emRiscoAlto > 0 ? `${emRiscoAlto} em risco alto` : "ninguém em risco alto"}`
+                : emRiscoAlto > 0
+                ? `${emRiscoAlto} em risco alto`
+                : "ninguém em risco alto"
+            }
           />
         </div>
       </section>

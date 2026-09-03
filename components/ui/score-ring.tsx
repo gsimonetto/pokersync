@@ -18,13 +18,42 @@ const RISCO_LABEL: Record<NivelRisco, string> = {
   alto: "risco alto",
 };
 
-export function ScoreRing({ valor, risco, className = "" }: { valor: number; risco: NivelRisco; className?: string }) {
+export type Tendencia = "subiu" | "caiu" | "estavel";
+
+const TENDENCIA_LABEL: Record<Tendencia, string> = {
+  subiu: "Subiu nos últimos 7 dias",
+  caiu: "Caiu nos últimos 7 dias",
+  estavel: "Estável nos últimos 7 dias",
+};
+
+export function ScoreRing({
+  valor,
+  risco,
+  tendencia,
+  className = "",
+}: {
+  valor: number;
+  risco: NivelRisco;
+  /** Opcional: só passa quando já tiver histórico carregado (Ficha do jogador) -- em lista, o custo de buscar histórico por linha não compensa. */
+  tendencia?: Tendencia;
+  className?: string;
+}) {
   return (
-    <span
-      title={`Score de evolução: ${valor} — ${RISCO_LABEL[risco]}`}
-      className={`inline-flex h-[22px] min-w-[22px] shrink-0 items-center justify-center rounded-full border-2 px-1 text-[10px] font-black tabular-nums ${RISCO_CLASSES[risco]} ${className}`}
-    >
-      {valor}
+    <span className={`inline-flex items-center gap-0.5 ${className}`}>
+      <span
+        title={`Score de evolução: ${valor} — ${RISCO_LABEL[risco]}`}
+        className={`inline-flex h-[22px] min-w-[22px] shrink-0 items-center justify-center rounded-full border-2 px-1 text-[10px] font-black tabular-nums ${RISCO_CLASSES[risco]}`}
+      >
+        {valor}
+      </span>
+      {tendencia && tendencia !== "estavel" && (
+        <span
+          title={TENDENCIA_LABEL[tendencia]}
+          className={`text-[11px] font-bold ${tendencia === "subiu" ? "text-positive" : "text-negative"}`}
+        >
+          {tendencia === "subiu" ? "▲" : "▼"}
+        </span>
+      )}
     </span>
   );
 }

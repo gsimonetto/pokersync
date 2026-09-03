@@ -11,6 +11,7 @@ import {
 } from "lucide-react";
 import { Chip } from "@/components/chip";
 import { EvolutionChart } from "@/components/time/evolution-chart";
+import { ScoreHistoryChart } from "@/components/time/score-history-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
 import { MetasCard } from "@/components/time/metas-card";
@@ -20,6 +21,7 @@ import {
   ALERTA_LABEL,
   type FinancialDay,
   type PlayerActivityDay,
+  type PlayerScoreHistoryPoint,
   type TeamAlert,
   type PlayerDetail,
   type PlayerSharedHand,
@@ -41,6 +43,7 @@ export function PlayerDetailBody({
   alertas,
   financeiro,
   staking,
+  historicoScore,
   podeGerenciarMetas,
   hrefMaoCompartilhada = (reviewId) => `/revisor?shared=${reviewId}`,
 }: {
@@ -52,6 +55,7 @@ export function PlayerDetailBody({
   alertas: TeamAlert[];
   financeiro: FinancialDay[];
   staking: PlayerStakingSession[];
+  historicoScore: PlayerScoreHistoryPoint[];
   podeGerenciarMetas: boolean;
   hrefMaoCompartilhada?: (reviewId: string) => string;
 }) {
@@ -114,6 +118,16 @@ export function PlayerDetailBody({
           />
         </div>
       </section>
+
+      <div className="rounded-xl border border-hairline bg-surface p-6">
+        <h2 className="text-base font-semibold">Score de evolução</h2>
+        <p className="mt-1 text-sm text-muted">
+          Resume atividade, acerto GTO, consistência e progresso num número só, dia a dia.
+        </p>
+        <div className="mt-4">
+          <ScoreHistoryChart dados={historicoScore} />
+        </div>
+      </div>
 
       <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
         <EvolutionChart dados={financeiro} titulo="Resultado no período" />
