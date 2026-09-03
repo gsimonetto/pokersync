@@ -16,6 +16,7 @@ import {
   fetchPlayerActivity,
   fetchPlayerAlerts,
   fetchPlayerDetail,
+  fetchPlayerEvolutionStats,
   fetchPlayerFinancialSeries,
   fetchPlayerLeaks,
   fetchPlayerScoreHistory,
@@ -24,6 +25,7 @@ import {
   traduzErroTime,
   type FinancialDay,
   type PlayerActivityDay,
+  type PlayerEvolutionStats,
   type PlayerScoreHistoryPoint,
   type TeamAlert,
   type PlayerDetail,
@@ -65,12 +67,13 @@ export function PlayerDetailModal({
   const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
   const [staking, setStaking] = useState<PlayerStakingSession[]>([]);
   const [historicoScore, setHistoricoScore] = useState<PlayerScoreHistoryPoint[]>([]);
+  const [evolutionStats, setEvolutionStats] = useState<PlayerEvolutionStats | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, fin, stk, hist] = await Promise.all([
+      const [d, a, l, m, al, fin, stk, hist, evo] = await Promise.all([
         fetchPlayerDetail(playerId, dias),
         fetchPlayerActivity(playerId, dias),
         fetchPlayerLeaks(playerId, dias),
@@ -79,6 +82,7 @@ export function PlayerDetailModal({
         fetchPlayerFinancialSeries(playerId, dias).catch(() => []),
         fetchPlayerStakingSessions(playerId).catch(() => []),
         fetchPlayerScoreHistory(playerId, dias).catch(() => []),
+        fetchPlayerEvolutionStats(playerId, dias).catch(() => null),
       ]);
       setP(d);
       setAtividade(a);
@@ -88,6 +92,7 @@ export function PlayerDetailModal({
       setFinanceiro(fin);
       setStaking(stk);
       setHistoricoScore(hist);
+      setEvolutionStats(evo);
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -162,6 +167,7 @@ export function PlayerDetailModal({
                 financeiro={financeiro}
                 staking={staking}
                 historicoScore={historicoScore}
+                evolutionStats={evolutionStats}
                 podeGerenciarMetas={meuPapel === "admin" || (meuPapel === "coach" && p.coachId === meuUserId)}
                 hrefMaoCompartilhada={(reviewId) => `/revisor?shared=${reviewId}`}
               />
