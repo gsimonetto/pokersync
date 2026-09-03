@@ -172,17 +172,24 @@ function ellipseSeatCoords(n: number, config: RingConfig = {}): { x: number; y: 
   // radiusY menor que radiusX: com 42 nos dois eixos, a cadeira oposta
   // ao hero (topo da mesa, em mesas com n par) quase saia do feltro —
   // confirmado visualmente num render de teste antes de mudar isso.
-  const radiusY = config.radiusY ?? 32;
-  // FIX (2026-09): agora que as cartas ficam SEMPRE em cima do nome (pedido
-  // explicito, ver Seat/CardFan em poker-table.tsx), os assentos da fileira
-  // de CIMA da mesa (sin<0) empurram o bloco de cartas ainda mais pra cima —
-  // ou seja, na direcao da borda de que eles ja estao mais perto. Nas fotos
-  // de teste em varias telas ("me mostre como ficou no celular e em outras
-  // telas"), esses assentos vazavam a carta pra fora do contorno arredondado.
+  //
+  // FIX (2026-09): pedido explicito ("quero os seats mais proximos da
+  // borda da mesa, estao quase no centro") -- 32/26 deixava a fileira
+  // vertical (topo/base) muito mais perto do centro, em proporcao, do
+  // que a fileira horizontal (radiusX=42), ficando mais evidente em
+  // mesas heads-up/3-max (so' sobra o eixo vertical). Subiu pro maior
+  // valor confirmado sem cortar carta/badge em nenhuma altura de tela
+  // testada (validado com render real do navegador do menor retangulo
+  // 8/5 ate' o mais achatado tipo notebook) -- acima disso, o bloco de
+  // nome+stack do assento de baixo (ou as cartas do assento de cima)
+  // comecam a vazar por cima da borda arredondada nas telas mais baixas.
+  const radiusY = config.radiusY ?? 38;
   // Os assentos de BAIXO nao tem esse problema (cartas "em cima do nome"
   // pra eles apontam pro CENTRO da mesa, lado oposto da borda), entao so' a
-  // metade de cima ganha um raio vertical menor (mais afastado da borda).
-  const radiusYTop = config.radiusYTop ?? 26;
+  // metade de cima ganha um raio vertical menor (mais afastado da borda) --
+  // mesmo motivo acima pro valor: maior confirmado sem cortar carta nas
+  // telas mais baixas testadas.
+  const radiusYTop = config.radiusYTop ?? 30;
   const coords: { x: number; y: number; cardSide: CardSide }[] = [];
 
   for (let i = 0; i < n; i++) {
