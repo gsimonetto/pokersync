@@ -1094,7 +1094,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                 {error || layoutError?.message || emptyMessage}
               </p>
             ) : round && currentPhase && tableHand && seatLayout ? (
-              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 900, maxHeight: 560, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1360, maxHeight: 850, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
                 {/* "vs Jam" testa a decisão do DEFENSOR, não do abridor
                     selecionado em "Posição herói" -- sem isso o jogador
                     pode ficar sem entender por que as cartas viradas
