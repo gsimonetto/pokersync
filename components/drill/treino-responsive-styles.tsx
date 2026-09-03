@@ -95,7 +95,15 @@ export function TreinoResponsiveStyles() {
         .ps-tr-filters {
           position: fixed !important;
           inset: 0;
-          z-index: 40;
+          /* FIX (bug reportado: "o feedback sobrepos o filtro, nao pode
+             acontecer") -- z-index 40 ficava ABAIXO do VerdictFlash (o
+             badge "Jogada Otima" que flutua sobre a mesa, z-index 50),
+             entao o feedback da mao anterior continuava visivel por
+             cima da gaveta de filtros aberta. A gaveta e' um overlay
+             modal -- precisa ficar acima de qualquer coisa da mesa por
+             tras dela, entao sobe pra 60 (acima do maior z-index usado
+             na mesa normal). */
+          z-index: 60;
           width: 82%;
           max-width: 320px;
           background: #050505;
