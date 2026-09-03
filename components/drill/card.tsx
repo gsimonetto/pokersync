@@ -17,7 +17,11 @@ import { T, F, SUITS, num } from "@/lib/poker/drill-theme";
      com naipe central"). */
 
 const SIZES = {
-  board: { w: 50, h: 71, rank: 15, cornerSuit: 11, bigCenter: 34, cornerOffset: 5, cornerGap: 2 },
+  // Aumentada ~12% (pedido explicito: "pode aumentar um pouco as
+  // cartas") -- 50x71 pra 56x80, mesma proporcao. Rank/naipe/offset
+  // escalados junto na mesma razao pra nao "sobrar" espaco em branco
+  // nem apertar os cantos.
+  board: { w: 56, h: 80, rank: 17, cornerSuit: 12, bigCenter: 38, cornerOffset: 6, cornerGap: 2 },
   // Hero maior — pedido explicito de aumentar mais uma vez. De 58x82
   // pra 72x100: quase 40% maior que a carta comunitaria, destaque de
   // "essas sao as suas cartas" sem precisar de rotacao ou selo extra.
@@ -266,7 +270,13 @@ export function Card({
         fontFamily: F,
         color: "#FFFFFF",
         background: bgColor,
-        boxShadow: "0 8px 18px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.12) inset",
+        // Borda preta sutil (pedido explicito) -- antes so' tinha o anel
+        // branco fraco por dentro (0 0 0 1px .12 inset), a carta "flutuava"
+        // sem contorno definido contra o feltro escuro. Um segundo anel,
+        // preto e um pouco mais forte, por FORA do branco (0 0 0 2px),
+        // da' o contorno sem parecer uma borda dura/CSS -- ainda fino o
+        // bastante pra nao competir com o rank/naipe.
+        boxShadow: "0 8px 18px rgba(0,0,0,.55), 0 0 0 1px rgba(255,255,255,.12) inset, 0 0 0 2px rgba(0,0,0,.45)",
       }}
     >
       {!hideCorners && (

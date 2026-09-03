@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { Loader2, SlidersHorizontal, X, CheckCircle2, XCircle, Info } from "lucide-react";
+import { Loader2, SlidersHorizontal, X, CheckCircle2, XCircle, Info, Check, RotateCcw } from "lucide-react";
 import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
@@ -189,6 +189,99 @@ function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color:
   );
 }
 
+// Breakpoint identico ao usado em treino-responsive-styles.tsx (768px) —
+// so' abaixo dele que a gaveta de filtros vira modal e o modo mesa-cheia
+// (fullscreen) existe. addEventListener("change", ...) reage a rotacao
+// de tela/redimensionamento sem precisar de um listener de resize solto.
+function useIsMobile(): boolean {
+  const [isMobile, setIsMobile] = useState(
+    () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
+  );
+  useEffect(() => {
+    const mq = window.matchMedia("(max-width: 768px)");
+    const onChange = () => setIsMobile(mq.matches);
+    onChange();
+    mq.addEventListener("change", onChange);
+    return () => mq.removeEventListener("change", onChange);
+  }, []);
+  return isMobile;
+}
+
+// Mesma logica de acerto/erro do VerdictFlash, mas em destaque na mesa
+// (pedido explicito: "animacao rapida no centro da tela") -- e' o
+// feedback principal do modo mesa-cheia, entao carrega tambem o botao
+// "Ver detalhes" junto (no card normal esse botao mora no painel acima
+// da mesa, que nao existe no modo tela-cheia).
+//
+// FIX (pedido explicito: "nao quero aquele conteiner preto, quero que
+// seja algo natural visualmente") -- a caixa preta arredondada com
+// borda colorida saiu. Agora e' so' o icone (com glow radial suave atras
+// dele, sem contorno duro) + o texto flutuando direto sobre o feltro,
+// com text-shadow no lugar de fundo solido pra continuar legivel. O
+// botao "Ver detalhes" continua, mas como pilula translucida separada
+// (nao mais dentro de uma caixa) — unico elemento com fundo, e' bem mais
+// discreto que o card preto de antes.
+//
+// FIX (pedido explicito: "pode ser acima do board") -- centralizado na
+// tela ele cobria o proprio board/pote (que fica no meio da mesa). Layout
+// HORIZONTAL e compacto (icone+texto+% numa linha so', botao logo
+// abaixo) cabe na faixa livre entre o vilao (topo da mesa) e o bloco
+// central de SPR/board/pote, sem disputar espaco com nenhum dos dois --
+// ver `top` do wrapper, calibrado pra essa faixa.
+function VerdictCenterFlash({
+  label, color, isGood, freqPct, onDetails,
+}: {
+  label: string;
+  color: string;
+  isGood: boolean;
+  freqPct: number | null;
+  onDetails: () => void;
+}) {
+  const Icon = isGood ? CheckCircle2 : XCircle;
+  return (
+    <div style={{ position: "absolute", top: "29%", left: "50%", transform: "translate(-50%, -50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "none", zIndex: 60 }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, animation: "verdictPop 320ms cubic-bezier(0.22, 1.4, 0.36, 1) both" }}>
+        <div
+          aria-hidden="true"
+          style={{ position: "absolute", inset: -20, borderRadius: "50%", background: `radial-gradient(circle, ${color}40, transparent 72%)`, pointerEvents: "none" }}
+        />
+        <Icon size={26} color={color} strokeWidth={2.2} style={{ flexShrink: 0, filter: `drop-shadow(0 0 12px ${color}aa)` }} />
+        <span style={{ fontFamily: F, color: "#FFFFFF", fontWeight: 800, fontSize: 16, whiteSpace: "nowrap", textShadow: "0 2px 14px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)" }}>{label}</span>
+        {freqPct != null && (
+          <span style={{ fontFamily: F, color: "rgba(255,255,255,.65)", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", textShadow: "0 2px 10px rgba(0,0,0,.85)" }}>{freqPct}%</span>
+        )}
+      </div>
+      <button
+        onClick={onDetails}
+        style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: 5, fontFamily: F, fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.75)", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 999, padding: "5px 12px", cursor: "pointer" }}
+      >
+        <Info size={11} />
+        Ver detalhes
+      </button>
+      <style>{`@keyframes verdictPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }`}</style>
+    </div>
+  );
+}
+
+// Botao da pilha vertical do modo mesa-cheia -- mais estreito e mais
+// alto que o botao "chip" do modo card normal, pra caber numa coluna
+// fina do lado direito da mesa em vez de uma linha horizontal embaixo.
+function fsActionBtnStyle(bg: string, color = "#FFFFFF"): React.CSSProperties {
+  return {
+    fontFamily: F,
+    width: 92,
+    padding: "13px 10px",
+    borderRadius: 12,
+    border: "1px solid rgba(255,255,255,0.14)",
+    background: bg,
+    color,
+    fontSize: 13,
+    fontWeight: 700,
+    cursor: "pointer",
+    boxShadow: "0 4px 14px rgba(0,0,0,.45)",
+  };
+}
+
 function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 7 }}>
@@ -322,17 +415,20 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   const [phaseKey, setPhaseKey] = useState<(typeof PHASES)[number]["key"]>("sbOpen");
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // Desktop comeca com os filtros abertos (igual sempre foi); mobile
-  // comeca fechado (gaveta, evita cobrir a mesa de cara). matchMedia so'
-  // roda uma vez no mount, no client. Isso gera um warning de hydration
-  // mismatch no console do modo dev (server sem `window` sempre renderiza
-  // aberto), mas e' inofensivo -- tentei "corrigir" via useEffect antes,
-  // mas isso criava um flash real (abre e fecha com animacao) no mobile,
-  // pior que o warning que resolvia.
-  const [filtersOpen, setFiltersOpen] = useState(() => {
-    if (typeof window === "undefined") return true;
-    return window.matchMedia("(min-width: 769px)").matches;
-  });
+  // Filtros SEMPRE comecam abertos, desktop ou celular (pedido explicito:
+  // "quando abrir o modo treino ja deve vir aberto o filtro pro jogador
+  // escolher qual sera o treino") -- antes so' o desktop abria assim; no
+  // celular a gaveta comecava fechada. No desktop isso e' so' o painel
+  // lateral (sempre foi assim); no celular vira a gaveta modal (ver
+  // treino-responsive-styles.tsx), fechada so' depois que o jogador
+  // aplica um filtro (ver handleApplyFilters mais abaixo).
+  const [filtersOpen, setFiltersOpen] = useState(true);
+  const isMobile = useIsMobile();
+  // Modo mesa-cheia (celular, pedido explicito: "ao aplicar, quero que a
+  // mesa ocupe a tela inteira") -- so' existe depois que o jogador aplica
+  // o filtro; volta pra false se ele reabrir os filtros (ver botao de
+  // filtro no cabecalho do modo tela-cheia, mais abaixo).
+  const [fullscreenMode, setFullscreenMode] = useState(false);
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<"fold" | "action" | "distractor" | null>(null);
@@ -594,9 +690,170 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     return { pot: spot.pot, spr, board: [], history: [], seats };
   }, [spot, round, chosen, activeHeroSeat, activeVillainSeat]);
 
+  // FIX (bug reportado): "no filtro de all-in ou aposta do vilao, os
+  // blinds nao estao sendo somados na mesa e nem a animacao das fichas
+  // esta vindo". Antes o tableHand nunca preenchia streetCommitments nem
+  // disparava chipAnimation -- a mesa sempre mostrava o pote pronto, sem
+  // nenhuma ficha na frente dos assentos e sem a bolinha voando. Blinds
+  // sempre entram como base (0.5bb SB / 1bb BB, se hero ou vilao ocupam
+  // esses assentos); em bbJam/sbCallJam o assento que ja agiu antes do
+  // spot comecar (activeVillainSeat -- quem abriu, em bbJam; quem deu
+  // jam, em sbCallJam) recebe o RESTANTE do pote (spot.pot menos o
+  // blind de quem esta decidindo agora), reconciliando com o pote
+  // exibido sem precisar de um breakdown de tamanho de aposta que o
+  // motor nao guarda por mao.
+  const SB_BLIND_BB = 0.5;
+  const BB_BLIND_BB = 1;
+  const seatBlind = useCallback((pos: string) => (pos === "SB" ? SB_BLIND_BB : pos === "BB" ? BB_BLIND_BB : 0), []);
+
+  const streetCommitments = useMemo(() => {
+    if (!spot) return undefined;
+    if (phaseKey === "sbOpen") {
+      // Ninguem decidiu nada ainda alem dos blinds forcados.
+      return { [heroPos]: seatBlind(heroPos), [villainPos]: seatBlind(villainPos) };
+    }
+    // bbJam/sbCallJam: activeVillainSeat ja tem uma acao (abertura ou
+    // jam) comprometida antes do jogador decidir.
+    const decidingBlind = seatBlind(activeHeroSeat);
+    return { [activeHeroSeat]: decidingBlind, [activeVillainSeat]: Math.max(0, spot.pot - decidingBlind) };
+  }, [spot, phaseKey, heroPos, villainPos, activeHeroSeat, activeVillainSeat, seatBlind]);
+
+  // Ficha voando do assento que ja agiu (activeVillainSeat) ate' o pote —
+  // so' nas fases onde alguem ja jogou antes do jogador decidir (bbJam:
+  // abertura; sbCallJam: jam). A key muda a cada mao nova (round.label +
+  // spotId + fase), entao a animacao roda de novo em toda mao nova dessas
+  // fases -- reforca "isso e' o que o vilao acabou de fazer".
+  const chipAnimation = useMemo(() => {
+    if (!spot || !round || phaseKey === "sbOpen" || !streetCommitments) return null;
+    const amount = streetCommitments[activeVillainSeat];
+    if (!amount || amount <= 0) return null;
+    return { fromPosLabel: activeVillainSeat, amount, key: `${spotId}-${phaseKey}-${round.label}` };
+  }, [spot, round, phaseKey, streetCommitments, activeVillainSeat, spotId]);
+
+  // Modo mesa-cheia: mesmo anel de 8-max do card normal (pedido
+  // explicito: "quero que venha os seats foscos mas todos eles
+  // preenchendo a mesa, pode por 8max") -- os assentos sem jogador ja
+  // ficam foscos sozinhos (SEAT_OPACITY.empty em poker-table.tsx), o
+  // tableHand ja preenche todos como "empty" exceto hero/vilao (ver
+  // useMemo de tableHand acima). So' desloca o assento do HERO um pouco
+  // pra esquerda (pedido explicito, sessao anterior: "a mao do hero
+  // pode jogar um pouco pra esquerda") pra abrir espaco pra pilha de
+  // botoes de aposta a direita.
+  const fullscreenSeatLayout = useMemo(() => {
+    if (!seatLayout) return null;
+    return seatLayout.map((s) => (s.isHero ? { ...s, x: 42 } : s));
+  }, [seatLayout]);
+
+  const clearFilters = useCallback(() => {
+    setStats({ hits: 0, total: 0 });
+    if (spots.length > 0) {
+      const { hero, villain } = parseMatchup(spots[0].matchup);
+      if (hero) setHeroPos(hero);
+      if (villain) setVillainPos(villain);
+      setStackBb(spots[0].stackBb);
+    }
+    setPhaseKey("sbOpen");
+  }, [spots]);
+
+  // "Aplicar" (pedido explicito): confirma os filtros, fecha a gaveta e
+  // -- so' no celular -- entra no modo mesa-cheia. No desktop so' fecha a
+  // gaveta (nao existe modo mesa-cheia la', o layout de sempre continua).
+  const applyFilters = useCallback(() => {
+    setFiltersOpen(false);
+    if (isMobile) setFullscreenMode(true);
+  }, [isMobile]);
+
   return (
     <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 8, height: "100%", minHeight: 0, position: "relative" }}>
       <TreinoResponsiveStyles />
+
+      {/* Modo mesa-cheia (celular, pedido explicito: "ao aplicar, quero
+          que a mesa ocupe a tela inteira, pode ser um retangulo vertical
+          pra ocupar toda a tela"). Portal (foge de qualquer container com
+          overflow:hidden da pagina) -- mesmo padrao ja usado no
+          EvDetailsModal abaixo. So' entra na arvore quando ha uma mao de
+          verdade pra mostrar (round/currentPhase/tableHand prontos),
+          senao ficaria uma tela preta vazia se o jogador aplicasse o
+          filtro antes do spot carregar. */}
+      {fullscreenMode && isMobile && round && currentPhase && tableHand && fullscreenSeatLayout && (
+        <ModalPortal>
+          <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "#000", display: "flex", flexDirection: "column", fontFamily: F }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", flexShrink: 0 }}>
+              <button
+                onClick={() => {
+                  setFullscreenMode(false);
+                  setFiltersOpen(true);
+                }}
+                aria-label="Abrir filtros"
+                title="Abrir filtros"
+                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0 }}
+              >
+                <SlidersHorizontal size={15} strokeWidth={1.5} />
+              </button>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
+                {heroPos} vs {villainPos} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>· {stackBb}bb</span>
+              </span>
+              <span style={{ marginLeft: "auto", fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
+                {stats.hits}/{stats.total}
+                {stats.total > 0 ? ` · ${sessionPct}%` : ""}
+              </span>
+            </div>
+
+            <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+              <PokerTable
+                hand={tableHand}
+                seats={fullscreenSeatLayout}
+                variant="treino"
+                aspectRatio="3 / 5"
+                minSeatScale={0.75}
+                streetCommitments={streetCommitments}
+                chipAnimation={chipAnimation}
+              />
+
+              {chosen && verdict && displayLabel && displayColor && (
+                <VerdictCenterFlash
+                  label={displayLabel}
+                  color={displayColor}
+                  isGood={isGoodVerdict}
+                  freqPct={chosenFreqPct}
+                  onDetails={() => setDetailsOpen(true)}
+                />
+              )}
+
+              {/* Botoes de aposta a DIREITA, empilhados na vertical
+                  (pedido explicito: "os botoes de apostas ficam a
+                  direita, como e' nas plataformas") -- a mao do hero foi
+                  deslocada pra esquerda (fullscreenSeatLayout, x:42 em
+                  vez de 50) exatamente pra abrir esse espaco. Cada botao
+                  com uma cor solida diferente (pedido explicito: "todos
+                  mesmo tamanho um de cada cor") -- mesma paleta de acao
+                  ja usada no resto do produto (drill-theme ACT: fold
+                  cinza, call/acao correta verde, aposta/distrator azul).*/}
+              <div style={{ position: "absolute", right: 10, top: "74%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", gap: 8, zIndex: 40 }}>
+                {!chosen ? (
+                  <>
+                    <button onClick={() => setChosen("action")} style={fsActionBtnStyle("#1F9D6B")}>
+                      {actionLabel}
+                    </button>
+                    {DISTRACTOR_LABEL[phaseKey] && (
+                      <button onClick={() => setChosen("distractor")} style={fsActionBtnStyle("#2563EB")}>
+                        {DISTRACTOR_LABEL[phaseKey]}
+                      </button>
+                    )}
+                    <button onClick={() => setChosen("fold")} style={fsActionBtnStyle("#DC2626")}>
+                      Fold
+                    </button>
+                  </>
+                ) : (
+                  <button onClick={() => nextRound(currentPhase)} style={fsActionBtnStyle("#FFFFFF", "#111111")}>
+                    Próxima
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </ModalPortal>
+      )}
 
       {/* Cabeçalho sempre com conteúdo visível -- antes ficava
           literalmente vazio (uma faixa preta sem nada) enquanto o
@@ -654,21 +911,38 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
               <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
                 Filtros
               </span>
-              <button
-                onClick={() => {
-                  setStats({ hits: 0, total: 0 });
-                  if (spots.length > 0) {
-                    const { hero, villain } = parseMatchup(spots[0].matchup);
-                    if (hero) setHeroPos(hero);
-                    if (villain) setVillainPos(villain);
-                    setStackBb(spots[0].stackBb);
-                  }
-                  setPhaseKey("sbOpen");
-                }}
-                style={{ fontFamily: F, fontSize: 10.5, fontWeight: 500, color: "rgba(255,255,255,0.5)", background: "transparent", border: 0, padding: 0, cursor: "pointer" }}
-              >
-                Limpar filtros
-              </button>
+              {isMobile ? (
+                // Celular (pedido explicito: "ter botao de aplicar filtro
+                // no inicio da modal e limpar tambem, pode ser apenas
+                // icones") -- Aplicar fecha a gaveta e entra no modo
+                // mesa-cheia; Limpar reseta pra combinacao padrao sem
+                // fechar nada, pro jogador continuar escolhendo.
+                <div style={{ display: "flex", gap: 6 }}>
+                  <button
+                    onClick={clearFilters}
+                    title="Limpar filtros"
+                    aria-label="Limpar filtros"
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", cursor: "pointer" }}
+                  >
+                    <RotateCcw size={14} />
+                  </button>
+                  <button
+                    onClick={applyFilters}
+                    title="Aplicar filtros"
+                    aria-label="Aplicar filtros"
+                    style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#FFFFFF", border: "1px solid #FFFFFF", color: "#111111", cursor: "pointer" }}
+                  >
+                    <Check size={15} strokeWidth={2.5} />
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={clearFilters}
+                  style={{ fontFamily: F, fontSize: 10.5, fontWeight: 500, color: "rgba(255,255,255,0.5)", background: "transparent", border: 0, padding: 0, cursor: "pointer" }}
+                >
+                  Limpar filtros
+                </button>
+              )}
             </div>
 
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
@@ -806,7 +1080,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                 )}
 
                 <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-                  <PokerTable hand={tableHand} seats={seatLayout} variant="treino" />
+                  <PokerTable hand={tableHand} seats={seatLayout} variant="treino" streetCommitments={streetCommitments} chipAnimation={chipAnimation} />
                   {chosen && verdict && displayLabel && displayColor && (
                     <VerdictFlash label={displayLabel} color={displayColor} isGood={isGoodVerdict} freqPct={chosenFreqPct} />
                   )}

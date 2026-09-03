@@ -22,9 +22,17 @@ import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
 // ilegivel, entao a mesa aceita ficar um pouco mais apertada em vez de
 // continuar encolhendo.
 const BASE_TABLE_WIDTH_PX = 900;
-const MIN_SEAT_SCALE = 0.4;
+const DEFAULT_MIN_SEAT_SCALE = 0.4;
 
-function useSeatScale(ref: React.RefObject<HTMLElement | null>) {
+// `minScale` (pedido pelo modo mesa-cheia do Treino no celular): o piso
+// padrao (0.4) foi calibrado pra mesa cheia de assentos com carta E nome
+// disputando espaco de verdade -- no modo mesa-cheia so' hero e vilao tem
+// conteudo de peso (os outros 6 assentos do anel 8-max ficam vazios/
+// foscos, so' o nome pequeno), entao o piso padrao encolhia hero/vilao
+// mais do que precisava. Um piso mais alto (ex: 0.75) protege so' os
+// assentos vazios da lateral (que ficam apertados numa mesa estreita em
+// pe) sem esmagar quem de fato importa olhar.
+function useSeatScale(ref: React.RefObject<HTMLElement | null>, minScale: number = DEFAULT_MIN_SEAT_SCALE) {
   const [scale, setScale] = useState(1);
   useEffect(() => {
     const el = ref.current;
@@ -32,11 +40,11 @@ function useSeatScale(ref: React.RefObject<HTMLElement | null>) {
     const observer = new ResizeObserver((entries) => {
       const width = entries[0]?.contentRect.width;
       if (!width) return;
-      setScale(Math.min(1, Math.max(MIN_SEAT_SCALE, width / BASE_TABLE_WIDTH_PX)));
+      setScale(Math.min(1, Math.max(minScale, width / BASE_TABLE_WIDTH_PX)));
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [ref]);
+  }, [ref, minScale]);
   return scale;
 }
 
@@ -585,19 +593,32 @@ export function PokerTable({
   chipAnimation,
   streetCommitments,
   variant = "replay",
+  // Retangulo deitado (8/5) por padrao -- mesa normal na tela toda em
+  // qualquer contexto ate agora. O modo tela-cheia do Treino no celular
+  // (pedido explicito: "mesa ocupe a tela inteira, pode ser um retangulo
+  // vertical") precisa de um formato em pe' — em vez de duplicar todo o
+  // desenho da mesa so' pra isso, a proporcao vira parametro.
+  aspectRatio = "8 / 5",
+  // Piso do auto-encolhimento por largura (ver useSeatScale acima) --
+  // ajustavel pra contextos onde os assentos "peso leve" (vazios/foscos)
+  // sao maioria, como o modo mesa-cheia do Treino (anel 8-max, so' hero e
+  // vilao com conteudo de verdade).
+  minSeatScale,
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
   chipAnimation?: { fromPosLabel: string; amount: number; key: string | number } | null;
   streetCommitments?: Record<string, number>;
   variant?: TableVariant;
+  aspectRatio?: string;
+  minSeatScale?: number;
 }) {
   const active = !!hand;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
   const felt = FELT_PALETTES[variant];
   const tableBoxRef = useRef<HTMLDivElement>(null);
-  const seatScale = useSeatScale(tableBoxRef);
+  const seatScale = useSeatScale(tableBoxRef, minSeatScale);
 
   return (
     <div style={{ position: "relative", display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
@@ -633,7 +654,7 @@ export function PokerTable({
           width: "100%",
           maxWidth: "100%",
           maxHeight: "100%",
-          aspectRatio: "8 / 5",
+          aspectRatio,
           margin: "auto",
           overflow: "hidden",
           borderRadius: TABLE_CORNER_RADIUS,
