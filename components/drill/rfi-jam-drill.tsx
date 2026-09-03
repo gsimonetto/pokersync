@@ -244,23 +244,18 @@ function VerdictCenterFlash({
   return (
     <div style={{ position: "absolute", top: "29%", left: "50%", transform: "translate(-50%, -50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "none", zIndex: 60 }}>
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, animation: "verdictPop 320ms cubic-bezier(0.22, 1.4, 0.36, 1) both" }}>
-        {/* FIX (pedido explicito: "o verde por fora esta cortando, traga
-            glow numa transicao sutil") -- o glow antigo (inset:-20,
-            fade so' a partir de 72% do raio) ainda tinha cor visivel
-            perto da borda do circulo; quando esse circulo esbarrava no
-            contorno arredondado da mesa (overflow:hidden), a cor sumia
-            de repente em vez de desvanecer, lendo como "corte". Raio
-            maior (-46) + fade começando mais cedo (35%) faz a cor
-            already estar quase zero bem antes de qualquer borda —
-            e a propria opacidade do glow entra com fade-in proprio
-            (verdictGlowIn, mais lento que o pop do icone/texto), pra
-            a transicao ficar sutil em vez de aparecer de golpe. */}
-        <div
-          aria-hidden="true"
-          style={{ position: "absolute", inset: -46, borderRadius: "50%", background: `radial-gradient(circle, ${color}26 0%, ${color}0d 35%, transparent 65%)`, animation: "verdictGlowIn 700ms ease-out both", pointerEvents: "none" }}
-        />
-        <Icon size={26} color={color} strokeWidth={2.2} style={{ flexShrink: 0, filter: `drop-shadow(0 0 12px ${color}aa)` }} />
-        <span style={{ fontFamily: F, color: "#FFFFFF", fontWeight: 800, fontSize: 16, whiteSpace: "nowrap", textShadow: "0 2px 14px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)" }}>{label}</span>
+        {/* FIX (pedido explicito, 2a rodada: "feedback vindo com brilho
+            que esta sendo cortado em volta da nomenclatura, pode tirar
+            ele e manter apenas o glow na tipografia") -- o circulo de
+            glow atras do icone (radial-gradient absoluto) ficava maior
+            que o texto do rotulo, e continuava sendo cortado pelo
+            contorno arredondado da mesa (overflow:hidden) mesmo depois
+            do raio maior da rodada anterior. Removido por completo -- o
+            brilho agora vem so' da propria tipografia (text-shadow
+            colorido no rotulo, drop-shadow colorido no icone), que nunca
+            ultrapassa a caixa do texto e por isso nunca "corta". */}
+        <Icon size={26} color={color} strokeWidth={2.2} style={{ flexShrink: 0, filter: `drop-shadow(0 0 10px ${color}cc)` }} />
+        <span style={{ fontFamily: F, color: "#FFFFFF", fontWeight: 800, fontSize: 16, whiteSpace: "nowrap", textShadow: `0 0 14px ${color}bb, 0 2px 14px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)` }}>{label}</span>
         {freqPct != null && (
           <span style={{ fontFamily: F, color: "rgba(255,255,255,.65)", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", textShadow: "0 2px 10px rgba(0,0,0,.85)" }}>{freqPct}%</span>
         )}
@@ -274,7 +269,6 @@ function VerdictCenterFlash({
       </button>
       <style>{`
         @keyframes verdictPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
-        @keyframes verdictGlowIn { from { opacity: 0; } to { opacity: 1; } }
       `}</style>
     </div>
   );
@@ -696,23 +690,6 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     }
   }, [activeHeroSeat]);
 
-  const tableHand: TableHand | null = useMemo(() => {
-    if (!spot || !round) return null;
-    const heroCards = classToDisplayCards(round.label);
-    const seats: Record<string, SeatState> = {};
-    ALL_POSITIONS.forEach((pos) => {
-      if (pos === activeHeroSeat) {
-        seats[pos] = { status: chosen ? "live" : "acting", stack: spot.effectiveStack, cards: heroCards };
-      } else if (pos === activeVillainSeat) {
-        seats[pos] = { status: "live", stack: spot.effectiveStack };
-      } else {
-        seats[pos] = { status: "empty" };
-      }
-    });
-    const spr = spot.pot > 0 ? Math.round((spot.effectiveStack / spot.pot) * 10) / 10 : null;
-    return { pot: spot.pot, spr, board: [], history: [], seats };
-  }, [spot, round, chosen, activeHeroSeat, activeVillainSeat]);
-
   // FIX (bug reportado): "no filtro de all-in ou aposta do vilao, os
   // blinds nao estao sendo somados na mesa e nem a animacao das fichas
   // esta vindo". Antes o tableHand nunca preenchia streetCommitments nem
@@ -752,6 +729,37 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     return { [activeHeroSeat]: decidingBlind, [activeVillainSeat]: villainCommitted };
   }, [spot, phaseKey, heroPos, villainPos, activeHeroSeat, activeVillainSeat, seatBlind]);
 
+  // FIX (bug reportado): "o SPR no celular esta errado, esta fixo um
+  // valor que nao condiz" + "o pote precisa contar tanto a aposta do bb
+  // + 0,5 do sb". `spot.pot` e' um numero FIXO por spot (so' os blinds
+  // iniciais -- ver comentario acima sobre streetCommitments), entao
+  // pot/SPR ficavam sempre com o mesmo valor de baseline, nao importa a
+  // fase/acao. O pote de verdade e' a soma do que cada lado ja colocou
+  // na mesa -- os mesmos valores que streetCommitments ja calcula pra
+  // desenhar as fichas -- entao o pote exibido (e o SPR derivado dele)
+  // agora usa essa soma em vez do campo fixo do spot.
+  const potBb = useMemo(() => {
+    if (!streetCommitments) return spot?.pot ?? 0;
+    return Object.values(streetCommitments).reduce((sum, v) => sum + v, 0);
+  }, [streetCommitments, spot]);
+
+  const tableHand: TableHand | null = useMemo(() => {
+    if (!spot || !round) return null;
+    const heroCards = classToDisplayCards(round.label);
+    const seats: Record<string, SeatState> = {};
+    ALL_POSITIONS.forEach((pos) => {
+      if (pos === activeHeroSeat) {
+        seats[pos] = { status: chosen ? "live" : "acting", stack: spot.effectiveStack, cards: heroCards };
+      } else if (pos === activeVillainSeat) {
+        seats[pos] = { status: "live", stack: spot.effectiveStack };
+      } else {
+        seats[pos] = { status: "empty" };
+      }
+    });
+    const spr = potBb > 0 ? Math.round((spot.effectiveStack / potBb) * 10) / 10 : null;
+    return { pot: potBb, spr, board: [], history: [], seats };
+  }, [spot, round, chosen, activeHeroSeat, activeVillainSeat, potBb]);
+
   // Ficha voando do assento que ja agiu (activeVillainSeat) ate' o pote —
   // so' nas fases onde alguem ja jogou antes do jogador decidir (bbJam:
   // abertura; sbCallJam: jam). A key muda a cada mao nova (round.label +
@@ -788,7 +796,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   // visualmente "presos" mais perto do centro enquanto o heroi ja tinha
   // ido pra beira. radiusY subiu de 30 pra 36 pra a metade de baixo do
   // anel acompanhar a mesma agressividade.
-  const FULLSCREEN_RING = useMemo(() => ({ radiusYTop: 38, radiusY: 36, radiusX: 40 }), []);
+  // FIX (2a rodada, pedido explicito: "os seats ao lado do hero ainda
+  // estao desalinhados... os seats que estao proximos a silhueta da
+  // mesa (quando faz a curva) nao estao na borda, estao mais pro
+  // centro") -- `exponent` mais alto (16, ver ellipseSeatCoords em
+  // seat-layout.ts) puxa so' os assentos DIAGONAIS (vizinhos do heroi)
+  // pra mais perto da borda de verdade, sem mexer nos assentos que ja
+  // caem certos nos eixos (topo/base/laterais).
+  const FULLSCREEN_RING = useMemo(() => ({ radiusYTop: 38, radiusY: 36, radiusX: 40, exponent: 16 }), []);
   const fullscreenSeatLayoutBase = useMemo(() => {
     try {
       return computeStylizedSeatLayout(activeHeroSeat, FULLSCREEN_RING);
