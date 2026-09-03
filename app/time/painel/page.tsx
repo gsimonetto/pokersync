@@ -317,7 +317,7 @@ function PainelConteudo() {
                   onChange={carregar} onErro={setErro} />
               )}
               {aba === "time" && info && (
-                <TabTime info={info} staff={staff} labels={labels} podeEditar={time?.role !== "player"}
+                <TabTime info={info} staff={staff} labels={labels} jogadores={jogadores} podeEditar={time?.role !== "player"}
                   onChange={carregar} onErro={setErro} />
               )}
             </>
