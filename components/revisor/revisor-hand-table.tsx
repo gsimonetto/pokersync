@@ -2,11 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers, Users } from "lucide-react";
+import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { ShareHandModal } from "./share-hand-modal";
+import { OpponentStatsModal } from "./opponent-stats-modal";
 import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
-import { fetchOpponentsStatsForHand, isSmallSample, type OpponentStats } from "@/lib/services/opponent-stats-service";
+import { fetchOpponentsStatsForHand, type OpponentStats } from "@/lib/services/opponent-stats-service";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
@@ -137,103 +138,6 @@ function ChipButton({
   );
 }
 
-// Uma célula de estatística dentro do card de oponente (rótulo pequeno
-// em cima, valor em destaque embaixo) -- mesmo padrão visual usado nos
-// badges de posição/ação da mesa.
-function StatCell({ label, value, suffix = "%" }: { label: string; value: number | null; suffix?: string }) {
-  return (
-    <div style={{ textAlign: "center", minWidth: 0 }}>
-      <div style={{ fontSize: 9, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>{label}</div>
-      <div style={{ fontSize: 12.5, fontWeight: 600, color: "rgba(255,255,255,0.85)", ...num }}>
-        {value == null ? "—" : `${value}${suffix}`}
-      </div>
-    </div>
-  );
-}
-
-// Card de perfil de UM oponente sentado na mesa -- VPIP/PFR/3-Bet
-// (preflop) + C-Bet/Fold-to-C-Bet/AF (pós-flop), agregado de TODAS as
-// mãos já revisadas contra esse nome (não só a mão atual). Amostra
-// pequena (<10 mãos) ganha um aviso, porque estatística de poker com
-// poucas mãos engana mais do que ajuda.
-function OpponentStatCard({ stats }: { stats: OpponentStats }) {
-  const small = isSmallSample(stats);
-  return (
-    <div
-      style={{
-        flexShrink: 0,
-        minWidth: 210,
-        padding: "10px 12px",
-        borderRadius: 10,
-        border: "1px solid rgba(255,255,255,0.08)",
-        background: "rgba(255,255,255,0.03)",
-      }}
-    >
-      <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 6, marginBottom: 8 }}>
-        <span
-          style={{ fontSize: 12.5, fontWeight: 600, color: "#FFFFFF", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
-          title={stats.opponentName}
-        >
-          {stats.opponentName}
-        </span>
-        <span style={{ fontSize: 10, color: small ? T.warn : "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
-          {stats.handsCount} mão{stats.handsCount === 1 ? "" : "s"}
-        </span>
-      </div>
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(3, 1fr)", gap: 6 }}>
-        <StatCell label="VPIP" value={stats.vpipPct} />
-        <StatCell label="PFR" value={stats.pfrPct} />
-        <StatCell label="3-Bet" value={stats.threeBetPct} />
-        <StatCell label="C-Bet" value={stats.cbetFlopPct} />
-        <StatCell label="Fold cB" value={stats.foldToCbetFlopPct} />
-        <StatCell label="AF" value={stats.aggressionFactor} suffix="" />
-      </div>
-      {small && (
-        <div style={{ marginTop: 6, fontSize: 10, color: T.warn, lineHeight: 1.4 }}>Amostra pequena — leia com cautela.</div>
-      )}
-    </div>
-  );
-}
-
-// Faixa horizontal com o perfil de cada oponente sentado nessa mão
-// específica (decisão de produto: dentro do replay, não uma página à
-// parte -- ver backlog "Estatísticas de oponente"). Some sozinha
-// quando ninguém na mesa tem histórico ainda -- não polui a tela com
-// cards vazios pra jogador nunca visto antes.
-function OpponentStatsRow({ parsedHand }: { parsedHand: ParsedHand }) {
-  const [stats, setStats] = useState<OpponentStats[]>([]);
-
-  useEffect(() => {
-    let cancelled = false;
-    fetchOpponentsStatsForHand(parsedHand)
-      .then((rows) => {
-        if (!cancelled) setStats(rows);
-      })
-      .catch(() => {
-        if (!cancelled) setStats([]);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [parsedHand]);
-
-  if (stats.length === 0) return null;
-
-  return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 6, flexShrink: 0 }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 5, fontSize: 11, color: "rgba(255,255,255,0.45)" }}>
-        <Users size={12} />
-        Perfil dos oponentes nessa mesa
-      </div>
-      <div style={{ display: "flex", gap: 8, overflowX: "auto", paddingBottom: 2 }}>
-        {stats.map((s) => (
-          <OpponentStatCard key={s.opponentName} stats={s} />
-        ))}
-      </div>
-    </div>
-  );
-}
-
 export function RevisorHandTable({
   parsedHand,
   tournamentName,
@@ -284,6 +188,27 @@ export function RevisorHandTable({
   // destino dos dois casos (aba "Salvos", ver revisor-spots-salvos.tsx).
   const [saved, setSaved] = useState(false);
   const [savingSpot, setSavingSpot] = useState(false);
+
+  // Perfil dos oponentes sentados nessa mão (VPIP/PFR/3-Bet aparecem
+  // direto no assento; o resto só na modal, ver opponentClicked abaixo).
+  // Mapa por nome pra o PokerTable so' precisar de um lookup por assento.
+  const [opponentStats, setOpponentStats] = useState<Record<string, OpponentStats>>({});
+  const [opponentClicked, setOpponentClicked] = useState<OpponentStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOpponentsStatsForHand(parsedHand)
+      .then((rows) => {
+        if (cancelled) return;
+        setOpponentStats(Object.fromEntries(rows.map((r) => [r.opponentName, r])));
+      })
+      .catch(() => {
+        if (!cancelled) setOpponentStats({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [parsedHand]);
 
   useEffect(() => {
     if (!reviewId) {
@@ -623,11 +548,16 @@ export function RevisorHandTable({
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. */}
         <div style={{ flex: 1, minHeight: 0 }}>
-          <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
+          <PokerTable
+            hand={replayState.tableHand}
+            seats={replayState.seatLayout}
+            chipAnimation={chipAnimation}
+            streetCommitments={replayState.streetCommitments}
+            opponentStats={opponentStats}
+            onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
+          />
         </div>
       </div>
-
-      <OpponentStatsRow parsedHand={parsedHand} />
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
         {trainHref ? (
@@ -657,6 +587,8 @@ export function RevisorHandTable({
       {reviewId && (
         <ShareHandModal open={shareModalOpen} reviewId={reviewId} onClose={() => setShareModalOpen(false)} />
       )}
+
+      <OpponentStatsModal stats={opponentClicked} onClose={() => setOpponentClicked(null)} />
     </div>
   );
 }

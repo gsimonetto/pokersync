@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Info } from "lucide-react";
 import { Card } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
+import type { OpponentStats } from "@/lib/services/opponent-stats-service";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -390,7 +392,7 @@ function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
 }
 
 function Seat({
-  seat, state, isDealer, pot, scale, heroScale = 1,
+  seat, state, isDealer, pot, scale, heroScale = 1, opponentStats, onOpponentClick,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
@@ -401,6 +403,12 @@ function Seat({
   // do hero pode ser um pouco maior") -- multiplica em cima do `scale`
   // geral (responsivo por largura da mesa), nao o substitui.
   heroScale?: number;
+  // Perfil consolidado do oponente sentado nesse assento, se ja existir
+  // (Revisor de Maos) -- so' preenchido pra assentos nao-hero com
+  // historico. Ausente (undefined) em qualquer outro contexto (Treino),
+  // que nunca passa esses props.
+  opponentStats?: OpponentStats;
+  onOpponentClick?: (playerName: string) => void;
 }) {
   const posCol = POS[seat.posLabel];
   const { status = "empty", stack, action, cards } = state;
@@ -503,12 +511,42 @@ function Seat({
         >
           {seat.playerName && (
             <>
-              <span
-                style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}
-                title={seat.playerName}
-              >
-                {truncateName(seat.playerName)}
-              </span>
+              {(() => {
+                // Clicavel so' quando ja existe perfil pra mostrar --
+                // sem isso o icone/clique nao levaria a lugar nenhum.
+                const clickable = !hero && !!opponentStats && !!onOpponentClick;
+                return (
+                  <span
+                    onClick={clickable ? () => onOpponentClick!(seat.playerName!) : undefined}
+                    title={clickable ? `Ver estatísticas completas de ${seat.playerName}` : seat.playerName}
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      gap: 3,
+                      cursor: clickable ? "pointer" : "default",
+                      maxWidth: 110,
+                    }}
+                  >
+                    <span style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      {truncateName(seat.playerName)}
+                    </span>
+                    {/* Icone discreto so' pra sinalizar "isso e' clicavel /
+                        tem mais informacao" -- pedido explicito ("precisa
+                        ter um icone bem sutil"), opacidade baixa de proposito. */}
+                    {clickable && <Info size={9} style={{ opacity: 0.5, flexShrink: 0 }} />}
+                  </span>
+                );
+              })()}
+              {/* Trio compacto VPIP/PFR/3-Bet -- pedido explicito ("nao
+                  ficar apertado", so' 3 numeros na tela principal; o
+                  resto das estatisticas fica na modal do clique). Mesma
+                  notacao "38/22/8" usada por trackers de mercado
+                  (Hold'em Manager/PokerTracker). */}
+              {!hero && opponentStats && (
+                <span style={{ fontSize: 9.5, color: "rgba(255,255,255,.55)", ...num }} title="VPIP / PFR / 3-Bet">
+                  {opponentStats.vpipPct ?? "—"}/{opponentStats.pfrPct ?? "—"}/{opponentStats.threeBetPct ?? "—"}
+                </span>
+              )}
               <div
                 style={{
                   width: "100%",
@@ -705,6 +743,11 @@ export function PokerTable({
   // curva suave. Cada aspectRatio precisa do proprio par calibrado;
   // culpa de quem desenha a mesa nessa proporcao passar o valor certo.
   cornerRadius = "10% / 16%",
+  // Perfil dos oponentes sentados na mesa, por nome (Revisor de Maos) --
+  // ausente em qualquer outro consumidor (Treino), que so' desenha
+  // ranges GTO e nao tem esse conceito.
+  opponentStats,
+  onOpponentClick,
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
@@ -715,6 +758,8 @@ export function PokerTable({
   minSeatScale?: number;
   heroScale?: number;
   cornerRadius?: string;
+  opponentStats?: Record<string, OpponentStats>;
+  onOpponentClick?: (playerName: string) => void;
 }) {
   const active = !!hand;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
@@ -932,6 +977,8 @@ export function PokerTable({
             pot={hand?.pot ?? 0}
             scale={seatScale}
             heroScale={heroScale}
+            opponentStats={s.playerName ? opponentStats?.[s.playerName] : undefined}
+            onOpponentClick={onOpponentClick}
           />
         ))}
 
