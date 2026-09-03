@@ -8,13 +8,16 @@ import { createClient } from "@/lib/supabase/server";
 import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
 
+// Campos em comum entre /hands/compute_cev (heads-up) e
+// /hands/compute_cev_multiway (3+ jogadores) -- só esses são gravados em
+// hand_ev_results; os dois endpoints devolvem mais alguns campos
+// específicos (ex: hero_icm_if_win_dollars só existe no heads-up, onde só
+// há 2 desfechos possíveis) que não usamos aqui.
 interface SolverCevResponse {
   hero_equity_pct: number;
   chips_at_risk: number;
   hero_expected_chip_delta: number;
   hero_icm_baseline_dollars: number;
-  hero_icm_if_win_dollars: number;
-  hero_icm_if_lose_dollars: number;
   hero_expected_icm_dollars: number;
   hero_expected_icm_delta_dollars: number;
 }
@@ -51,7 +54,7 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       eligible: false,
-      reason: "Não é um all-in heads-up preflop com as duas mãos mostradas — fora do escopo do cálculo hoje.",
+      reason: "Não é um all-in preflop com as mãos de todos os envolvidos mostradas no showdown — fora do escopo do cálculo hoje.",
     });
   }
 
@@ -95,19 +98,34 @@ export async function POST(request: Request) {
     });
   }
 
-  let solverResult: SolverCevResponse;
-  try {
-    const res = await fetch(`${solverUrl}/hands/compute_cev`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json", "X-API-Key": solverKey },
-      body: JSON.stringify({
-        hero_combo: confrontation.heroCombo,
-        villain_combo: confrontation.villainCombo,
-        hero_stack_before: confrontation.heroStackBefore,
-        villain_stack_before: confrontation.villainStackBefore,
+  // Heads-up (2 jogadores) usa o endpoint original (fórmula fechada,
+  // <1s); 3+ jogadores usa o endpoint multiway (Monte Carlo com ICM por
+  // iteração, ~1-2s — ver pokersync-solver/engine/hand_cev_multiway.py).
+  const isMultiway = confrontation.combos.length > 2;
+  const endpoint = isMultiway ? "/hands/compute_cev_multiway" : "/hands/compute_cev";
+  const payload = isMultiway
+    ? {
+        combos: confrontation.combos,
+        stacks_before: confrontation.stacksBefore,
+        hero_idx: confrontation.heroIdx,
         other_stacks: confrontation.otherStacks,
         payouts,
-      }),
+      }
+    : {
+        hero_combo: confrontation.combos[confrontation.heroIdx],
+        villain_combo: confrontation.combos[1 - confrontation.heroIdx],
+        hero_stack_before: confrontation.stacksBefore[confrontation.heroIdx],
+        villain_stack_before: confrontation.stacksBefore[1 - confrontation.heroIdx],
+        other_stacks: confrontation.otherStacks,
+        payouts,
+      };
+
+  let solverResult: SolverCevResponse;
+  try {
+    const res = await fetch(`${solverUrl}${endpoint}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json", "X-API-Key": solverKey },
+      body: JSON.stringify(payload),
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
