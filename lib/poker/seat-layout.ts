@@ -158,7 +158,7 @@ function clockwiseOccupiedSeats(seats: ParsedSeat[], buttonSeatNumber: number, m
 // isso que RingConfig existe: quem desenha um anel numa proporcao muito
 // diferente da 8/5 padrao passa os proprios raios em vez de aceitar o
 // default.
-type RingConfig = { centerY?: number; radiusX?: number; radiusY?: number; radiusYTop?: number };
+type RingConfig = { centerY?: number; radiusX?: number; radiusY?: number; radiusYTop?: number; exponent?: number };
 
 function ellipseSeatCoords(n: number, config: RingConfig = {}): { x: number; y: number; cardSide: CardSide }[] {
   const centerX = 50;
@@ -194,7 +194,20 @@ function ellipseSeatCoords(n: number, config: RingConfig = {}): { x: number; y: 
     // normal), eleva cada um a 2/expoente mantendo o sinal — quanto
     // maior o expoente, mais a curva "achata" nos lados e concentra a
     // curvatura nos cantos (formato de retangulo arredondado).
-    const p = 2 / SUPERELLIPSE_EXPONENT;
+    // FIX (pedido explicito: "os seats ao lado do hero ainda estão
+    // desalinhados... os seats que estao proximos a silhueta da mesa
+    // (quando faz a curva) nao estao na borda, estao mais pro centro") --
+    // no modo mesa-cheia (retangulo bem mais alto que largo), o expoente
+    // padrao (4) deixava os assentos diagonais (vizinhos do heroi) longe
+    // demais da borda real, porque a curva parametrica so' se aproxima
+    // do canto verdadeiro aos poucos com o expoente -- valores maiores
+    // "achatam" mais a curva pros cantos, aproximando o assento
+    // diagonal da borda sem mexer nos assentos que ja caem exatamente
+    // nos eixos (topo/base/laterais, onde cos ou sin já valem 0 ou ±1
+    // independente do expoente). `exponent` no RingConfig deixa quem
+    // desenha um anel de proporcao muito diferente (mesa-cheia) usar um
+    // valor maior so' ali, sem mudar o anel padrao das mesas deitadas.
+    const p = 2 / (config.exponent ?? SUPERELLIPSE_EXPONENT);
     const cosP = Math.sign(cos) * Math.abs(cos) ** p;
     const sinP = Math.sign(sin) * Math.abs(sin) ** p;
     const x = centerX + radiusX * cosP;
