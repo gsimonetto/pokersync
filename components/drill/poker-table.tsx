@@ -3,9 +3,9 @@
 import { useEffect, useRef, useState } from "react";
 import { Info } from "lucide-react";
 import { Card } from "./card";
-import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
+import { F, POS, ACT, T, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
-import type { OpponentStats } from "@/lib/services/opponent-stats-service";
+import { classifyOpponentStyle, type OpponentStats } from "@/lib/services/opponent-stats-service";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -438,14 +438,22 @@ function Seat({
     </div>
   );
 
-  // Chip de HUD com o perfil do oponente -- pedido explicito: "acima do
-  // nick", como os trackers de mercado fazem (HM3/PT4 flutuam o HUD por
-  // cima do assento, separado da placa de nome). Clicavel (leva pra
-  // modal com o perfil completo); o icone de info fica dentro do proprio
-  // chip, que ja e' o sinal visual principal de "tem mais informacao".
-  // Contraste alto de proposito (texto quase branco, fundo solido) --
-  // versao anterior (numeros dentro da placa de nome) ficou apagada
-  // demais pra ler de relance.
+  // Cor do chip de HUD por estilo de jogo do oponente -- classificado
+  // pelo Aggression Factor (unico numero que ja temos que mede
+  // agressividade pos-flop de forma direta): verde = dentro da faixa
+  // balanceada, vermelho = agressivo, amarelo = passivo. Sem dado
+  // suficiente (AF null) cai em "balanced" (verde neutro) em vez de
+  // arriscar uma cor que sugira algo que a amostra nao sustenta.
+  const OPPONENT_STYLE_COLOR = { aggressive: T.bad, passive: T.warn, balanced: T.ok } as const;
+  const opponentStyleColor = opponentStats ? OPPONENT_STYLE_COLOR[classifyOpponentStyle(opponentStats)] : T.ok;
+
+  // Chip de HUD com o perfil do oponente -- pedido explicito: entre a
+  // tag de posicao e a placa de nome (nao em cima da posicao). Clicavel
+  // (leva pra modal com o perfil completo); o icone de info fica dentro
+  // do proprio chip, que ja e' o sinal visual principal de "tem mais
+  // informacao". Glow + cor da borda/numeros seguem o estilo do
+  // oponente (ver OPPONENT_STYLE_COLOR acima) -- fundo continua solido
+  // escuro pra manter contraste alto de leitura em qualquer cor.
   const opponentHudChip =
     !hero && opponentStats ? (
       <div
@@ -460,23 +468,22 @@ function Seat({
           fontFamily: F,
           fontSize: 11,
           fontWeight: 700,
-          color: "#FFFFFF",
+          color: opponentStyleColor,
           background: "rgba(10,10,12,0.88)",
-          border: "1px solid rgba(255,255,255,0.28)",
-          boxShadow: "0 3px 8px rgba(0,0,0,.55)",
+          border: `1px solid ${opponentStyleColor}99`,
+          boxShadow: `0 0 10px ${opponentStyleColor}66, 0 3px 8px rgba(0,0,0,.55)`,
           cursor: onOpponentClick ? "pointer" : "default",
           whiteSpace: "nowrap",
           ...num,
         }}
       >
         {opponentStats.vpipPct ?? "—"}/{opponentStats.pfrPct ?? "—"}/{opponentStats.threeBetPct ?? "—"}
-        <Info size={10} style={{ opacity: 0.75, flexShrink: 0 }} />
+        <Info size={10} style={{ opacity: 0.85, flexShrink: 0 }} />
       </div>
     ) : null;
 
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-      {opponentHudChip}
       <div style={{ position: "relative" }}>
         {isDealer && (
           <div
@@ -525,6 +532,8 @@ function Seat({
           {seat.posLabel}
         </div>
       </div>
+
+      {opponentHudChip}
 
       {!empty && (
         <div

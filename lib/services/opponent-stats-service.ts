@@ -34,6 +34,31 @@ export function isSmallSample(stats: Pick<OpponentStats, "handsCount">): boolean
   return stats.handsCount < MIN_RELIABLE_HANDS;
 }
 
+// Classificacao de estilo por Aggression Factor -- pedido explicito
+// (verde/vermelho/amarelo no chip da mesa e na modal). AF ((bet+raise)/
+// call pós-flop) é o único número que já calculamos que mede
+// agressividade de forma direta; limiares abaixo de 1 (mais call que
+// bet/raise) e acima de 2 (bem mais bet/raise que call) são os cortes
+// de mercado mais comuns pra "passivo"/"agressivo" -- entre os dois cai
+// em "balanced" (dentro da faixa esperada). Sem AF (amostra sem mão
+// pós-flop ainda) cai em "balanced" por padrão, em vez de arriscar uma
+// cor que a amostra não sustenta.
+export type OpponentStyle = "aggressive" | "passive" | "balanced";
+
+export function classifyOpponentStyle(stats: Pick<OpponentStats, "aggressionFactor">): OpponentStyle {
+  const af = stats.aggressionFactor;
+  if (af == null) return "balanced";
+  if (af > 2) return "aggressive";
+  if (af < 1) return "passive";
+  return "balanced";
+}
+
+export const OPPONENT_STYLE_LABEL: Record<OpponentStyle, string> = {
+  aggressive: "Agressivo",
+  passive: "Passivo",
+  balanced: "Equilibrado",
+};
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRow(row: any): OpponentStats {
   return {

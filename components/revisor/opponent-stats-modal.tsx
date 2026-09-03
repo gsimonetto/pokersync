@@ -2,7 +2,24 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import { isSmallSample, type OpponentStats } from "@/lib/services/opponent-stats-service";
+import {
+  isSmallSample,
+  classifyOpponentStyle,
+  OPPONENT_STYLE_LABEL,
+  type OpponentStats,
+  type OpponentStyle,
+} from "@/lib/services/opponent-stats-service";
+
+// Mesma classificacao/cor do chip na mesa (ver poker-table.tsx) --
+// consistencia entre onde o jogador primeiro ve o dado (chip) e onde
+// ve o detalhe (aqui). Tailwind nao tem token de amarelo no design
+// system geral (so' positive/negative), entao "passivo" usa amber-400
+// direto, mesmo tom ja usado no aviso de amostra pequena logo abaixo.
+const STYLE_BADGE_CLASS: Record<OpponentStyle, string> = {
+  aggressive: "bg-negative/15 text-negative border-negative/30",
+  passive: "bg-amber-400/15 text-amber-400 border-amber-400/30",
+  balanced: "bg-positive/15 text-positive border-positive/30",
+};
 
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v}%`;
@@ -33,6 +50,7 @@ export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | 
 
   if (!stats) return null;
   const small = isSmallSample(stats);
+  const style = classifyOpponentStyle(stats);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/70 px-4 backdrop-blur-sm">
@@ -46,9 +64,14 @@ export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | 
             <X size={16} />
           </button>
         </div>
-        <p className="mt-0.5 text-[11px] text-muted">
-          {stats.handsCount} mão{stats.handsCount === 1 ? "" : "s"} jogada{stats.handsCount === 1 ? "" : "s"} contra você
-        </p>
+        <div className="mt-1.5 flex items-center gap-2">
+          <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${STYLE_BADGE_CLASS[style]}`}>
+            {OPPONENT_STYLE_LABEL[style]}
+          </span>
+          <p className="text-[11px] text-muted">
+            {stats.handsCount} mão{stats.handsCount === 1 ? "" : "s"} jogada{stats.handsCount === 1 ? "" : "s"} contra você
+          </p>
+        </div>
         {small && <p className="mt-1.5 text-[11px] text-amber-400">Amostra pequena — leia com cautela.</p>}
 
         <div className="mt-3 flex flex-col">
