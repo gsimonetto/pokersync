@@ -11,7 +11,7 @@ import { Kpi } from "@/components/time/kpi";
 import { HeroMetric } from "@/components/time/hero-metric";
 import { PeriodSelector } from "@/components/period-selector";
 import {
-  diasSemAtividade,
+  calcularScore,
   type FinancialDay,
   type PeriodComparison,
   type TeamActivityDay,
@@ -35,8 +35,6 @@ import { BRL, variacao } from "@/lib/format";
 // 4. Assistente do coach por ultimo, largura cheia (Top do periodo foi
 //    removido daqui por pedido explicito -- ranking mora na aba
 //    Jogadores).
-
-const INATIVO_DIAS = 7;
 
 export function TabVisaoGeral({
   teamId,
@@ -70,10 +68,9 @@ export function TabVisaoGeral({
   const revisadas = jogadores.reduce((a, j) => a + j.maosRevisadas, 0);
   const jogos = jogadores.reduce((a, j) => a + j.jogosNoTime, 0);
   const lucro = jogadores.reduce((a, j) => a + j.lucroNoTime, 0);
-  const inativos = jogadores.filter((j) => {
-    const d = diasSemAtividade(j.lastActivityAt);
-    return d === null || d >= INATIVO_DIAS;
-  }).length;
+  const scores = jogadores.map(calcularScore);
+  const scoreMedio = scores.length > 0 ? Math.round(scores.reduce((a, s) => a + s.valor, 0) / scores.length) : null;
+  const emRiscoAlto = scores.filter((s) => s.risco === "alto").length;
   const acertoPct = treinos > 0 ? Math.round((acertos / treinos) * 100) : null;
 
   const varTreinos = variacao(comparacao?.treinosAtual, comparacao?.treinosAnterior);
@@ -130,10 +127,10 @@ export function TabVisaoGeral({
             hint={varRevisadas != null ? `${varRevisadas > 0 ? "+" : ""}${varRevisadas}% vs período anterior` : undefined}
           />
           <HeroMetric
-            label="Precisam de atenção"
-            value={String(inativos)}
-            tone={inativos > 0 ? "ruim" : "neutro"}
-            hint={`${jogadores.length - inativos} ativos`}
+            label="Score de evolução do time"
+            value={scoreMedio === null ? "—" : String(scoreMedio)}
+            tone={scoreMedio === null ? "neutro" : scoreMedio >= 70 ? "bom" : scoreMedio >= 40 ? "neutro" : "ruim"}
+            hint={emRiscoAlto > 0 ? `${emRiscoAlto} em risco alto` : "ninguém em risco alto"}
           />
         </div>
       </section>

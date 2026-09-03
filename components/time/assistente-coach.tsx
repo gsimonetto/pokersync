@@ -23,12 +23,14 @@ import {
   type PlayerCard,
 } from "@/lib/services/team-funnel-service";
 import {
+  calcularScore,
   fetchTeamAlerts,
   ALERTA_LABEL,
   type TeamAlert,
   type TeamAlertKind,
   type TeamDashboardRow,
 } from "@/lib/services/team-service";
+import { ScoreRing } from "@/components/ui/score-ring";
 
 // Resumo do coach: o que precisa de decisao agora, morando na aba
 // Jogadores (nao no Funil — o coach passa mais tempo aqui, e o board do
@@ -150,13 +152,43 @@ export function AssistenteCoach({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [teamId]);
 
-  const prontos = useMemo(() => cards.filter(progressoPronto), [cards]);
+  // Menor score primeiro em cada bloco: dentro do mesmo tipo de aviso, o
+  // jogador que está pior no geral (não só nesse ponto isolado) sobe pro
+  // topo -- é a diferença entre uma lista plana e uma fila priorizada.
+  function porRisco(playerId: string): number {
+    const j = porNome.get(playerId);
+    return j ? calcularScore(j).valor : 100;
+  }
+
+  const prontos = useMemo(
+    () => cards.filter(progressoPronto).sort((a, b) => porRisco(a.playerId) - porRisco(b.playerId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cards, porNome]
+  );
   const estagnados = useMemo(() => {
     const limite = Date.now() - 14 * 24 * 60 * 60 * 1000;
-    return cards.filter((c) => !progressoPronto(c) && new Date(c.movedAt).getTime() < limite && c.drillsDone === 0 && c.reviewsDone === 0);
-  }, [cards]);
-  const comFaltas = useMemo(() => cards.filter((c) => c.eventosAusente >= 2), [cards]);
-  const alertasRelevantes = useMemo(() => alertas.filter((a) => !ALERTA_IRRELEVANTE.has(a.kind)), [alertas]);
+    return cards
+      .filter((c) => !progressoPronto(c) && new Date(c.movedAt).getTime() < limite && c.drillsDone === 0 && c.reviewsDone === 0)
+      .sort((a, b) => porRisco(a.playerId) - porRisco(b.playerId));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [cards, porNome]);
+  const comFaltas = useMemo(
+    () => cards.filter((c) => c.eventosAusente >= 2).sort((a, b) => porRisco(a.playerId) - porRisco(b.playerId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [cards, porNome]
+  );
+  const alertasRelevantes = useMemo(
+    () =>
+      alertas
+        .filter((a) => !ALERTA_IRRELEVANTE.has(a.kind))
+        .sort((a, b) => porRisco(a.playerId) - porRisco(b.playerId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [alertas, porNome]
+  );
+  const emRiscoAlto = useMemo(
+    () => new Set(jogadores.filter((j) => calcularScore(j).risco === "alto").map((j) => j.userId)),
+    [jogadores]
+  );
 
   useEffect(() => {
     registrarVistas([
@@ -188,6 +220,18 @@ export function AssistenteCoach({
   const total = prontosVisiveis.length + estagnadosVisiveis.length + comFaltasVisiveis.length + alertasVisiveis.length;
   if (!carregado || total === 0) return null;
 
+  // Quantos jogadores distintos, entre os que aparecem agora, estão em
+  // risco alto pelo Score de evolução -- vira o sinal visual do badge
+  // do cabeçalho (vermelho em vez de neutro), pra saber a gravidade
+  // antes mesmo de abrir a caixa.
+  const idsVisiveis = new Set([
+    ...prontosVisiveis.map((c) => c.playerId),
+    ...comFaltasVisiveis.map((c) => c.playerId),
+    ...estagnadosVisiveis.map((c) => c.playerId),
+    ...alertasVisiveis.map((a) => a.playerId),
+  ]);
+  const totalRiscoAlto = [...idsVisiveis].filter((id) => emRiscoAlto.has(id)).length;
+
   function abrirFicha(playerId: string) {
     if (onAbrirFicha) onAbrirFicha(playerId);
     else router.push(`/time/jogador/${playerId}`);
@@ -201,7 +245,14 @@ export function AssistenteCoach({
       >
         <Sparkles size={16} />
         Assistente do coach
-        <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{total}</span>
+        <span
+          className={`rounded-full px-2 py-0.5 text-[11px] font-bold ${
+            totalRiscoAlto > 0 ? "bg-negative/15 text-negative" : "bg-elevated text-muted"
+          }`}
+          title={totalRiscoAlto > 0 ? `${totalRiscoAlto} jogador(es) em risco alto agora` : undefined}
+        >
+          {total}
+        </span>
         <ChevronDown size={16} className={`ml-auto text-muted transition-transform ${aberto ? "rotate-180" : ""}`} />
       </button>
 
@@ -217,7 +268,10 @@ export function AssistenteCoach({
                 const j = porNome.get(c.playerId);
                 return (
                   <li key={c.cardId} className="flex items-center justify-between gap-2 text-[13px]">
-                    <button onClick={() => { dispensar(`pronto:${c.cardId}`); abrirFicha(c.playerId); }} className="min-w-0 truncate text-left hover:underline">{j?.nome ?? "Jogador"}</button>
+                    <button onClick={() => { dispensar(`pronto:${c.cardId}`); abrirFicha(c.playerId); }} className="flex min-w-0 items-center gap-1.5 text-left hover:underline">
+                      {j && <ScoreRing valor={calcularScore(j).valor} risco={calcularScore(j).risco} />}
+                      <span className="truncate">{j?.nome ?? "Jogador"}</span>
+                    </button>
                     <button onClick={() => { dispensar(`pronto:${c.cardId}`); moverProximaFase(c); }}
                       className="flex shrink-0 items-center gap-1 rounded-full border border-positive/40 px-2 py-0.5 text-[11px] text-positive transition-colors hover:bg-positive/10">
                       Subir fase <ArrowRight size={11} />
@@ -242,8 +296,9 @@ export function AssistenteCoach({
                 const j = porNome.get(c.playerId);
                 return (
                   <li key={c.cardId} className="flex items-center justify-between gap-2">
-                    <button onClick={() => { dispensar(`falta:${c.cardId}`); abrirFicha(c.playerId); }} className="min-w-0 truncate text-left text-[13px] hover:underline">
-                      {j?.nome ?? "Jogador"} <span className="text-muted">· {c.eventosAusente} faltas</span>
+                    <button onClick={() => { dispensar(`falta:${c.cardId}`); abrirFicha(c.playerId); }} className="flex min-w-0 items-center gap-1.5 text-left text-[13px] hover:underline">
+                      {j && <ScoreRing valor={calcularScore(j).valor} risco={calcularScore(j).risco} />}
+                      <span className="truncate">{j?.nome ?? "Jogador"} <span className="text-muted">· {c.eventosAusente} faltas</span></span>
                     </button>
                     <button onClick={() => dispensar(`falta:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
                       <X size={12} />
@@ -265,7 +320,10 @@ export function AssistenteCoach({
                 const j = porNome.get(c.playerId);
                 return (
                   <li key={c.cardId} className="flex items-center justify-between gap-2">
-                    <button onClick={() => { dispensar(`estagnado:${c.cardId}`); abrirFicha(c.playerId); }} className="min-w-0 truncate text-left text-[13px] hover:underline">{j?.nome ?? "Jogador"}</button>
+                    <button onClick={() => { dispensar(`estagnado:${c.cardId}`); abrirFicha(c.playerId); }} className="flex min-w-0 items-center gap-1.5 text-left text-[13px] hover:underline">
+                      {j && <ScoreRing valor={calcularScore(j).valor} risco={calcularScore(j).risco} />}
+                      <span className="truncate">{j?.nome ?? "Jogador"}</span>
+                    </button>
                     <button onClick={() => dispensar(`estagnado:${c.cardId}`)} aria-label="Dispensar" className="shrink-0 text-muted/60 hover:text-muted">
                       <X size={12} />
                     </button>

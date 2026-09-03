@@ -5,10 +5,12 @@ import Link from "next/link";
 import { ExternalLink, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { RankChip } from "@/components/ui/rank-chip";
+import { ScoreRing } from "@/components/ui/score-ring";
 import { PeriodSelector } from "@/components/period-selector";
 import { PlayerDetailBody } from "@/components/time/player-detail-body";
 import { ModalPortal } from "@/components/modal-portal";
 import {
+  calcularScore,
   diasSemAtividade,
   fetchPlayerActivity,
   fetchPlayerAlerts,
@@ -106,6 +108,7 @@ export function PlayerDetailModal({
               <p className="flex items-center gap-2 truncate text-[15px] font-semibold">
                 {p?.nome ?? (loading ? "Carregando…" : "Jogador")}
                 {p?.level != null && <RankChip level={p.level} />}
+                {p && <ScoreRing valor={calcularScore(p).valor} risco={calcularScore(p).risco} />}
               </p>
               {p && (
                 <p className="truncate text-xs text-muted">

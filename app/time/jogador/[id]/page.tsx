@@ -5,11 +5,13 @@ import { Avatar } from "@/components/avatar";
 import { AppHeader } from "@/components/app-header";
 import { AppShell } from "@/components/app-shell";
 import { RankChip } from "@/components/ui/rank-chip";
+import { ScoreRing } from "@/components/ui/score-ring";
 import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import { PlayerDetailBody } from "@/components/time/player-detail-body";
 import { TeamPrintStyles } from "@/components/time/print-styles";
 import { createClient } from "@/lib/supabase/client";
 import {
+  calcularScore,
   diasSemAtividade,
   fetchPlayerActivity,
   fetchPlayerAlerts,
@@ -104,6 +106,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
           p ? (
             <>
               {p.level != null && <RankChip level={p.level} />}
+              <ScoreRing valor={calcularScore(p).valor} risco={calcularScore(p).risco} />
               <span>
                 {[
                   p.coachNome ? `coach: ${p.coachNome}` : "sem coach atribuído",

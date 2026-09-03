@@ -7,11 +7,13 @@ import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertic
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { RankChip } from "@/components/ui/rank-chip";
+import { ScoreRing } from "@/components/ui/score-ring";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { PlayerDetailModal } from "@/components/time/player-detail-modal";
 import {
   assignCoach,
   assignTeamDrill,
+  calcularScore,
   diasSemAtividade,
   fetchTeamLeakPlayers,
   removeMember,
@@ -36,10 +38,11 @@ import { BRL } from "@/lib/format";
 
 const INATIVO_DIAS = 7;
 
-type Ordem = "nome" | "xp" | "treinos" | "acerto" | "revisadas" | "resultado";
+type Ordem = "nome" | "risco" | "xp" | "treinos" | "acerto" | "revisadas" | "resultado";
 
 const OPCOES_ORDEM: { key: Ordem; label: string }[] = [
   { key: "nome", label: "Nome" },
+  { key: "risco", label: "Prioridade (Score de evolução)" },
   { key: "xp", label: "Ranking (XP no período)" },
   { key: "treinos", label: "Mais treinos" },
   { key: "acerto", label: "Melhor acerto GTO" },
@@ -113,6 +116,8 @@ export function TabJogadores({
     const acerto = (j: TeamDashboardRow) => (j.treinos > 0 ? j.acertosGto / j.treinos : -1);
     const sorters: Record<Ordem, (a: TeamDashboardRow, b: TeamDashboardRow) => number> = {
       nome: (a, b) => a.nome.localeCompare(b.nome),
+      // Menor score primeiro: quem precisa de atenção do coach aparece no topo.
+      risco: (a, b) => calcularScore(a).valor - calcularScore(b).valor,
       xp: (a, b) => b.xpPeriodo - a.xpPeriodo || (b.streakDays ?? 0) - (a.streakDays ?? 0),
       treinos: (a, b) => b.treinos - a.treinos,
       acerto: (a, b) => acerto(b) - acerto(a),
@@ -177,6 +182,7 @@ export function TabJogadores({
             const d = diasSemAtividade(j.lastActivityAt);
             const inativo = d === null || d >= INATIVO_DIAS;
             const pct = j.treinos > 0 ? Math.round((j.acertosGto / j.treinos) * 100) : null;
+            const score = calcularScore(j);
             const aberto = expandidos.has(j.userId);
             return (
               <li key={j.userId} className="py-2.5">
@@ -200,6 +206,7 @@ export function TabJogadores({
                         {j.nome}
                       </button>
                       <RankChip level={j.level ?? 1} />
+                      <ScoreRing valor={score.valor} risco={score.risco} />
                       {j.labelName && j.labelColor && (
                         <Chip color={j.labelColor} size="sm">{j.labelName}</Chip>
                       )}

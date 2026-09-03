@@ -527,6 +527,56 @@ export function diasSemAtividade(lastActivityAt: string | null): number | null {
 }
 
 // ============================================================
+// Score de evolução (0-100) -- resume num número só o que hoje só dava
+// pra ver abrindo a ficha e cruzando 4-5 métricas na cabeça. Serve
+// tanto pra linha de TeamDashboardRow (lista de Jogadores) quanto pra
+// PlayerDetail (ficha) -- as duas já têm os campos abaixo, então não
+// precisa de RPC nova nem tabela nova.
+// Pesos: atividade pesa mais (é o sinal mais rápido de que algo mudou),
+// depois estudo (acerto GTO), depois consistência (streak) e progresso
+// (volume de treino/revisão no período). Faixas de risco usam a MESMA
+// semântica de cor que o Assistente do coach já usa pros blocos de
+// alerta (positive/evolution/negative), não uma paleta nova.
+// ============================================================
+export interface ScoreInput {
+  treinos: number;
+  acertosGto: number;
+  maosRevisadas: number;
+  streakDays: number | null;
+  lastActivityAt: string | null;
+}
+
+export type NivelRisco = "baixo" | "medio" | "alto";
+
+export interface EvolutionScore {
+  valor: number;
+  risco: NivelRisco;
+}
+
+function pontosAtividade(lastActivityAt: string | null): number {
+  const d = diasSemAtividade(lastActivityAt);
+  if (d === null) return 0;
+  if (d === 0) return 40;
+  if (d <= 3) return 32;
+  if (d <= 7) return 20;
+  if (d <= 14) return 8;
+  return 0;
+}
+
+export function calcularScore(j: ScoreInput): EvolutionScore {
+  const acertoPct = j.treinos > 0 ? (j.acertosGto / j.treinos) * 100 : null;
+  const pontosEstudo = acertoPct === null ? 10 : Math.min(30, Math.round(acertoPct * 0.3));
+  const pontosConsistencia = Math.min(15, Math.round((j.streakDays ?? 0) * 1.5));
+  const pontosProgresso = Math.min(15, Math.round((j.treinos + j.maosRevisadas) * 1.5));
+  const valor = Math.max(
+    0,
+    Math.min(100, pontosAtividade(j.lastActivityAt) + pontosEstudo + pontosConsistencia + pontosProgresso)
+  );
+  const risco: NivelRisco = valor < 40 ? "alto" : valor < 70 ? "medio" : "baixo";
+  return { valor, risco };
+}
+
+// ============================================================
 // Jogador individual (visao do coach)
 // ============================================================
 
