@@ -5,7 +5,9 @@ import Link from "next/link";
 import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { ShareHandModal } from "./share-hand-modal";
+import { OpponentStatsModal } from "./opponent-stats-modal";
 import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
+import { fetchOpponentsStatsForHand, type OpponentStats } from "@/lib/services/opponent-stats-service";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
@@ -186,6 +188,27 @@ export function RevisorHandTable({
   // destino dos dois casos (aba "Salvos", ver revisor-spots-salvos.tsx).
   const [saved, setSaved] = useState(false);
   const [savingSpot, setSavingSpot] = useState(false);
+
+  // Perfil dos oponentes sentados nessa mão (VPIP/PFR/3-Bet aparecem
+  // direto no assento; o resto só na modal, ver opponentClicked abaixo).
+  // Mapa por nome pra o PokerTable so' precisar de um lookup por assento.
+  const [opponentStats, setOpponentStats] = useState<Record<string, OpponentStats>>({});
+  const [opponentClicked, setOpponentClicked] = useState<OpponentStats | null>(null);
+
+  useEffect(() => {
+    let cancelled = false;
+    fetchOpponentsStatsForHand(parsedHand)
+      .then((rows) => {
+        if (cancelled) return;
+        setOpponentStats(Object.fromEntries(rows.map((r) => [r.opponentName, r])));
+      })
+      .catch(() => {
+        if (!cancelled) setOpponentStats({});
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [parsedHand]);
 
   useEffect(() => {
     if (!reviewId) {
@@ -525,7 +548,14 @@ export function RevisorHandTable({
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. */}
         <div style={{ flex: 1, minHeight: 0 }}>
-          <PokerTable hand={replayState.tableHand} seats={replayState.seatLayout} chipAnimation={chipAnimation} streetCommitments={replayState.streetCommitments} />
+          <PokerTable
+            hand={replayState.tableHand}
+            seats={replayState.seatLayout}
+            chipAnimation={chipAnimation}
+            streetCommitments={replayState.streetCommitments}
+            opponentStats={opponentStats}
+            onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
+          />
         </div>
       </div>
 
@@ -557,6 +587,8 @@ export function RevisorHandTable({
       {reviewId && (
         <ShareHandModal open={shareModalOpen} reviewId={reviewId} onClose={() => setShareModalOpen(false)} />
       )}
+
+      <OpponentStatsModal stats={opponentClicked} onClose={() => setOpponentClicked(null)} />
     </div>
   );
 }

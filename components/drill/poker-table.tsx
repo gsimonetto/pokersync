@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
+import { Info } from "lucide-react";
 import { Card } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
+import type { OpponentStats } from "@/lib/services/opponent-stats-service";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -390,7 +392,7 @@ function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
 }
 
 function Seat({
-  seat, state, isDealer, pot, scale, heroScale = 1,
+  seat, state, isDealer, pot, scale, heroScale = 1, opponentStats, onOpponentClick,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
@@ -401,6 +403,12 @@ function Seat({
   // do hero pode ser um pouco maior") -- multiplica em cima do `scale`
   // geral (responsivo por largura da mesa), nao o substitui.
   heroScale?: number;
+  // Perfil consolidado do oponente sentado nesse assento, se ja existir
+  // (Revisor de Maos) -- so' preenchido pra assentos nao-hero com
+  // historico. Ausente (undefined) em qualquer outro contexto (Treino),
+  // que nunca passa esses props.
+  opponentStats?: OpponentStats;
+  onOpponentClick?: (playerName: string) => void;
 }) {
   const posCol = POS[seat.posLabel];
   const { status = "empty", stack, action, cards } = state;
@@ -429,6 +437,40 @@ function Seat({
       {!acting && <ActionBadge action={action} pot={pot} />}
     </div>
   );
+
+  // Chip de HUD com o perfil do oponente -- entre a tag de posicao e a
+  // placa de nome. Clicavel (leva pra modal com o perfil completo); o
+  // icone de info fica dentro do proprio chip, que ja e' o sinal visual
+  // principal de "tem mais informacao". Sem cor por faixa de proposito
+  // (pedido explicito): so' o numero cru, sem juizo de valor embutido --
+  // quem decide o que "38/22/8" significa e' o jogador, nao o produto.
+  const opponentHudChip =
+    !hero && opponentStats ? (
+      <div
+        onClick={onOpponentClick ? () => onOpponentClick(seat.playerName!) : undefined}
+        title={`VPIP / PFR / 3-Bet — clique pro perfil completo de ${seat.playerName}`}
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 2,
+          padding: "3px 9px",
+          borderRadius: 999,
+          fontFamily: F,
+          fontSize: 11,
+          fontWeight: 700,
+          color: "#FFFFFF",
+          background: "rgba(10,10,12,0.88)",
+          border: "1px solid rgba(255,255,255,0.28)",
+          boxShadow: "0 0 8px rgba(255,255,255,.18), 0 3px 8px rgba(0,0,0,.55)",
+          cursor: onOpponentClick ? "pointer" : "default",
+          whiteSpace: "nowrap",
+          ...num,
+        }}
+      >
+        {opponentStats.vpipPct ?? "—"}/{opponentStats.pfrPct ?? "—"}/{opponentStats.threeBetPct ?? "—"}
+        <Info size={10} style={{ opacity: 0.7, flexShrink: 0, marginLeft: 2 }} />
+      </div>
+    ) : null;
 
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
@@ -480,6 +522,8 @@ function Seat({
           {seat.posLabel}
         </div>
       </div>
+
+      {opponentHudChip}
 
       {!empty && (
         <div
@@ -705,6 +749,11 @@ export function PokerTable({
   // curva suave. Cada aspectRatio precisa do proprio par calibrado;
   // culpa de quem desenha a mesa nessa proporcao passar o valor certo.
   cornerRadius = "10% / 16%",
+  // Perfil dos oponentes sentados na mesa, por nome (Revisor de Maos) --
+  // ausente em qualquer outro consumidor (Treino), que so' desenha
+  // ranges GTO e nao tem esse conceito.
+  opponentStats,
+  onOpponentClick,
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
@@ -715,6 +764,8 @@ export function PokerTable({
   minSeatScale?: number;
   heroScale?: number;
   cornerRadius?: string;
+  opponentStats?: Record<string, OpponentStats>;
+  onOpponentClick?: (playerName: string) => void;
 }) {
   const active = !!hand;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
@@ -932,6 +983,8 @@ export function PokerTable({
             pot={hand?.pot ?? 0}
             scale={seatScale}
             heroScale={heroScale}
+            opponentStats={s.playerName ? opponentStats?.[s.playerName] : undefined}
+            onOpponentClick={onOpponentClick}
           />
         ))}
 
