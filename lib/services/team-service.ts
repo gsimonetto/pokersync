@@ -576,6 +576,62 @@ export function calcularScore(j: ScoreInput): EvolutionScore {
   return { valor, risco };
 }
 
+// ------------------------------------------------------------
+// Histórico do Score (foto diária gravada por snapshot_team_scores(),
+// migração team_player_score_snapshots) -- alimenta o gráfico de
+// tendência na Ficha do jogador e a comparação com "7 dias atrás" nos
+// lugares onde o selo aparece.
+// ------------------------------------------------------------
+export interface PlayerScoreHistoryPoint {
+  dia: string;
+  score: number;
+  risco: NivelRisco;
+}
+
+export async function fetchPlayerScoreHistory(playerId: string, days = 30): Promise<PlayerScoreHistoryPoint[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_player_score_history", { p_player: playerId, p_days: days });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    dia: r.dia,
+    score: r.score,
+    risco: r.risco as NivelRisco,
+  }));
+}
+
+export type TendenciaScore = "subiu" | "caiu" | "estavel";
+
+// Compara o score de hoje com o mais antigo disponível até 7 dias atrás
+// -- "estavel" cobre tanto empate quanto histórico curto demais (menos
+// de 2 dias), pra não fingir uma tendência que não dá pra sustentar.
+export function calcularTendencia(historico: PlayerScoreHistoryPoint[]): TendenciaScore {
+  if (historico.length < 2) return "estavel";
+  const hoje = historico[historico.length - 1];
+  const limite = Date.now() - 7 * 24 * 60 * 60 * 1000;
+  const referencia = historico.find((p) => new Date(p.dia).getTime() >= limite) ?? historico[0];
+  if (referencia === hoje) return "estavel";
+  if (hoje.score > referencia.score) return "subiu";
+  if (hoje.score < referencia.score) return "caiu";
+  return "estavel";
+}
+
+export interface TeamScoreHistoryPoint {
+  dia: string;
+  scoreMedio: number;
+}
+
+export async function fetchTeamScoreHistory(days = 30): Promise<TeamScoreHistoryPoint[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_score_history", { p_days: days });
+  if (error) throw error;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    dia: r.dia,
+    scoreMedio: Math.round(Number(r.score_medio ?? 0)),
+  }));
+}
+
 // ============================================================
 // Jogador individual (visao do coach)
 // ============================================================

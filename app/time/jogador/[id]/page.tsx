@@ -12,18 +12,21 @@ import { TeamPrintStyles } from "@/components/time/print-styles";
 import { createClient } from "@/lib/supabase/client";
 import {
   calcularScore,
+  calcularTendencia,
   diasSemAtividade,
   fetchPlayerActivity,
   fetchPlayerAlerts,
   fetchPlayerDetail,
   fetchPlayerFinancialSeries,
   fetchPlayerLeaks,
+  fetchPlayerScoreHistory,
   fetchPlayerSharedHands,
   fetchPlayerStakingSessions,
   fetchMyMembership,
   traduzErroTime,
   type FinancialDay,
   type PlayerActivityDay,
+  type PlayerScoreHistoryPoint,
   type TeamAlert,
   type PlayerDetail,
   type PlayerSharedHand,
@@ -54,6 +57,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const [alertas, setAlertas] = useState<TeamAlert[]>([]);
   const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
   const [staking, setStaking] = useState<PlayerStakingSession[]>([]);
+  const [historicoScore, setHistoricoScore] = useState<PlayerScoreHistoryPoint[]>([]);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [meuPapel, setMeuPapel] = useState<string | null>(null);
 
@@ -61,7 +65,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, fin, stk, mem, auth] = await Promise.all([
+      const [d, a, l, m, al, fin, stk, hist, mem, auth] = await Promise.all([
         fetchPlayerDetail(id, dias),
         fetchPlayerActivity(id, dias),
         fetchPlayerLeaks(id, dias),
@@ -69,6 +73,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
         fetchPlayerAlerts(id).catch(() => []),
         fetchPlayerFinancialSeries(id, dias).catch(() => []),
         fetchPlayerStakingSessions(id).catch(() => []),
+        fetchPlayerScoreHistory(id, dias).catch(() => []),
         fetchMyMembership().catch(() => null),
         createClient().auth.getUser(),
       ]);
@@ -79,6 +84,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
       setAlertas(al);
       setFinanceiro(fin);
       setStaking(stk);
+      setHistoricoScore(hist);
       setMeuPapel(mem?.role ?? null);
       setMeuId(auth.data.user?.id ?? null);
     } catch (e) {
@@ -106,7 +112,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
           p ? (
             <>
               {p.level != null && <RankChip level={p.level} />}
-              <ScoreRing valor={calcularScore(p).valor} risco={calcularScore(p).risco} />
+              <ScoreRing valor={calcularScore(p).valor} risco={calcularScore(p).risco} tendencia={calcularTendencia(historicoScore)} />
               <span>
                 {[
                   p.coachNome ? `coach: ${p.coachNome}` : "sem coach atribuído",
@@ -150,6 +156,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
           alertas={alertas}
           financeiro={financeiro}
           staking={staking}
+          historicoScore={historicoScore}
           podeGerenciarMetas={meuPapel === "admin" || (meuPapel === "coach" && p.coachId === meuId)}
         />
       )}

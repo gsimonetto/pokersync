@@ -15,6 +15,7 @@ import {
   fetchTeamInfo,
   fetchTeamLabels,
   fetchTeamLeaks,
+  fetchTeamScoreHistory,
   fetchTeamStaff,
   fetchInvites,
   traduzErroTime,
@@ -30,6 +31,7 @@ import {
   type TeamInvite,
   type TeamLabel,
   type TeamLeak,
+  type TeamScoreHistoryPoint,
   type TeamStaff,
 } from "@/lib/services/team-service";
 import { fetchTeamEvents, type TeamEvent } from "@/lib/services/team-calendar-service";
@@ -106,6 +108,7 @@ function PainelConteudo() {
   const [labels, setLabels] = useState<TeamLabel[]>([]);
   const [linhas, setLinhas] = useState<TeamDashboardRow[]>([]);
   const [leaks, setLeaks] = useState<TeamLeak[]>([]);
+  const [historicoScoreTime, setHistoricoScoreTime] = useState<TeamScoreHistoryPoint[]>([]);
   const [atividade, setAtividade] = useState<TeamActivityDay[]>([]);
   const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
   const [pendentes, setPendentes] = useState<PendingMember[]>([]);
@@ -127,7 +130,7 @@ function PainelConteudo() {
       setTime(t);
       setInfo(i);
 
-      const [rows, lk, at, fin, st, lb, pend, inv, comp, ev] = await Promise.all([
+      const [rows, lk, at, fin, st, lb, pend, inv, comp, ev, histScore] = await Promise.all([
         fetchTeamDashboard(dias),
         fetchTeamLeaks(dias),
         fetchTeamActivity(dias),
@@ -138,6 +141,8 @@ function PainelConteudo() {
         fetchInvites(t.team.id).catch(() => []),
         fetchPeriodComparison(dias).catch(() => null),
         fetchTeamEvents().catch(() => []),
+        // Jogador não tem permissão pra essa RPC (é visão de admin/coach) -- cai pra vazio sem quebrar a tela.
+        fetchTeamScoreHistory(dias).catch(() => []),
       ]);
       setLinhas(rows);
       setLeaks(lk);
@@ -149,6 +154,7 @@ function PainelConteudo() {
       setInvites(inv);
       setComparacao(comp);
       setEventos(ev);
+      setHistoricoScoreTime(histScore);
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -292,7 +298,7 @@ function PainelConteudo() {
                 </>
               )}
               {aba === "estatisticas" && time && (
-                <TabVisaoGeral teamId={time.team.id} jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
+                <TabVisaoGeral teamId={time.team.id} jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} historicoScoreTime={historicoScoreTime} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
                   onAbrirFunil={() => router.push("/time/painel/funil")} onErro={setErro} />
               )}
               {aba === "jogadores" && time && (
