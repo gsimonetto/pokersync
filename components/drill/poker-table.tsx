@@ -5,7 +5,7 @@ import { Info } from "lucide-react";
 import { Card } from "./card";
 import { F, POS, ACT, T, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
-import { classifyOpponentStyle, type OpponentStats } from "@/lib/services/opponent-stats-service";
+import { classifyStatLevel, type OpponentStats, type StatLevel } from "@/lib/services/opponent-stats-service";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -438,22 +438,23 @@ function Seat({
     </div>
   );
 
-  // Cor do chip de HUD por estilo de jogo do oponente -- classificado
-  // pelo Aggression Factor (unico numero que ja temos que mede
-  // agressividade pos-flop de forma direta): verde = dentro da faixa
-  // balanceada, vermelho = agressivo, amarelo = passivo. Sem dado
-  // suficiente (AF null) cai em "balanced" (verde neutro) em vez de
-  // arriscar uma cor que sugira algo que a amostra nao sustenta.
-  const OPPONENT_STYLE_COLOR = { aggressive: T.bad, passive: T.warn, balanced: T.ok } as const;
-  const opponentStyleColor = opponentStats ? OPPONENT_STYLE_COLOR[classifyOpponentStyle(opponentStats)] : T.ok;
+  // Cor POR ESTATISTICA (pedido explicito: "a cor de cada estatistica...
+  // e nao o todo" -- veio no lugar da versao anterior, que coloria o
+  // chip inteiro por um unico estilo geral). Cada numero do trio (VPIP/
+  // PFR/3-Bet) e' classificado na sua propria faixa -- ver
+  // classifyStatLevel/STAT_RANGE em opponent-stats-service.ts.
+  const STAT_LEVEL_COLOR: Record<StatLevel, string> = { aggressive: T.bad, passive: T.warn, balanced: T.ok };
+  const statColor = (stat: "vpip" | "pfr" | "threeBet", value: number | null) => {
+    const level = classifyStatLevel(stat, value);
+    return level ? STAT_LEVEL_COLOR[level] : "rgba(255,255,255,.5)";
+  };
 
   // Chip de HUD com o perfil do oponente -- pedido explicito: entre a
   // tag de posicao e a placa de nome (nao em cima da posicao). Clicavel
   // (leva pra modal com o perfil completo); o icone de info fica dentro
   // do proprio chip, que ja e' o sinal visual principal de "tem mais
-  // informacao". Glow + cor da borda/numeros seguem o estilo do
-  // oponente (ver OPPONENT_STYLE_COLOR acima) -- fundo continua solido
-  // escuro pra manter contraste alto de leitura em qualquer cor.
+  // informacao". Container fica neutro (glow branco) -- a cor mora em
+  // CADA numero, nao no chip inteiro.
   const opponentHudChip =
     !hero && opponentStats ? (
       <div
@@ -462,23 +463,26 @@ function Seat({
         style={{
           display: "flex",
           alignItems: "center",
-          gap: 4,
+          gap: 2,
           padding: "3px 9px",
           borderRadius: 999,
           fontFamily: F,
           fontSize: 11,
           fontWeight: 700,
-          color: opponentStyleColor,
           background: "rgba(10,10,12,0.88)",
-          border: `1px solid ${opponentStyleColor}99`,
-          boxShadow: `0 0 10px ${opponentStyleColor}66, 0 3px 8px rgba(0,0,0,.55)`,
+          border: "1px solid rgba(255,255,255,0.28)",
+          boxShadow: "0 0 8px rgba(255,255,255,.18), 0 3px 8px rgba(0,0,0,.55)",
           cursor: onOpponentClick ? "pointer" : "default",
           whiteSpace: "nowrap",
           ...num,
         }}
       >
-        {opponentStats.vpipPct ?? "—"}/{opponentStats.pfrPct ?? "—"}/{opponentStats.threeBetPct ?? "—"}
-        <Info size={10} style={{ opacity: 0.85, flexShrink: 0 }} />
+        <span style={{ color: statColor("vpip", opponentStats.vpipPct) }}>{opponentStats.vpipPct ?? "—"}</span>
+        <span style={{ color: "rgba(255,255,255,.35)" }}>/</span>
+        <span style={{ color: statColor("pfr", opponentStats.pfrPct) }}>{opponentStats.pfrPct ?? "—"}</span>
+        <span style={{ color: "rgba(255,255,255,.35)" }}>/</span>
+        <span style={{ color: statColor("threeBet", opponentStats.threeBetPct) }}>{opponentStats.threeBetPct ?? "—"}</span>
+        <Info size={10} style={{ opacity: 0.7, flexShrink: 0, marginLeft: 2, color: "rgba(255,255,255,.7)" }} />
       </div>
     ) : null;
 

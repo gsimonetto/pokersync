@@ -34,30 +34,31 @@ export function isSmallSample(stats: Pick<OpponentStats, "handsCount">): boolean
   return stats.handsCount < MIN_RELIABLE_HANDS;
 }
 
-// Classificacao de estilo por Aggression Factor -- pedido explicito
-// (verde/vermelho/amarelo no chip da mesa e na modal). AF ((bet+raise)/
-// call pós-flop) é o único número que já calculamos que mede
-// agressividade de forma direta; limiares abaixo de 1 (mais call que
-// bet/raise) e acima de 2 (bem mais bet/raise que call) são os cortes
-// de mercado mais comuns pra "passivo"/"agressivo" -- entre os dois cai
-// em "balanced" (dentro da faixa esperada). Sem AF (amostra sem mão
-// pós-flop ainda) cai em "balanced" por padrão, em vez de arriscar uma
-// cor que a amostra não sustenta.
-export type OpponentStyle = "aggressive" | "passive" | "balanced";
+// Classificacao POR ESTATISTICA (pedido explicito: "a cor de cada
+// estatistica... e nao o todo" -- veio no lugar de uma classificacao
+// unica pro oponente inteiro que existia antes). Cada stat tem sua
+// propria faixa "dentro do esperado" -- fora dela pra cima e' leitura
+// agressiva/solta, pra baixo e' passiva/apertada. Faixas sao os cortes
+// aproximados de mercado pra regulars de MTT/6-max (Hold'em Manager/
+// PokerTracker citam algo nessa vizinhanca) -- ajustavel, nao e' lei.
+export type StatLevel = "aggressive" | "balanced" | "passive";
 
-export function classifyOpponentStyle(stats: Pick<OpponentStats, "aggressionFactor">): OpponentStyle {
-  const af = stats.aggressionFactor;
-  if (af == null) return "balanced";
-  if (af > 2) return "aggressive";
-  if (af < 1) return "passive";
+const STAT_RANGE: Record<"vpip" | "pfr" | "threeBet", { passiveBelow: number; aggressiveAbove: number }> = {
+  vpip: { passiveBelow: 15, aggressiveAbove: 30 },
+  pfr: { passiveBelow: 12, aggressiveAbove: 24 },
+  threeBet: { passiveBelow: 4, aggressiveAbove: 10 },
+};
+
+// null quando nao ha valor pra classificar (amostra sem oportunidade
+// daquele spot) -- sem isso o chip coloriria um "—" com uma cor que nao
+// significa nada.
+export function classifyStatLevel(stat: keyof typeof STAT_RANGE, value: number | null): StatLevel | null {
+  if (value == null) return null;
+  const range = STAT_RANGE[stat];
+  if (value > range.aggressiveAbove) return "aggressive";
+  if (value < range.passiveBelow) return "passive";
   return "balanced";
 }
-
-export const OPPONENT_STYLE_LABEL: Record<OpponentStyle, string> = {
-  aggressive: "Agressivo",
-  passive: "Passivo",
-  balanced: "Equilibrado",
-};
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function mapRow(row: any): OpponentStats {

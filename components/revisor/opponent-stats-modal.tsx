@@ -2,34 +2,42 @@
 
 import { useEffect } from "react";
 import { X } from "lucide-react";
-import {
-  isSmallSample,
-  classifyOpponentStyle,
-  OPPONENT_STYLE_LABEL,
-  type OpponentStats,
-  type OpponentStyle,
-} from "@/lib/services/opponent-stats-service";
+import { isSmallSample, classifyStatLevel, type OpponentStats, type StatLevel } from "@/lib/services/opponent-stats-service";
 
-// Mesma classificacao/cor do chip na mesa (ver poker-table.tsx) --
-// consistencia entre onde o jogador primeiro ve o dado (chip) e onde
-// ve o detalhe (aqui). Tailwind nao tem token de amarelo no design
-// system geral (so' positive/negative), entao "passivo" usa amber-400
-// direto, mesmo tom ja usado no aviso de amostra pequena logo abaixo.
-const STYLE_BADGE_CLASS: Record<OpponentStyle, string> = {
-  aggressive: "bg-negative/15 text-negative border-negative/30",
-  passive: "bg-amber-400/15 text-amber-400 border-amber-400/30",
-  balanced: "bg-positive/15 text-positive border-positive/30",
+// Mesma classificacao por estatistica do chip na mesa (ver
+// poker-table.tsx) -- consistencia entre onde o jogador primeiro ve o
+// dado (chip) e onde ve o detalhe (aqui). Tailwind nao tem token de
+// amarelo no design system geral (so' positive/negative), entao
+// "passivo" usa amber-400 direto, mesmo tom ja usado no aviso de
+// amostra pequena logo abaixo.
+const STAT_LEVEL_CLASS: Record<StatLevel, string> = {
+  aggressive: "text-negative",
+  passive: "text-amber-400",
+  balanced: "text-positive",
 };
 
 function fmtPct(v: number | null): string {
   return v == null ? "—" : `${v}%`;
 }
 
-function StatRow({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function StatRow({
+  label,
+  value,
+  hint,
+  colorClass,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  // Presente so' nas 3 estatisticas classificaveis (VPIP/PFR/3-Bet) --
+  // pedido explicito: cor POR estatistica, nao um estilo geral pro
+  // oponente inteiro. O resto da lista fica neutro.
+  colorClass?: string;
+}) {
   return (
     <div className="flex items-center justify-between border-b border-hairline/50 py-1.5 last:border-0" title={hint}>
       <span className="text-[11px] text-muted">{label}</span>
-      <span className="text-[12.5px] font-semibold tabular-nums text-ink">{value}</span>
+      <span className={`text-[12.5px] font-semibold tabular-nums ${colorClass ?? "text-ink"}`}>{value}</span>
     </div>
   );
 }
@@ -50,7 +58,10 @@ export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | 
 
   if (!stats) return null;
   const small = isSmallSample(stats);
-  const style = classifyOpponentStyle(stats);
+
+  const vpipLevel = classifyStatLevel("vpip", stats.vpipPct);
+  const pfrLevel = classifyStatLevel("pfr", stats.pfrPct);
+  const threeBetLevel = classifyStatLevel("threeBet", stats.threeBetPct);
 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/70 px-4 backdrop-blur-sm">
@@ -64,20 +75,29 @@ export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | 
             <X size={16} />
           </button>
         </div>
-        <div className="mt-1.5 flex items-center gap-2">
-          <span className={`rounded-full border px-2 py-0.5 text-[10.5px] font-semibold ${STYLE_BADGE_CLASS[style]}`}>
-            {OPPONENT_STYLE_LABEL[style]}
-          </span>
-          <p className="text-[11px] text-muted">
-            {stats.handsCount} mão{stats.handsCount === 1 ? "" : "s"} jogada{stats.handsCount === 1 ? "" : "s"} contra você
-          </p>
-        </div>
+        <p className="mt-0.5 text-[11px] text-muted">
+          {stats.handsCount} mão{stats.handsCount === 1 ? "" : "s"} jogada{stats.handsCount === 1 ? "" : "s"} contra você
+        </p>
         {small && <p className="mt-1.5 text-[11px] text-amber-400">Amostra pequena — leia com cautela.</p>}
 
         <div className="mt-3 flex flex-col">
-          <StatRow label="VPIP" value={fmtPct(stats.vpipPct)} hint="Voluntarily Put money In Pot no preflop" />
-          <StatRow label="PFR" value={fmtPct(stats.pfrPct)} hint="Preflop raise" />
-          <StatRow label="3-Bet" value={fmtPct(stats.threeBetPct)} />
+          <StatRow
+            label="VPIP"
+            value={fmtPct(stats.vpipPct)}
+            hint="Voluntarily Put money In Pot no preflop"
+            colorClass={vpipLevel ? STAT_LEVEL_CLASS[vpipLevel] : undefined}
+          />
+          <StatRow
+            label="PFR"
+            value={fmtPct(stats.pfrPct)}
+            hint="Preflop raise"
+            colorClass={pfrLevel ? STAT_LEVEL_CLASS[pfrLevel] : undefined}
+          />
+          <StatRow
+            label="3-Bet"
+            value={fmtPct(stats.threeBetPct)}
+            colorClass={threeBetLevel ? STAT_LEVEL_CLASS[threeBetLevel] : undefined}
+          />
           <StatRow label="Fold to 3-Bet" value={fmtPct(stats.foldTo3BetPct)} hint="Só conta mãos em que ele levou um 3-bet" />
           <StatRow label="C-Bet no flop" value={fmtPct(stats.cbetFlopPct)} hint="Só conta mãos em que ele foi o agressor pré-flop" />
           <StatRow label="Fold to C-Bet (flop)" value={fmtPct(stats.foldToCbetFlopPct)} />
