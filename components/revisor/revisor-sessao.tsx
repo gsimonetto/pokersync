@@ -73,11 +73,18 @@ interface HandInListing {
   hand_review_tag_links?: { tag_id: string; hand_review_tags: { id: string; label: string }[] | null }[];
 }
 
+// Pedido explicito: aumentar a largura da carta (~60% da coluna de
+// 220px) SEM esticar a altura da linha -- carta 100% (nao cortada) no
+// tamanho "board" ficaria alta demais (a lista viraria uma sequencia de
+// linhas gigantes). Por isso HalfCard, agora no tamanho "board" (era
+// "mini"): larga o bastante pra ler de relance, cortada na metade pra
+// manter a linha compacta. 2 cartas + gap tomam ~116px dos ~192px
+// uteis da coluna (padding 14px de cada lado).
 function HeroCardsPreview({ cards }: { cards: string[] }) {
   return (
-    <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
+    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
       {cards.map((c, i) => (
-        <HalfCard key={i} card={c} />
+        <HalfCard key={i} card={c} size="board" />
       ))}
     </div>
   );

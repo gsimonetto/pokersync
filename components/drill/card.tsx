@@ -320,16 +320,40 @@ export function Card({
 // Vilao sem cartas reveladas agora simplesmente nao mostra nenhuma carta
 // (so o seatInfo), em vez de um placeholder de verso.
 
-// Mini-carta cortada pela metade (mostra so o topo) — usada em listagens
+// Carta cortada pela metade (mostra so o topo) — usada em listagens
 // compactas (ex: preview do hero na lista de maos do Revisor) onde nao ha
-// espaco pra carta inteira mas o rank+naipe do canto ja identifica a carta.
-// Reusa o mesmo Card (mesmas cores/glyphs), so corta visualmente via
-// overflow:hidden num container mais baixo — nao duplica estilo.
-export function HalfCard({ card }: { card: string }) {
-  const s = SIZES.mini;
-  const visibleH = Math.round(s.h * 0.52);
+// altura pra carta inteira, mas o rank+naipe do canto ja identifica a
+// carta. Reusa o mesmo Card (mesmas cores/glyphs), so corta visualmente
+// via overflow:hidden num container mais baixo — nao duplica estilo.
+// `size` (pedido explicito): cortar em vez de exibir 100% e' exatamente
+// o que permite a carta ficar LARGA/legivel sem esticar a altura da
+// linha -- default "mini" (uso historico), mas "board" fica bem maior
+// e mais facil de ler mantendo a mesma proporcao de corte.
+export function HalfCard({ card, size = "mini" }: { card: string; size?: Size }) {
+  const s = SIZES[size];
+  // 0.52 -> 0.68 (pedido explicito: "aumente um pouco a parte cortada,
+  // mostrando mais do naipe") -- o naipe central fica ancorado no meio
+  // da carta INTEIRA (SuitCenter usa top:"50%" por padrao aqui, ver
+  // comentario abaixo), entao cortar mais abaixo revela mais dele em
+  // vez de só a ponta.
+  const visibleH = Math.round(s.h * 0.68);
   return (
-    <div style={{ width: s.w, height: visibleH, overflow: "hidden", borderRadius: 6, flexShrink: 0 }}>
+    <div
+      style={{
+        width: s.w,
+        height: visibleH,
+        overflow: "hidden",
+        borderRadius: 6,
+        flexShrink: 0,
+        // Borda preta solida (pedido explicito: "igual na mesa") --
+        // mesmo contorno que a mesa de poker usa em volta do feltro
+        // (poker-table.tsx: `border: "2px solid #000000"`), aplicada
+        // aqui no wrapper que corta a carta (a carta em si ja tem seu
+        // proprio anel bem mais fraco via boxShadow, pensado pra carta
+        // inteira -- nao dava o mesmo destaque numa versao cortada).
+        border: "2px solid #000000",
+      }}
+    >
       {/* Ideia original: pegar o layout normal da carta e cortar pela
           metade (overflow:hidden no container), sem reposicionar nada.
           - Canto superior-esquerdo: mantido, mas SEM o naipe pequeno
@@ -340,7 +364,7 @@ export function HalfCard({ card }: { card: string }) {
             centerSuitTop) — nao sobe, so e' cortado pelo container. */}
       <Card
         card={card}
-        size="mini"
+        size={size}
         hideBottomRightCorner
         hideCornerSuitGlyph
       />
