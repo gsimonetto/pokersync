@@ -66,13 +66,20 @@ export class UnknownHeroPositionError extends Error {
 // real do hero (vinda da coluna drills.position). Reaproveita o anel
 // visual de 8 cadeiras, rotacionado pra que o hero sempre caia no slot
 // de baixo com o ROTULO CORRETO.
-export function computeStylizedSeatLayout(heroPosition: string): SeatLayoutSlot[] {
+// `ringConfig` (opcional): so' quem desenha o anel numa proporcao MUITO
+// diferente do retangulo deitado padrao precisa passar isso -- hoje, so'
+// o modo mesa-cheia do Treino no celular (retangulo EM PE). Sem ele,
+// reusa o RING_COORDS ja calculado uma vez no carregamento do modulo
+// (mesmo comportamento de sempre, zero mudanca pros demais usos).
+export function computeStylizedSeatLayout(heroPosition: string, ringConfig?: RingConfig): SeatLayoutSlot[] {
   const heroIndex = RING_ORDER_8MAX.indexOf(heroPosition);
   if (heroIndex === -1) {
     throw new UnknownHeroPositionError(heroPosition);
   }
 
-  return RING_COORDS.map((coord, i) => {
+  const ring = ringConfig ? ellipseSeatCoords(8, ringConfig) : RING_COORDS;
+
+  return ring.map((coord, i) => {
     const offset = i - HERO_SLOT_INDEX;
     const labelIndex = (heroIndex + offset + RING_ORDER_8MAX.length * 2) % RING_ORDER_8MAX.length;
     return {
@@ -143,19 +150,29 @@ function clockwiseOccupiedSeats(seats: ParsedSeat[], buttonSeatNumber: number, m
 // usada pra desenhar o proprio contorno da mesa logo abaixo em
 // PokerTable, entao os assentos acompanham a borda de verdade em vez de
 // "flutuar" pra dentro ou pra fora dela.
-function ellipseSeatCoords(n: number): { x: number; y: number; cardSide: CardSide }[] {
+// Raios em % da caixa da mesa -- calibrados originalmente pro retangulo
+// DEITADO (8/5) usado em toda mesa "normal". Um retangulo EM PE (o modo
+// mesa-cheia do Treino no celular, aspectRatio "3/5") tem uma relacao
+// largura:altura bem diferente, entao os mesmos % de raio vertical
+// deixam os assentos de cima/baixo com folga desproporcional -- e' por
+// isso que RingConfig existe: quem desenha um anel numa proporcao muito
+// diferente da 8/5 padrao passa os proprios raios em vez de aceitar o
+// default.
+type RingConfig = { centerY?: number; radiusX?: number; radiusY?: number; radiusYTop?: number };
+
+function ellipseSeatCoords(n: number, config: RingConfig = {}): { x: number; y: number; cardSide: CardSide }[] {
   const centerX = 50;
   // FIX (2026-08): centro subiu de 50 para 46 e radiusY caiu de 36 para
   // 32 — com os valores antigos o slot do hero caia em y=86 e o bloco
   // dele (o mais alto da mesa) era cortado pela borda inferior do
   // container, mesmo bug do anel estilizado acima. Agora o hero cai em
   // y=78, com folga suficiente para cartas + chips.
-  const centerY = 46;
-  const radiusX = 42;
+  const centerY = config.centerY ?? 46;
+  const radiusX = config.radiusX ?? 42;
   // radiusY menor que radiusX: com 42 nos dois eixos, a cadeira oposta
   // ao hero (topo da mesa, em mesas com n par) quase saia do feltro —
   // confirmado visualmente num render de teste antes de mudar isso.
-  const radiusY = 32;
+  const radiusY = config.radiusY ?? 32;
   // FIX (2026-09): agora que as cartas ficam SEMPRE em cima do nome (pedido
   // explicito, ver Seat/CardFan em poker-table.tsx), os assentos da fileira
   // de CIMA da mesa (sin<0) empurram o bloco de cartas ainda mais pra cima —
@@ -165,7 +182,7 @@ function ellipseSeatCoords(n: number): { x: number; y: number; cardSide: CardSid
   // Os assentos de BAIXO nao tem esse problema (cartas "em cima do nome"
   // pra eles apontam pro CENTRO da mesa, lado oposto da borda), entao so' a
   // metade de cima ganha um raio vertical menor (mais afastado da borda).
-  const radiusYTop = 26;
+  const radiusYTop = config.radiusYTop ?? 26;
   const coords: { x: number; y: number; cardSide: CardSide }[] = [];
 
   for (let i = 0; i < n; i++) {

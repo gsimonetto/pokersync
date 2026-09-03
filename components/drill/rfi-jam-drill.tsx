@@ -76,8 +76,11 @@ const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam"; label: string }[] = [
 
 const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
   open: "Abrir (raise)",
-  allin: "Jam (all-in)",
-  call: "Pagar (call)",
+  // Pedido explicito: "botao de all-in nao e' pra ter a nomenclatura jam".
+  allin: "All-in",
+  // Pedido explicito: "o botao de pagar e' apenas call, tire a
+  // informacao pagar".
+  call: "Call",
 };
 
 // Terceiro botão "distrator" por fase -- pedido explícito: sempre 3+
@@ -92,7 +95,7 @@ const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
 // fase continua com só 2 botões.
 const DISTRACTOR_LABEL: Partial<Record<(typeof PHASES)[number]["key"], string>> = {
   sbOpen: "Limpar (call)",
-  bbJam: "Pagar (call)",
+  bbJam: "Call",
 };
 
 const VERDICT_LABEL: Record<Verdict, string> = {
@@ -241,9 +244,20 @@ function VerdictCenterFlash({
   return (
     <div style={{ position: "absolute", top: "29%", left: "50%", transform: "translate(-50%, -50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "none", zIndex: 60 }}>
       <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, animation: "verdictPop 320ms cubic-bezier(0.22, 1.4, 0.36, 1) both" }}>
+        {/* FIX (pedido explicito: "o verde por fora esta cortando, traga
+            glow numa transicao sutil") -- o glow antigo (inset:-20,
+            fade so' a partir de 72% do raio) ainda tinha cor visivel
+            perto da borda do circulo; quando esse circulo esbarrava no
+            contorno arredondado da mesa (overflow:hidden), a cor sumia
+            de repente em vez de desvanecer, lendo como "corte". Raio
+            maior (-46) + fade começando mais cedo (35%) faz a cor
+            already estar quase zero bem antes de qualquer borda —
+            e a propria opacidade do glow entra com fade-in proprio
+            (verdictGlowIn, mais lento que o pop do icone/texto), pra
+            a transicao ficar sutil em vez de aparecer de golpe. */}
         <div
           aria-hidden="true"
-          style={{ position: "absolute", inset: -20, borderRadius: "50%", background: `radial-gradient(circle, ${color}40, transparent 72%)`, pointerEvents: "none" }}
+          style={{ position: "absolute", inset: -46, borderRadius: "50%", background: `radial-gradient(circle, ${color}26 0%, ${color}0d 35%, transparent 65%)`, animation: "verdictGlowIn 700ms ease-out both", pointerEvents: "none" }}
         />
         <Icon size={26} color={color} strokeWidth={2.2} style={{ flexShrink: 0, filter: `drop-shadow(0 0 12px ${color}aa)` }} />
         <span style={{ fontFamily: F, color: "#FFFFFF", fontWeight: 800, fontSize: 16, whiteSpace: "nowrap", textShadow: "0 2px 14px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)" }}>{label}</span>
@@ -258,7 +272,10 @@ function VerdictCenterFlash({
         <Info size={11} />
         Ver detalhes
       </button>
-      <style>{`@keyframes verdictPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }`}</style>
+      <style>{`
+        @keyframes verdictPop { from { opacity: 0; transform: scale(0.8); } to { opacity: 1; transform: scale(1); } }
+        @keyframes verdictGlowIn { from { opacity: 0; } to { opacity: 1; } }
+      `}</style>
     </div>
   );
 }
@@ -266,16 +283,22 @@ function VerdictCenterFlash({
 // Botao da pilha vertical do modo mesa-cheia -- mais estreito e mais
 // alto que o botao "chip" do modo card normal, pra caber numa coluna
 // fina do lado direito da mesa em vez de uma linha horizontal embaixo.
+// FIX (pedido explicito: "diminuir os botoes de acoes pra que nao pegue
+// o seat da direita") -- eram largos demais (92px) pro anel de 8-max do
+// modo mesa-cheia, onde tem assento (CO) proximo da mesma borda direita
+// onde a coluna de botoes fica ancorada. Mais estreitos (76px) e com
+// padding/fonte um pouco menores, a coluna inteira fica mais compacta e
+// para de alcancar o assento.
 function fsActionBtnStyle(bg: string, color = "#FFFFFF"): React.CSSProperties {
   return {
     fontFamily: F,
-    width: 92,
-    padding: "13px 10px",
-    borderRadius: 12,
+    width: 76,
+    padding: "10px 8px",
+    borderRadius: 11,
     border: "1px solid rgba(255,255,255,0.14)",
     background: bg,
     color,
-    fontSize: 13,
+    fontSize: 12,
     fontWeight: 700,
     cursor: "pointer",
     boxShadow: "0 4px 14px rgba(0,0,0,.45)",
@@ -696,15 +719,27 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   // disparava chipAnimation -- a mesa sempre mostrava o pote pronto, sem
   // nenhuma ficha na frente dos assentos e sem a bolinha voando. Blinds
   // sempre entram como base (0.5bb SB / 1bb BB, se hero ou vilao ocupam
-  // esses assentos); em bbJam/sbCallJam o assento que ja agiu antes do
-  // spot comecar (activeVillainSeat -- quem abriu, em bbJam; quem deu
-  // jam, em sbCallJam) recebe o RESTANTE do pote (spot.pot menos o
-  // blind de quem esta decidindo agora), reconciliando com o pote
-  // exibido sem precisar de um breakdown de tamanho de aposta que o
-  // motor nao guarda por mao.
+  // esses assentos).
   const SB_BLIND_BB = 0.5;
   const BB_BLIND_BB = 1;
   const seatBlind = useCallback((pos: string) => (pos === "SB" ? SB_BLIND_BB : pos === "BB" ? BB_BLIND_BB : 0), []);
+
+  // FIX (2a rodada, bug reportado: "nao apareceu a acao do vilao na
+  // mesa"): a 1a versao tentava derivar o valor do vilao de `spot.pot -
+  // blind`, mas spot.pot e' um numero FIXO por spot (so' os blinds
+  // iniciais, o mesmo pras 3 fases) -- nao cresce com a acao do vilao.
+  // Nas fases onde o vilao ja agiu antes do jogador decidir, isso sempre
+  // dava 0 (pot inteiro ja "gasto" no blind de quem decide), escondendo
+  // a ficha do vilao por completo. Agora usa o dado real disponivel pra
+  // cada caso:
+  // - sbCallJam: o vilao (activeVillainSeat) deu JAM -- valor exato e
+  //   conhecido, e' o proprio effective stack (all-in = tudo que tem).
+  // - bbJam: o vilao ABRIU (raise, nao all-in) -- o motor nao guarda o
+  //   tamanho exato da abertura por mao (so' frequencia/EV por classe de
+  //   mao), entao usa uma abertura padrao (convencao visual, tamanho
+  //   tipico de RFI a stack raso) so' pra a ficha aparecer na mesa —
+  //   melhor que nao mostrar nada da acao do vilao.
+  const OPEN_RAISE_APPROX_BB = 2;
 
   const streetCommitments = useMemo(() => {
     if (!spot) return undefined;
@@ -712,10 +747,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
       // Ninguem decidiu nada ainda alem dos blinds forcados.
       return { [heroPos]: seatBlind(heroPos), [villainPos]: seatBlind(villainPos) };
     }
-    // bbJam/sbCallJam: activeVillainSeat ja tem uma acao (abertura ou
-    // jam) comprometida antes do jogador decidir.
     const decidingBlind = seatBlind(activeHeroSeat);
-    return { [activeHeroSeat]: decidingBlind, [activeVillainSeat]: Math.max(0, spot.pot - decidingBlind) };
+    const villainCommitted = phaseKey === "sbCallJam" ? spot.effectiveStack : OPEN_RAISE_APPROX_BB;
+    return { [activeHeroSeat]: decidingBlind, [activeVillainSeat]: villainCommitted };
   }, [spot, phaseKey, heroPos, villainPos, activeHeroSeat, activeVillainSeat, seatBlind]);
 
   // Ficha voando do assento que ja agiu (activeVillainSeat) ate' o pote —
@@ -735,14 +769,43 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   // preenchendo a mesa, pode por 8max") -- os assentos sem jogador ja
   // ficam foscos sozinhos (SEAT_OPACITY.empty em poker-table.tsx), o
   // tableHand ja preenche todos como "empty" exceto hero/vilao (ver
-  // useMemo de tableHand acima). So' desloca o assento do HERO um pouco
-  // pra esquerda (pedido explicito, sessao anterior: "a mao do hero
-  // pode jogar um pouco pra esquerda") pra abrir espaco pra pilha de
-  // botoes de aposta a direita.
+  // useMemo de tableHand acima).
+  //
+  // FIX (pedido explicito): "o seat do topo esta quase no meio da mesa,
+  // suba pra ficar alinhado a mesa" -- o anel padrao (RING_COORDS) foi
+  // calibrado pro retangulo DEITADO (8/5) que toda mesa normal usa; num
+  // retangulo EM PE (aspectRatio "3/5" aqui) a MESMA % vertical vira uma
+  // distancia em pixel bem maior (a caixa e' bem mais alta), entao o
+  // assento de cima sobrava longe da borda de verdade. FULLSCREEN_RING
+  // usa radiusYTop bem maior (38 em vez de 26 -> y=8% em vez de 20%) so'
+  // pra esse contexto, sem mexer no anel das mesas deitadas.
+  //
+  // FIX (2a rodada, pedido explicito): "os seats ao lado do hero estao
+  // fugindo da borda da mesa" -- o assento do heroi foi deslocado pra um
+  // canto bem mais agressivo (x:28,y:88 mais abaixo) do que o resto do
+  // anel usa (radiusY:30 antigo -> y~71%), entao os vizinhos do heroi
+  // (calculados pelo anel normal, sem o desvio manual do heroi) ficavam
+  // visualmente "presos" mais perto do centro enquanto o heroi ja tinha
+  // ido pra beira. radiusY subiu de 30 pra 36 pra a metade de baixo do
+  // anel acompanhar a mesma agressividade.
+  const FULLSCREEN_RING = useMemo(() => ({ radiusYTop: 38, radiusY: 36, radiusX: 40 }), []);
+  const fullscreenSeatLayoutBase = useMemo(() => {
+    try {
+      return computeStylizedSeatLayout(activeHeroSeat, FULLSCREEN_RING);
+    } catch {
+      return null;
+    }
+  }, [activeHeroSeat, FULLSCREEN_RING]);
+
+  // Herói maior e mais no canto inferior esquerdo (pedido explicito: "o
+  // layout do hero pode ser um pouco maior e pode jogar mais para o
+  // canto esquerdo inferior") -- so' o slot do heroi e' deslocado (x mais
+  // pra esquerda, y mais pra baixo); o "maior" vem do heroScale passado
+  // pro PokerTable abaixo, que escala so' o assento do heroi.
   const fullscreenSeatLayout = useMemo(() => {
-    if (!seatLayout) return null;
-    return seatLayout.map((s) => (s.isHero ? { ...s, x: 42 } : s));
-  }, [seatLayout]);
+    if (!fullscreenSeatLayoutBase) return null;
+    return fullscreenSeatLayoutBase.map((s) => (s.isHero ? { ...s, x: 28, y: 88 } : s));
+  }, [fullscreenSeatLayoutBase]);
 
   const clearFilters = useCallback(() => {
     setStats({ hits: 0, total: 0 });
@@ -805,7 +868,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                 seats={fullscreenSeatLayout}
                 variant="treino"
                 aspectRatio="3 / 5"
+                cornerRadius="10% / 6%"
                 minSeatScale={0.75}
+                heroScale={1.4}
                 streetCommitments={streetCommitments}
                 chipAnimation={chipAnimation}
               />
@@ -829,7 +894,15 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                   mesmo tamanho um de cada cor") -- mesma paleta de acao
                   ja usada no resto do produto (drill-theme ACT: fold
                   cinza, call/acao correta verde, aposta/distrator azul).*/}
-              <div style={{ position: "absolute", right: 10, top: "74%", transform: "translateY(-50%)", display: "flex", flexDirection: "column", gap: 8, zIndex: 40 }}>
+              {/* FIX (pedido explicito): "o ultimo botao dos 3 precisa
+                  estar alinhado com o seat pra nao ficar mais pra cima"
+                  -- antes o bloco inteiro era centralizado numa altura
+                  fixa (top:74% + translateY(-50%)), entao o Fold (ultimo
+                  da coluna) sobrava bem acima da linha do heroi. Agora a
+                  BASE da coluna (translateY(-100%) em vez de -50%) fica
+                  ancorada perto da linha do heroi (y:88% no seat layout),
+                  entao o ultimo botao cai alinhado com o assento. */}
+              <div style={{ position: "absolute", right: 10, top: "90%", transform: "translateY(-100%)", display: "flex", flexDirection: "column", gap: 8, zIndex: 40 }}>
                 {!chosen ? (
                   <>
                     <button onClick={() => setChosen("action")} style={fsActionBtnStyle("#1F9D6B")}>
