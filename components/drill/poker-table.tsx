@@ -48,6 +48,13 @@ function useSeatScale(ref: React.RefObject<HTMLElement | null>, minScale: number
   return scale;
 }
 
+// "8 / 5" -> 1.6 (largura / altura) -- usado pra calcular o retangulo
+// que cabe na tela via cqw/cqh, ver comentario na caixa da mesa abaixo.
+function parseAspectRatio(value: string): number {
+  const [w, h] = value.split("/").map((part) => Number(part.trim()));
+  return w > 0 && h > 0 ? w / h : 1;
+}
+
 export interface SeatState {
   status: "empty" | "live" | "acting" | "folded";
   stack?: number;
@@ -217,7 +224,7 @@ const MIN_COMMITTED_TO_SHOW = 0.5;
 // comentario do parametro.
 
 const TABLE_CENTER = { x: 50, y: 44 };
-const COMMITTED_OFFSET_PX = 56;
+const COMMITTED_OFFSET_PX = 96;
 const HERO_COMMITTED_OFFSET_PX = 104;
 const ABOVE_SEAT_EXTRA_OFFSET_PX = 14;
 
@@ -715,9 +722,23 @@ export function PokerTable({
   const felt = FELT_PALETTES[variant];
   const tableBoxRef = useRef<HTMLDivElement>(null);
   const seatScale = useSeatScale(tableBoxRef, minSeatScale);
+  const aspectRatioValue = parseAspectRatio(aspectRatio);
 
   return (
-    <div style={{ position: "relative", display: "flex", flexDirection: "column", height: "100%", minHeight: 0 }}>
+    <div
+      style={{
+        position: "relative",
+        display: "flex",
+        flexDirection: "column",
+        alignItems: "center",
+        height: "100%",
+        minHeight: 0,
+        // FIX (2026-09): ver comentario na caixa da mesa logo abaixo --
+        // "containerType: size" habilita as unidades cqw/cqh, que sao a
+        // base do calculo que corrige o achatamento em tela de notebook.
+        containerType: "size",
+      }}
+    >
       <style>{`
         @keyframes seatPulse { 0%, 100% { filter: drop-shadow(0 0 0px rgba(255,255,255,0)); } 50% { filter: drop-shadow(0 0 6px rgba(255,255,255,0.15)); } }
         @keyframes cardDeal { from { opacity: 0; transform: translateY(-8px) rotate(-4deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
@@ -747,7 +768,19 @@ export function PokerTable({
         style={{
           position: "relative",
           flex: "0 1 auto",
-          width: "100%",
+          // FIX (2026-09): "desalinhado na tela do notebook" -- com
+          // width:100% fixo, o navegador calculava a altura pelo
+          // aspectRatio a PARTIR da largura, e so' DEPOIS aplicava
+          // maxHeight -- numa tela mais baixa que larga (notebook), isso
+          // cortava a altura sem encolher a largura junto, achatando a
+          // mesa e descolando cartas/badges (com tamanho fixo em px) das
+          // posicoes que deveriam ocupar. `cqw`/`cqh` (unidades de
+          // container, habilitadas pelo containerType:"size" no pai)
+          // medem a largura/altura REAIS disponiveis; width = o menor
+          // entre "100% da largura" e "altura disponivel * proporcao"
+          // -- exatamente o maior retangulo 8/5 que cabe nos dois eixos
+          // ao mesmo tempo, tipo um <img style="object-fit:contain">.
+          width: `min(100cqw, ${aspectRatioValue * 100}cqh)`,
           maxWidth: "100%",
           maxHeight: "100%",
           aspectRatio,
