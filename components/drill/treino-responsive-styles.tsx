@@ -37,6 +37,35 @@ export function TreinoResponsiveStyles() {
         border-radius: 3px;
       }
 
+      /* Faixa intermediaria (bug reportado: "responsividade quebrada ao
+         redimensionar a janela no desktop") -- entre o mobile (768px,
+         que vira gaveta modal) e uma tela cheia confortavel, a coluna
+         de filtros fixa em 240px + a mesa espremida no resto podiam
+         nao caber: com 5 secoes de chips (Tipo/Situacao/Hero/Vilao/
+         Stack, cada uma agora com um chip extra "Qualquer") o aside
+         ficava mais cheio, e nada nessa faixa de largura reduzia a
+         coluna nem deixava o cabecalho (toggle + "SB vs BB · 15bb" +
+         contador de sessao) quebrar linha -- o cabecalho estourava
+         horizontalmente e a coluna de filtros cortava o texto dos
+         chips maiores ("vs All-in (responder)"). */
+      @media (min-width: 769px) and (max-width: 1080px) {
+        .ps-tr-body { grid-template-columns: 200px minmax(0, 1fr) !important; }
+        .ps-tr-filters-scroll { padding: 12px 10px !important; }
+        .ps-tr-header {
+          flex-wrap: wrap;
+          row-gap: 6px;
+        }
+        /* "SB vs BB · 15bb" e o contador de sessao brigavam pelo mesmo
+           espaco central quando o header nao tinha mais onde encolher --
+           o contador (menos essencial que saber o spot atual) cede a
+           linha e desce, em vez de cortar/sobrepor o resto. */
+        .ps-tr-session {
+          order: 3;
+          flex-basis: 100%;
+          justify-content: flex-start !important;
+        }
+      }
+
       @media (max-width: 768px) {
         /* Tela travada em 100dvh com overflow hidden: o jogador não
            deve precisar rolar pra achar os botões de aposta (bug

@@ -20,7 +20,8 @@ export interface RfiJamSpot {
   exploitability: number | null;
   sbOpen: RfiJamPhaseRaw;
   bbJam: RfiJamPhaseRaw;
-  sbCallJam: RfiJamPhaseRaw;
+  // So' existe em spots de RFI/Jam -- spots de Push/Fold tem so' 2 fases.
+  sbCallJam?: RfiJamPhaseRaw;
 }
 
 export interface RfiJamListItem {
@@ -69,7 +70,11 @@ const ACTION_RAISE_TYPE: Record<RfiJamPhaseRaw["action"], "raise" | "allin" | un
   call: undefined,
 };
 
-function phaseToRangeHands(phase: RfiJamPhaseRaw): RangeHands {
+// `phase` pode não existir (spots de Push/Fold não têm sb_call_jam) --
+// devolve grade vazia em vez de quebrar, quem chama decide se esconde
+// essa fase da UI (ver motor-library-panel.tsx).
+function phaseToRangeHands(phase: RfiJamPhaseRaw | undefined): RangeHands {
+  if (!phase) return {};
   const out: RangeHands = {};
   const raiseType = ACTION_RAISE_TYPE[phase.action];
   for (const [label, [freq]] of Object.entries(phase.hands)) {
@@ -90,7 +95,14 @@ export function rfiJamSpotToRangeHands(spot: RfiJamSpot) {
   };
 }
 
-// Lista os spots rfi_jam disponíveis (só o necessário pra montar um
+// Situações que o Treino sabe desenhar hoje -- RFI/Jam (3 fases:
+// sb_open/bb_jam/sb_call_jam) e Push/Fold (2 fases: sb_open/bb_jam, no
+// MESMO formato -- ver jobs/solve_pushfold_batch.py no pokersync-solver,
+// v0.2.0). Qualquer outro `action` na tabela (ex: pos-flop, quando
+// existir) fica de fora ate' ter uma tela que saiba renderizar.
+const DRILL_ACTIONS = ["rfi_jam", "pushfold"] as const;
+
+// Lista os spots disponíveis pro Treino (só o necessário pra montar um
 // seletor) — separado do fetch completo porque o gto_nodes de cada
 // spot pesa ~15-17KB, não queremos baixar todos só pra listar.
 export async function listRfiJamSpots(): Promise<RfiJamListItem[]> {
@@ -98,7 +110,7 @@ export async function listRfiJamSpots(): Promise<RfiJamListItem[]> {
   const { data, error } = await supabase
     .from("drills")
     .select("spot_id, position, stack_bb")
-    .eq("action", "rfi_jam")
+    .in("action", DRILL_ACTIONS)
     .order("position", { ascending: true })
     .order("stack_bb", { ascending: true });
 
@@ -116,7 +128,7 @@ export async function getRfiJamSpot(spotId: string): Promise<RfiJamSpot | null> 
     .from("drills")
     .select("spot_id, position, stack_bb, effective_stack, pot, exploitability, gto_nodes")
     .eq("spot_id", spotId)
-    .eq("action", "rfi_jam")
+    .in("action", DRILL_ACTIONS)
     .single();
 
   if (error) {
@@ -125,10 +137,13 @@ export async function getRfiJamSpot(spotId: string): Promise<RfiJamSpot | null> 
   }
   if (!data) return null;
 
+  // sb_call_jam so' existe em spots de RFI/Jam -- Push/Fold so' tem 2
+  // fases (nao existe um "pagar o all-in" separado, quem empurrou ja'
+  // esta' all-in por definicao).
   const nodes = data.gto_nodes as {
     sb_open: RfiJamPhaseRaw;
     bb_jam: RfiJamPhaseRaw;
-    sb_call_jam: RfiJamPhaseRaw;
+    sb_call_jam?: RfiJamPhaseRaw;
   };
 
   return {

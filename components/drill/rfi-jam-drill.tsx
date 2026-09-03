@@ -15,7 +15,6 @@ import {
   ALL_POSITIONS,
   getRfiJamSpot,
   listRfiJamSpots,
-  matchupKey,
   parseMatchup,
   type RfiJamListItem,
   type RfiJamPhaseRaw,
@@ -137,6 +136,13 @@ const VERDICT_LABEL: Record<Verdict, string> = {
 };
 
 const STACK_OPTIONS = [10, 15, 20, 25, 30, 40, 50, 60];
+
+// Valor especial "Qualquer" pros 4 filtros que suportam sorteio (Situação,
+// Hero, Vilão, Stack) -- pedido explicito: "adicionar qualquer" em cada um.
+// Tipo fica de fora (só ICM existe de verdade hoje, "Qualquer" não faria
+// sentido com uma única opção disponível).
+const ANY = "any" as const;
+type AnyOr<T> = T | typeof ANY;
 
 // "Tipo" de solve -- hoje só existe ICM no banco (todo job de RFI/Jam
 // usa engine/rfi_jam.py, que é ICM-aware). ChipEV puro (sem considerar
@@ -474,11 +480,34 @@ interface RfiJamDrillProps {
 export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDrillProps) {
   const router = useRouter();
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
+  // Cada dimensao guarda o valor CONCRETO sendo jogado agora (sempre
+  // resolvido, nunca "any") -- e' o que o resto da tela (mesa, assentos,
+  // header) sempre leu. As 4 flags *Any abaixo sao so' a INTENCAO do
+  // filtro ("sorteia entre tudo"); quem resolve pra um valor concreto a
+  // cada mao e' rollAndDraw() (ver useEffect [roundSeed, spotCache]).
   const [heroPos, setHeroPos] = useState<string>("SB");
   const [villainPos, setVillainPos] = useState<string>("BB");
   const [stackBb, setStackBb] = useState<number>(15);
-  const [spot, setSpot] = useState<RfiJamSpot | null>(null);
   const [phaseKey, setPhaseKey] = useState<(typeof PHASES)[number]["key"]>("sbOpen");
+  const [heroAny, setHeroAny] = useState(false);
+  const [villainAny, setVillainAny] = useState(false);
+  const [stackAny, setStackAny] = useState(false);
+  const [phaseAny, setPhaseAny] = useState(false);
+  const [spot, setSpot] = useState<RfiJamSpot | null>(null);
+  // Cache de TODOS os spots listados (hoje ~8 no total, ~15-17KB cada --
+  // baixar tudo de uma vez custa pouco e deixa o sorteio 100% local, sem
+  // esperar rede a cada mao nova quando "Qualquer" esta ativo em alguma
+  // dimensao).
+  const [spotCache, setSpotCache] = useState<Record<string, RfiJamSpot>>({});
+  // Incrementado a cada acao que deve produzir uma mao nova (clique em
+  // filtro, "Proxima", espaco, Limpar filtros) -- o useEffect que
+  // realmente sorteia depende SO' disso (+ spotCache), nunca de
+  // heroPos/villainPos/stackBb/phaseKey diretamente: se dependesse
+  // deles, o proprio rollAndDraw() mudando esses estados (quando alguma
+  // dimensao esta em "Qualquer") disparia o efeito de novo sozinho, sem
+  // nenhuma acao do jogador -- looping/trocando de mao sem clique.
+  const [roundSeed, setRoundSeed] = useState(0);
+  const bump = useCallback(() => setRoundSeed((n) => n + 1), []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
   // Filtros SEMPRE comecam abertos, desktop ou celular (pedido explicito:
@@ -532,73 +561,31 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialStackBb, initialMatchup]);
 
-  // Disponibilidade de cada dimensão do filtro, dado o que já está
-  // selecionado nas outras -- mesmo padrão do FilterSidebar da aba
-  // Pós-flop (counts condicionados). Villão hero->villão hero->stack
-  // formam uma cadeia (cada um restringe o próximo).
-  const villainsForHero = useMemo(
-    () => new Set(spots.filter((s) => parseMatchup(s.matchup).hero === heroPos).map((s) => parseMatchup(s.matchup).villain)),
-    [spots, heroPos]
+  // Contagem de spots que casam com uma dimensao fixada em `value`,
+  // respeitando as OUTRAS 2 dimensoes do jeito que estao agora (fixas ou
+  // "Qualquer", que conta como sem restricao) -- vira o "(4)" ao lado de
+  // cada chip, incluindo o proprio chip "Qualquer" (conta o total
+  // disponivel ignorando essa dimensao). Mesmo padrao usado no
+  // FilterSidebar da aba Pós-flop (counts condicionados), agora
+  // ANY-aware.
+  const poolCount = useCallback(
+    (dim: "hero" | "villain" | "stack", value: AnyOr<string> | AnyOr<number>) => {
+      return spots.filter((s) => {
+        const { hero, villain } = parseMatchup(s.matchup);
+        const hOk = dim === "hero" ? value === ANY || hero === value : heroAny || hero === heroPos;
+        const vOk = dim === "villain" ? value === ANY || villain === value : villainAny || villain === villainPos;
+        const stOk = dim === "stack" ? value === ANY || s.stackBb === value : stackAny || s.stackBb === stackBb;
+        return hOk && vOk && stOk;
+      }).length;
+    },
+    [spots, heroAny, villainAny, stackAny, heroPos, villainPos, stackBb]
   );
-  const stacksForMatchup = useMemo(
-    () =>
-      Array.from(new Set(spots.filter((s) => s.matchup === matchupKey(heroPos, villainPos)).map((s) => s.stackBb))).sort(
-        (a, b) => a - b
-      ),
-    [spots, heroPos, villainPos]
-  );
-  // Contagem de stacks disponíveis por posição -- vira o "(4)" ao lado
-  // do chip, pra escanear sem precisar clicar em cada um.
-  const stackCountForHero = useCallback(
-    (pos: string) => new Set(spots.filter((s) => parseMatchup(s.matchup).hero === pos).map((s) => s.stackBb)).size,
-    [spots]
-  );
-  const stackCountForHeroVillain = useCallback(
-    (h: string, v: string) => new Set(spots.filter((s) => s.matchup === matchupKey(h, v)).map((s) => s.stackBb)).size,
-    [spots]
-  );
-
-  // Auto-correção quando a seleção atual fica inválida (ex: trocou o
-  // herói e o vilão selecionado não existe mais pra esse herói) --
-  // sempre cai no primeiro disponível, nunca trava num estado sem dado.
-  useEffect(() => {
-    if (villainsForHero.size > 0 && !villainsForHero.has(villainPos)) {
-      const first = spots.find((s) => parseMatchup(s.matchup).hero === heroPos);
-      if (first) setVillainPos(parseMatchup(first.matchup).villain ?? villainPos);
-    }
-  }, [villainsForHero, villainPos, heroPos, spots]);
-
-  useEffect(() => {
-    if (stacksForMatchup.length > 0 && !stacksForMatchup.includes(stackBb)) {
-      setStackBb(stacksForMatchup[0]);
-    }
-  }, [stacksForMatchup, stackBb]);
-
-  const spotId = useMemo(() => {
-    const key = matchupKey(heroPos, villainPos);
-    const found = spots.find((s) => s.matchup === key && s.stackBb === stackBb);
-    return found?.spotId ?? "";
-  }, [spots, heroPos, villainPos, stackBb]);
-
-  useEffect(() => {
-    if (!spotId) {
-      setSpot(null);
-      setLoading(false);
-      return;
-    }
-    setLoading(true);
-    setError("");
-    getRfiJamSpot(spotId)
-      .then((s) => setSpot(s))
-      .catch(() => setError("Erro ao carregar esse spot."))
-      .finally(() => setLoading(false));
-  }, [spotId]);
 
   const currentPhase: RfiJamPhaseRaw | null = useMemo(() => {
     if (!spot) return null;
     if (phaseKey === "sbOpen") return spot.sbOpen;
     if (phaseKey === "bbJam") return spot.bbJam;
-    return spot.sbCallJam;
+    return spot.sbCallJam ?? null;
   }, [spot, phaseKey]);
 
   const nextRound = useCallback((phase: RfiJamPhaseRaw) => {
@@ -610,10 +597,94 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     setDetailsOpen(false);
   }, []);
 
+  // Baixa (e guarda em cache) o gto_nodes completo de TODO spot listado
+  // que ainda nao foi buscado -- pequeno o bastante hoje (~8 spots) pra
+  // nao valer a pena buscar so' sob demanda. Deixa o sorteio abaixo 100%
+  // sincrono/local depois que a cache enche uma vez.
   useEffect(() => {
-    if (currentPhase) nextRound(currentPhase);
+    let alive = true;
+    const missing = spots.filter((s) => !(s.spotId in spotCache));
+    if (missing.length === 0) return;
+    Promise.all(missing.map((s) => getRfiJamSpot(s.spotId).then((data) => [s.spotId, data] as const)))
+      .then((entries) => {
+        if (!alive) return;
+        setSpotCache((prev) => {
+          const next = { ...prev };
+          for (const [id, data] of entries) if (data) next[id] = data;
+          return next;
+        });
+      })
+      .catch(() => setError("Erro ao carregar spots."));
+    return () => {
+      alive = false;
+    };
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [currentPhase]);
+  }, [spots, spotCache]);
+
+  // O sorteio de verdade: monta o conjunto de spots que casam com as
+  // dimensoes FIXAS do filtro (uma dimensao em "Qualquer" nao restringe
+  // nada), escolhe um aleatorio dele, resolve a situacao (fixa ou
+  // sorteada tambem, se Situacao = Qualquer) e desenha a mao. So' roda
+  // quando `roundSeed` muda (acao explicita do jogador) ou quando a
+  // cache termina de encher -- nunca reage a heroPos/villainPos/
+  // stackBb/phaseKey mudando sozinhos, senao os proprios setX() daqui
+  // de dentro disparariam o efeito de novo, trocando de mao sem
+  // nenhuma acao do jogador.
+  useEffect(() => {
+    // Push/Fold so' tem 2 fases (sem sb_call_jam) -- se a Situação
+    // estiver FIXA num valor que o spot não tem, ele nem entra no pool
+    // (evita sortear um Push/Fold quando o jogador pediu especificamente
+    // "vs All-in (pagar)", que so' RFI/Jam resolve). Só filtra pelos
+    // spots já em cache -- os que ainda não chegaram entram otimista,
+    // o efeito roda de novo quando a cache completar.
+    const pool = spots.filter((s) => {
+      const { hero, villain } = parseMatchup(s.matchup);
+      if (!(heroAny || hero === heroPos)) return false;
+      if (!(villainAny || villain === villainPos)) return false;
+      if (!(stackAny || s.stackBb === stackBb)) return false;
+      if (!phaseAny) {
+        const cached = spotCache[s.spotId];
+        if (cached && !cached[phaseKey]) return false;
+      }
+      return true;
+    });
+    if (pool.length === 0) {
+      setSpot(null);
+      setRound(null);
+      setLoading(spots.length === 0);
+      return;
+    }
+    const picked = pool[Math.floor(Math.random() * pool.length)];
+    const pickedSpot = spotCache[picked.spotId];
+    if (!pickedSpot) return; // ainda buscando essa combinacao -- efeito roda de novo quando a cache encher
+
+    // Sorteio de Situação (quando "Qualquer") so' entre as fases que
+    // ESSE spot realmente tem -- Push/Fold sorteia so' entre as 2 dele,
+    // nunca cai numa "vs All-in (pagar)" vazia.
+    const availablePhases = PHASES.filter((p) => Boolean(pickedSpot[p.key]));
+    const resolvedPhaseKey = phaseAny
+      ? (availablePhases[Math.floor(Math.random() * availablePhases.length)] ?? PHASES[0]).key
+      : phaseKey;
+    const { hero, villain } = parseMatchup(picked.matchup);
+    if (hero && hero !== heroPos) setHeroPos(hero);
+    if (villain && villain !== villainPos) setVillainPos(villain);
+    if (picked.stackBb !== stackBb) setStackBb(picked.stackBb);
+    if (resolvedPhaseKey !== phaseKey) setPhaseKey(resolvedPhaseKey);
+
+    setSpot(pickedSpot);
+    setLoading(false);
+    setError("");
+    const phase = pickedSpot[resolvedPhaseKey];
+    if (!phase) {
+      // Situação fixa que esse spot não resolve (ex: escolheu "vs
+      // All-in (pagar)" mas o pool só tinha esse Push/Fold em cache no
+      // momento do sorteio) -- mostra "sem mãos" em vez de quebrar.
+      setRound(null);
+      return;
+    }
+    nextRound(phase);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [roundSeed, spotCache]);
 
   const isMarginal = round ? round.gap < MARGINAL_GAP_THRESHOLD : false;
 
@@ -705,7 +776,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
       if (target.matches("input, textarea, select")) return;
       if (e.code === "Space") {
         e.preventDefault();
-        if (chosen && currentPhase) nextRound(currentPhase);
+        if (chosen) bump();
         return;
       }
       if (!chosen) {
@@ -716,7 +787,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [chosen, currentPhase, nextRound, distractorLabel]);
+  }, [chosen, bump, distractorLabel]);
 
   const sessionPct = stats.total > 0 ? Math.round((stats.hits / stats.total) * 100) : 0;
   const emptyMessage = spots.length === 0 ? "Nenhum spot RFI/Jam encontrado no Supabase ainda." : "Sem mãos geradas pra essa combinação de filtros ainda.";
@@ -827,8 +898,8 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     if (!spot || !round || phaseKey === "sbOpen" || !streetCommitments) return null;
     const amount = streetCommitments[activeVillainSeat];
     if (!amount || amount <= 0) return null;
-    return { fromPosLabel: activeVillainSeat, amount, key: `${spotId}-${phaseKey}-${round.label}` };
-  }, [spot, round, phaseKey, streetCommitments, activeVillainSeat, spotId]);
+    return { fromPosLabel: activeVillainSeat, amount, key: `${spot.spotId}-${phaseKey}-${round.label}` };
+  }, [spot, round, phaseKey, streetCommitments, activeVillainSeat]);
 
   // Modo mesa-cheia: mesmo anel de 8-max do card normal (pedido
   // explicito: "quero que venha os seats foscos mas todos eles
@@ -913,16 +984,18 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     });
   }, [fullscreenSeatLayoutBase]);
 
+  // "Limpar" agora quer dizer "sem nenhuma restrição" -- todas as 4
+  // dimensões que suportam sorteio voltam pra "Qualquer" (em vez de
+  // cair numa combinação fixa arbitrária como antes), e uma mão nova é
+  // sorteada dentre TUDO que existe no banco.
   const clearFilters = useCallback(() => {
     setStats({ hits: 0, total: 0 });
-    if (spots.length > 0) {
-      const { hero, villain } = parseMatchup(spots[0].matchup);
-      if (hero) setHeroPos(hero);
-      if (villain) setVillainPos(villain);
-      setStackBb(spots[0].stackBb);
-    }
-    setPhaseKey("sbOpen");
-  }, [spots]);
+    setHeroAny(true);
+    setVillainAny(true);
+    setStackAny(true);
+    setPhaseAny(true);
+    bump();
+  }, [bump]);
 
   // "Aplicar" (pedido explicito): confirma os filtros, fecha a gaveta e
   // -- so' no celular -- entra no modo mesa-cheia. No desktop so' fecha a
@@ -1024,7 +1097,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                     </button>
                   </>
                 ) : (
-                  <button onClick={() => nextRound(currentPhase)} style={fsActionBtnStyle("#FFFFFF", "#111111")}>
+                  <button onClick={bump} style={fsActionBtnStyle("#FFFFFF", "#111111")}>
                     Próxima
                   </button>
                 )}
@@ -1070,50 +1143,42 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
           className={`ps-tr-filters${filtersOpen ? " ps-tr-filters--open" : ""}`}
           style={{ position: "relative", minHeight: 0, overflow: filtersOpen ? "visible" : "hidden" }}
         >
-          {/* FIX (pedido explicito: "ao clicar no X no filtro precisa
-              fechar o modo treino e ir pra tela inicial") -- so' no
-              celular: la' a gaveta de filtros e' um overlay que cobre a
-              tela inteira (feito pra "fechar" de vez, nao pra so'
-              recolher), entao o X sai do Treino direto. No desktop esse
-              MESMO X e' o botao de recolher/mostrar o painel lateral
-              fixo (pra sobrar mais espaco pra mesa, ver comentario logo
-              abaixo do ps-tr-filters-toggle) -- ali continua so'
-              escondendo os filtros, sem sair da tela. */}
-          {filtersOpen && (
-            <button
-              onClick={() => (isMobile ? router.push("/modulos") : setFiltersOpen(false))}
-              title={isMobile ? "Fechar treino" : "Esconder filtros"}
-              style={{ position: "absolute", top: 10, right: 10, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)" }}
-            >
-              <X size={15} />
-            </button>
-          )}
-
           {/* height:100% -- sem isso o aside fica do tamanho do próprio
               conteúdo (5 seções de chips) e sobra um bloco morto vazio
               embaixo dele na coluna, já que a mesa ao lado é bem mais
               alta. O grid já estica o WRAPPER pra altura toda; faltava
               o aside herdar isso. */}
           <aside className="ps-tr-filters-scroll" style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, padding: "16px 14px", borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)", border: "1px solid rgba(255,255,255,0.08)", overflowY: "auto", height: "100%", boxSizing: "border-box" }}>
+            {/* FIX (bug reportado: "a nomenclatura Limpar filtros esta
+                atras do botao de fechar") -- antes o X de
+                esconder/fechar era um elemento position:absolute
+                separado (top:10,right:10, relativo ao WRAPPER de fora),
+                flutuando por cima do texto "Limpar filtros" desse
+                cabecalho (que vive DENTRO do aside, com seu proprio
+                padding) -- as duas coisas miravam o mesmo cantinho por
+                mecanismos diferentes e colidiam. Agora e' tudo UM SO'
+                grupo de icones dentro do mesmo flex row (mesmo padrao
+                do celular: Limpar sempre com icone, Aplicar so' no
+                celular, Fechar/Esconder por ultimo) -- sem position:
+                absolute em lugar nenhum, entao nunca mais sobrepõe. */}
             <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8 }}>
               <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.16em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
                 Filtros
               </span>
-              {isMobile ? (
-                // Celular (pedido explicito: "ter botao de aplicar filtro
-                // no inicio da modal e limpar tambem, pode ser apenas
-                // icones") -- Aplicar fecha a gaveta e entra no modo
-                // mesa-cheia; Limpar reseta pra combinacao padrao sem
-                // fechar nada, pro jogador continuar escolhendo.
-                <div style={{ display: "flex", gap: 6 }}>
-                  <button
-                    onClick={clearFilters}
-                    title="Limpar filtros"
-                    aria-label="Limpar filtros"
-                    style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", cursor: "pointer" }}
-                  >
-                    <RotateCcw size={14} />
-                  </button>
+              <div style={{ display: "flex", gap: 6, flexShrink: 0 }}>
+                <button
+                  onClick={clearFilters}
+                  title="Limpar filtros"
+                  aria-label="Limpar filtros"
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "rgba(255,255,255,0.06)", border: "1px solid rgba(255,255,255,0.12)", color: "rgba(255,255,255,0.6)", cursor: "pointer" }}
+                >
+                  <RotateCcw size={14} />
+                </button>
+                {isMobile && (
+                  // Aplicar so' existe no celular (pedido explicito de
+                  // antes: fecha a gaveta e entra no modo mesa-cheia) --
+                  // no desktop os filtros ja aplicam ao vivo, nao existe
+                  // um "confirmar" separado.
                   <button
                     onClick={applyFilters}
                     title="Aplicar filtros"
@@ -1122,48 +1187,24 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                   >
                     <Check size={15} strokeWidth={2.5} />
                   </button>
-                </div>
-              ) : (
+                )}
                 <button
-                  onClick={clearFilters}
-                  style={{ fontFamily: F, fontSize: 10.5, fontWeight: 500, color: "rgba(255,255,255,0.5)", background: "transparent", border: 0, padding: 0, cursor: "pointer" }}
+                  onClick={() => (isMobile ? router.push("/modulos") : setFiltersOpen(false))}
+                  title={isMobile ? "Fechar treino" : "Esconder filtros"}
+                  aria-label={isMobile ? "Fechar treino" : "Esconder filtros"}
+                  style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)", cursor: "pointer" }}
                 >
-                  Limpar filtros
+                  <X size={15} />
                 </button>
-              )}
+              </div>
             </div>
 
+            {/* Ordem pedida: Tipo, Situação, Hero, Vilão, Stack -- cada
+                um (exceto Tipo, que hoje so' tem 1 opcao de verdade)
+                ganha um chip extra "Qualquer" que sorteia entre todos os
+                valores dessa dimensao a cada mao nova, em vez de travar
+                num so'. */}
             <div style={{ display: "flex", flexDirection: "column", gap: 14 }}>
-              <FilterSection label="Posição herói">
-                {ALL_POSITIONS.map((p) => {
-                  const n = stackCountForHero(p);
-                  return (
-                    <FilterChip key={p} label={n > 0 ? `${p} (${n})` : p} active={p === heroPos} disabled={n === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setHeroPos(p); }} />
-                  );
-                })}
-              </FilterSection>
-
-              <FilterSection label="Posição vilão">
-                {ALL_POSITIONS.map((p) => {
-                  const n = stackCountForHeroVillain(heroPos, p);
-                  return (
-                    <FilterChip key={p} label={n > 0 ? `${p} (${n})` : p} active={p === villainPos} disabled={n === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setVillainPos(p); }} />
-                  );
-                })}
-              </FilterSection>
-
-              <FilterSection label="Stack">
-                {STACK_OPTIONS.map((s) => (
-                  <FilterChip key={s} label={`${s}bb`} active={s === stackBb} disabled={!stacksForMatchup.includes(s)} onClick={() => { setStats({ hits: 0, total: 0 }); setStackBb(s); }} />
-                ))}
-              </FilterSection>
-
-              <FilterSection label="Situação">
-                {PHASES.map((p) => (
-                  <FilterChip key={p.key} label={p.label} active={p.key === phaseKey} disabled={!spot} onClick={() => { setStats({ hits: 0, total: 0 }); setPhaseKey(p.key); }} />
-                ))}
-              </FilterSection>
-
               <FilterSection label="Tipo">
                 {TYPE_OPTIONS.map((t) => (
                   <FilterChip
@@ -1175,6 +1216,67 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                     onClick={() => {}}
                   />
                 ))}
+              </FilterSection>
+
+              <FilterSection label="Situação">
+                <FilterChip label="Qualquer" active={phaseAny} disabled={spots.length === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setPhaseAny(true); bump(); }} />
+                {PHASES.map((p) => (
+                  <FilterChip
+                    key={p.key}
+                    label={p.label}
+                    active={!phaseAny && p.key === phaseKey}
+                    disabled={spots.length === 0}
+                    onClick={() => { setStats({ hits: 0, total: 0 }); setPhaseAny(false); setPhaseKey(p.key); bump(); }}
+                  />
+                ))}
+              </FilterSection>
+
+              <FilterSection label="Hero">
+                <FilterChip label={`Qualquer (${poolCount("hero", ANY)})`} active={heroAny} disabled={poolCount("hero", ANY) === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setHeroAny(true); bump(); }} />
+                {ALL_POSITIONS.map((p) => {
+                  const n = poolCount("hero", p);
+                  return (
+                    <FilterChip
+                      key={p}
+                      label={n > 0 ? `${p} (${n})` : p}
+                      active={!heroAny && p === heroPos}
+                      disabled={n === 0}
+                      onClick={() => { setStats({ hits: 0, total: 0 }); setHeroAny(false); setHeroPos(p); bump(); }}
+                    />
+                  );
+                })}
+              </FilterSection>
+
+              <FilterSection label="Vilão">
+                <FilterChip label={`Qualquer (${poolCount("villain", ANY)})`} active={villainAny} disabled={poolCount("villain", ANY) === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setVillainAny(true); bump(); }} />
+                {ALL_POSITIONS.map((p) => {
+                  const n = poolCount("villain", p);
+                  return (
+                    <FilterChip
+                      key={p}
+                      label={n > 0 ? `${p} (${n})` : p}
+                      active={!villainAny && p === villainPos}
+                      disabled={n === 0}
+                      onClick={() => { setStats({ hits: 0, total: 0 }); setVillainAny(false); setVillainPos(p); bump(); }}
+                    />
+                  );
+                })}
+              </FilterSection>
+
+              <FilterSection label="Stack">
+                <FilterChip label={`Qualquer (${poolCount("stack", ANY)})`} active={stackAny} disabled={poolCount("stack", ANY) === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setStackAny(true); bump(); }} />
+                {STACK_OPTIONS.map((s) => {
+                  const n = poolCount("stack", s);
+                  return (
+                    <FilterChip
+                      key={s}
+                      label={n > 0 ? `${s}bb (${n})` : `${s}bb`}
+                      active={!stackAny && s === stackBb}
+                      disabled={n === 0}
+                      onClick={() => { setStats({ hits: 0, total: 0 }); setStackAny(false); setStackBb(s); bump(); }}
+                    />
+                  );
+                })}
               </FilterSection>
             </div>
 
@@ -1320,7 +1422,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                         Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : chosen === "distractor" ? distractorLabel ?? "outra" : actionLabel}</span> — resumo acima.
                       </div>
                       <button
-                        onClick={() => nextRound(currentPhase)}
+                        onClick={bump}
                         style={{ fontFamily: F, background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "10px 24px", cursor: "pointer", fontWeight: 500, fontSize: 13, flexShrink: 0 }}
                       >
                         Próxima <span style={{ fontSize: 11, color: "rgba(0,0,0,0.5)" }}>(espaço)</span>
