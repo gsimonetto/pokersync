@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useRouter } from "next/navigation";
 import { Loader2, SlidersHorizontal, X, CheckCircle2, XCircle, Info, Check, RotateCcw } from "lucide-react";
 import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
@@ -74,14 +75,27 @@ const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam"; label: string }[] = [
   { key: "sbCallJam", label: "vs All-in (pagar)" },
 ];
 
+// FIX (pedido explicito: "ter apenas uma nomenclatura All in/raise/
+// fold/call/limp") -- nomes dos botoes de acao usam so' esses 5 termos
+// canonicos em todo o Treino, sem variante tecnica ("Abrir (raise)")
+// nem redundante ("Limpar (call)") misturada.
 const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
-  open: "Abrir (raise)",
+  open: "Raise",
   // Pedido explicito: "botao de all-in nao e' pra ter a nomenclatura jam".
   allin: "All-in",
   // Pedido explicito: "o botao de pagar e' apenas call, tire a
   // informacao pagar".
   call: "Call",
 };
+
+// Stack abaixo do qual abrir vira jogada binaria de verdade (all-in ou
+// fold, sem meio-termo) -- acima disso, abrir de menos (limp) tambem
+// vira uma opcao real errada pra testar. Pedido explicito: "botoes de
+// aposta para 15bb ou menos: allin, raise pra 2bb ou fold quando nao
+// sou o BB / acima disso ter raise, limp ou fold".
+const OPEN_SHOVE_STACK_THRESHOLD_BB = 15;
+const OPEN_SMALL_RAISE_LABEL = "Raise pra 2bb";
+const OPEN_LIMP_LABEL = "Limp";
 
 // Terceiro botão "distrator" por fase -- pedido explícito: sempre 3+
 // opções na barra de ação (fold + a correta + pelo menos uma errada),
@@ -93,10 +107,21 @@ const ACTION_LABEL: Record<RfiJamPhaseRaw["action"], string> = {
 // tem uma 3a ação real pra fabricar, e forçar uma (ex "Aumentar", que
 // nem é uma jogada legal ali) ensinaria uma opção que não existe. Essa
 // fase continua com só 2 botões.
-const DISTRACTOR_LABEL: Partial<Record<(typeof PHASES)[number]["key"], string>> = {
-  sbOpen: "Limpar (call)",
-  bbJam: "Call",
-};
+//
+// FIX (2a rodada, pedido explicito): em sbOpen o distrator agora
+// depende do stack efetivo do spot -- com stack raso (<=15bb) a jogada
+// certa do solver ja' costuma ser o proprio All-in, entao o erro real
+// de comparar e' "abrir pouco" (Raise pra 2bb); com stack fundo, a
+// jogada certa costuma ser Raise, e o erro real e' nao abrir nada
+// (Limp). O botao CERTO continua vindo direto do solver (ACTION_LABEL
+// acima) -- so' o texto do errado muda com o stack.
+function getDistractorLabel(phaseKey: (typeof PHASES)[number]["key"], effectiveStackBb: number | null): string | null {
+  if (phaseKey === "bbJam") return "Call";
+  if (phaseKey === "sbOpen") {
+    return effectiveStackBb != null && effectiveStackBb <= OPEN_SHOVE_STACK_THRESHOLD_BB ? OPEN_SMALL_RAISE_LABEL : OPEN_LIMP_LABEL;
+  }
+  return null;
+}
 
 const VERDICT_LABEL: Record<Verdict, string> = {
   OTIMA: "Jogada Ótima",
@@ -335,7 +360,7 @@ function FreqBar({ label, pct, highlighted }: { label: string; pct: number; high
 // o detalhe técnico clica; quem só quer treinar o feedback rápido não
 // precisa decifrar "equity ICM" no meio da sessão.
 function EvDetailsModal({
-  onClose, actionLabel, distractorLabel, chosen, foldPct, actionPct, gapRelativePct, evFold, evAction, isMarginal,
+  onClose, actionLabel, distractorLabel, chosen, foldPct, actionPct, gapRelativePct, evFold, evAction, isMarginal, isGoodVerdict,
 }: {
   onClose: () => void;
   actionLabel: string;
@@ -347,7 +372,20 @@ function EvDetailsModal({
   evFold: number;
   evAction: number;
   isMarginal: boolean;
+  isGoodVerdict: boolean;
 }) {
+  // FIX (pedido explicito: "a perca de bb nos detalhes e' o que falta,
+  // da forma que esta ta muito confuso ainda") -- antes esse numero
+  // mostrava sempre a MESMA % (a diferenca entre as duas opcoes da
+  // mao), nao importa se o jogador acertou ou errou -- depois de uma
+  // "Jogada Otima" o modal podia mostrar "40% de diferenca", lendo como
+  // se o jogador tivesse perdido 40% mesmo tendo acertado. Nao da pra
+  // mostrar a perda em bb de verdade ainda (o motor so' calcula EV em
+  // equity ICM, nao tem EV em fichas puras -- ver TYPE_OPTIONS acima).
+  // O que da pra corrigir sem inventar numero: deixar claro que o
+  // jogador so' PERDE essa fatia quando joga errado -- acertando, a
+  // perda e' 0%, nao a diferenca entre as opcoes.
+  const userLossPct = isGoodVerdict ? 0 : gapRelativePct;
   useEscapeToClose(onClose);
   return (
     <ModalPortal>
@@ -387,19 +425,24 @@ function EvDetailsModal({
 
             <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
               <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-                {chosen === "distractor" ? "Quanto as opções reais valem" : "Quanto isso vale"}
+                Quanto você perdeu aqui
               </span>
               <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: 26, fontWeight: 800, color: isMarginal ? "#f5a524" : "#FFFFFF" }}>
-                  {gapRelativePct != null ? `${gapRelativePct.toFixed(1)}%` : "—"}
+                <span style={{ fontSize: 26, fontWeight: 800, color: userLossPct === 0 ? "#34D399" : isMarginal ? "#f5a524" : "#FFFFFF" }}>
+                  {userLossPct != null ? `${userLossPct.toFixed(1)}%` : "—"}
                 </span>
-                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>de diferença entre Fold e {actionLabel.toLowerCase()}</span>
+                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>
+                  {userLossPct === 0 ? "você manteve o valor máximo dessa decisão" : `do valor máximo que essa decisão tinha`}
+                </span>
               </div>
               <p style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5, color: "rgba(255,255,255,0.35)" }}>
-                {chosen === "distractor" && distractorLabel && (
-                  <>O motor não calcula o valor de {distractorLabel.toLowerCase()} aqui (ele nunca considera essa jogada) — o número acima é só a diferença entre as duas opções reais. </>
+                {userLossPct === 0 ? (
+                  <>Essa mão tinha até {gapRelativePct != null ? `${gapRelativePct.toFixed(1)}%` : "uma boa diferença"} de valor em jogo entre Fold e {actionLabel.toLowerCase()} — mas como você escolheu o lado certo, não perdeu nada disso.</>
+                ) : chosen === "distractor" && distractorLabel ? (
+                  <>O motor não calcula o valor de {distractorLabel.toLowerCase()} aqui (ele nunca considera essa jogada) — o número acima é a diferença entre as duas opções reais (Fold e {actionLabel.toLowerCase()}), que é o que você abriu mão ao escolher uma jogada fora da conta do GTO.</>
+                ) : (
+                  <>Fold valia {evFold.toFixed(1)} e {actionLabel.toLowerCase()} valia {evAction.toFixed(1)} (em equity de premiação desse torneio) — a % acima é essa diferença, na fatia que você abriu mão. É comparável entre mãos diferentes; os valores brutos entre parênteses não são (dependem do formato desse torneio específico).</>
                 )}
-                Esse número é o que dá pra comparar entre mãos diferentes. Os valores de equity ICM crus (fold {evFold.toFixed(1)} · {actionLabel.toLowerCase()} {evAction.toFixed(1)}) são específicos desse torneio — servem só pra calcular a % acima, não pra comparar com outra mão.
               </p>
             </div>
           </div>
@@ -424,6 +467,7 @@ interface RfiJamDrillProps {
 // esquerda, mesa (com o herói de verdade sentado, feltro azul) no
 // meio, resultado GTO numa linha acima da mesa.
 export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDrillProps) {
+  const router = useRouter();
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   const [heroPos, setHeroPos] = useState<string>("SB");
   const [villainPos, setVillainPos] = useState<string>("BB");
@@ -617,6 +661,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     : null;
 
   const actionLabel = currentPhase ? ACTION_LABEL[currentPhase.action] : "";
+  const distractorLabel = getDistractorLabel(phaseKey, spot?.effectiveStack ?? null);
 
   // Uma frase só, sem "equity"/"ICM"/"gap" -- é o que aparece por
   // padrão depois de cada mão. Quem quer os números de verdade clica
@@ -626,13 +671,13 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     // Distrator: não tem EV real calculado (o solver nunca resolve
     // essa jogada), então a frase não tenta comparar valor -- só avisa
     // que essa opção nem entra na conta do GTO aqui.
-    if (chosen === "distractor") return `O GTO nem considera ${(DISTRACTOR_LABEL[phaseKey] ?? "essa jogada").toLowerCase()} nessa situação.`;
+    if (chosen === "distractor") return `O GTO nem considera ${(distractorLabel ?? "essa jogada").toLowerCase()} nessa situação.`;
     if (isMarginal) return "As duas jogadas valem praticamente o mesmo aqui — não tinha erro grave possível.";
     const chosenLabel = chosen === "fold" ? "Fold" : actionLabel;
     const otherLabel = chosen === "fold" ? actionLabel : "Fold";
     if (isGoodVerdict) return `Boa escolha — o GTO também prefere ${chosenLabel} na maioria das vezes aqui.`;
     return `O GTO prefere ${otherLabel} na maioria das vezes aqui.`;
-  }, [round, chosen, currentPhase, isMarginal, isGoodVerdict, actionLabel, phaseKey]);
+  }, [round, chosen, currentPhase, isMarginal, isGoodVerdict, actionLabel, distractorLabel]);
 
   useEffect(() => {
     if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
@@ -661,12 +706,12 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
       if (!chosen) {
         if (e.key.toUpperCase() === "Q") setChosen("fold");
         if (e.key.toUpperCase() === "W") setChosen("action");
-        if (e.key.toUpperCase() === "E" && DISTRACTOR_LABEL[phaseKey]) setChosen("distractor");
+        if (e.key.toUpperCase() === "E" && distractorLabel) setChosen("distractor");
       }
     }
     window.addEventListener("keydown", onKey);
     return () => window.removeEventListener("keydown", onKey);
-  }, [chosen, currentPhase, nextRound, phaseKey]);
+  }, [chosen, currentPhase, nextRound, distractorLabel]);
 
   const sessionPct = stats.total > 0 ? Math.round((stats.hits / stats.total) * 100) : 0;
   const emptyMessage = spots.length === 0 ? "Nenhum spot RFI/Jam encontrado no Supabase ainda." : "Sem mãos geradas pra essa combinação de filtros ainda.";
@@ -713,10 +758,18 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   //   conhecido, e' o proprio effective stack (all-in = tudo que tem).
   // - bbJam: o vilao ABRIU (raise, nao all-in) -- o motor nao guarda o
   //   tamanho exato da abertura por mao (so' frequencia/EV por classe de
-  //   mao), entao usa uma abertura padrao (convencao visual, tamanho
-  //   tipico de RFI a stack raso) so' pra a ficha aparecer na mesa —
-  //   melhor que nao mostrar nada da acao do vilao.
-  const OPEN_RAISE_APPROX_BB = 2;
+  //   mao), entao usa uma abertura padrao (convencao visual) so' pra a
+  //   ficha aparecer na mesa — melhor que nao mostrar nada da acao do
+  //   vilao.
+  //
+  // FIX (bug reportado: "SPR errado, valor heuristico que nao condiz
+  // com o cenario filtrado") -- esse valor era 2 mas o job que gera os
+  // spots no motor (solve_rfi_jam_batch.py) usa `open_size=2.2` por
+  // padrao pra TODOS os stacks (RfiJamSolver.__init__ tambem tem
+  // open_size=2.2 como default) -- 2 nunca bateu com o dado real, so'
+  // que em stacks rasos a diferenca de 0.2bb sumia no arredondamento
+  // visual. Corrigido pra 2.2, o valor de verdade usado pelo motor.
+  const OPEN_RAISE_APPROX_BB = 2.2;
 
   const streetCommitments = useMemo(() => {
     if (!spot) return undefined;
@@ -817,9 +870,42 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   // canto esquerdo inferior") -- so' o slot do heroi e' deslocado (x mais
   // pra esquerda, y mais pra baixo); o "maior" vem do heroScale passado
   // pro PokerTable abaixo, que escala so' o assento do heroi.
+  // FIX (2a rodada, pedido explicito: "sobe um pouco pra nao ficar uma
+  // mao sobre a outra e alinhe o outro lado tambem" + "e se a acao for
+  // do outro lado antes? os botoes de acao nao podem ficar em cima do
+  // layout do vilao") -- o vizinho do heroi no anel (unico outro
+  // assento sempre ocupado, o vilao) fica no indice 1 (esquerda) quando
+  // o heroi da mao e' o SB, ou no indice 7 (direita, espelhado) quando
+  // e' o BB (fase bbJam) -- a posicao do heroi vira alvo fixo (x:28,
+  // y:88), mas o anel comum deixava esse vizinho baixo demais e perto
+  // demais do centro, colidindo com o proprio leque de cartas do heroi
+  // (que cresce com heroScale) e, no lado direito, caindo bem em cima
+  // da coluna de botoes de acao (ancorada em right:10).
+  //
+  // FIX (3a rodada, pedido explicito: "o seat do lado esquerdo ainda
+  // fica muito proximo e sobrepondo as cartas do heroi") -- y:60/x:16
+  // da rodada anterior nao abria folga suficiente pro leque de cartas
+  // aumentado (heroScale).
+  //
+  // FIX (4a rodada, BUG reportado: "a mesa precisa ser alinhada pra
+  // 8max, o treino ta em 6") -- o ajuste anterior (y:48, quase na linha
+  // do meio da mesa) empurrou esse vizinho pra quase EM CIMA do assento
+  // fixo do meio-da-lateral (UTG/CO, que cai em y~46 nesse mesmo anel),
+  // colapsando os dois num so' ponto visual -- por isso a mesa parecia
+  // ter so' 6 posicoes distinguiveis em vez de 8. Agora y:64 fica a meio
+  // caminho entre o heroi (y:88) e esse assento lateral (y:46), com
+  // folga clara dos dois lados; x:14/86 (em vez de 10/90) tira ele de
+  // cima da mesma linha vertical do assento lateral. Confirmado em
+  // teste visual com o anel de 8 assentos completo, sem sobreposicao
+  // nem com o heroi nem com o vizinho de baixo dele.
   const fullscreenSeatLayout = useMemo(() => {
     if (!fullscreenSeatLayoutBase) return null;
-    return fullscreenSeatLayoutBase.map((s) => (s.isHero ? { ...s, x: 28, y: 88 } : s));
+    return fullscreenSeatLayoutBase.map((s, i) => {
+      if (s.isHero) return { ...s, x: 28, y: 88 };
+      if (i === 1) return { ...s, x: 14, y: 64 };
+      if (i === fullscreenSeatLayoutBase.length - 1) return { ...s, x: 86, y: 64 };
+      return s;
+    });
   }, [fullscreenSeatLayoutBase]);
 
   const clearFilters = useCallback(() => {
@@ -923,9 +1009,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                     <button onClick={() => setChosen("action")} style={fsActionBtnStyle("#1F9D6B")}>
                       {actionLabel}
                     </button>
-                    {DISTRACTOR_LABEL[phaseKey] && (
+                    {distractorLabel && (
                       <button onClick={() => setChosen("distractor")} style={fsActionBtnStyle("#2563EB")}>
-                        {DISTRACTOR_LABEL[phaseKey]}
+                        {distractorLabel}
                       </button>
                     )}
                     <button onClick={() => setChosen("fold")} style={fsActionBtnStyle("#DC2626")}>
@@ -979,10 +1065,19 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
           className={`ps-tr-filters${filtersOpen ? " ps-tr-filters--open" : ""}`}
           style={{ position: "relative", minHeight: 0, overflow: filtersOpen ? "visible" : "hidden" }}
         >
+          {/* FIX (pedido explicito: "ao clicar no X no filtro precisa
+              fechar o modo treino e ir pra tela inicial") -- so' no
+              celular: la' a gaveta de filtros e' um overlay que cobre a
+              tela inteira (feito pra "fechar" de vez, nao pra so'
+              recolher), entao o X sai do Treino direto. No desktop esse
+              MESMO X e' o botao de recolher/mostrar o painel lateral
+              fixo (pra sobrar mais espaco pra mesa, ver comentario logo
+              abaixo do ps-tr-filters-toggle) -- ali continua so'
+              escondendo os filtros, sem sair da tela. */}
           {filtersOpen && (
             <button
-              onClick={() => setFiltersOpen(false)}
-              title="Esconder filtros"
+              onClick={() => (isMobile ? router.push("/modulos") : setFiltersOpen(false))}
+              title={isMobile ? "Fechar treino" : "Esconder filtros"}
               style={{ position: "absolute", top: 10, right: 10, zIndex: 1, display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)" }}
             >
               <X size={15} />
@@ -1093,7 +1188,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
           <div
             className="ps-tr-filters-backdrop"
             onClick={() => setFiltersOpen(false)}
-            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 39 }}
+            style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 59 }}
           />
         )}
 
@@ -1156,7 +1251,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                   <EvDetailsModal
                     onClose={() => setDetailsOpen(false)}
                     actionLabel={actionLabel}
-                    distractorLabel={DISTRACTOR_LABEL[phaseKey] ?? null}
+                    distractorLabel={distractorLabel}
                     chosen={chosen}
                     foldPct={Math.round((1 - round.freq) * 100)}
                     actionPct={Math.round(round.freq * 100)}
@@ -1164,6 +1259,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                     evFold={currentPhase.ev_fold}
                     evAction={round.ev}
                     isMarginal={isMarginal}
+                    isGoodVerdict={isGoodVerdict}
                   />
                 )}
 
@@ -1200,12 +1296,12 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                           errada -- em "vs All-in" (sbCallJam) não tem
                           (fold ou call são as únicas ações possíveis
                           depois de alguém all-in num pote HU). */}
-                      {DISTRACTOR_LABEL[phaseKey] && (
+                      {distractorLabel && (
                         <button
                           onClick={() => setChosen("distractor")}
                           style={{ fontFamily: F, minWidth: 96, display: "flex", flexDirection: "column", alignItems: "center", gap: 4, borderRadius: 10, border: "1px solid rgba(255,255,255,0.10)", background: "#1A1A1A", padding: "13px 18px", fontSize: 14.5, fontWeight: 600, color: "#FFFFFF", cursor: "pointer" }}
                         >
-                          {DISTRACTOR_LABEL[phaseKey]}
+                          {distractorLabel}
                           <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)" }}>E</span>
                         </button>
                       )}
@@ -1216,7 +1312,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
                           ("Você jogou X — resumo acima"), em vez de só
                           o botão sozinho. */}
                       <div style={{ fontFamily: F, flex: 1, padding: "10px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : chosen === "distractor" ? DISTRACTOR_LABEL[phaseKey] ?? "outra" : actionLabel}</span> — resumo acima.
+                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : chosen === "distractor" ? distractorLabel ?? "outra" : actionLabel}</span> — resumo acima.
                       </div>
                       <button
                         onClick={() => nextRound(currentPhase)}
