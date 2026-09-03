@@ -1347,3 +1347,44 @@ export async function fetchTeamUnreadCount(): Promise<number> {
   if (error) throw error;
   return count ?? 0;
 }
+
+// ============================================================
+// Player Evolution do jogador (visão do coach) -- hand_tags só é
+// legível pelo próprio dono (RLS), então isso não existia antes.
+// Mesmas fórmulas de lib/services/analysis-service.ts
+// (computePreflopMetrics/computePostflopMetrics), agregadas em SQL
+// pra um jogador só via team_player_evolution_stats().
+// ============================================================
+export interface PlayerEvolutionStats {
+  hands: number;
+  vpipPct: number | null;
+  pfrPct: number | null;
+  threeBetPct: number | null;
+  foldTo3betPct: number | null;
+  cbetFlopPct: number | null;
+  foldToCbetFlopPct: number | null;
+  aggressionFactor: number | null;
+  aggressionFrequencyPct: number | null;
+  wsdPct: number | null;
+  wsdWonPct: number | null;
+}
+
+export async function fetchPlayerEvolutionStats(playerId: string, days = 30): Promise<PlayerEvolutionStats> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_player_evolution_stats", { p_player: playerId, p_days: days });
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  return {
+    hands: r?.hands ?? 0,
+    vpipPct: r?.vpip_pct ?? null,
+    pfrPct: r?.pfr_pct ?? null,
+    threeBetPct: r?.three_bet_pct ?? null,
+    foldTo3betPct: r?.fold_to_3bet_pct ?? null,
+    cbetFlopPct: r?.cbet_flop_pct ?? null,
+    foldToCbetFlopPct: r?.fold_to_cbet_flop_pct ?? null,
+    aggressionFactor: r?.aggression_factor ?? null,
+    aggressionFrequencyPct: r?.aggression_frequency_pct ?? null,
+    wsdPct: r?.wsd_pct ?? null,
+    wsdWonPct: r?.wsd_won_pct ?? null,
+  };
+}

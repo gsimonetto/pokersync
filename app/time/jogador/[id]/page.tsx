@@ -17,6 +17,7 @@ import {
   fetchPlayerActivity,
   fetchPlayerAlerts,
   fetchPlayerDetail,
+  fetchPlayerEvolutionStats,
   fetchPlayerFinancialSeries,
   fetchPlayerLeaks,
   fetchPlayerScoreHistory,
@@ -26,6 +27,7 @@ import {
   traduzErroTime,
   type FinancialDay,
   type PlayerActivityDay,
+  type PlayerEvolutionStats,
   type PlayerScoreHistoryPoint,
   type TeamAlert,
   type PlayerDetail,
@@ -58,6 +60,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
   const [staking, setStaking] = useState<PlayerStakingSession[]>([]);
   const [historicoScore, setHistoricoScore] = useState<PlayerScoreHistoryPoint[]>([]);
+  const [evolutionStats, setEvolutionStats] = useState<PlayerEvolutionStats | null>(null);
   const [meuId, setMeuId] = useState<string | null>(null);
   const [meuPapel, setMeuPapel] = useState<string | null>(null);
 
@@ -65,7 +68,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, fin, stk, hist, mem, auth] = await Promise.all([
+      const [d, a, l, m, al, fin, stk, hist, evo, mem, auth] = await Promise.all([
         fetchPlayerDetail(id, dias),
         fetchPlayerActivity(id, dias),
         fetchPlayerLeaks(id, dias),
@@ -74,6 +77,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
         fetchPlayerFinancialSeries(id, dias).catch(() => []),
         fetchPlayerStakingSessions(id).catch(() => []),
         fetchPlayerScoreHistory(id, dias).catch(() => []),
+        fetchPlayerEvolutionStats(id, dias).catch(() => null),
         fetchMyMembership().catch(() => null),
         createClient().auth.getUser(),
       ]);
@@ -85,6 +89,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
       setFinanceiro(fin);
       setStaking(stk);
       setHistoricoScore(hist);
+      setEvolutionStats(evo);
       setMeuPapel(mem?.role ?? null);
       setMeuId(auth.data.user?.id ?? null);
     } catch (e) {
@@ -157,6 +162,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
           financeiro={financeiro}
           staking={staking}
           historicoScore={historicoScore}
+          evolutionStats={evolutionStats}
           podeGerenciarMetas={meuPapel === "admin" || (meuPapel === "coach" && p.coachId === meuId)}
         />
       )}
