@@ -69,9 +69,14 @@ function classToDisplayCards(label: string): [string, string] {
   return suited ? [`${r1}h`, `${r2}h`] : [`${r1}h`, `${r2}d`];
 }
 
+// FIX (pedido explicito: "nos filtros tirar a nomenclatura jam e
+// manter apenas all in") -- mesma nomenclatura padronizada ja usada
+// nos botoes de acao (All-in, nao Jam) agora tambem no filtro de
+// Situacao. As duas fases que envolvem all-in continuam distinguiveis
+// pelo texto entre parenteses (responder vs pagar).
 const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam"; label: string }[] = [
   { key: "sbOpen", label: "vs Open (abrir)" },
-  { key: "bbJam", label: "vs Jam (responder)" },
+  { key: "bbJam", label: "vs All-in (responder)" },
   { key: "sbCallJam", label: "vs All-in (pagar)" },
 ];
 
