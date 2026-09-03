@@ -12,7 +12,14 @@ import {
   createCashSession,
   attachReviewsToSession,
   updateSessionBounty,
+  linkOrCreateBankrollSessionForTournament,
+  type HandSession,
 } from "@/lib/services/hand-session-service";
+
+// Lembra a última escolha do jogador (marcado/desmarcado) entre uma
+// importação e outra -- pedido explícito, pra não ter que decidir de
+// novo toda vez.
+const ALSO_LOG_BANKROLL_KEY = "pokersync:import:alsoLogToBankroll";
 
 // Versão compacta do import de hand history (mesmo motor de
 // components/revisor/revisor-nova-mao.tsx: createImportBatch +
@@ -35,6 +42,24 @@ export function ManualImportPanel({ onImported }: { onImported: () => void }) {
   const [selected, setSelected] = useState<number[]>([]);
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
+  const [warning, setWarning] = useState("");
+  const [alsoLogToBankroll, setAlsoLogToBankroll] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = window.localStorage.getItem(ALSO_LOG_BANKROLL_KEY);
+    return saved === null ? true : saved === "true";
+  });
+
+  function toggleAlsoLogToBankroll() {
+    setAlsoLogToBankroll((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(ALSO_LOG_BANKROLL_KEY, String(next));
+      } catch {
+        // preferencia nao salva -- sem impacto, so nao lembra da proxima vez
+      }
+      return next;
+    });
+  }
 
   async function handleParse() {
     if (!text.trim() || busy) return;
@@ -63,6 +88,7 @@ export function ManualImportPanel({ onImported }: { onImported: () => void }) {
     if (!batch || selected.length === 0 || busy) return;
     setBusy(true);
     setError("");
+    setWarning("");
     try {
       const supabase = createClient();
       const { data } = await supabase.auth.getUser();
@@ -82,11 +108,13 @@ export function ManualImportPanel({ onImported }: { onImported: () => void }) {
 
       if (tournInfo.tournamentIdPs) {
         const existing = await findExistingTournamentSession(userId, tournInfo.tournamentIdPs);
+        let tournamentSession: HandSession;
         if (existing) {
           await attachReviewsToSession(ids, existing.id, selectedParsedHands);
           if (suggestedBounty != null && (existing.bounty_current == null || suggestedBounty > existing.bounty_current)) {
             await updateSessionBounty(existing.id, suggestedBounty).catch(() => {});
           }
+          tournamentSession = existing;
         } else {
           const formatType = tournInfo.looksLikeBounty ? "pko" : "regular";
           const created = await createTournamentSession({
@@ -98,6 +126,25 @@ export function ManualImportPanel({ onImported }: { onImported: () => void }) {
             buyin: tournInfo.buyin,
           });
           await attachReviewsToSession(ids, created.id, selectedParsedHands);
+          tournamentSession = created;
+        }
+
+        // "Também lançar na Banca" (pedido explícito) -- so' pra torneio
+        // (cash nao tem buyin/resultado pra inferir so do hand history).
+        // Falha de cotação/rede aqui NAO derruba a importação inteira (a
+        // mão já está salva) -- só avisa, o jogador ainda pode lançar essa
+        // sessão manualmente na Banca depois.
+        if (alsoLogToBankroll) {
+          try {
+            const result = await linkOrCreateBankrollSessionForTournament({ userId, handSession: tournamentSession });
+            if (!result) {
+              setWarning(
+                "Mão importada, mas não consegui lançar na Banca agora (sem cotação USD→BRL disponível) — lance manualmente por lá quando puder."
+              );
+            }
+          } catch {
+            setWarning("Mão importada, mas houve um erro ao lançar na Banca — confira/lance manualmente por lá.");
+          }
         }
       } else if (firstHand.stakes) {
         // Cash game (sem "Tournament #"): agrupa por stakes, sem premiação
@@ -195,6 +242,19 @@ export function ManualImportPanel({ onImported }: { onImported: () => void }) {
               );
             })}
           </ul>
+
+          <div
+            onClick={toggleAlsoLogToBankroll}
+            className="mt-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-hairline bg-void p-2.5 text-xs text-muted hover:text-ink"
+          >
+            <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${alsoLogToBankroll ? "border-ink bg-ink" : "border-hairline"}`}>
+              {alsoLogToBankroll && <Check size={11} className="text-void" />}
+            </span>
+            <span className="flex-1">
+              Também lançar essa sessão na Gestão de Banca (torneio identificado — buy-in/resultado convertidos automaticamente)
+            </span>
+          </div>
+
           <div className="mt-3 flex items-center justify-between">
             <button onClick={handleDiscard} className="text-xs text-muted hover:text-ink">
               Descartar
@@ -212,6 +272,9 @@ export function ManualImportPanel({ onImported }: { onImported: () => void }) {
       )}
 
       {error && <p className="mt-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{error}</p>}
+      {warning && !error && (
+        <p className="mt-2.5 rounded-lg border border-hairline bg-elevated p-2.5 text-[13px] text-muted">{warning}</p>
+      )}
     </div>
   );
 }

@@ -1,5 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
+import { addSession } from "@/lib/services/bankroll-service";
+import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
+import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
+import { getUsdBrlRate } from "@/lib/services/fx-service";
+import { todayISO } from "@/lib/bankroll/format";
 
 // Camada de servico do novo agrupador do Revisor. Torneios sao unicos por
 // (user_id, tournament_id_ps) — quando o parser identifica esses campos na
@@ -295,4 +300,68 @@ export async function attachReviewsToSession(reviewIds: string[], sessionId: str
   }
 
   await touchSession(sessionId);
+}
+
+// Cria (ou reaproveita) a sessão de banca correspondente a um torneio
+// importado, ligando pelo mesmo campo que app/banca/page.tsx já usava só
+// pro fluxo do agente (bankroll_sessions.imported_hand_session_id) --
+// extraído pra cá pra ser reaproveitado também na importação manual
+// (Análise/Revisor), que antes deixava o jogador sem nenhum jeito de
+// preencher a Banca automaticamente a partir de uma mão colada.
+//
+// So' cria pra TORNEIO (buyin conhecido) -- cash game nao tem um
+// "buyin"/"resultado" que de' pra inferir so' do hand history (falta
+// duracao da sessao, por exemplo), entao fica de fora aqui, igual o
+// fluxo do agente ja fazia.
+//
+// Buy-in/premiacao do hand history vem sempre em USD (mesma convencao
+// documentada em app/banca/page.tsx) -- converte pra BRL usando a
+// cotacao do dia. Se a cotacao falhar, NAO cria a sessao com taxa
+// inventada (1:1 corromperia o valor) -- devolve null e quem chamou
+// avisa o jogador pra tentar de novo.
+export async function linkOrCreateBankrollSessionForTournament(params: {
+  userId: string;
+  handSession: HandSession;
+}): Promise<{ created: boolean; bankrollSessionId: string } | null> {
+  const { userId, handSession } = params;
+  if (handSession.kind !== "tournament" || handSession.buyin == null) return null;
+
+  const supabase = createClient();
+
+  // Ja existe sessao de banca ligada a essa sessao de maos? Nao duplica --
+  // so' retorna a existente (created:false).
+  const { data: existing, error: existingErr } = await supabase
+    .from("bankroll_sessions")
+    .select("id")
+    .eq("imported_hand_session_id", handSession.id)
+    .limit(1);
+  if (existingErr) throw existingErr;
+  if (existing && existing.length > 0) return { created: false, bankrollSessionId: existing[0].id };
+
+  const rate = await getUsdBrlRate();
+  if (!rate || rate <= 0) return null;
+
+  let cashoutUsd = 0;
+  if (handSession.tournament_id_ps) {
+    const payouts = await fetchTournamentPayouts();
+    const payout = payouts.find((p) => p.tournamentIdPs === handSession.tournament_id_ps);
+    cashoutUsd = payout?.heroPayoutAmount ?? 0;
+  }
+
+  const rawVenue = (handSession.label.split(" / ")[0] || "").trim();
+  const saved = await addSession({
+    date: handSession.updated_at?.slice(0, 10) || todayISO(),
+    format: "MTT",
+    buyIn: +((handSession.buyin ?? 0) * rate).toFixed(2),
+    reentries: 0,
+    cashout: +(cashoutUsd * rate).toFixed(2),
+    stake: "",
+    venue: rawVenue || undefined,
+    currency: "BRL",
+    notes: `Importado via hand history — ${handSession.label} (US$ ${(handSession.buyin ?? 0).toFixed(2)} × ${rate.toFixed(2)})`,
+    importedHandSessionId: handSession.id,
+  });
+  await linkHandSessionReviews(handSession.id, saved.id);
+
+  return { created: true, bankrollSessionId: saved.id };
 }

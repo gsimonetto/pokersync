@@ -28,11 +28,17 @@ import {
   createCashSession,
   attachReviewsToSession,
   updateSessionBounty,
+  linkOrCreateBankrollSessionForTournament,
   type FormatType,
   type HandSession,
 } from "@/lib/services/hand-session-service";
 
 const MAX_IMAGES = 3;
+
+// Mesma chave do painel de Análise (components/analysis/ManualImportPanel.tsx)
+// -- pedido explícito: a última escolha do jogador vale nos dois lugares,
+// não é uma preferência por tela.
+const ALSO_LOG_BANKROLL_KEY = "pokersync:import:alsoLogToBankroll";
 
 interface ImageDraft {
   file: File;
@@ -87,6 +93,41 @@ export function RevisorNovaMao({
   const [formatChoice, setFormatChoice] = useState<FormatType>("regular");
   const [bountyInput, setBountyInput] = useState("");
   const [sessionError, setSessionError] = useState("");
+  const [bankrollWarning, setBankrollWarning] = useState("");
+  const [alsoLogToBankroll, setAlsoLogToBankroll] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = window.localStorage.getItem(ALSO_LOG_BANKROLL_KEY);
+    return saved === null ? true : saved === "true";
+  });
+
+  function toggleAlsoLogToBankroll() {
+    setAlsoLogToBankroll((prev) => {
+      const next = !prev;
+      try {
+        window.localStorage.setItem(ALSO_LOG_BANKROLL_KEY, String(next));
+      } catch {
+        // preferencia nao salva -- sem impacto, so nao lembra da proxima vez
+      }
+      return next;
+    });
+  }
+
+  // Chamado nos dois caminhos de resolução de torneio (anexar a existente
+  // ou criar novo) antes de finishImport() navegar pra longe -- falha
+  // aqui não derruba o import (a mão já está salva), só avisa.
+  async function maybeLogToBankroll(tournamentSession: HandSession) {
+    if (!alsoLogToBankroll || !userId) return;
+    try {
+      const result = await linkOrCreateBankrollSessionForTournament({ userId, handSession: tournamentSession });
+      if (!result) {
+        setBankrollWarning(
+          "Mão salva, mas não consegui lançar na Banca agora (sem cotação USD→BRL disponível) — lance manualmente por lá quando puder."
+        );
+      }
+    } catch {
+      setBankrollWarning("Mão salva, mas houve um erro ao lançar na Banca — confira/lance manualmente por lá.");
+    }
+  }
 
   // ---- Manual / print (bloco secundario, recolhido) ----
   const [manualOpen, setManualOpen] = useState(false);
@@ -286,6 +327,7 @@ export function RevisorNovaMao({
       ) {
         await updateSessionBounty(sessionFlow.existing.id, sessionFlow.suggestedBounty).catch(() => {});
       }
+      await maybeLogToBankroll(sessionFlow.existing);
       finishImport(pendingReviewIds, sessionFlow.existing.id);
     } catch (e) {
       setSessionError(e instanceof Error ? e.message : "Erro ao anexar ao torneio.");
@@ -331,6 +373,7 @@ export function RevisorNovaMao({
       );
       setFormatChoice("regular");
       setBountyInput("");
+      await maybeLogToBankroll(created);
       finishImport(pendingReviewIds, created.id);
     } catch (e) {
       setSessionError(e instanceof Error ? e.message : "Erro ao criar o torneio.");
@@ -442,6 +485,16 @@ export function RevisorNovaMao({
           <p className="mb-3 text-xs text-muted">
             Encontrei <b className="text-ink">{sessionFlow.existing.label}</b> na sua lista. Anexar essa mão a ele ou criar um torneio novo?
           </p>
+          <div
+            onClick={toggleAlsoLogToBankroll}
+            className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-hairline bg-void p-2.5 text-xs text-muted hover:text-ink"
+          >
+            <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${alsoLogToBankroll ? "border-ink bg-ink" : "border-hairline"}`}>
+              {alsoLogToBankroll && <Check size={11} className="text-void" />}
+            </span>
+            <span className="flex-1">Também lançar essa sessão na Gestão de Banca</span>
+          </div>
+
           {sessionError && <p className="mb-2 text-xs text-negative">{sessionError}</p>}
           <div className="flex gap-2.5">
             <button
@@ -504,6 +557,16 @@ export function RevisorNovaMao({
               />
             </div>
           )}
+
+          <div
+            onClick={toggleAlsoLogToBankroll}
+            className="mb-3 flex cursor-pointer items-center gap-2.5 rounded-lg border border-hairline bg-void p-2.5 text-xs text-muted hover:text-ink"
+          >
+            <span className={`grid h-4 w-4 shrink-0 place-items-center rounded border ${alsoLogToBankroll ? "border-ink bg-ink" : "border-hairline"}`}>
+              {alsoLogToBankroll && <Check size={11} className="text-void" />}
+            </span>
+            <span className="flex-1">Também lançar essa sessão na Gestão de Banca</span>
+          </div>
 
           {sessionError && <p className="mb-2 text-xs text-negative">{sessionError}</p>}
 
@@ -798,6 +861,12 @@ export function RevisorNovaMao({
       {error && (
         <div className="mb-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">
           {error}
+        </div>
+      )}
+
+      {bankrollWarning && !error && (
+        <div className="mb-2.5 rounded-lg border border-hairline bg-elevated p-2.5 text-[13px] text-muted">
+          {bankrollWarning}
         </div>
       )}
 

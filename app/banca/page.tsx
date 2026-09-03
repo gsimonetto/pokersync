@@ -14,6 +14,7 @@ import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
+import { getUsdBrlRate } from "@/lib/services/fx-service";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { FilterPopover } from "@/components/ui/filter-popover";
@@ -70,42 +71,6 @@ const BUYIN_RANGES: { value: string; label: string; test: (v: number) => boolean
   { value: "50-200", label: "R$50–200", test: (v) => v > 50 && v <= 200 },
   { value: "200+", label: "R$200+", test: (v) => v > 200 },
 ];
-
-// Cotação USD→BRL pra converter torneios do agente automaticamente (ver
-// importAgentTournaments) — API pública gratuita, sem chave (AwesomeAPI,
-// mantida pelo mesmo pessoal por trás do dólar hoje em vários apps
-// brasileiros). Cacheada 12h no navegador: não precisa bater na API a
-// cada carregamento de página, e uma falha pontual da API não trava a
-// importação por muito tempo.
-const USD_BRL_CACHE_KEY = "pokersync:banca:usdBrlRate";
-const USD_BRL_TTL_MS = 12 * 60 * 60 * 1000;
-
-async function getUsdBrlRate(): Promise<number | null> {
-  try {
-    const raw = window.localStorage.getItem(USD_BRL_CACHE_KEY);
-    if (raw) {
-      const cached = JSON.parse(raw) as { rate: number; fetchedAt: number };
-      if (cached.rate > 0 && Date.now() - cached.fetchedAt < USD_BRL_TTL_MS) return cached.rate;
-    }
-  } catch {
-    // cache indisponível/corrompido -- segue pra buscar fresco
-  }
-  try {
-    const res = await fetch("https://economia.awesomeapi.com.br/json/last/USD-BRL");
-    if (!res.ok) return null;
-    const data = await res.json();
-    const rate = Number(data?.USDBRL?.bid);
-    if (!(rate > 0)) return null;
-    try {
-      window.localStorage.setItem(USD_BRL_CACHE_KEY, JSON.stringify({ rate, fetchedAt: Date.now() }));
-    } catch {
-      // falha ao cachear não impede de usar a cotação que acabou de vir
-    }
-    return rate;
-  } catch {
-    return null;
-  }
-}
 
 // "Há X min/h/d" pro card de status do agente — só isso, sem lib externa.
 function timeAgo(iso: string): string {
