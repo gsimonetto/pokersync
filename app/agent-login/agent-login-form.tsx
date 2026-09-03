@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import { AlertCircle } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
@@ -38,6 +38,12 @@ export default function AgentLoginForm() {
   const [err, setErr] = useState(
     state ? "" : "Link inválido — abra o login pelo botão \"Entrar com Google\" dentro do PokerSync Agent."
   );
+  // Dispara sozinho assim que a página abre — o jogador já clicou em
+  // "Entrar com Google" dentro do agente pra chegar até aqui, então pedir
+  // outro clique nessa página é um passo a mais sem necessidade. O botão
+  // continua existindo abaixo como retry, caso o auto-disparo falhe (ex.
+  // `state` ausente/inválido) ou o supabase.auth demore/erre.
+  const autoTriggered = useRef(false);
 
   async function handleGoogleLogin() {
     if (!state) return;
@@ -58,6 +64,13 @@ export default function AgentLoginForm() {
       setIsLoading(false);
     }
   }
+
+  useEffect(() => {
+    if (autoTriggered.current || !state) return;
+    autoTriggered.current = true;
+    handleGoogleLogin();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [state]);
 
   return (
     <div className="relative min-h-screen w-full bg-void text-ink flex items-center justify-center p-4 overflow-hidden font-sans">
