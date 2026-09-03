@@ -8,12 +8,14 @@ import { TeamBanner } from "@/components/time/team-banner";
 import { useConfirm } from "@/components/confirm-dialog";
 import { ACCENT } from "@/lib/modules-data";
 import {
+  calcularScore,
   createLabel,
   deleteLabel,
   traduzErroTime,
   updateTeamInfo,
   uploadTeamBanner,
   uploadTeamLogo,
+  type TeamDashboardRow,
   type TeamInfo,
   type TeamLabel,
   type TeamRole,
@@ -30,6 +32,7 @@ export function TabTime({
   info,
   staff,
   labels,
+  jogadores,
   podeEditar,
   onChange,
   onErro,
@@ -37,6 +40,8 @@ export function TabTime({
   info: TeamInfo;
   staff: TeamStaff[];
   labels: TeamLabel[];
+  /** Pra calcular o score médio por coach na Equipe técnica -- staking house com mais de um coach usa isso pra comparar. */
+  jogadores: TeamDashboardRow[];
   podeEditar: boolean;
   onChange: () => void;
   onErro: (s: string) => void;
@@ -50,6 +55,19 @@ export function TabTime({
   const [enviandoBanner, setEnviandoBanner] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
   const bannerRef = useRef<HTMLInputElement>(null);
+
+  // Score médio dos jogadores atribuídos a cada coach -- é a comparação
+  // objetiva que uma staking house com mais de um coach precisa, sem
+  // criar uma tela nova: só agrega o mesmo Score de evolução que já
+  // aparece em Jogadores/Assistente/Ficha, agrupado por coachId.
+  function statsDoCoach(coachId: string) {
+    const doCoach = jogadores.filter((j) => j.coachId === coachId);
+    if (doCoach.length === 0) return null;
+    const scores = doCoach.map(calcularScore);
+    const media = Math.round(scores.reduce((a, s) => a + s.valor, 0) / scores.length);
+    const emRiscoAlto = scores.filter((s) => s.risco === "alto").length;
+    return { media, emRiscoAlto, total: doCoach.length };
+  }
 
   async function salvar() {
     if (!nome.trim()) return onErro("O time precisa de um nome.");
@@ -239,32 +257,48 @@ export function TabTime({
         <p className="mt-1 text-sm text-muted">Administradores e coaches do time.</p>
 
         <ul className="mt-4 divide-y divide-hairline">
-          {staff.map((s) => (
-            <li key={s.userId} className="flex flex-wrap items-center gap-3 py-3">
-              <Avatar id={s.avatarId} url={s.avatarUrl} size={36} />
-              <div className="min-w-0 flex-1">
-                <p className="flex flex-wrap items-center gap-2 truncate text-sm font-medium">
-                  {s.nome}
-                  {s.userId === info.ownerId && (
-                    <span className="flex items-center gap-1 rounded-full border border-hairline px-2 py-px text-[10px] font-bold uppercase tracking-wider text-muted">
-                      <ShieldCheck size={10} /> Dono
-                    </span>
-                  )}
-                </p>
-                <p className="text-xs text-muted">
-                  {PAPEL[s.role]}
-                  {s.role === "admin" && s.isCoach && " · também revisa mãos"}
-                  {" · desde "}
-                  {new Date(s.joinedAt).toLocaleDateString("pt-BR")}
-                </p>
-              </div>
-              {s.isCoach && (
-                <span className="text-xs text-muted">
-                  {s.jogadores} jogador{s.jogadores === 1 ? "" : "es"}
-                </span>
-              )}
-            </li>
-          ))}
+          {staff.map((s) => {
+            const stats = s.isCoach ? statsDoCoach(s.userId) : null;
+            return (
+              <li key={s.userId} className="flex flex-wrap items-center gap-3 py-3">
+                <Avatar id={s.avatarId} url={s.avatarUrl} size={36} />
+                <div className="min-w-0 flex-1">
+                  <p className="flex flex-wrap items-center gap-2 truncate text-sm font-medium">
+                    {s.nome}
+                    {s.userId === info.ownerId && (
+                      <span className="flex items-center gap-1 rounded-full border border-hairline px-2 py-px text-[10px] font-bold uppercase tracking-wider text-muted">
+                        <ShieldCheck size={10} /> Dono
+                      </span>
+                    )}
+                  </p>
+                  <p className="text-xs text-muted">
+                    {PAPEL[s.role]}
+                    {s.role === "admin" && s.isCoach && " · também revisa mãos"}
+                    {" · desde "}
+                    {new Date(s.joinedAt).toLocaleDateString("pt-BR")}
+                  </p>
+                </div>
+                {s.isCoach && (
+                  <div className="text-right text-xs text-muted">
+                    <p>
+                      {s.jogadores} jogador{s.jogadores === 1 ? "" : "es"}
+                    </p>
+                    {stats && (
+                      <p
+                        className={
+                          stats.media >= 70 ? "text-positive" : stats.media >= 40 ? "text-evolution" : "text-negative"
+                        }
+                        title="Média do Score de evolução dos jogadores atribuídos a este coach"
+                      >
+                        Score médio {stats.media}
+                        {stats.emRiscoAlto > 0 && ` · ${stats.emRiscoAlto} em risco alto`}
+                      </p>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
         </ul>
       </section>
 
