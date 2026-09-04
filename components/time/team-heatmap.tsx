@@ -56,13 +56,17 @@ export function TeamHeatmap({ dados }: { dados: FinancialDay[] }) {
                 {week.map(({ date, d }) => {
                   const dia = porDia.get(date);
                   const future = d > today;
+                  const cor = cellColor(dia);
                   return (
                     <div
                       key={date}
                       onMouseEnter={() => !future && setHoverKey(date)}
                       onMouseLeave={() => setHoverKey((k) => (k === date ? null : k))}
-                      className="size-[20px] rounded-[4px] transition-transform duration-100 hover:scale-110"
-                      style={{ background: future ? "transparent" : cellColor(dia) }}
+                      className="size-[20px] rounded-[4px] transition-all duration-150 hover:scale-125 hover:z-10"
+                      style={{
+                        background: future ? "transparent" : cor,
+                        boxShadow: !future && dia && dia.sessoes > 0 && hoverKey === date ? `0 0 10px 1px ${cor}` : "none",
+                      }}
                       title={dia ? `${date} · ${dia.sessoes} jogo(s) · ${BRL.format(dia.resultado)}` : date}
                     />
                   );
