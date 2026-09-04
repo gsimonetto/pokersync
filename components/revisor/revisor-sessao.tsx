@@ -146,6 +146,13 @@ export function RevisorSessao({
   // overlay deslizante, fecha sozinha ao selecionar uma mao (a mesa e' o
   // destino, nao a lista).
   const [listOpen, setListOpen] = useState(false);
+  // Alvo pra onde RevisorHandTable porta os botoes Salvar/Compartilhar/
+  // Analisar no modo tela-cheia (pedido explicito: "os icones precisam
+  // ficar ao lado do filtro la em cima") -- state (nao ref simples)
+  // porque o portal so pode renderizar depois que esse node existir de
+  // verdade no DOM; guardar em state garante o re-render assim que o
+  // callback ref abaixo dispara.
+  const [actionsSlotEl, setActionsSlotEl] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function measure() {
@@ -517,6 +524,7 @@ export function RevisorSessao({
       reviewId={selectedId}
       onOpenHand={() => selectedId && onOpenHand(selectedId)}
       onFatalError={goToNextHand}
+      actionsSlot={isMobile ? actionsSlotEl : undefined}
     />
   ) : selectedId && parsedForSelected === null ? (
     <div
@@ -594,6 +602,11 @@ export function RevisorSessao({
             >
               <List size={16} />
             </button>
+
+            {/* Alvo do portal de RevisorHandTable (Salvar/Compartilhar/
+                Analisar) -- pedido explicito: "os icones precisam ficar
+                ao lado do filtro la em cima". */}
+            <div ref={setActionsSlotEl} style={{ display: "flex", alignItems: "center", gap: 6, marginLeft: "auto" }} />
           </div>
 
           <div style={{ flex: 1, minHeight: 0, padding: "0 8px 8px", display: "flex", flexDirection: "column" }}>
