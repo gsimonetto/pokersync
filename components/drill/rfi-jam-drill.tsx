@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Loader2, SlidersHorizontal, X, CheckCircle2, XCircle, Info, Check, RotateCcw } from "lucide-react";
+import { Loader2, Lock, SlidersHorizontal, X, CheckCircle2, XCircle, Info, Check, RotateCcw } from "lucide-react";
 import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
@@ -471,13 +471,18 @@ interface RfiJamDrillProps {
   // senao cai no default de sempre.
   initialStackBb?: number;
   initialMatchup?: string;
+  // Free (ver PLANS.free.modules.drill.limit.random em
+  // lib/plans/plans-data.ts): sorteia entre TODAS as dimensoes desde o
+  // primeiro spot e nunca deixa o jogador abrir o painel de filtros --
+  // "10 sessoes por dia, sorteadas, nao podera escolher".
+  filtersLocked?: boolean;
 }
 
 // Tela única de treino (pré-flop RFI/Jam por enquanto -- é o único
 // tipo de spot com dado real no banco hoje). Sem abas: filtros à
 // esquerda, mesa (com o herói de verdade sentado, feltro azul) no
 // meio, resultado GTO numa linha acima da mesa.
-export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDrillProps) {
+export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocked }: RfiJamDrillProps) {
   const router = useRouter();
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   // Cada dimensao guarda o valor CONCRETO sendo jogado agora (sempre
@@ -517,8 +522,21 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
   // lateral (sempre foi assim); no celular vira a gaveta modal (ver
   // treino-responsive-styles.tsx), fechada so' depois que o jogador
   // aplica um filtro (ver handleApplyFilters mais abaixo).
-  const [filtersOpen, setFiltersOpen] = useState(true);
+  const [filtersOpen, setFiltersOpen] = useState(!filtersLocked);
   const isMobile = useIsMobile();
+
+  // Free: forca "Qualquer" nas 4 dimensoes uma unica vez, no mount --
+  // dali pra frente o efeito de sorteio (useEffect [roundSeed,
+  // spotCache], mais abaixo) ja pega o pool inteiro sozinho a cada
+  // "Proxima" mao, sem precisar repetir isto a cada rodada.
+  useEffect(() => {
+    if (!filtersLocked) return;
+    setHeroAny(true);
+    setVillainAny(true);
+    setStackAny(true);
+    setPhaseAny(true);
+    setFiltersOpen(false);
+  }, [filtersLocked]);
   // Modo mesa-cheia (celular, pedido explicito: "ao aplicar, quero que a
   // mesa ocupe a tela inteira") -- so' existe depois que o jogador aplica
   // o filtro; volta pra false se ele reabrir os filtros (ver botao de
@@ -1021,14 +1039,29 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", flexShrink: 0 }}>
               <button
                 onClick={() => {
+                  if (filtersLocked) return;
                   setFullscreenMode(false);
                   setFiltersOpen(true);
                 }}
-                aria-label="Abrir filtros"
-                title="Abrir filtros"
-                style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0 }}
+                disabled={filtersLocked}
+                aria-label={filtersLocked ? "Filtros disponíveis a partir do plano Individual" : "Abrir filtros"}
+                title={filtersLocked ? "Filtros disponíveis a partir do plano Individual" : "Abrir filtros"}
+                style={{
+                  display: "flex",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  width: 34,
+                  height: 34,
+                  borderRadius: 9,
+                  background: "#1A1A1A",
+                  border: "1px solid rgba(255,255,255,0.10)",
+                  color: "rgba(255,255,255,0.7)",
+                  flexShrink: 0,
+                  opacity: filtersLocked ? 0.45 : 1,
+                  cursor: filtersLocked ? "not-allowed" : "pointer",
+                }}
               >
-                <SlidersHorizontal size={15} strokeWidth={1.5} />
+                {filtersLocked ? <Lock size={14} strokeWidth={1.75} /> : <SlidersHorizontal size={15} strokeWidth={1.5} />}
               </button>
               <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
                 {heroPos} vs {villainPos} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>· {stackBb}bb</span>
@@ -1116,11 +1149,24 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
       <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minHeight: 34 }}>
         <button
           className="ps-tr-filters-toggle"
-          onClick={() => setFiltersOpen((v) => !v)}
-          title={filtersOpen ? "Esconder filtros" : "Mostrar filtros"}
-          style={{ alignItems: "center", justifyContent: "center", width: 34, height: 34, borderRadius: 9, background: filtersOpen ? "rgba(255,255,255,0.10)" : "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0 }}
+          onClick={() => !filtersLocked && setFiltersOpen((v) => !v)}
+          disabled={filtersLocked}
+          title={filtersLocked ? "Filtros disponíveis a partir do plano Individual" : filtersOpen ? "Esconder filtros" : "Mostrar filtros"}
+          style={{
+            alignItems: "center",
+            justifyContent: "center",
+            width: 34,
+            height: 34,
+            borderRadius: 9,
+            background: filtersOpen ? "rgba(255,255,255,0.10)" : "#1A1A1A",
+            border: "1px solid rgba(255,255,255,0.10)",
+            color: "rgba(255,255,255,0.7)",
+            flexShrink: 0,
+            opacity: filtersLocked ? 0.45 : 1,
+            cursor: filtersLocked ? "not-allowed" : "pointer",
+          }}
         >
-          <SlidersHorizontal size={15} strokeWidth={1.5} />
+          {filtersLocked ? <Lock size={14} strokeWidth={1.75} /> : <SlidersHorizontal size={15} strokeWidth={1.5} />}
         </button>
 
         <span style={{ fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)", flexShrink: 0, whiteSpace: "nowrap" }}>

@@ -86,9 +86,17 @@ export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
   },
 };
 
+// Radar PokerSync = o agente desktop (repo proprio gsimonetto/pokersync-agent,
+// Tauri + Rust). Varre o computador do jogador atras de hand history
+// (PokerStars, GGPoker, PartyPoker, 888poker, ACR) e sincroniza sozinho com
+// o Revisor/Player Evolution -- sem precisar colar mao por mao na mao.
 export const RADAR_COPY: ModuleCopy = {
   title: "Radar PokerSync",
-  blurb: "Inteligência de mesas e oponentes pra você escolher onde sentar.",
-  benefits: ["Scouting de mesas e adversários", "Alertas de oportunidade em tempo real"],
+  blurb: "O agente desktop que varre suas hand histories sozinho e sincroniza com o PokerSync em segundo plano.",
+  benefits: [
+    "Detecta PokerStars, GGPoker, PartyPoker, 888poker e ACR automaticamente",
+    "Só reenvia o que mudou desde a última varredura",
+    "Alimenta Revisor e Player Evolution sem colar hand history na mão",
+  ],
   differential: "Complemento vendido à parte — disponível a partir do Individual Pro.",
 };

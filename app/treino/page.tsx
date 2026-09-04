@@ -103,19 +103,29 @@ function useStackFromUrl(): number | undefined {
 // propria -- so' decide depois que plano + contagem de hoje chegam, pra nao
 // deixar o jogador comecar um drill que o banco vai recusar salvar no final
 // (trigger training_sessions_check_free_limit).
-function useDailyTrainingLimit(): "loading" | "ok" | "locked" {
-  const [state, setState] = useState<"loading" | "ok" | "locked">("loading");
+interface DailyTrainingLimit {
+  status: "loading" | "ok" | "locked";
+  // Free (limit.random em PLANS.free.modules.drill): sorteia sozinho e
+  // nao deixa escolher o spot, mesmo antes de bater as 10/dia.
+  filtersLocked: boolean;
+}
+
+function useDailyTrainingLimit(): DailyTrainingLimit {
+  const [state, setState] = useState<DailyTrainingLimit>({ status: "loading", filtersLocked: false });
   useEffect(() => {
     let alive = true;
     Promise.all([fetchMyPlanId(), fetchTodayTrainingCount()])
       .then(([plan, count]) => {
         if (!alive) return;
         const limit = getModuleLimit(plan, "drill");
-        setState(limit && count >= limit.amount ? "locked" : "ok");
+        setState({
+          status: limit && count >= limit.amount ? "locked" : "ok",
+          filtersLocked: Boolean(limit?.random),
+        });
       })
       .catch(() => {
         // erro ao checar plano/contagem nao pode travar quem tem direito
-        if (alive) setState("ok");
+        if (alive) setState({ status: "ok", filtersLocked: false });
       });
     return () => {
       alive = false;
@@ -165,7 +175,7 @@ function TreinoShell() {
   const leakTip = useBankrollLeakTip();
   const suggestion = useSuggestedSpot();
   const stackFromUrl = useStackFromUrl();
-  const dailyLimit = useDailyTrainingLimit();
+  const { status: dailyLimit, filtersLocked } = useDailyTrainingLimit();
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
 
@@ -311,6 +321,7 @@ function TreinoShell() {
             <RfiJamDrill
               initialMatchup={suggestion?.matchup}
               initialStackBb={suggestion?.stackBb ?? appliedStackBb ?? stackFromUrl}
+              filtersLocked={filtersLocked}
             />
           ) : null}
         </div>

@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { isModuleUnlocked, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
+import { hasAddon, isModuleUnlocked, resolveAddonForRoute, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
@@ -102,10 +102,15 @@ export async function updateSession(request: NextRequest) {
     // /revisor). Aqui, no servidor, e' onde o bloqueio vale de verdade
     // pra qualquer jeito de chegar na rota.
     const moduleKey = resolveModuleForRoute(pathname);
-    if (moduleKey) {
+    // "radar" e' addon, nao modulo (ver AddonKey em lib/plans/plans-data.ts)
+    // -- so' entra aqui quando moduleKey nao resolveu nada, os dois
+    // conjuntos de rotas nunca se sobrepoem.
+    const addonKey = moduleKey ? null : resolveAddonForRoute(pathname);
+
+    if (moduleKey || addonKey) {
       const { data: planRow } = await supabase.from("user_plans").select("plan").maybeSingle();
       const plan = toPlanId(planRow?.plan);
-      let allowed = isModuleUnlocked(plan, moduleKey);
+      let allowed = moduleKey ? isModuleUnlocked(plan, moduleKey) : hasAddon(plan, addonKey!);
 
       // "Meu Time" tem uma excecao: um jogador convidado por um coach
       // com plano Team enxerga o time mesmo com plano pessoal free ou
@@ -123,7 +128,7 @@ export async function updateSession(request: NextRequest) {
       }
 
       if (!allowed) {
-        const redirect = NextResponse.redirect(new URL(`/modulos?locked=${moduleKey}`, request.url));
+        const redirect = NextResponse.redirect(new URL(`/modulos?locked=${moduleKey ?? addonKey}`, request.url));
         response.cookies.getAll().forEach((cookie) => {
           redirect.cookies.set(cookie);
         });

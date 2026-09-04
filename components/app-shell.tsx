@@ -18,7 +18,7 @@ import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { fetchTeamUnreadCount, fetchMyMembership } from "@/lib/services/team-service";
 import { fetchFriendUnreadCount } from "@/lib/services/friend-service";
 import { fetchMyPlanId } from "@/lib/services/plan-service";
-import { isModuleUnlocked, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
+import { hasAddon, isModuleUnlocked, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
 import { modules } from "@/lib/modules-data";
 
 type OpenMenu = "notifications" | "help" | "profile" | "chats" | null;
@@ -96,7 +96,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // "Meu Time" mesmo com plano pessoal que nao libera o modulo --
   // mesma excecao aplicada no middleware.
   const [hasTeamMembership, setHasTeamMembership] = useState(false);
-  const [lockedModule, setLockedModule] = useState<ModuleKey | null>(null);
+  const [lockedModule, setLockedModule] = useState<ModuleKey | "radar" | null>(null);
 
   useEffect(() => {
     try {
@@ -152,7 +152,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     const locked = new URLSearchParams(window.location.search).get("locked");
     if (!locked) return;
-    setLockedModule(locked as ModuleKey);
+    setLockedModule(locked as ModuleKey | "radar");
     router.replace(pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -195,11 +195,18 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         // hover cinza generico -- pedido explicito pra ficar "nitido",
         // igual ao resto do produto ja associa cor a cada modulo.
         const hovered = hoverKey === m.key;
-        const moduleKey = m.key as ModuleKey;
+        // "radar" nao e' ModuleKey -- e' addon, vendido a parte do plano
+        // base (ver lib/plans/plans-data.ts) -- checa hasAddon() em vez
+        // de isModuleUnlocked() pra essa entrada.
+        const moduleKey = m.key as ModuleKey | "radar";
         // plan === null (ainda carregando) nunca trava nada aqui -- so'
         // decide travar depois que a resposta chega, pra nao acender e
         // apagar cadeado na tela toda hora que o menu monta.
-        const locked = plan !== null && !isModuleUnlocked(plan, moduleKey) && !(moduleKey === "time" && hasTeamMembership);
+        const locked =
+          plan !== null &&
+          (moduleKey === "radar"
+            ? !hasAddon(plan, "radar")
+            : !isModuleUnlocked(plan, moduleKey) && !(moduleKey === "time" && hasTeamMembership));
 
         if (locked) {
           return (

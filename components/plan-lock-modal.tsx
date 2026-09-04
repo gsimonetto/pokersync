@@ -3,8 +3,8 @@
 import Link from "next/link";
 import { Lock, Check } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
-import { MODULE_COPY } from "@/lib/plans/module-copy";
-import { cheapestPlanUnlocking, type ModuleKey } from "@/lib/plans/plans-data";
+import { MODULE_COPY, RADAR_COPY } from "@/lib/plans/module-copy";
+import { cheapestPlanUnlocking, cheapestPlanUnlockingAddon, type ModuleKey } from "@/lib/plans/plans-data";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -12,11 +12,14 @@ const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" 
 // (components/app-shell.tsx) ou cai aqui via redirect do middleware
 // (?locked=<modulo>, ver lib/supabase/middleware.ts). Conteudo por
 // modulo vem de lib/plans/module-copy.ts -- foco no beneficio pro
-// jogador, nao em lista de feature tecnica solta.
-export function PlanLockModal({ moduleKey, onClose }: { moduleKey: ModuleKey | null; onClose: () => void }) {
+// jogador, nao em lista de feature tecnica solta. "radar" e' addon, nao
+// modulo (ver AddonKey em lib/plans/plans-data.ts), por isso o tipo e a
+// resolucao de copy/plano tratam ele a parte dos demais.
+export function PlanLockModal({ moduleKey, onClose }: { moduleKey: ModuleKey | "radar" | null; onClose: () => void }) {
   if (!moduleKey) return null;
-  const copy = MODULE_COPY[moduleKey];
-  const plan = cheapestPlanUnlocking(moduleKey);
+  const isRadar = moduleKey === "radar";
+  const copy = isRadar ? RADAR_COPY : MODULE_COPY[moduleKey];
+  const plan = isRadar ? cheapestPlanUnlockingAddon("radar") : cheapestPlanUnlocking(moduleKey);
 
   return (
     <Modal open title={copy.title} onClose={onClose}>

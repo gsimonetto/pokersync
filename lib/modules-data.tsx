@@ -1,4 +1,4 @@
-import { Target, TrendingUp, BookOpen, LineChart, Layers, Users, Trophy } from "lucide-react";
+import { Target, TrendingUp, BookOpen, LineChart, Layers, Users, Trophy, Radar as RadarIcon } from "lucide-react";
 import type { ModuleDef } from "@/components/module-card";
 
 export const ACCENT = {
@@ -9,6 +9,7 @@ export const ACCENT = {
   pink: "#E0559E",
   cyan: "#22D3EE",
   indigo: "#6366F1",
+  gold: "#E8B93C",
 };
 
 // Espelha o array `modules` de src/components/Dashboard.jsx (projeto Vite).
@@ -79,5 +80,18 @@ export const modules: ModuleDef[] = [
     accent: ACCENT.pink,
     available: true,
     href: "/ranges",
+  },
+  {
+    // "radar" nao e' um ModuleKey (lib/plans/plans-data.ts) -- e' um
+    // AddonKey, vendido a parte do plano base. O AppShell (nav) trata
+    // esta chave como caso especial: checa hasAddon() em vez de
+    // isModuleUnlocked() antes de decidir se cadeado.
+    key: "radar",
+    icon: RadarIcon,
+    title: "Radar PokerSync",
+    subtitle: "Agente desktop de sincronização",
+    accent: ACCENT.gold,
+    available: true,
+    href: "/radar",
   },
 ];

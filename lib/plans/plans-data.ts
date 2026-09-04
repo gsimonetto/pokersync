@@ -111,6 +111,13 @@ export const PLANS: Record<PlanId, PlanDef> = {
 
 export const PLAN_IDS: PlanId[] = ["free", "individual", "individual_pro", "team", "team_pro"];
 
+// Planos com botao de assinatura self-service em /planos (ver
+// lib/billing/stripe.ts, que mapeia cada um pro proprio Price ID). Os
+// planos Team ficam de fora por enquanto -- normalmente fecham por
+// contato direto antes de existir um fluxo de convite em massa pra vaga
+// de jogador; mover pra ca quando isso mudar, sem tocar em mais nada.
+export const SELF_SERVE_PLAN_IDS: PlanId[] = ["individual", "individual_pro"];
+
 function isPlanId(value: string): value is PlanId {
   return (PLAN_IDS as string[]).includes(value);
 }
@@ -143,6 +150,12 @@ export function cheapestPlanUnlocking(module: ModuleKey): PlanDef | null {
   return id ? PLANS[id] : null;
 }
 
+// Mesma ideia, pro Radar (addon, nao modulo -- ver AddonKey acima).
+export function cheapestPlanUnlockingAddon(addon: AddonKey): PlanDef | null {
+  const id = PLAN_IDS.find((planId) => hasAddon(planId, addon));
+  return id ? PLANS[id] : null;
+}
+
 // --------------------------------------------------------------
 // Rotas -> modulo (pra gating de URL, ver lib/supabase/middleware.ts)
 // --------------------------------------------------------------
@@ -170,6 +183,16 @@ export function resolveModuleForRoute(pathname: string): ModuleKey | null {
     const excluded = route.exclude?.some((ex) => pathname === ex || pathname.startsWith(`${ex}/`));
     if (excluded) return null;
     return route.module;
+  }
+  return null;
+}
+
+// Mesma ideia que MODULE_ROUTES, pros addons (hoje so' o Radar).
+export const ADDON_ROUTES: { prefix: string; addon: AddonKey }[] = [{ prefix: "/radar", addon: "radar" }];
+
+export function resolveAddonForRoute(pathname: string): AddonKey | null {
+  for (const route of ADDON_ROUTES) {
+    if (pathname === route.prefix || pathname.startsWith(`${route.prefix}/`)) return route.addon;
   }
   return null;
 }
