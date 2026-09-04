@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
+import { Bell, CircleHelp, Crown, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -349,6 +349,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               title="Início"
             >
               <Home className="size-[18px]" />
+            </Link>
+            <Link
+              href="/planos"
+              className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
+                pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
+              }`}
+              aria-label="Planos"
+              title="Planos"
+            >
+              <Crown className="size-[18px]" />
             </Link>
             <button
               onClick={() => toggleMenu("chats")}

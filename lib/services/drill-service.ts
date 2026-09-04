@@ -239,3 +239,23 @@ export async function fetchDrillFacets(): Promise<DrillFacet[]> {
   if (error) throw error;
   return data ?? [];
 }
+
+// Quantos drills o jogador ja completou hoje -- usado pra aplicar o
+// limite diario do plano Free (ver PLANS.free.modules.drill.limit em
+// lib/plans/plans-data.ts) na tela do Treino (app/treino/page.tsx),
+// antes de deixar ele comecar mais um. A trava de verdade e' o trigger
+// training_sessions_check_free_limit no banco (a RPC register_training
+// tem o erro dela ignorado pelo client, "XP e' bonus, nao trava o
+// treino") -- isto aqui e' so' pra avisar o jogador antes, em vez dele
+// jogar o drill inteiro e so descobrir no fim que nao contou.
+export async function fetchTodayTrainingCount(): Promise<number> {
+  const supabase = createClient();
+  const startOfDay = new Date();
+  startOfDay.setHours(0, 0, 0, 0);
+  const { count, error } = await supabase
+    .from("training_sessions")
+    .select("id", { count: "exact", head: true })
+    .gte("created_at", startOfDay.toISOString());
+  if (error) throw error;
+  return count ?? 0;
+}

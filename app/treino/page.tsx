@@ -2,12 +2,15 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Target, X } from "lucide-react";
+import Link from "next/link";
+import { Lock, Target, X } from "lucide-react";
 import { RfiJamDrill } from "@/components/drill/rfi-jam-drill";
 import { AppShell } from "@/components/app-shell";
 import { F } from "@/lib/poker/drill-theme";
-import { fetchSuggestionTarget } from "@/lib/services/drill-service";
+import { fetchSuggestionTarget, fetchTodayTrainingCount } from "@/lib/services/drill-service";
 import { fetchSessions } from "@/lib/services/bankroll-service";
+import { fetchMyPlanId } from "@/lib/services/plan-service";
+import { getModuleLimit } from "@/lib/plans/plans-data";
 import { groupStats } from "@/lib/bankroll/calc";
 import { fmtPct, TOURNEY_FORMATS } from "@/lib/bankroll/format";
 
@@ -95,6 +98,55 @@ function useStackFromUrl(): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+// Limite diario do Free (10 sessoes/dia, ver PLANS.free.modules.drill.limit
+// em lib/plans/plans-data.ts). "loading" nunca libera nem trava por conta
+// propria -- so' decide depois que plano + contagem de hoje chegam, pra nao
+// deixar o jogador comecar um drill que o banco vai recusar salvar no final
+// (trigger training_sessions_check_free_limit).
+function useDailyTrainingLimit(): "loading" | "ok" | "locked" {
+  const [state, setState] = useState<"loading" | "ok" | "locked">("loading");
+  useEffect(() => {
+    let alive = true;
+    Promise.all([fetchMyPlanId(), fetchTodayTrainingCount()])
+      .then(([plan, count]) => {
+        if (!alive) return;
+        const limit = getModuleLimit(plan, "drill");
+        setState(limit && count >= limit.amount ? "locked" : "ok");
+      })
+      .catch(() => {
+        // erro ao checar plano/contagem nao pode travar quem tem direito
+        if (alive) setState("ok");
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return state;
+}
+
+function TrainingLimitCard() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated text-muted">
+        <Lock size={20} />
+      </div>
+      <div>
+        <h2 className="text-base font-semibold text-ink">Limite diário do Free atingido</h2>
+        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
+          Você já treinou suas 10 sessões de hoje. Volte amanhã ou faça upgrade pra treinar sem limite, escolhendo o
+          próprio spot em vez de esperar o sorteio do dia.
+        </p>
+      </div>
+      <Link
+        href="/planos"
+        className="inline-flex items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
+      >
+        Ver planos
+      </Link>
+    </div>
+  );
+}
+
 function TreinoShell() {
   // Altura disponível medida, não chutada. O card usava
   // `calc(100vh - 32px)`, ignorando o header global do app que fica
@@ -113,6 +165,7 @@ function TreinoShell() {
   const leakTip = useBankrollLeakTip();
   const suggestion = useSuggestedSpot();
   const stackFromUrl = useStackFromUrl();
+  const dailyLimit = useDailyTrainingLimit();
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
 
@@ -252,10 +305,14 @@ function TreinoShell() {
         )}
 
         <div style={{ flex: 1, minHeight: 0 }}>
-          <RfiJamDrill
-            initialMatchup={suggestion?.matchup}
-            initialStackBb={suggestion?.stackBb ?? appliedStackBb ?? stackFromUrl}
-          />
+          {dailyLimit === "locked" ? (
+            <TrainingLimitCard />
+          ) : dailyLimit === "ok" ? (
+            <RfiJamDrill
+              initialMatchup={suggestion?.matchup}
+              initialStackBb={suggestion?.stackBb ?? appliedStackBb ?? stackFromUrl}
+            />
+          ) : null}
         </div>
       </div>
     </div>

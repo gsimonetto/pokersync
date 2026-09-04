@@ -617,9 +617,16 @@ export default function BankrollPage() {
     try {
       const saved = editingId ? await apiUpdateSession(editingId, draft) : await apiAddSession(draft);
       setSessions((prev) => prev.map((x) => (x.id === draft.id ? saved : x)));
-    } catch {
+    } catch (e) {
       // Edicao volta ao estado anterior; registro novo some da lista.
-      setErr(editingId ? "Nao foi possivel salvar a edicao." : "Nao foi possivel salvar a sessao.");
+      const limiteMensal = e instanceof Error && e.message.includes("LIMITE_MENSAL_BANCA");
+      setErr(
+        limiteMensal
+          ? "Você atingiu o limite de 10 registros por mês do plano Free. Veja os planos pra continuar registrando."
+          : editingId
+            ? "Nao foi possivel salvar a edicao."
+            : "Nao foi possivel salvar a sessao."
+      );
       setSessions(editingId ? backup : (prev) => prev.filter((x) => x.id !== draft.id));
     }
   }

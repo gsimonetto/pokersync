@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CircleHelp, House, Trophy } from "lucide-react";
+import { Bell, CircleHelp, Crown, House, Trophy } from "lucide-react";
 import { Logo } from "./logo";
 import { Avatar } from "./avatar";
 import { ProfileMenu } from "./profile-menu";
@@ -134,6 +134,18 @@ export function TopNav() {
               </Link>
             );
           })}
+
+          <Link
+            href="/planos"
+            aria-current={pathname === "/planos" ? "page" : undefined}
+            aria-label="Planos"
+            title="Planos"
+            className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
+              pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
+            }`}
+          >
+            <Crown className="size-[18px]" />
+          </Link>
 
           <div className="relative">
             <button
