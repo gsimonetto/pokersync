@@ -51,6 +51,7 @@ const AUTOPLAY_MS = 900;
 function InfoChip({ icon, label }: { icon: React.ReactNode; label: string }) {
   return (
     <div
+      className="ps-rv-table-header-chip"
       style={{
         display: "flex",
         alignItems: "center",
@@ -118,7 +119,7 @@ function ChipButton({
   );
   if (href && !disabled) {
     return (
-      <Link href={href} title={title} style={style} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <Link href={href} title={title} className="ps-rv-table-action-btn" style={style} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
         {content}
       </Link>
     );
@@ -129,6 +130,7 @@ function ChipButton({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       title={title}
+      className="ps-rv-table-action-btn"
       style={style}
       onMouseEnter={() => setHover(true)}
       onMouseLeave={() => setHover(false)}
