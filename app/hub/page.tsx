@@ -930,9 +930,21 @@ function RankingSection({
               Carregando ranking…
             </div>
           ) : !entries || entries.length === 0 ? (
-            <div className="flex flex-col items-center gap-2 p-10 text-center text-sm text-muted">
-              <Trophy size={28} strokeWidth={1.3} className="opacity-30" />
-              {!season ? "Nenhuma temporada ativa no momento." : "Ninguém ganhou XP nessa temporada ainda."}
+            <div
+              className="relative flex flex-col items-center gap-3 overflow-hidden rounded-xl p-10 text-center"
+              style={{ background: `radial-gradient(circle at 50% 0%, ${ACCENT}14, transparent 70%)` }}
+            >
+              <span className="grid h-14 w-14 place-items-center rounded-full border" style={{ borderColor: `${ACCENT}40`, background: `${ACCENT}12` }}>
+                <Trophy size={24} className="icon-glow" style={{ color: ACCENT }} strokeWidth={1.5} />
+              </span>
+              <p className="text-sm font-semibold text-ink">
+                {!season ? "Nenhuma temporada ativa no momento" : "A temporada acabou de começar"}
+              </p>
+              <p className="max-w-xs text-xs leading-relaxed text-muted">
+                {!season
+                  ? "Assim que uma nova temporada abrir, o ranking e o pódio aparecem aqui."
+                  : "Treine, revise mãos e jogue pra ganhar XP — o pódio aparece assim que os 3 primeiros colocados tiverem pontos."}
+              </p>
             </div>
           ) : (
             <>
