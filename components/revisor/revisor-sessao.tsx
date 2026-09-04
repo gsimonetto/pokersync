@@ -1,6 +1,6 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { AlertTriangle, Loader2, ChevronRight, Search, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
@@ -42,10 +42,15 @@ import { F, T } from "@/lib/poker/drill-theme";
 // botao "Analisar mao" saem daqui — agora vivem no header da propria
 // mesa (RevisorHandTable), reposicionados pro canto superior direito
 // como pedido.
-const GRID_HEIGHT = "calc(100vh - 240px)"; // aproximado — depende do header
-// fixo da pagina (fora deste componente). Se ainda sobrar scroll da
-// pagina inteira ao abrir a tela, o ajuste fino de altura do
-// header/breadcrumb fica no componente pai (nao presente neste arquivo).
+// Altura medida de verdade (nao mais um calc(100vh - Npx) chutado) --
+// mesma tecnica do Modo Treino (app/treino/page.tsx: useDailyTrainingLimit
+// / medicao de altura), pedido explicito pra as duas telas ficarem "bem
+// parecidas" em tamanho. Mede o offset real do topo do grid (que muda
+// conforme header global, breadcrumb etc.) e usa o espaco que sobra ate'
+// o fim da viewport, com o mesmo respiro inferior de 40px do Treino.
+const GRID_FALLBACK_HEIGHT = "calc(100vh - 240px)"; // usado so' ate a 1a medicao real
+const GRID_MIN_HEIGHT = 480;
+const BOTTOM_PADDING_PX = 40;
 
 interface HandInListing {
   id: string;
@@ -73,18 +78,16 @@ interface HandInListing {
   hand_review_tag_links?: { tag_id: string; hand_review_tags: { id: string; label: string }[] | null }[];
 }
 
-// Pedido explicito: aumentar a largura da carta (~60% da coluna de
-// 220px) SEM esticar a altura da linha -- carta 100% (nao cortada) no
-// tamanho "board" ficaria alta demais (a lista viraria uma sequencia de
-// linhas gigantes). Por isso HalfCard, agora no tamanho "board" (era
-// "mini"): larga o bastante pra ler de relance, cortada na metade pra
-// manter a linha compacta. 2 cartas + gap tomam ~116px dos ~192px
-// uteis da coluna (padding 14px de cada lado).
+// Tamanho "mini" (era "board" -- pedido explicito de voltar atras: a
+// listagem inteira ficou grande demais depois do aumento). Mantem o
+// MESMO formato visual da carta (corte na metade + borda preta solida,
+// ver HalfCard em components/drill/card.tsx), so' no tamanho compacto
+// de antes.
 function HeroCardsPreview({ cards }: { cards: string[] }) {
   return (
-    <div style={{ display: "flex", gap: 4, flexShrink: 0 }}>
+    <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
       {cards.map((c, i) => (
-        <HalfCard key={i} card={c} size="board" />
+        <HalfCard key={i} card={c} size="mini" />
       ))}
     </div>
   );
@@ -123,6 +126,21 @@ export function RevisorSessao({
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyWithAction, setOnlyWithAction] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+
+  const gridRef = useRef<HTMLDivElement | null>(null);
+  const [gridHeight, setGridHeight] = useState<number | null>(null);
+
+  useEffect(() => {
+    function measure() {
+      const el = gridRef.current;
+      if (!el) return;
+      const top = el.getBoundingClientRect().top + window.scrollY;
+      setGridHeight(Math.max(GRID_MIN_HEIGHT, window.innerHeight - top - BOTTOM_PADDING_PX));
+    }
+    measure();
+    window.addEventListener("resize", measure);
+    return () => window.removeEventListener("resize", measure);
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -282,7 +300,16 @@ export function RevisorSessao({
           em cada coluna, a lista rola por dentro e a mesa nunca sai da
           tela. Colunas 220px / 1fr (era 260px) — mesa ganha mais espaco,
           "precisa ser maior, ocupar mais espaço". */}
-      <div style={{ display: "grid", gridTemplateColumns: "220px 1fr", gap: 12, height: GRID_HEIGHT, minHeight: 480 }}>
+      <div
+        ref={gridRef}
+        style={{
+          display: "grid",
+          gridTemplateColumns: "220px 1fr",
+          gap: 12,
+          height: gridHeight ? `${gridHeight}px` : GRID_FALLBACK_HEIGHT,
+          minHeight: GRID_MIN_HEIGHT,
+        }}
+      >
         <aside
           style={{
             borderRadius: 14,
