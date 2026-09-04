@@ -259,3 +259,21 @@ export async function fetchTodayTrainingCount(): Promise<number> {
   if (error) throw error;
   return count ?? 0;
 }
+
+// Acerto/erro ACUMULADO do jogador em todo o historico de training_sessions
+// -- nao e' uma contagem de sessao/pagina, e' o placar "X/Y otimas" mostrado
+// no cabecalho do Treino (rfi-jam-drill.tsx). Antes esse numero vivia so'
+// em estado local do componente, entao reiniciava a cada login/reload
+// (bug reportado) -- agora e' sempre lido daqui e so' incrementado
+// localmente enquanto a mesma sessao de navegador dura, pra nao bater no
+// banco a cada mao.
+export async function fetchTrainingAccuracy(): Promise<{ hits: number; total: number }> {
+  const supabase = createClient();
+  const [totalRes, hitsRes] = await Promise.all([
+    supabase.from("training_sessions").select("id", { count: "exact", head: true }),
+    supabase.from("training_sessions").select("id", { count: "exact", head: true }).eq("verdict", "PERFECT"),
+  ]);
+  if (totalRes.error) throw totalRes.error;
+  if (hitsRes.error) throw hitsRes.error;
+  return { hits: hitsRes.count ?? 0, total: totalRes.count ?? 0 };
+}

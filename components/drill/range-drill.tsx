@@ -5,7 +5,7 @@ import { Loader2 } from "lucide-react";
 import { getDecision, type HandDecision, type RangeHands } from "@/components/ranges/range-grid";
 import { getRange, listRanges, type RangeListItem } from "@/lib/services/range-service";
 import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
-import { logDrillAnswer } from "@/lib/services/range-journal-service";
+import { logDrillAnswer, fetchRangeDrillAccuracy } from "@/lib/services/range-journal-service";
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 type PaintAction = "fold" | "call" | "raise";
@@ -63,7 +63,25 @@ export function RangeDrill({ initialRangeId = null }: { initialRangeId?: string 
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<PaintAction | null>(null);
+  // Placar ACUMULADO de todo o historico do jogador (nao e' por sessao/
+  // range escolhido) -- comeca em 0/0 so' ate a busca no banco responder,
+  // depois nunca mais reinicia sozinho (mesmo padrao do Modo Treino, ver
+  // fetchTrainingAccuracy em lib/services/drill-service.ts).
   const [stats, setStats] = useState({ hits: 0, total: 0 });
+
+  useEffect(() => {
+    let alive = true;
+    fetchRangeDrillAccuracy()
+      .then((acc) => {
+        if (alive) setStats(acc);
+      })
+      .catch(() => {
+        // sem sessao/erro de rede -- fica em 0/0 e segue contando dali
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     listRanges()
@@ -164,10 +182,7 @@ export function RangeDrill({ initialRangeId = null }: { initialRangeId?: string 
       <div className="mb-6 flex flex-wrap items-center justify-between gap-3">
         <select
           value={rangeId}
-          onChange={(e) => {
-            setStats({ hits: 0, total: 0 });
-            setRangeId(e.target.value);
-          }}
+          onChange={(e) => setRangeId(e.target.value)}
           className="rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm"
         >
           {ranges.map((r) => (

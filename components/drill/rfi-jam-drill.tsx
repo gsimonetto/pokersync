@@ -8,6 +8,7 @@ import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-sty
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
+import { fetchTrainingAccuracy } from "@/lib/services/drill-service";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import { FilterChip as SharedFilterChip } from "@/components/ui/filter-chip";
@@ -476,13 +477,18 @@ interface RfiJamDrillProps {
   // primeiro spot e nunca deixa o jogador abrir o painel de filtros --
   // "10 sessoes por dia, sorteadas, nao podera escolher".
   filtersLocked?: boolean;
+  // Chamado a cada mao respondida (mesmo round que dispara o
+  // registerTraining logo abaixo) -- o pai (app/treino/page.tsx) usa
+  // isso pra contar localmente e travar assim que bater o limite
+  // diario do Free, sem precisar reconsultar o banco a cada mao.
+  onRoundComplete?: () => void;
 }
 
 // Tela única de treino (pré-flop RFI/Jam por enquanto -- é o único
 // tipo de spot com dado real no banco hoje). Sem abas: filtros à
 // esquerda, mesa (com o herói de verdade sentado, feltro azul) no
 // meio, resultado GTO numa linha acima da mesa.
-export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocked }: RfiJamDrillProps) {
+export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocked, onRoundComplete }: RfiJamDrillProps) {
   const router = useRouter();
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   // Cada dimensao guarda o valor CONCRETO sendo jogado agora (sempre
@@ -545,8 +551,26 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<"fold" | "action" | "distractor" | null>(null);
+  // Placar ACUMULADO de todo o historico do jogador (nao e' por sessao/
+  // pagina) -- comeca em 0/0 so' ate a busca no banco responder, depois
+  // nunca mais reinicia sozinho (nem em novo login, nem ao trocar
+  // filtro -- ver comentario em fetchTrainingAccuracy).
   const [stats, setStats] = useState({ hits: 0, total: 0 });
   const [detailsOpen, setDetailsOpen] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    fetchTrainingAccuracy()
+      .then((acc) => {
+        if (alive) setStats(acc);
+      })
+      .catch(() => {
+        // sem sessao/erro de rede -- fica em 0/0 e segue contando dali
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     listRfiJamSpots()
@@ -775,6 +799,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
     setStats((prev) => ({ hits: prev.hits + (verdict === "OTIMA" ? 1 : 0), total: prev.total + 1 }));
     const isGood = verdict === "OTIMA" || verdict === "ACEITAVEL";
+    onRoundComplete?.();
     registerTraining({
       spotId: spot?.spotId ?? null,
       verdict: VERDICT_TO_RPC[verdict],
@@ -1005,7 +1030,6 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // cair numa combinação fixa arbitrária como antes), e uma mão nova é
   // sorteada dentre TUDO que existe no banco.
   const clearFilters = useCallback(() => {
-    setStats({ hits: 0, total: 0 });
     setHeroAny(true);
     setVillainAny(true);
     setStackAny(true);
@@ -1263,20 +1287,20 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
               </FilterSection>
 
               <FilterSection label="Situação">
-                <FilterChip label="Qualquer" active={phaseAny} disabled={spots.length === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setPhaseAny(true); bump(); }} />
+                <FilterChip label="Qualquer" active={phaseAny} disabled={spots.length === 0} onClick={() => { setPhaseAny(true); bump(); }} />
                 {PHASES.map((p) => (
                   <FilterChip
                     key={p.key}
                     label={p.label}
                     active={!phaseAny && p.key === phaseKey}
                     disabled={spots.length === 0}
-                    onClick={() => { setStats({ hits: 0, total: 0 }); setPhaseAny(false); setPhaseKey(p.key); bump(); }}
+                    onClick={() => { setPhaseAny(false); setPhaseKey(p.key); bump(); }}
                   />
                 ))}
               </FilterSection>
 
               <FilterSection label="Hero">
-                <FilterChip label={`Qualquer (${poolCount("hero", ANY)})`} active={heroAny} disabled={poolCount("hero", ANY) === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setHeroAny(true); bump(); }} />
+                <FilterChip label={`Qualquer (${poolCount("hero", ANY)})`} active={heroAny} disabled={poolCount("hero", ANY) === 0} onClick={() => { setHeroAny(true); bump(); }} />
                 {ALL_POSITIONS.map((p) => {
                   const n = poolCount("hero", p);
                   return (
@@ -1285,14 +1309,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                       label={n > 0 ? `${p} (${n})` : p}
                       active={!heroAny && p === heroPos}
                       disabled={n === 0}
-                      onClick={() => { setStats({ hits: 0, total: 0 }); setHeroAny(false); setHeroPos(p); bump(); }}
+                      onClick={() => { setHeroAny(false); setHeroPos(p); bump(); }}
                     />
                   );
                 })}
               </FilterSection>
 
               <FilterSection label="Vilão">
-                <FilterChip label={`Qualquer (${poolCount("villain", ANY)})`} active={villainAny} disabled={poolCount("villain", ANY) === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setVillainAny(true); bump(); }} />
+                <FilterChip label={`Qualquer (${poolCount("villain", ANY)})`} active={villainAny} disabled={poolCount("villain", ANY) === 0} onClick={() => { setVillainAny(true); bump(); }} />
                 {ALL_POSITIONS.map((p) => {
                   const n = poolCount("villain", p);
                   return (
@@ -1301,14 +1325,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                       label={n > 0 ? `${p} (${n})` : p}
                       active={!villainAny && p === villainPos}
                       disabled={n === 0}
-                      onClick={() => { setStats({ hits: 0, total: 0 }); setVillainAny(false); setVillainPos(p); bump(); }}
+                      onClick={() => { setVillainAny(false); setVillainPos(p); bump(); }}
                     />
                   );
                 })}
               </FilterSection>
 
               <FilterSection label="Stack">
-                <FilterChip label={`Qualquer (${poolCount("stack", ANY)})`} active={stackAny} disabled={poolCount("stack", ANY) === 0} onClick={() => { setStats({ hits: 0, total: 0 }); setStackAny(true); bump(); }} />
+                <FilterChip label={`Qualquer (${poolCount("stack", ANY)})`} active={stackAny} disabled={poolCount("stack", ANY) === 0} onClick={() => { setStackAny(true); bump(); }} />
                 {STACK_OPTIONS.map((s) => {
                   const n = poolCount("stack", s);
                   return (
@@ -1317,7 +1341,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                       label={n > 0 ? `${s}bb (${n})` : `${s}bb`}
                       active={!stackAny && s === stackBb}
                       disabled={n === 0}
-                      onClick={() => { setStats({ hits: 0, total: 0 }); setStackAny(false); setStackBb(s); bump(); }}
+                      onClick={() => { setStackAny(false); setStackBb(s); bump(); }}
                     />
                   );
                 })}
