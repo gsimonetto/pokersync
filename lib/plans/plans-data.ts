@@ -97,9 +97,13 @@ export const PLANS: Record<PlanId, PlanDef> = {
     // (ver isAddonUnlocked, que soma esta flag com user_plans.radar_addon).
     addons: { radar: false },
   },
+  // Nomenclatura pedida: os dois planos de time se chamam "Team Pro" e
+  // "Team Elite" (os ids internos continuam "team"/"team_pro" -- so' o
+  // nome comercial mudou, ver user_plans.plan no banco). Limite de
+  // vagas ainda em definicao.
   team: {
     id: "team",
-    name: "Team",
+    name: "Team Pro",
     priceCents: 49990,
     seats: 10,
     modules: TEAM_MODULES,
@@ -107,7 +111,7 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
   team_pro: {
     id: "team_pro",
-    name: "Team Pro",
+    name: "Team Elite",
     priceCents: 99990,
     seats: 50,
     modules: TEAM_MODULES,
@@ -157,6 +161,33 @@ export function hasAddon(plan: PlanId, addon: AddonKey): boolean {
 // ainda nao tem esse dado carregado.
 export function isAddonUnlocked(plan: PlanId, addon: AddonKey, purchased = false): boolean {
   return hasAddon(plan, addon) || purchased;
+}
+
+// --------------------------------------------------------------
+// Acesso em cascata do Time: um jogador vinculado (team_members.status
+// = 'ativo') usa o acesso do time, nao o proprio -- todos os modulos
+// liberados, sem limite de Free e com Radar incluso, igual a quem paga
+// Team Pro/Elite diretamente (ver TEAM_MODULES). Isso vale INDEPENDENTE
+// do que `user_plans.plan` do jogador diz (pode ser 'free', nunca teve
+// plano proprio). Ao ser removido do time, perde tudo isso e volta a
+// depender só do proprio plano -- ver trigger
+// team_members_block_individual_on_activate no banco, que ja bloqueia
+// (rebaixa pra free) quem tinha Individual no momento em que entra.
+//
+// As tres funcoes abaixo (sufixo `For`) sao as usadas de verdade em
+// toda checagem de acesso (AppShell, middleware, limites de Free) --
+// isModuleUnlocked/getModuleLimit/isAddonUnlocked sozinhas so' descrevem
+// o plano isolado, sem a cascata.
+export function isModuleUnlockedFor(plan: PlanId, module: ModuleKey, hasTeamAccess: boolean): boolean {
+  return hasTeamAccess || isModuleUnlocked(plan, module);
+}
+
+export function getModuleLimitFor(plan: PlanId, module: ModuleKey, hasTeamAccess: boolean): ModuleLimit | null {
+  return hasTeamAccess ? null : getModuleLimit(plan, module);
+}
+
+export function isAddonUnlockedFor(plan: PlanId, addon: AddonKey, purchased: boolean, hasTeamAccess: boolean): boolean {
+  return hasTeamAccess || isAddonUnlocked(plan, addon, purchased);
 }
 
 // Plano mais barato (na ordem de PLAN_IDS, que ja e' crescente por preco)

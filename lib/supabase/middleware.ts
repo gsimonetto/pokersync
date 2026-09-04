@@ -2,6 +2,11 @@ import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAddonUnlocked, isModuleUnlocked, resolveAddonForRoute, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
 
+// Nao usa isModuleUnlockedFor/isAddonUnlockedFor daqui: essas ja assumem
+// hasTeamAccess resolvido, mas aqui so' vale a pena consultar
+// team_members quando o proprio plano JA falhou (ver bloco abaixo) --
+// pouparia uma query no caso comum (usuario com plano que ja libera).
+
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 horas
@@ -114,19 +119,28 @@ export async function updateSession(request: NextRequest) {
         ? isModuleUnlocked(plan, moduleKey)
         : isAddonUnlocked(plan, addonKey!, Boolean(planRow?.radar_addon));
 
-      // "Meu Time" tem uma excecao: um jogador convidado por um coach
-      // com plano Team enxerga o time mesmo com plano pessoal free ou
-      // individual -- o acesso vem da associacao ao time (team_members),
-      // nao do proprio plano. Mesma regra que ja valia pra CRIAR time
-      // (planoPermiteCriarTime em lib/services/team-service.ts), agora
-      // tambem pra acessar um time do qual ja se e' membro.
-      if (!allowed && moduleKey === "time") {
+      // Acesso em cascata do Time: um jogador vinculado a um time usa o
+      // acesso do time, nao o proprio (ver isModuleUnlockedFor em
+      // lib/plans/plans-data.ts) -- so' consulta team_members quando o
+      // proprio plano ja falhou, pra nao gastar query em toda rota pra
+      // quem ja tem acesso pelo plano.
+      if (!allowed) {
         const { data: membership } = await supabase
           .from("team_members")
-          .select("user_id")
+          .select("status")
           .eq("user_id", user.id)
           .maybeSingle();
-        allowed = Boolean(membership);
+
+        if (membership?.status === "ativo") {
+          // Membro ATIVO: acesso completo, igual a quem paga Team
+          // Pro/Elite diretamente -- vale pra qualquer modulo ou o addon.
+          allowed = true;
+        } else if (moduleKey === "time" && membership) {
+          // "Meu Time" tem uma segunda excecao: membro 'pendente' (ainda
+          // na fila de aprovacao) precisa ver a propria tela de espera,
+          // mesmo sem cascata completa ainda.
+          allowed = true;
+        }
       }
 
       if (!allowed) {

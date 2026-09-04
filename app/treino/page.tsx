@@ -10,7 +10,8 @@ import { F } from "@/lib/poker/drill-theme";
 import { fetchSuggestionTarget, fetchTodayTrainingCount } from "@/lib/services/drill-service";
 import { fetchSessions } from "@/lib/services/bankroll-service";
 import { fetchMyPlanId } from "@/lib/services/plan-service";
-import { getModuleLimit } from "@/lib/plans/plans-data";
+import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
+import { getModuleLimitFor } from "@/lib/plans/plans-data";
 import { groupStats } from "@/lib/bankroll/calc";
 import { fmtPct, TOURNEY_FORMATS } from "@/lib/bankroll/format";
 
@@ -114,10 +115,12 @@ function useDailyTrainingLimit(): DailyTrainingLimit {
   const [state, setState] = useState<DailyTrainingLimit>({ status: "loading", filtersLocked: false });
   useEffect(() => {
     let alive = true;
-    Promise.all([fetchMyPlanId(), fetchTodayTrainingCount()])
-      .then(([plan, count]) => {
+    Promise.all([fetchMyPlanId(), fetchTodayTrainingCount(), fetchHasActiveTeamAccess()])
+      .then(([plan, count, hasTeamAccess]) => {
         if (!alive) return;
-        const limit = getModuleLimit(plan, "drill");
+        // Membro ativo de time usa o acesso do time -- sem limite, sem
+        // sorteio forcado, mesmo que o proprio plano ainda diga 'free'.
+        const limit = getModuleLimitFor(plan, "drill", hasTeamAccess);
         setState({
           status: limit && count >= limit.amount ? "locked" : "ok",
           filtersLocked: Boolean(limit?.random),

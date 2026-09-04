@@ -4,7 +4,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Bell, CircleHelp, Crown, House, Trophy } from "lucide-react";
+import { Bell, CircleHelp, CreditCard, Crown, House, Trophy } from "lucide-react";
 import { Logo } from "./logo";
 import { Avatar } from "./avatar";
 import { ProfileMenu } from "./profile-menu";
@@ -13,6 +13,8 @@ import { HelpMenu } from "./help-menu";
 import { RankChip } from "./ui/rank-chip";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
+import { fetchMyPlanId } from "@/lib/services/plan-service";
+import type { PlanId } from "@/lib/plans/plans-data";
 import { createClient } from "@/lib/supabase/client";
 import { useInactivityLogout } from "@/lib/hooks/use-inactivity-logout";
 import { usePresenceHeartbeat } from "@/lib/hooks/use-presence-heartbeat";
@@ -44,7 +46,7 @@ function isHiddenRoute(pathname: string) {
 // "/revisor/admin" tambem fica de fora: painel oculto (sem link no fluxo
 // do jogador, acesso direto por URL restrito a um unico e-mail) que
 // nunca foi migrado pro AppShell.
-const APP_SHELL_ROUTE_PREFIXES = ["/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar"];
+const APP_SHELL_ROUTE_PREFIXES = ["/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta"];
 const APP_SHELL_EXCLUDED_PREFIXES = ["/time/convite", "/revisor/admin"];
 
 function usaAppShell(pathname: string) {
@@ -64,21 +66,24 @@ export function TopNav() {
   const [level, setLevel] = useState<number | null>(null);
   const [unread, setUnread] = useState(0);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
+  const [plan, setPlan] = useState<PlanId | null>(null);
 
   useEffect(() => {
     let alive = true;
     (async () => {
       try {
         const supabase = createClient();
-        const [p, { data: progressRow }, unreadCount] = await Promise.all([
+        const [p, { data: progressRow }, unreadCount, planId] = await Promise.all([
           fetchProfile(),
           supabase.from("user_progress").select("level").maybeSingle(),
           fetchUnreadCount().catch(() => 0),
+          fetchMyPlanId().catch(() => null),
         ]);
         if (!alive) return;
         setProfile(p);
         setLevel(progressRow?.level ?? null);
         setUnread(unreadCount);
+        setPlan(planId);
       } catch {
         // sem sessao configurada: mantem os fallbacks
       }
@@ -135,17 +140,33 @@ export function TopNav() {
             );
           })}
 
-          <Link
-            href="/planos"
-            aria-current={pathname === "/planos" ? "page" : undefined}
-            aria-label="Planos"
-            title="Planos"
-            className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
-              pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
-            }`}
-          >
-            <Crown className="size-[18px]" />
-          </Link>
+          {/* Coroa (upsell) so' pra quem e' Free -- quem ja paga algo ve
+              "Meu Plano" no lugar. Mesma regra de components/app-shell.tsx. */}
+          {plan === "free" ? (
+            <Link
+              href="/planos"
+              aria-current={pathname === "/planos" ? "page" : undefined}
+              aria-label="Planos"
+              title="Planos"
+              className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
+                pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
+              }`}
+            >
+              <Crown className="size-[18px]" />
+            </Link>
+          ) : (
+            <Link
+              href="/minha-conta"
+              aria-current={pathname === "/minha-conta" ? "page" : undefined}
+              aria-label="Meu Plano"
+              title="Meu Plano"
+              className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
+                pathname === "/minha-conta" ? "text-ink" : "text-muted"
+              }`}
+            >
+              <CreditCard className="size-[18px]" />
+            </Link>
+          )}
 
           <div className="relative">
             <button

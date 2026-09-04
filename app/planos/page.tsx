@@ -5,7 +5,8 @@ import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2, Lock, Radar as RadarIcon, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
-import { ADDON_PRICES, PLAN_IDS, PLANS, SELF_SERVE_PLAN_IDS, isAddonUnlocked, type PlanId, type ModuleKey } from "@/lib/plans/plans-data";
+import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
+import { ADDON_PRICES, PLAN_IDS, PLANS, SELF_SERVE_PLAN_IDS, isAddonUnlockedFor, type PlanId, type ModuleKey } from "@/lib/plans/plans-data";
 import { MODULE_COPY, RADAR_COPY } from "@/lib/plans/module-copy";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
@@ -21,16 +22,18 @@ function PlanosContent() {
   const searchParams = useSearchParams();
   const [myPlan, setMyPlan] = useState<PlanId | null>(null);
   const [radarAddon, setRadarAddon] = useState(false);
+  const [hasTeamAccess, setHasTeamAccess] = useState(false);
   const [loadingTarget, setLoadingTarget] = useState<CheckoutTarget | null>(null);
   const [checkoutMsg, setCheckoutMsg] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
-    fetchMyPlanState()
-      .then((s) => {
+    Promise.all([fetchMyPlanState(), fetchHasActiveTeamAccess()])
+      .then(([s, teamAccess]) => {
         if (!alive) return;
         setMyPlan(s.plan);
         setRadarAddon(s.radarAddon);
+        setHasTeamAccess(teamAccess);
       })
       .catch(() => {
         // sem sessao/erro de rede: segue sem destacar nenhum card
@@ -76,8 +79,8 @@ function PlanosContent() {
     }
   }
 
-  const radarUnlocked = myPlan !== null && isAddonUnlocked(myPlan, "radar", radarAddon);
-  const radarIncludedInPlan = myPlan !== null && PLANS[myPlan].addons.radar;
+  const radarUnlocked = myPlan !== null && isAddonUnlockedFor(myPlan, "radar", radarAddon, hasTeamAccess);
+  const radarIncludedInPlan = (myPlan !== null && PLANS[myPlan].addons.radar) || hasTeamAccess;
 
   return (
     <main className="w-full px-4 py-6 md:px-6 md:py-10">

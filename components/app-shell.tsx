@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Crown, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
+import { Bell, CircleHelp, CreditCard, Crown, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -18,7 +18,7 @@ import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { fetchTeamUnreadCount, fetchMyMembership } from "@/lib/services/team-service";
 import { fetchFriendUnreadCount } from "@/lib/services/friend-service";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
-import { isAddonUnlocked, isModuleUnlocked, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
+import { isAddonUnlockedFor, isModuleUnlockedFor, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
 import { modules } from "@/lib/modules-data";
 
 type OpenMenu = "notifications" | "help" | "profile" | "chats" | null;
@@ -35,6 +35,8 @@ async function fetchAllChatUnread(): Promise<number> {
 }
 
 const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
+// Nenhum modulo/accent existente usa laranja (ver ACCENT em lib/modules-data.tsx).
+const CHAT_ACCENT = "#F2994A";
 
 // Casca compartilhada (sidebar + topbar) entre os módulos que já migraram
 // pro layout novo -- hoje /modulos e /banca. Cada módulo continua dono do
@@ -94,10 +96,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [plan, setPlan] = useState<PlanId | null>(null);
   // Radar comprado avulso, independente do plano (ver isAddonUnlocked).
   const [radarAddon, setRadarAddon] = useState(false);
-  // Membro de time (mesmo que o time pertenca a outra pessoa) enxerga
-  // "Meu Time" mesmo com plano pessoal que nao libera o modulo --
-  // mesma excecao aplicada no middleware.
+  // Qualquer membro (mesmo 'pendente', ainda na fila de aprovacao)
+  // enxerga "Meu Time" -- e' onde ele ve o proprio status. So' membro
+  // 'ativo' usa a CASCATA de verdade (todos os outros modulos + Radar +
+  // sem limite de Free), ver isModuleUnlockedFor/isAddonUnlockedFor.
   const [hasTeamMembership, setHasTeamMembership] = useState(false);
+  const [hasTeamAccess, setHasTeamAccess] = useState(false);
   const [lockedModule, setLockedModule] = useState<ModuleKey | "radar" | null>(null);
 
   useEffect(() => {
@@ -134,7 +138,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         setPlan(planRes.value.plan);
         setRadarAddon(planRes.value.radarAddon);
       }
-      if (membershipRes.status === "fulfilled") setHasTeamMembership(membershipRes.value !== null);
+      if (membershipRes.status === "fulfilled") {
+        setHasTeamMembership(membershipRes.value !== null);
+        setHasTeamAccess(membershipRes.value?.status === "ativo");
+      }
     })();
     return () => {
       alive = false;
@@ -210,8 +217,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const locked =
           plan !== null &&
           (moduleKey === "radar"
-            ? !isAddonUnlocked(plan, "radar", radarAddon)
-            : !isModuleUnlocked(plan, moduleKey) && !(moduleKey === "time" && hasTeamMembership));
+            ? !isAddonUnlockedFor(plan, "radar", radarAddon, hasTeamAccess)
+            : // "Meu Time" tem uma segunda excecao: membro 'pendente' (ainda
+              // na fila, hasTeamMembership mas nao hasTeamAccess) precisa
+              // ver a propria tela de espera -- os outros modulos so'
+              // liberam com hasTeamAccess (membro 'ativo').
+              !isModuleUnlockedFor(plan, moduleKey, hasTeamAccess) && !(moduleKey === "time" && hasTeamMembership));
 
         if (locked) {
           return (
@@ -261,6 +272,46 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         );
       })}
+
+      {/* Chat saiu do topbar (components/top-nav.tsx tinha o mesmo botao)
+          pra virar item do menu lateral, com cor propria (nenhum modulo
+          usa laranja ainda) -- pedido explicito de reorganizacao dos
+          icones do topo. Abre o mesmo ChatCenter de sempre, so' mudou
+          de onde se clica. */}
+      <button
+        type="button"
+        title={collapsed ? "Chat" : undefined}
+        onClick={() => {
+          setMobileOpen(false);
+          toggleMenu("chats");
+        }}
+        onMouseEnter={() => setHoverKey("chat")}
+        onMouseLeave={() => setHoverKey((k) => (k === "chat" ? null : k))}
+        className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-150 ${
+          collapsed ? "justify-center" : ""
+        } ${openMenu === "chats" || hoverKey === "chat" ? "text-ink" : "text-muted"}`}
+        style={{
+          background: hoverKey === "chat" ? `${CHAT_ACCENT}1A` : openMenu === "chats" ? "rgba(255,255,255,0.06)" : undefined,
+          boxShadow: hoverKey === "chat" ? `0 0 14px ${CHAT_ACCENT}55, 0 0 2px ${CHAT_ACCENT}` : undefined,
+        }}
+      >
+        <span
+          className="absolute inset-y-1.5 left-0 w-[3px] rounded-full transition-opacity"
+          style={{ background: CHAT_ACCENT, opacity: openMenu === "chats" || hoverKey === "chat" ? 1 : 0 }}
+        />
+        <MessageCircle
+          size={18}
+          strokeWidth={1.75}
+          className="shrink-0"
+          style={{ color: openMenu === "chats" || hoverKey === "chat" ? CHAT_ACCENT : undefined }}
+        />
+        {!collapsed && <span className="flex-1 truncate">Chat</span>}
+        {!collapsed && unreadChats > 0 && (
+          <span className="grid min-w-[18px] shrink-0 place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
+            {unreadChats > 9 ? "9+" : unreadChats}
+          </span>
+        )}
+      </button>
     </>
   );
 
@@ -362,29 +413,32 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Home className="size-[18px]" />
             </Link>
-            <Link
-              href="/planos"
-              className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
-                pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
-              }`}
-              aria-label="Planos"
-              title="Planos"
-            >
-              <Crown className="size-[18px]" />
-            </Link>
-            <button
-              onClick={() => toggleMenu("chats")}
-              className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
-              aria-label="Conversas"
-              title="Conversas"
-            >
-              <MessageCircle className="size-[18px]" />
-              {unreadChats > 0 && (
-                <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
-                  {unreadChats > 9 ? "9+" : unreadChats}
-                </span>
-              )}
-            </button>
+            {/* Coroa (upsell) so' pra quem e' Free -- quem ja paga algo
+                (ou usa acesso de time) ve "Meu Plano" no lugar, pra
+                gerenciar em vez de ser empurrado pra comprar de novo. */}
+            {plan === "free" ? (
+              <Link
+                href="/planos"
+                className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
+                  pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
+                }`}
+                aria-label="Planos"
+                title="Planos"
+              >
+                <Crown className="size-[18px]" />
+              </Link>
+            ) : (
+              <Link
+                href="/minha-conta"
+                className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
+                  pathname === "/minha-conta" ? "text-ink" : "text-muted"
+                }`}
+                aria-label="Meu Plano"
+                title="Meu Plano"
+              >
+                <CreditCard className="size-[18px]" />
+              </Link>
+            )}
             <div className="relative">
               <button
                 onClick={() => toggleMenu("notifications")}
