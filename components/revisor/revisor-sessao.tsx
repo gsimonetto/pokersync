@@ -1,11 +1,13 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Loader2, ChevronRight, Search, X, List } from "lucide-react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { AlertTriangle, Loader2, ChevronRight, Search, X, List, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard } from "@/components/drill/card";
 import { RevisorResponsiveStyles } from "./revisor-responsive-styles";
+import { ModalPortal } from "@/components/modal-portal";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { F, T } from "@/lib/poker/drill-theme";
@@ -114,10 +116,18 @@ function didHeroEnterHand(
 export function RevisorSessao({
   sessionId,
   onOpenHand,
+  onBack,
 }: {
   sessionId: string;
   onOpenHand: (reviewId: string) => void;
+  // Botao de voltar do modo tela-cheia no celular (ver ModalPortal
+  // abaixo) -- a tela normal (fora do celular) ja tem seu proprio botao
+  // de voltar renderizado pelo componente pai (app/revisor/page.tsx),
+  // mas esse fica ESCONDIDO atras do portal em tela cheia no mobile, entao
+  // o portal precisa do proprio caminho de volta.
+  onBack: () => void;
 }) {
+  const isMobile = useIsMobile();
   const [session, setSession] = useState<HandSession | null>(null);
   const [hands, setHands] = useState<HandInListing[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
@@ -130,11 +140,6 @@ export function RevisorSessao({
 
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [gridHeight, setGridHeight] = useState<number | null>(null);
-  // Offset do topo do grid, exposto como CSS var pro breakpoint mobile
-  // (ver revisor-responsive-styles.tsx) -- mesmo mecanismo do Treino
-  // (--ps-treino-top em treino-responsive-styles.tsx), usado la' pra
-  // travar a altura em 100dvh sem estourar a tela pra baixo do topo.
-  const [topOffset, setTopOffset] = useState(0);
   // Gaveta da lista de maos no mobile (pedido explicito: "adapte o
   // revisor de maos igual ao modo treino") -- mesmo padrao da gaveta de
   // filtros do Treino: lista some por padrao no celular, abre como
@@ -147,7 +152,6 @@ export function RevisorSessao({
       const el = gridRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top + window.scrollY;
-      setTopOffset(top);
       setGridHeight(Math.max(GRID_MIN_HEIGHT, window.innerHeight - top - BOTTOM_PADDING_PX));
     }
     measure();
@@ -305,49 +309,333 @@ export function RevisorSessao({
     );
   }
 
+  // Lista de maos (header com busca/toggle "so com acao" + itens
+  // clicaveis) -- fatorada numa variavel pra ser usada TANTO na coluna
+  // fixa do desktop QUANTO na gaveta em tela cheia do celular (JSX
+  // identico, so' o wrapper externo muda entre os dois modos).
+  const listPanel = (
+    <>
+      <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
+          <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
+            Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
+          </span>
+          <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+            <button
+              onClick={() => {
+                setSearchOpen((v) => !v);
+                if (searchOpen) setSearchQuery("");
+              }}
+              title="Buscar mãos"
+              style={{
+                all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
+                width: 22, height: 22, borderRadius: 6,
+                background: searchOpen ? "rgba(255,255,255,0.14)" : "transparent",
+                color: searchOpen ? "#FFFFFF" : "rgba(255,255,255,0.4)",
+              }}
+            >
+              <Search size={13} />
+            </button>
+            {isMobile && (
+              <button
+                onClick={() => setListOpen(false)}
+                title="Fechar"
+                style={{
+                  all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
+                  width: 22, height: 22, borderRadius: 6, color: "rgba(255,255,255,0.5)",
+                }}
+              >
+                <X size={14} />
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* "Só com ação" agora é um toggle sempre visível (pedido
+            explicito) — não depende mais de abrir a busca pra
+            aparecer. Selecionar pula a mão atual, se ela ficar de
+            fora do filtro, pra próxima mão visível (ver useEffect
+            acima). */}
+        <button
+          onClick={() => setOnlyWithAction((v) => !v)}
+          style={{
+            all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
+            fontFamily: F, fontSize: 11.5, fontWeight: 600,
+            padding: "7px 10px", borderRadius: 9,
+            border: `1px solid ${onlyWithAction ? "#34D399" : "rgba(255,255,255,0.14)"}`,
+            background: onlyWithAction ? "rgba(52,211,153,0.16)" : "rgba(255,255,255,0.03)",
+            color: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.65)",
+          }}
+        >
+          <span
+            style={{
+              width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
+              background: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.25)",
+              boxShadow: onlyWithAction ? "0 0 6px #34D399" : "none",
+            }}
+          />
+          Só com ação
+        </button>
+
+        {searchOpen && (
+          <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+            <div
+              style={{
+                flex: 1, display: "flex", alignItems: "center", gap: 5,
+                background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)",
+                borderRadius: 8, padding: "5px 8px",
+              }}
+            >
+              <Search size={11} color="rgba(255,255,255,0.35)" />
+              <input
+                autoFocus
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Posição, stack ou nº da mão"
+                style={{
+                  all: "unset", flex: 1, fontFamily: F, fontSize: 11.5,
+                  color: "#FFFFFF", minWidth: 0,
+                }}
+              />
+              {searchQuery && (
+                <button onClick={() => setSearchQuery("")} style={{ all: "unset", cursor: "pointer", display: "grid", placeItems: "center" }}>
+                  <X size={11} color="rgba(255,255,255,0.4)" />
+                </button>
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Filtro por marcador (pedido explicito) — so lista tags
+            que realmente aparecem em alguma mao dessa sessao.
+            Continua dentro da busca (searchOpen), e' mais
+            situacional que "so com acao". */}
+        {searchOpen && availableTags.length > 0 && (
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
+            {availableTags.map((t) => {
+              const active = tagFilter === t.id;
+              return (
+                <button
+                  key={t.id}
+                  onClick={() => setTagFilter(active ? null : t.id)}
+                  style={{
+                    all: "unset", cursor: "pointer",
+                    fontFamily: F, fontSize: 10.5, fontWeight: 500,
+                    padding: "4px 9px", borderRadius: 999,
+                    border: `1px solid ${active ? "#FFFFFF" : "rgba(255,255,255,0.14)"}`,
+                    background: active ? "rgba(255,255,255,0.14)" : "transparent",
+                    color: active ? "#FFFFFF" : "rgba(255,255,255,0.5)",
+                  }}
+                >
+                  {t.label}
+                </button>
+              );
+            })}
+          </div>
+        )}
+      </div>
+      <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
+        {hands.length === 0 && (
+          <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão nessa sessão ainda.</p>
+        )}
+        {hands.length > 0 && filteredHands.length === 0 && (
+          <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão encontrada pra essa busca.</p>
+        )}
+        {filteredHands.map(({ hand: h, index: i }) => {
+          const active = selectedId === h.id;
+          const heroCards = h.parsed_data?.heroCards;
+          const heroPosition = h.parsed_data?.heroPosition;
+          const heroEntered = didHeroEnterHand(h.parsed_data?.heroName, h.parsed_data?.streets);
+          return (
+            <button
+              key={h.id}
+              onClick={() => {
+                setSelectedId(h.id);
+                // No mobile a lista e' uma gaveta -- selecionar uma
+                // mao fecha ela sozinha pra revelar a mesa na hora,
+                // sem precisar de um segundo toque no X.
+                setListOpen(false);
+              }}
+              style={{
+                all: "unset", cursor: "pointer", display: "block", width: "100%",
+                padding: "10px 14px",
+                borderBottom:
+                  filteredHands.findIndex((f) => f.hand.id === h.id) < filteredHands.length - 1
+                    ? "1px solid rgba(255,255,255,0.04)"
+                    : "none",
+                background: active ? "rgba(255,255,255,0.06)" : "transparent",
+                borderLeft: active ? "2px solid #FFFFFF" : "2px solid transparent",
+              }}
+            >
+              {/* alignItems "flex-end" (era "center") — pedido
+                  explicito: "deixe as imagens grudadas na parte de
+                  baixo do card". */}
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
+                {heroCards && heroCards.length > 0 && <HeroCardsPreview cards={heroCards} />}
+                <div style={{ minWidth: 0, flex: 1 }}>
+                  {/* Numero da mao (sequencial na sessao) — pedido
+                      explicito: "quero nesta tela tambem qual o
+                      numero da mao... isso e bom para filtros
+                      depois". Titulo (formato/stakes) e data
+                      continuam removidos. */}
+                  <div style={{ fontSize: 11.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)" }}>
+                    Mão {i + 1}
+                  </div>
+                  <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
+                    {h.status === "concluida" && <span style={{ color: T.ok }}>✓</span>}
+                    {heroPosition && <span>{heroPosition}</span>}
+                    {heroEntered !== null && (
+                      <span
+                        title={heroEntered ? "Hero entrou na mão (fez alguma ação)" : "Hero foldou assim que teve que decidir"}
+                        style={{
+                          display: "inline-block",
+                          width: 6,
+                          height: 6,
+                          borderRadius: "50%",
+                          background: heroEntered ? "#34D399" : "rgba(255,255,255,0.25)",
+                          flexShrink: 0,
+                        }}
+                      />
+                    )}
+                  </div>
+                </div>
+                {active && <ChevronRight size={12} color="rgba(255,255,255,0.4)" />}
+              </div>
+            </button>
+          );
+        })}
+      </div>
+    </>
+  );
+
+  // Mesa (ou estado de erro/vazio) -- tambem fatorada, mesmo motivo do
+  // listPanel acima: identica nos dois modos, so' o wrapper muda.
+  const tablePanel: ReactNode = selectedId && parsedForSelected ? (
+    <RevisorHandTable
+      parsedHand={parsedForSelected}
+      tournamentName={session.label ?? null}
+      reviewId={selectedId}
+      onOpenHand={() => selectedId && onOpenHand(selectedId)}
+      onFatalError={goToNextHand}
+    />
+  ) : selectedId && parsedForSelected === null ? (
+    <div
+      style={{
+        display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
+        gap: 10, padding: 40, borderRadius: 14,
+        background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+        border: "1px solid rgba(255,255,255,0.08)", minHeight: 400,
+      }}
+    >
+      <AlertTriangle size={22} color={T.warn} />
+      <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12.5, textAlign: "center", maxWidth: 380 }}>
+        Essa mão não tem hand history parseável — abra em &quot;Analisar mão&quot; pra revisar sem a mesa visual.
+      </p>
+      <button
+        onClick={() => selectedId && onOpenHand(selectedId)}
+        style={{ background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 12.5 }}
+      >
+        Abrir análise
+      </button>
+    </div>
+  ) : (
+    <div
+      style={{
+        display: "flex", alignItems: "center", justifyContent: "center", padding: 40,
+        borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+        border: "1px solid rgba(255,255,255,0.08)", minHeight: 400,
+        color: "rgba(255,255,255,0.4)", fontSize: 12.5,
+      }}
+    >
+      Selecione uma mão na lista.
+    </div>
+  );
+
+  // Modo tela-cheia no celular (pedido explicito: "deixe fora igual e' no
+  // modo treino") -- Portal (foge de QUALQUER container/padding da pagina,
+  // mesmo padrao ja usado no modo mesa-cheia do Treino em
+  // rfi-jam-drill.tsx) em vez de so' colapsar o grid via CSS: o botao de
+  // voltar e o de "Mãos" ficam soltos por cima da mesa (nao dentro do
+  // card com borda/padding do container padrao da pagina), e a mesa
+  // ocupa o viewport inteiro de verdade -- sem isso, o card com borda
+  // arredondada + padding do app/revisor/page.tsx sempre sobrava altura
+  // e empurrava a pagina inteira pra fora da tela (causa da barra de
+  // rolagem reportada).
+  if (isMobile) {
+    return (
+      <ModalPortal>
+        <RevisorResponsiveStyles />
+        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "#000", display: "flex", flexDirection: "column", fontFamily: F }}>
+          <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", flexShrink: 0 }}>
+            <button
+              onClick={onBack}
+              aria-label="Voltar"
+              title="Voltar"
+              style={{
+                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                width: 34, height: 34, borderRadius: 9, background: "#1A1A1A",
+                border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0,
+              }}
+            >
+              <ArrowLeft size={16} />
+            </button>
+            <button
+              onClick={() => setListOpen(true)}
+              style={{
+                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
+                fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
+                padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.14)",
+                background: "rgba(255,255,255,0.04)", flexShrink: 0,
+              }}
+            >
+              <List size={14} />
+              Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
+            </button>
+          </div>
+
+          <div style={{ flex: 1, minHeight: 0, padding: "0 8px 8px", display: "flex", flexDirection: "column" }}>
+            {tablePanel}
+          </div>
+        </div>
+
+        {/* Gaveta da lista + backdrop -- por cima do modo tela-cheia
+            (z-index maior que o container de 100 acima). */}
+        <div
+          onClick={() => setListOpen(false)}
+          style={{
+            position: "fixed", inset: 0, zIndex: 150, background: "rgba(0,0,0,0.55)",
+            opacity: listOpen ? 1 : 0, pointerEvents: listOpen ? "auto" : "none",
+            transition: "opacity 220ms ease",
+          }}
+        />
+        <aside
+          style={{
+            position: "fixed", inset: 0, zIndex: 160, width: "82%", maxWidth: 320,
+            background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
+            display: "flex", flexDirection: "column",
+            transform: listOpen ? "translateX(0)" : "translateX(-100%)",
+            transition: "transform 220ms ease",
+          }}
+        >
+          {listPanel}
+        </aside>
+      </ModalPortal>
+    );
+  }
+
   return (
     <div
-      className="ps-rv-page"
-      style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, ["--ps-rv-top" as string]: `${topOffset}px` }}
+      style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14 }}
     >
-      <RevisorResponsiveStyles />
-
-      {/* Botao "Mãos" — so existe visualmente no mobile (ver
-          revisor-responsive-styles.tsx), abre a lista como gaveta
-          deslizante em vez de disputar espaco com a mesa numa coluna de
-          220px espremida. Mesmo padrao do botao de filtros do Treino. */}
-      <button
-        onClick={() => setListOpen(true)}
-        className="ps-rv-list-toggle"
-        style={{
-          all: "unset", cursor: "pointer", display: "none", alignItems: "center", gap: 6,
-          fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
-          padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.14)",
-          background: "rgba(255,255,255,0.04)", flexShrink: 0, width: "fit-content",
-        }}
-      >
-        <List size={14} />
-        Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
-      </button>
-
-      {/* Backdrop da gaveta — so aparece com a gaveta aberta no mobile. */}
-      <div
-        className={`ps-rv-list-backdrop${listOpen ? " ps-rv-list-backdrop--open" : ""}`}
-        onClick={() => setListOpen(false)}
-        style={{ display: "none" }}
-      />
-
       {/* Master-detail: coluna esquerda com maos, coluna direita com mesa.
           Altura TRAVADA (nao so minHeight) — pedido explicito: "a mesa
           some quando desce a listagem". Com altura fixa + overflow proprio
           em cada coluna, a lista rola por dentro e a mesa nunca sai da
           tela. Colunas 220px / 1fr (era 260px) — mesa ganha mais espaco,
-          "precisa ser maior, ocupar mais espaço". No mobile (ver
-          revisor-responsive-styles.tsx) vira 1 coluna so' — a lista sai
-          do fluxo e vira a gaveta acima. */}
+          "precisa ser maior, ocupar mais espaço". Abaixo de 769px isso nao
+          renderiza mais -- vira o modo tela-cheia acima. */}
       <div
         ref={gridRef}
-        className="ps-rv-body"
         style={{
           display: "grid",
           gridTemplateColumns: "220px 1fr",
@@ -357,7 +645,6 @@ export function RevisorSessao({
         }}
       >
         <aside
-          className={`ps-rv-list${listOpen ? " ps-rv-list--open" : ""}`}
           style={{
             borderRadius: 14,
             background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
@@ -368,196 +655,7 @@ export function RevisorSessao({
             minHeight: 0,
           }}
         >
-          <div style={{ padding: "10px 14px", borderBottom: "1px solid rgba(255,255,255,0.06)", flexShrink: 0, display: "flex", flexDirection: "column", gap: 8 }}>
-            <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between" }}>
-              <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-                Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
-              </span>
-              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
-                <button
-                  onClick={() => {
-                    setSearchOpen((v) => !v);
-                    if (searchOpen) setSearchQuery("");
-                  }}
-                  title="Buscar mãos"
-                  style={{
-                    all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
-                    width: 22, height: 22, borderRadius: 6,
-                    background: searchOpen ? "rgba(255,255,255,0.14)" : "transparent",
-                    color: searchOpen ? "#FFFFFF" : "rgba(255,255,255,0.4)",
-                  }}
-                >
-                  <Search size={13} />
-                </button>
-                {/* Fechar a gaveta — so existe visualmente no mobile. */}
-                <button
-                  onClick={() => setListOpen(false)}
-                  title="Fechar"
-                  className="ps-rv-list-close"
-                  style={{
-                    all: "unset", cursor: "pointer", display: "none", placeItems: "center",
-                    width: 22, height: 22, borderRadius: 6, color: "rgba(255,255,255,0.5)",
-                  }}
-                >
-                  <X size={14} />
-                </button>
-              </div>
-            </div>
-
-            {/* "Só com ação" agora é um toggle sempre visível (pedido
-                explicito) — não depende mais de abrir a busca pra
-                aparecer. Selecionar pula a mão atual, se ela ficar de
-                fora do filtro, pra próxima mão visível (ver useEffect
-                acima). */}
-            <button
-              onClick={() => setOnlyWithAction((v) => !v)}
-              style={{
-                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center", gap: 6,
-                fontFamily: F, fontSize: 11.5, fontWeight: 600,
-                padding: "7px 10px", borderRadius: 9,
-                border: `1px solid ${onlyWithAction ? "#34D399" : "rgba(255,255,255,0.14)"}`,
-                background: onlyWithAction ? "rgba(52,211,153,0.16)" : "rgba(255,255,255,0.03)",
-                color: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.65)",
-              }}
-            >
-              <span
-                style={{
-                  width: 7, height: 7, borderRadius: "50%", flexShrink: 0,
-                  background: onlyWithAction ? "#34D399" : "rgba(255,255,255,0.25)",
-                  boxShadow: onlyWithAction ? "0 0 6px #34D399" : "none",
-                }}
-              />
-              Só com ação
-            </button>
-
-            {searchOpen && (
-              <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-                <div
-                  style={{
-                    flex: 1, display: "flex", alignItems: "center", gap: 5,
-                    background: "#0A0A0A", border: "1px solid rgba(255,255,255,0.14)",
-                    borderRadius: 8, padding: "5px 8px",
-                  }}
-                >
-                  <Search size={11} color="rgba(255,255,255,0.35)" />
-                  <input
-                    autoFocus
-                    value={searchQuery}
-                    onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Posição, stack ou nº da mão"
-                    style={{
-                      all: "unset", flex: 1, fontFamily: F, fontSize: 11.5,
-                      color: "#FFFFFF", minWidth: 0,
-                    }}
-                  />
-                  {searchQuery && (
-                    <button onClick={() => setSearchQuery("")} style={{ all: "unset", cursor: "pointer", display: "grid", placeItems: "center" }}>
-                      <X size={11} color="rgba(255,255,255,0.4)" />
-                    </button>
-                  )}
-                </div>
-              </div>
-            )}
-
-            {/* Filtro por marcador (pedido explicito) — so lista tags
-                que realmente aparecem em alguma mao dessa sessao.
-                Continua dentro da busca (searchOpen), e' mais
-                situacional que "so com acao". */}
-            {searchOpen && availableTags.length > 0 && (
-              <div style={{ display: "flex", flexWrap: "wrap", gap: 5 }}>
-                {availableTags.map((t) => {
-                  const active = tagFilter === t.id;
-                  return (
-                    <button
-                      key={t.id}
-                      onClick={() => setTagFilter(active ? null : t.id)}
-                      style={{
-                        all: "unset", cursor: "pointer",
-                        fontFamily: F, fontSize: 10.5, fontWeight: 500,
-                        padding: "4px 9px", borderRadius: 999,
-                        border: `1px solid ${active ? "#FFFFFF" : "rgba(255,255,255,0.14)"}`,
-                        background: active ? "rgba(255,255,255,0.14)" : "transparent",
-                        color: active ? "#FFFFFF" : "rgba(255,255,255,0.5)",
-                      }}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-            )}
-          </div>
-          <div style={{ overflowY: "auto", flex: 1, minHeight: 0 }}>
-            {hands.length === 0 && (
-              <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão nessa sessão ainda.</p>
-            )}
-            {hands.length > 0 && filteredHands.length === 0 && (
-              <p style={{ padding: 14, fontSize: 12, color: "rgba(255,255,255,0.4)" }}>Nenhuma mão encontrada pra essa busca.</p>
-            )}
-            {filteredHands.map(({ hand: h, index: i }) => {
-              const active = selectedId === h.id;
-              const heroCards = h.parsed_data?.heroCards;
-              const heroPosition = h.parsed_data?.heroPosition;
-              const heroEntered = didHeroEnterHand(h.parsed_data?.heroName, h.parsed_data?.streets);
-              return (
-                <button
-                  key={h.id}
-                  onClick={() => {
-                    setSelectedId(h.id);
-                    // No mobile a lista e' uma gaveta -- selecionar uma
-                    // mao fecha ela sozinha pra revelar a mesa na hora,
-                    // sem precisar de um segundo toque no X.
-                    setListOpen(false);
-                  }}
-                  style={{
-                    all: "unset", cursor: "pointer", display: "block", width: "100%",
-                    padding: "10px 14px",
-                    borderBottom:
-                      filteredHands.findIndex((f) => f.hand.id === h.id) < filteredHands.length - 1
-                        ? "1px solid rgba(255,255,255,0.04)"
-                        : "none",
-                    background: active ? "rgba(255,255,255,0.06)" : "transparent",
-                    borderLeft: active ? "2px solid #FFFFFF" : "2px solid transparent",
-                  }}
-                >
-                  {/* alignItems "flex-end" (era "center") — pedido
-                      explicito: "deixe as imagens grudadas na parte de
-                      baixo do card". */}
-                  <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-end", gap: 8 }}>
-                    {heroCards && heroCards.length > 0 && <HeroCardsPreview cards={heroCards} />}
-                    <div style={{ minWidth: 0, flex: 1 }}>
-                      {/* Numero da mao (sequencial na sessao) — pedido
-                          explicito: "quero nesta tela tambem qual o
-                          numero da mao... isso e bom para filtros
-                          depois". Titulo (formato/stakes) e data
-                          continuam removidos. */}
-                      <div style={{ fontSize: 11.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)" }}>
-                        Mão {i + 1}
-                      </div>
-                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-                        {h.status === "concluida" && <span style={{ color: T.ok }}>✓</span>}
-                        {heroPosition && <span>{heroPosition}</span>}
-                        {heroEntered !== null && (
-                          <span
-                            title={heroEntered ? "Hero entrou na mão (fez alguma ação)" : "Hero foldou assim que teve que decidir"}
-                            style={{
-                              display: "inline-block",
-                              width: 6,
-                              height: 6,
-                              borderRadius: "50%",
-                              background: heroEntered ? "#34D399" : "rgba(255,255,255,0.25)",
-                              flexShrink: 0,
-                            }}
-                          />
-                        )}
-                      </div>
-                    </div>
-                    {active && <ChevronRight size={12} color="rgba(255,255,255,0.4)" />}
-                  </div>
-                </button>
-              );
-            })}
-          </div>
+          {listPanel}
         </aside>
 
         {/* overflow "auto" (era "hidden") — pedido explicito: "botoes de
@@ -566,47 +664,8 @@ export function RevisorSessao({
             cortava os botoes (que ficam embaixo da mesa) junto com o
             excesso. "auto" so cria uma rolagem interna nesse caso raro,
             nunca esconde os controles. */}
-        <section className="ps-rv-table-col" style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
-          {selectedId && parsedForSelected ? (
-            <RevisorHandTable
-              parsedHand={parsedForSelected}
-              tournamentName={session.label ?? null}
-              reviewId={selectedId}
-              onOpenHand={() => selectedId && onOpenHand(selectedId)}
-              onFatalError={goToNextHand}
-            />
-          ) : selectedId && parsedForSelected === null ? (
-            <div
-              style={{
-                display: "flex", flexDirection: "column", alignItems: "center", justifyContent: "center",
-                gap: 10, padding: 40, borderRadius: 14,
-                background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
-                border: "1px solid rgba(255,255,255,0.08)", minHeight: 400,
-              }}
-            >
-              <AlertTriangle size={22} color={T.warn} />
-              <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12.5, textAlign: "center", maxWidth: 380 }}>
-                Essa mão não tem hand history parseável — abra em &quot;Analisar mão&quot; pra revisar sem a mesa visual.
-              </p>
-              <button
-                onClick={() => selectedId && onOpenHand(selectedId)}
-                style={{ background: "#FFFFFF", color: "#111111", border: 0, borderRadius: 10, padding: "8px 16px", cursor: "pointer", fontWeight: 500, fontSize: 12.5 }}
-              >
-                Abrir análise
-              </button>
-            </div>
-          ) : (
-            <div
-              style={{
-                display: "flex", alignItems: "center", justifyContent: "center", padding: 40,
-                borderRadius: 14, background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
-                border: "1px solid rgba(255,255,255,0.08)", minHeight: 400,
-                color: "rgba(255,255,255,0.4)", fontSize: 12.5,
-              }}
-            >
-              Selecione uma mão na lista.
-            </div>
-          )}
+        <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
+          {tablePanel}
         </section>
       </div>
 

@@ -144,7 +144,7 @@ function RevisorPageInner() {
           <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
         )}
         {screen === "sessao" && selectedSessionId && (
-          <RevisorSessao sessionId={selectedSessionId} onOpenHand={goDetalhe} />
+          <RevisorSessao sessionId={selectedSessionId} onOpenHand={goDetalhe} onBack={goFila} />
         )}
         {screen === "detalhe" && selectedReviewId && (
           <RevisorDetalhe reviewId={selectedReviewId} onBack={backFromDetalhe} />
