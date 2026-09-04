@@ -159,9 +159,9 @@ function useDailyTrainingLimit(): DailyTrainingLimit {
 
 function TrainingLimitCard() {
   return (
-    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
-      <div className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated text-muted">
-        <Lock size={20} />
+    <div className="fade-in-up flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="grid size-12 place-items-center rounded-full border" style={{ borderColor: "rgba(224,178,76,0.4)", background: "rgba(224,178,76,0.1)" }}>
+        <Lock size={20} className="icon-glow" style={{ color: "#E0B24C" }} />
       </div>
       <div>
         <h2 className="text-base font-semibold text-ink">Limite diário do Free atingido</h2>
@@ -263,6 +263,7 @@ function TreinoShell() {
       >
         {suggestion && (
           <div
+            className="fade-in-up"
             style={{
               display: "flex",
               alignItems: "center",
@@ -286,6 +287,7 @@ function TreinoShell() {
 
         {!suggestion && leakTip && !tipDismissed && (
           <div
+            className="fade-in-up"
             style={{
               display: "flex",
               alignItems: "center",
