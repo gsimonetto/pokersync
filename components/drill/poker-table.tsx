@@ -690,6 +690,61 @@ function ChipAnimation({
   );
 }
 
+// Flash de Check/Fold — pedido explicito: "quero uma animacao de quando
+// o jogador dar check ou fold pra ficar visualmente facil, igual e' com
+// os blinds hoje". Bet/call/raise ja tem a ChipAnimation (ficha voando
+// ate o pote, bem chamativa); check e fold nao movem ficha nenhuma,
+// entao ganham o mesmo nivel de destaque de um jeito proprio: um rotulo
+// grande, colorido (mesma paleta do ACT em drill-theme.ts) que estoura
+// no proprio assento e desaparece -- nao precisa viajar ate o pote
+// porque check/fold nao movem fichas.
+const ACTION_FLASH_META: Record<"fold" | "check", { label: string; color: string }> = {
+  fold: { label: "FOLD", color: "#94A3B8" },
+  check: { label: "CHECK", color: "#7DD3FC" },
+};
+
+function ActionFlash({
+  seat,
+  kind,
+  animKey,
+  scale,
+}: {
+  seat: SeatLayoutSlot;
+  kind: "fold" | "check";
+  animKey: string | number;
+  scale: number;
+}) {
+  const meta = ACTION_FLASH_META[kind];
+  return (
+    <div
+      key={animKey}
+      style={{
+        position: "absolute",
+        left: `${seat.x}%`,
+        top: `${seat.y}%`,
+        transform: `translate(-50%, -50%) scale(${scale})`,
+        zIndex: 30,
+        pointerEvents: "none",
+      }}
+    >
+      <div
+        style={{
+          fontFamily: F,
+          fontWeight: 800,
+          fontSize: 22,
+          letterSpacing: 0.5,
+          color: meta.color,
+          textShadow: `0 0 18px ${meta.color}, 0 2px 6px rgba(0,0,0,.7)`,
+          whiteSpace: "nowrap",
+          animation: "actionFlashPop 650ms ease-out forwards",
+        }}
+      >
+        {meta.label}
+      </div>
+    </div>
+  );
+}
+
 // Badge de SPR — fica ACIMA das cartas do board, dentro do bloco
 // central da mesa (pedido explícito: "informação do SPR em cima das
 // cartas pra ficar visível"). Posicionado no fluxo do stack central em
@@ -754,6 +809,7 @@ export function PokerTable({
   // ranges GTO e nao tem esse conceito.
   opponentStats,
   onOpponentClick,
+  actionFlash,
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
@@ -766,10 +822,15 @@ export function PokerTable({
   cornerRadius?: string;
   opponentStats?: Record<string, OpponentStats>;
   onOpponentClick?: (playerName: string) => void;
+  // Flash de "FOLD"/"CHECK" no proprio assento (ver ActionFlash acima) --
+  // ausente em qualquer consumidor que nao passe (ex: Treino), sem
+  // mudanca de comportamento pra quem nao usa.
+  actionFlash?: { fromPosLabel: string; kind: "fold" | "check"; key: string | number } | null;
 }) {
   const active = !!hand;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
+  const flashFromSeat = actionFlash ? seats.find((s) => s.posLabel === actionFlash.fromPosLabel) : null;
   const felt = FELT_PALETTES[variant];
   const tableBoxRef = useRef<HTMLDivElement>(null);
   const seatScale = useSeatScale(tableBoxRef, minSeatScale);
@@ -799,6 +860,12 @@ export function PokerTable({
           15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
           85% { opacity: 1; transform: translate(calc(-50% + var(--chip-dx)), calc(-50% + var(--chip-dy))) scale(1); }
           100% { opacity: 0; transform: translate(calc(-50% + var(--chip-dx)), calc(-50% + var(--chip-dy))) scale(0.85); }
+        }
+        @keyframes actionFlashPop {
+          0%   { opacity: 0; transform: scale(0.4); }
+          25%  { opacity: 1; transform: scale(1.18); }
+          45%  { opacity: 1; transform: scale(1); }
+          100% { opacity: 0; transform: scale(1) translateY(-18px); }
         }
       `}</style>
 
@@ -996,6 +1063,10 @@ export function PokerTable({
 
         {chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
           <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} scale={seatScale} />
+        )}
+
+        {actionFlash && flashFromSeat && (
+          <ActionFlash seat={flashFromSeat} kind={actionFlash.kind} animKey={actionFlash.key} scale={seatScale} />
         )}
       </div>
     </div>
