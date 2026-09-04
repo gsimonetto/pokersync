@@ -7,17 +7,10 @@ import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
-import {
-  fetchPlayerPerformance,
-  fetchPreflopSituations,
-  type PlayerPerformance,
-  type PreflopSituation,
-} from "@/lib/services/performance-service";
+import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
-import { StatCardGrid, statBar, toneFromRange } from "@/components/analysis/shared";
-import { ModuleCardShell } from "@/components/module-card-shell";
 import { Modal } from "@/components/ui/modal";
 import { MinhasMetasModalBody } from "@/components/goals/minhas-metas-modal";
 import { RecadosCoachModalBody } from "@/components/goals/recados-coach-modal";
@@ -32,14 +25,6 @@ const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" 
 // mapeado aqui ainda.
 const ACHIEVEMENT_ICON: Record<string, LucideIcon> = {
   founder: Trophy,
-};
-
-// Mesmas faixas de referencia de app/performance/page.tsx (funcao
-// Frequencia) -- contexto visual, nunca veredito de certo/errado.
-const REF = {
-  vpip: { min: 18, max: 28, escala: 60 },
-  pfr: { min: 14, max: 22, escala: 60 },
-  threeBet: { min: 5, max: 10, escala: 20 },
 };
 
 function fmtPct(v: number | null | undefined, digits = 1): string | null {
@@ -63,7 +48,6 @@ export default function ModulosPage() {
   const [level, setLevel] = useState<number | null>(null);
   const [team, setTeam] = useState<{ name: string; accent: string } | null>(null);
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
-  const [preflop, setPreflop] = useState<PreflopSituation[]>([]);
   const [avgBuyin, setAvgBuyin] = useState<number | null>(null);
   const [totalGanhos, setTotalGanhos] = useState<number | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -125,12 +109,11 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [profileRes, userRes, progressRes, perfRes, preflopRes, tournSessionsRes, achievementsRes, payoutsRes] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, perfRes, tournSessionsRes, achievementsRes, payoutsRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchPlayerPerformance(),
-        fetchPreflopSituations(),
         fetchTournamentSessions(),
         fetchMyAchievements(),
         fetchTournamentPayouts(),
@@ -140,7 +123,6 @@ export default function ModulosPage() {
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (perfRes.status === "fulfilled") setPerf(perfRes.value);
-      if (preflopRes.status === "fulfilled") setPreflop(preflopRes.value);
       if (achievementsRes.status === "fulfilled") setAchievements(achievementsRes.value);
 
       // Buy-in médio / Ganhos totais: SÓ das mãos importadas (hand_sessions
@@ -188,9 +170,6 @@ export default function ModulosPage() {
 
   const displayName = profile?.apelido || profile?.nome || "Jogador";
   const age = useMemo(() => calcAge(profile?.data_nascimento ?? null), [profile]);
-
-  const foldTo3bet = preflop.find((p) => p.label === "Fold para 3-Bet");
-  const blindDefense = preflop.find((p) => p.label === "Defesa de Blinds");
 
   return (
     <AppShell>
@@ -334,115 +313,50 @@ export default function ModulosPage() {
           </div>
         </section>
 
-        {/* Frequências pré-flop: mesmo StatCardGrid (régua + marcador com
-            glow) do Player Evolution (components/analysis/shared.tsx),
-            pedido explícito -- antes essa tela tinha uma régua própria
-            (FreqCard/FreqSimples) com visual diferente. Fold p/ 3-Bet e
-            Defesa de Blinds vêm de fetchPreflopSituations, mesma fonte
-            real usada na aba "Situações pré-flop" da Performance. */}
-        <section className="flex shrink-0 flex-col rounded-xl border border-hairline bg-surface p-4">
-          <div className="mb-3 flex shrink-0 flex-wrap items-center justify-between gap-2">
-            <div className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-muted">
-              <Target size={14} className="text-training" />
-              Frequências pré-flop
+        {/* Minhas Metas + Recados do Coach: menu compacto, 2 itens lado a
+            lado (nao mais 2 cards grandes de modulo) -- so' icone, label e
+            bolinha de notificacao, abrindo modal ao clicar. Frequencias
+            pre-flop saiu daqui: ja existe em Player Evolution, duplicar so'
+            inflava a tela sem necessidade. Sem time, so' o item de Metas
+            aparece (ocupa a linha inteira, sem coluna vazia do lado). */}
+        <div className={`grid divide-hairline overflow-hidden rounded-xl border border-hairline bg-surface ${team ? "grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0" : "grid-cols-1"}`}>
+          <button
+            onClick={() => setMetasModalOpen(true)}
+            className="group flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-elevated"
+          >
+            <div className="relative shrink-0">
+              <div className="flex size-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-[#E0954C]">
+                <Target size={16} />
+              </div>
+              {metasDot && (
+                <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
+              )}
             </div>
-            <Link href="/performance" className="flex items-center gap-1 text-xs text-muted hover:text-ink">
-              Ver Player Evolution <ArrowRight size={12} />
-            </Link>
-          </div>
-
-          <StatCardGrid
-            items={[
-              {
-                label: "VPIP",
-                value: perf?.vpip_pct != null ? `${Number(perf.vpip_pct).toFixed(1)}%` : null,
-                tone: toneFromRange(perf?.vpip_pct ?? null, REF.vpip.min, REF.vpip.max),
-                bar: statBar(perf?.vpip_pct ?? null, REF.vpip.min, REF.vpip.max, REF.vpip.escala),
-              },
-              {
-                label: "PFR",
-                value: perf?.pfr_pct != null ? `${Number(perf.pfr_pct).toFixed(1)}%` : null,
-                tone: toneFromRange(perf?.pfr_pct ?? null, REF.pfr.min, REF.pfr.max),
-                bar: statBar(perf?.pfr_pct ?? null, REF.pfr.min, REF.pfr.max, REF.pfr.escala),
-              },
-              {
-                label: "3-Bet",
-                value: perf?.three_bet_pct != null ? `${Number(perf.three_bet_pct).toFixed(1)}%` : null,
-                tone: toneFromRange(perf?.three_bet_pct ?? null, REF.threeBet.min, REF.threeBet.max),
-                bar: statBar(perf?.three_bet_pct ?? null, REF.threeBet.min, REF.threeBet.max, REF.threeBet.escala),
-              },
-              {
-                label: "Fold p/ 3-Bet",
-                value: foldTo3bet?.pct != null ? `${foldTo3bet.pct}%` : null,
-                hint: foldTo3bet?.sample != null ? `sobre ${foldTo3bet.sample} mãos` : undefined,
-              },
-              {
-                label: "Defesa de Blinds",
-                value: blindDefense?.pct != null ? `${blindDefense.pct}%` : null,
-                hint: blindDefense?.sample != null ? `sobre ${blindDefense.sample} mãos` : undefined,
-              },
-            ]}
-          />
-
-          <p className="mt-2.5 shrink-0 text-[11px] text-muted/70">
-            Calculado sobre <strong className="text-ink/85">{perf?.maos_com_dados_frequencia ?? 0}</strong> mãos com
-            hand history estruturada.
-          </p>
-        </section>
-
-        {/* Minhas Metas + Recados do Coach: preenche o espaço que sobrava
-            depois das Frequências. Mesmo padrao visual dos cards de modulo
-            (ModuleCardShell) de antes do redesenho -- aqui abrem modal em
-            vez de navegar. Sem time, so' o card de Metas aparece (ocupa a
-            linha inteira sozinho, sem buraco). */}
-        <div className={`grid gap-3 ${team ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}>
-          <button onClick={() => setMetasModalOpen(true)} className="block text-left">
-            <ModuleCardShell accent="#E0954C" available>
-              <div
-                aria-hidden="true"
-                className="acc-glow pointer-events-none absolute -left-10 -top-10 size-32 rounded-full blur-2xl"
-              />
-              <div className="relative flex items-start justify-between gap-2">
-                <div className="relative shrink-0">
-                  <div className="acc-border flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-elevated">
-                    <Target size={20} className="acc-fg" />
-                  </div>
-                  {metasDot && (
-                    <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
-                  )}
-                </div>
-                <ArrowRight size={16} className="acc-fg text-muted opacity-0 transition-all duration-200 group-hover:opacity-100" />
-              </div>
-              <div className="relative mt-4">
-                <h3 className="acc-fg text-sm font-semibold text-ink">Minhas Metas</h3>
-                <p className="mt-1 text-xs leading-relaxed text-muted">Volume, estudo e prazo de conclusão.</p>
-              </div>
-            </ModuleCardShell>
+            <div className="min-w-0 flex-1">
+              <p className="text-[13px] font-semibold text-ink">Minhas Metas</p>
+              <p className="truncate text-[11px] text-muted">Volume, estudo e prazo de conclusão</p>
+            </div>
+            <ArrowRight size={14} className="shrink-0 text-muted opacity-0 transition-all duration-200 group-hover:opacity-100" />
           </button>
 
           {team && (
-            <button onClick={() => setCoachModalOpen(true)} className="block text-left">
-              <ModuleCardShell accent="#7C83E0" available>
-                <div
-                  aria-hidden="true"
-                  className="acc-glow pointer-events-none absolute -left-10 -top-10 size-32 rounded-full blur-2xl"
-                />
-                <div className="relative flex items-start justify-between gap-2">
-                  <div className="relative shrink-0">
-                    <div className="acc-border flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-elevated">
-                      <MessageSquare size={20} className="acc-fg" />
-                    </div>
-                    {coachDot && (
-                      <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
-                    )}
-                  </div>
-                  <ArrowRight size={16} className="acc-fg text-muted opacity-0 transition-all duration-200 group-hover:opacity-100" />
+            <button
+              onClick={() => setCoachModalOpen(true)}
+              className="group flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-elevated"
+            >
+              <div className="relative shrink-0">
+                <div className="flex size-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-[#7C83E0]">
+                  <MessageSquare size={16} />
                 </div>
-                <div className="relative mt-4">
-                  <h3 className="acc-fg text-sm font-semibold text-ink">Recados do Coach</h3>
-                  <p className="mt-1 text-xs leading-relaxed text-muted">Metas, funil, checklist, alertas e comentários.</p>
-                </div>
-              </ModuleCardShell>
+                {coachDot && (
+                  <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
+                )}
+              </div>
+              <div className="min-w-0 flex-1">
+                <p className="text-[13px] font-semibold text-ink">Recados do Coach</p>
+                <p className="truncate text-[11px] text-muted">Metas, funil, checklist e alertas</p>
+              </div>
+              <ArrowRight size={14} className="shrink-0 text-muted opacity-0 transition-all duration-200 group-hover:opacity-100" />
             </button>
           )}
         </div>
