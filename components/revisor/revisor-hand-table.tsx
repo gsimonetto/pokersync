@@ -86,6 +86,7 @@ function ChipButton({
   href,
   disabled,
   title,
+  iconOnly,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -93,26 +94,50 @@ function ChipButton({
   href?: string;
   disabled?: boolean;
   title?: string;
+  // No celular, Salvar/Compartilhar/Analisar disputam a mesma linha dos
+  // controles de navegacao (anterior/play/proximo) -- com o rotulo em
+  // texto, os 3 juntos nao cabem e o ultimo corta pra fora da tela
+  // (pedido explicito: "apenas icones"). So' o icone, num botao quadrado
+  // do mesmo tamanho dos controles de navegacao ao lado.
+  iconOnly?: boolean;
 }) {
   const [hover, setHover] = useState(false);
-  const style: React.CSSProperties = {
-    display: "flex",
-    alignItems: "center",
-    gap: 6,
-    fontFamily: F,
-    fontSize: 12,
-    fontWeight: 500,
-    padding: "7px 13px",
-    borderRadius: 999,
-    border: `1px solid ${disabled ? "rgba(255,255,255,0.08)" : hover ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"}`,
-    background: disabled ? "rgba(255,255,255,0.02)" : hover ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
-    color: disabled ? "rgba(255,255,255,0.25)" : hover ? "#FFFFFF" : "rgba(255,255,255,0.75)",
-    whiteSpace: "nowrap",
-    cursor: disabled ? "not-allowed" : "pointer",
-    textDecoration: "none",
-    transition: "all 150ms ease",
-  };
-  const content = (
+  const style: React.CSSProperties = iconOnly
+    ? {
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        width: 30,
+        height: 30,
+        borderRadius: 999,
+        border: `1px solid ${disabled ? "rgba(255,255,255,0.08)" : hover ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"}`,
+        background: disabled ? "rgba(255,255,255,0.02)" : hover ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
+        color: disabled ? "rgba(255,255,255,0.25)" : hover ? "#FFFFFF" : "rgba(255,255,255,0.75)",
+        cursor: disabled ? "not-allowed" : "pointer",
+        textDecoration: "none",
+        transition: "all 150ms ease",
+        flexShrink: 0,
+      }
+    : {
+        display: "flex",
+        alignItems: "center",
+        gap: 6,
+        fontFamily: F,
+        fontSize: 12,
+        fontWeight: 500,
+        padding: "7px 13px",
+        borderRadius: 999,
+        border: `1px solid ${disabled ? "rgba(255,255,255,0.08)" : hover ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"}`,
+        background: disabled ? "rgba(255,255,255,0.02)" : hover ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
+        color: disabled ? "rgba(255,255,255,0.25)" : hover ? "#FFFFFF" : "rgba(255,255,255,0.75)",
+        whiteSpace: "nowrap",
+        cursor: disabled ? "not-allowed" : "pointer",
+        textDecoration: "none",
+        transition: "all 150ms ease",
+      };
+  const content = iconOnly ? (
+    icon
+  ) : (
     <>
       {icon}
       {label}
@@ -120,7 +145,15 @@ function ChipButton({
   );
   if (href && !disabled) {
     return (
-      <Link href={href} title={title} className="ps-rv-table-action-btn" style={style} onMouseEnter={() => setHover(true)} onMouseLeave={() => setHover(false)}>
+      <Link
+        href={href}
+        title={title}
+        aria-label={iconOnly ? title ?? label : undefined}
+        className="ps-rv-table-action-btn"
+        style={style}
+        onMouseEnter={() => setHover(true)}
+        onMouseLeave={() => setHover(false)}
+      >
         {content}
       </Link>
     );
@@ -131,6 +164,7 @@ function ChipButton({
       onClick={disabled ? undefined : onClick}
       disabled={disabled}
       title={title}
+      aria-label={iconOnly ? title ?? label : undefined}
       className="ps-rv-table-action-btn"
       style={style}
       onMouseEnter={() => setHover(true)}
@@ -542,6 +576,7 @@ export function RevisorHandTable({
                 title={saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
                 onClick={toggleSaved}
                 disabled={savingSpot}
+                iconOnly={isMobile}
               />
             )}
             {canShare && (
@@ -550,10 +585,17 @@ export function RevisorHandTable({
                 label="Compartilhar"
                 title="Compartilhar essa mão com o coach"
                 onClick={() => setShareModalOpen(true)}
+                iconOnly={isMobile}
               />
             )}
             {canAnalyze && (
-              <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" />
+              <ChipButton
+                icon={<Target size={13} />}
+                label="Analisar mão"
+                onClick={onOpenHand}
+                title="Analisar essa mão em detalhe"
+                iconOnly={isMobile}
+              />
             )}
           </div>
         </div>

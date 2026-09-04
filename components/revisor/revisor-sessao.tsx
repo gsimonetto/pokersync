@@ -579,17 +579,20 @@ export function RevisorSessao({
             >
               <ArrowLeft size={16} />
             </button>
+            {/* So' o icone -- rotulo "Mãos" + contagem saem daqui (pedido
+                explicito) e continuam so' dentro da propria gaveta, que
+                ja mostra "Mãos (N)" no topo do listPanel quando abre. */}
             <button
               onClick={() => setListOpen(true)}
+              aria-label={`Mãos (${filteredHands.length}${filteredHands.length !== hands.length ? `/${hands.length}` : ""})`}
+              title="Mãos da sessão"
               style={{
-                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", gap: 6,
-                fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
-                padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.14)",
-                background: "rgba(255,255,255,0.04)", flexShrink: 0,
+                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                width: 34, height: 34, borderRadius: 9, background: "#1A1A1A",
+                border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0,
               }}
             >
-              <List size={14} />
-              Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
+              <List size={16} />
             </button>
           </div>
 
