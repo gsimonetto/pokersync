@@ -858,31 +858,6 @@ function MissionCard({ item, preview }: { item: AnyMission; preview: boolean }) 
   );
 }
 
-// Alternador Missões/Ranking -- vive dentro do container de cada vista
-// (mesmo padrão de segmented-control usado no Painel do Time e no
-// Construtor de Ranges), no lugar de uma barra sticky separada.
-function ViewToggle({
-  view,
-  setView,
-  className,
-}: {
-  view: "missoes" | "ranking";
-  setView: (v: "missoes" | "ranking") => void;
-  className?: string;
-}) {
-  return (
-    <TabNav
-      className={className}
-      value={view}
-      onChange={setView}
-      options={[
-        { value: "missoes", label: "Missões", icon: Target },
-        { value: "ranking", label: "Ranking", icon: Trophy },
-      ]}
-    />
-  );
-}
-
 function fmtDate(d: string) {
   return new Date(d + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" });
 }

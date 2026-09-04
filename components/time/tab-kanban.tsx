@@ -662,7 +662,8 @@ function ModalCard({
     const ativa = labelsAtivas.has(labelId);
     const prev = new Set(labelsAtivas);
     const next = new Set(labelsAtivas);
-    ativa ? next.delete(labelId) : next.add(labelId);
+    if (ativa) next.delete(labelId);
+    else next.add(labelId);
     setLabelsAtivas(next);
     try {
       await setCardLabel(card.cardId, labelId, !ativa);

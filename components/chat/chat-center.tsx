@@ -149,7 +149,6 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
     carregarTudo();
     const id = setInterval(carregarTudo, POLL_MS);
     return () => clearInterval(id);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const contatosTime = useMemo<Contato[]>(() => {
@@ -230,7 +229,6 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
       // fluxo que gera esse link hoje (notificacao de mensagem de time).
       abrirConversa({ id: initialOtherUserId, relacao: "time" } as Contato);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialOtherUserId]);
 
   useEffect(() => {

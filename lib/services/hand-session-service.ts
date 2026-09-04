@@ -323,7 +323,9 @@ export async function linkOrCreateBankrollSessionForTournament(params: {
   userId: string;
   handSession: HandSession;
 }): Promise<{ created: boolean; bankrollSessionId: string } | null> {
-  const { userId, handSession } = params;
+  // userId nao e' usado aqui -- addSession() resolve o dono via
+  // getUserId() internamente (mesma convencao do resto do bankroll-service).
+  const { handSession } = params;
   if (handSession.kind !== "tournament" || handSession.buyin == null) return null;
 
   const supabase = createClient();

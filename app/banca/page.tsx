@@ -24,7 +24,6 @@ import {
   addSession as apiAddSession,
   updateSession as apiUpdateSession,
   deleteSession as apiDeleteSession,
-  updateSessionDiary as apiUpdateSessionDiary,
   fetchTransactions,
   addTransaction as apiAddTransaction,
   deleteTransaction as apiDeleteTransaction,
@@ -496,6 +495,10 @@ export default function BankrollPage() {
     }
     return [...base].reverse();
   }, [platformSessions, historyFormat, historyRange, historyBuyin, historyImported]);
+  // Metas: dá pra criar (form abaixo, handleAddGoal) mas a lista/progresso
+  // e a remoção ainda não têm UI -- goalsProgress e handleRemoveGoal ficam
+  // aqui prontos, esperando essa tela ser desenhada.
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
 
   // Quantas maos foram revisadas por sessao -- antes o vinculo so existia
@@ -715,6 +718,7 @@ export default function BankrollPage() {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function handleRemoveGoal(id: string) {
     const backup = goals;
     setGoals((prev) => prev.filter((g) => g.id !== id));
@@ -726,6 +730,7 @@ export default function BankrollPage() {
     }
   }
 
+  // eslint-disable-next-line @typescript-eslint/no-unused-vars
   async function handleQuickStudy(minutes: number) {
     const draft: StudyLog = { id: `tmp-${Date.now()}`, date: todayISO(), minutes };
     setStudyLogs((prev) => [...prev, draft]);

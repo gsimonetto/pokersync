@@ -276,7 +276,8 @@ export function RangeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode }
                 <button
                   onClick={() => {
                     setShowMoreMenu(false);
-                    teamId ? handleUnpublish() : handlePublish();
+                    if (teamId) handleUnpublish();
+                    else handlePublish();
                   }}
                   disabled={publishing}
                   className="flex w-full items-center gap-2 rounded-lg px-3 py-2 text-left text-sm text-ink hover:bg-elevated disabled:opacity-50"

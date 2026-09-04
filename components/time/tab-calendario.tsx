@@ -147,7 +147,6 @@ export function TabCalendario({
         <ModalCalendarioCompleto
           eventos={eventos}
           jogadores={jogadores}
-          teamId={teamId}
           podeCriar={podeCriar}
           onFechar={() => setCalendarioAberto(false)}
           onAbrirAgendar={() => setModalAberto(true)}
@@ -187,7 +186,6 @@ export function TabCalendario({
 function ModalCalendarioCompleto({
   eventos,
   jogadores,
-  teamId,
   podeCriar,
   onFechar,
   onAbrirAgendar,
@@ -196,7 +194,6 @@ function ModalCalendarioCompleto({
 }: {
   eventos: TeamEvent[];
   jogadores: TeamDashboardRow[];
-  teamId: string;
   podeCriar: boolean;
   onFechar: () => void;
   onAbrirAgendar: () => void;

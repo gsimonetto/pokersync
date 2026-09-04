@@ -147,7 +147,6 @@ export function computeReferenceProfile(rows: AnalysisHandRow[]): ReferenceProfi
 // hand_reviews já restringe a linhas do próprio usuário.
 // ============================================================
 
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function normalizeFormat(raw: string | null | undefined): GameFormat | null {
   if (!raw) return null;
   const v = raw.trim().toLowerCase();

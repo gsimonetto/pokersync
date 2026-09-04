@@ -148,7 +148,7 @@ export function PlayerDetailBody({
 
         <div className="mt-4">
           {aba === "geral" && (
-            <AbaGeral p={p} leaks={leaks} alertas={alertas} historicoScore={historicoScore} />
+            <AbaGeral leaks={leaks} alertas={alertas} historicoScore={historicoScore} />
           )}
           {aba === "financeiro" && <AbaFinanceiro financeiro={financeiro} staking={staking} />}
           {aba === "estudo" && (
@@ -167,12 +167,10 @@ export function PlayerDetailBody({
 // entrar em financeiro/estudo/performance.
 // ------------------------------------------------------------
 function AbaGeral({
-  p,
   leaks,
   alertas,
   historicoScore,
 }: {
-  p: PlayerDetail;
   leaks: PlayerLeak[];
   alertas: TeamAlert[];
   historicoScore: PlayerScoreHistoryPoint[];

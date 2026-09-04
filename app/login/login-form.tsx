@@ -255,7 +255,8 @@ export default function LoginForm() {
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    isRegister ? handleRegister() : handleLogin();
+    if (isRegister) handleRegister();
+    else handleLogin();
   };
 
   return (

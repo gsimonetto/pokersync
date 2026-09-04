@@ -108,6 +108,11 @@ export default function PerformancePage() {
 
   useEffect(() => {
     loadAll();
+    // Carrega so' uma vez, ao montar -- loadAll muda de referencia a cada
+    // render (nao esta em useCallback) e mudanca de filtro ja tem reload
+    // proprio (handleBuyinFilterChange -> reloadTournamentMetrics), entao
+    // incluir loadAll aqui causaria recarregar tudo de novo sem necessidade.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   const filteredRows = useMemo(() => applyAnalysisFilters(rows, filters), [rows, filters]);

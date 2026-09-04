@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, GitCompare, CalendarCheck } from "lucide-react";
 import { EvolutionChart } from "@/components/time/evolution-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";

@@ -558,7 +558,6 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
         setError("Erro ao listar spots RFI/Jam.");
         setLoading(false);
       });
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [initialStackBb, initialMatchup]);
 
   // Contagem de spots que casam com uma dimensao fixada em `value`,
@@ -618,7 +617,6 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup }: RfiJamDril
     return () => {
       alive = false;
     };
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [spots, spotCache]);
 
   // O sorteio de verdade: monta o conjunto de spots que casam com as
