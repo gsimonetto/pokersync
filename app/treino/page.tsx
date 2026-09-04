@@ -1,6 +1,6 @@
 "use client";
 
-import { Suspense, useEffect, useRef, useState } from "react";
+import { Suspense, useCallback, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Lock, Target, X } from "lucide-react";
@@ -109,10 +109,23 @@ interface DailyTrainingLimit {
   // Free (limit.random em PLANS.free.modules.drill): sorteia sozinho e
   // nao deixa escolher o spot, mesmo antes de bater as 10/dia.
   filtersLocked: boolean;
+  // Chamar a cada mao respondida -- ver comentario em recordRound abaixo.
+  recordRound: () => void;
 }
 
+// So' busca plano/contagem UMA VEZ, no mount -- mas o limite precisa
+// reagir a cada mao jogada NA MESMA sessao, sem esperar reload de
+// pagina, senao o jogador passa de 10 sem nunca ver a tela de bloqueio
+// (bug reportado: contagem so' era checada uma vez ao abrir /treino).
+// `count` local comeca no valor real do banco e incrementa a cada
+// registerTraining disparado pelo RfiJamDrill (ver onRoundComplete),
+// sem precisar reconsultar o banco a cada mao.
 function useDailyTrainingLimit(): DailyTrainingLimit {
-  const [state, setState] = useState<DailyTrainingLimit>({ status: "loading", filtersLocked: false });
+  const [status, setStatus] = useState<"loading" | "ok" | "locked">("loading");
+  const [filtersLocked, setFiltersLocked] = useState(false);
+  const limitAmountRef = useRef<number | null>(null);
+  const countRef = useRef(0);
+
   useEffect(() => {
     let alive = true;
     Promise.all([fetchMyPlanId(), fetchTodayTrainingCount(), fetchHasActiveTeamAccess()])
@@ -121,20 +134,27 @@ function useDailyTrainingLimit(): DailyTrainingLimit {
         // Membro ativo de time usa o acesso do time -- sem limite, sem
         // sorteio forcado, mesmo que o proprio plano ainda diga 'free'.
         const limit = getModuleLimitFor(plan, "drill", hasTeamAccess);
-        setState({
-          status: limit && count >= limit.amount ? "locked" : "ok",
-          filtersLocked: Boolean(limit?.random),
-        });
+        limitAmountRef.current = limit?.amount ?? null;
+        countRef.current = count;
+        setFiltersLocked(Boolean(limit?.random));
+        setStatus(limit && count >= limit.amount ? "locked" : "ok");
       })
       .catch(() => {
         // erro ao checar plano/contagem nao pode travar quem tem direito
-        if (alive) setState({ status: "ok", filtersLocked: false });
+        if (alive) setStatus("ok");
       });
     return () => {
       alive = false;
     };
   }, []);
-  return state;
+
+  const recordRound = useCallback(() => {
+    countRef.current += 1;
+    const limit = limitAmountRef.current;
+    if (limit !== null && countRef.current >= limit) setStatus("locked");
+  }, []);
+
+  return { status, filtersLocked, recordRound };
 }
 
 function TrainingLimitCard() {
@@ -178,7 +198,7 @@ function TreinoShell() {
   const leakTip = useBankrollLeakTip();
   const suggestion = useSuggestedSpot();
   const stackFromUrl = useStackFromUrl();
-  const { status: dailyLimit, filtersLocked } = useDailyTrainingLimit();
+  const { status: dailyLimit, filtersLocked, recordRound } = useDailyTrainingLimit();
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
 
@@ -325,6 +345,7 @@ function TreinoShell() {
               initialMatchup={suggestion?.matchup}
               initialStackBb={suggestion?.stackBb ?? appliedStackBb ?? stackFromUrl}
               filtersLocked={filtersLocked}
+              onRoundComplete={recordRound}
             />
           ) : null}
         </div>

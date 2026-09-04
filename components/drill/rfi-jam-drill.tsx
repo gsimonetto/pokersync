@@ -476,13 +476,18 @@ interface RfiJamDrillProps {
   // primeiro spot e nunca deixa o jogador abrir o painel de filtros --
   // "10 sessoes por dia, sorteadas, nao podera escolher".
   filtersLocked?: boolean;
+  // Chamado a cada mao respondida (mesmo round que dispara o
+  // registerTraining logo abaixo) -- o pai (app/treino/page.tsx) usa
+  // isso pra contar localmente e travar assim que bater o limite
+  // diario do Free, sem precisar reconsultar o banco a cada mao.
+  onRoundComplete?: () => void;
 }
 
 // Tela única de treino (pré-flop RFI/Jam por enquanto -- é o único
 // tipo de spot com dado real no banco hoje). Sem abas: filtros à
 // esquerda, mesa (com o herói de verdade sentado, feltro azul) no
 // meio, resultado GTO numa linha acima da mesa.
-export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocked }: RfiJamDrillProps) {
+export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocked, onRoundComplete }: RfiJamDrillProps) {
   const router = useRouter();
   const [spots, setSpots] = useState<RfiJamListItem[]>([]);
   // Cada dimensao guarda o valor CONCRETO sendo jogado agora (sempre
@@ -775,6 +780,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
     setStats((prev) => ({ hits: prev.hits + (verdict === "OTIMA" ? 1 : 0), total: prev.total + 1 }));
     const isGood = verdict === "OTIMA" || verdict === "ACEITAVEL";
+    onRoundComplete?.();
     registerTraining({
       spotId: spot?.spotId ?? null,
       verdict: VERDICT_TO_RPC[verdict],
