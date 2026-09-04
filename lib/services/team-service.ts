@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import { isModuleUnlocked, toPlanId } from "@/lib/plans/plans-data";
+import { fetchMyPlanId } from "@/lib/services/plan-service";
 
 // ============================================================
 // Modo Team — base (time, papeis, convites por token)
@@ -138,13 +140,11 @@ async function getUserId(): Promise<string> {
 // ============================================================
 
 export async function fetchMyPlan(): Promise<string> {
-  const supabase = createClient();
-  const { data } = await supabase.from("user_plans").select("plan").maybeSingle();
-  return data?.plan ?? "free";
+  return fetchMyPlanId();
 }
 
 export function planoPermiteCriarTime(plan: string): boolean {
-  return plan === "team" || plan === "master";
+  return isModuleUnlocked(toPlanId(plan), "time");
 }
 
 // ============================================================

@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, Home, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
+import { Bell, CircleHelp, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
@@ -11,11 +11,14 @@ import { HelpMenu } from "@/components/help-menu";
 import { ProfileMenu } from "@/components/profile-menu";
 import { RankChip } from "@/components/ui/rank-chip";
 import { ChatCenter } from "@/components/chat/chat-center";
+import { PlanLockModal } from "@/components/plan-lock-modal";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
-import { fetchTeamUnreadCount } from "@/lib/services/team-service";
+import { fetchTeamUnreadCount, fetchMyMembership } from "@/lib/services/team-service";
 import { fetchFriendUnreadCount } from "@/lib/services/friend-service";
+import { fetchMyPlanId } from "@/lib/services/plan-service";
+import { isModuleUnlocked, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
 import { modules } from "@/lib/modules-data";
 
 type OpenMenu = "notifications" | "help" | "profile" | "chats" | null;
@@ -83,6 +86,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [collapsed, setCollapsed] = useState(false);
   const [mobileOpen, setMobileOpen] = useState(false);
   const [hoverKey, setHoverKey] = useState<string | null>(null);
+  // null == plano ainda nao carregou -- nenhum modulo aparece travado
+  // nesse meio tempo (evita "piscar" cadeado antes da resposta chegar).
+  // A trava de verdade e' no servidor (lib/supabase/middleware.ts); isto
+  // aqui e' so' pra nao deixar o jogador clicar num link que o servidor
+  // vai barrar de qualquer jeito.
+  const [plan, setPlan] = useState<PlanId | null>(null);
+  // Membro de time (mesmo que o time pertenca a outra pessoa) enxerga
+  // "Meu Time" mesmo com plano pessoal que nao libera o modulo --
+  // mesma excecao aplicada no middleware.
+  const [hasTeamMembership, setHasTeamMembership] = useState(false);
+  const [lockedModule, setLockedModule] = useState<ModuleKey | null>(null);
 
   useEffect(() => {
     try {
@@ -101,17 +115,21 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       } catch {
         return;
       }
-      const [profileRes, progressRes, unreadRes, unreadChatsRes] = await Promise.allSettled([
+      const [profileRes, progressRes, unreadRes, unreadChatsRes, planRes, membershipRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchUnreadCount(),
         fetchAllChatUnread(),
+        fetchMyPlanId(),
+        fetchMyMembership(),
       ]);
       if (!alive) return;
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
       if (unreadChatsRes.status === "fulfilled") setUnreadChats(unreadChatsRes.value);
+      if (planRes.status === "fulfilled") setPlan(planRes.value);
+      if (membershipRes.status === "fulfilled") setHasTeamMembership(membershipRes.value !== null);
     })();
     return () => {
       alive = false;
@@ -124,6 +142,17 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     setPendingChatId(chatId);
     setOpenMenu("chats");
     // limpa o parametro da URL pra nao reabrir num refresh/voltar
+    router.replace(pathname);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Chegou aqui via redirect do middleware (rota bloqueada pro plano
+  // atual, ver lib/supabase/middleware.ts) -- abre a mesma modal de
+  // upsell que o clique no menu abriria.
+  useEffect(() => {
+    const locked = new URLSearchParams(window.location.search).get("locked");
+    if (!locked) return;
+    setLockedModule(locked as ModuleKey);
     router.replace(pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -166,6 +195,35 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         // hover cinza generico -- pedido explicito pra ficar "nitido",
         // igual ao resto do produto ja associa cor a cada modulo.
         const hovered = hoverKey === m.key;
+        const moduleKey = m.key as ModuleKey;
+        // plan === null (ainda carregando) nunca trava nada aqui -- so'
+        // decide travar depois que a resposta chega, pra nao acender e
+        // apagar cadeado na tela toda hora que o menu monta.
+        const locked = plan !== null && !isModuleUnlocked(plan, moduleKey) && !(moduleKey === "time" && hasTeamMembership);
+
+        if (locked) {
+          return (
+            <button
+              key={m.key}
+              type="button"
+              title={collapsed ? `${m.title} (bloqueado)` : undefined}
+              onClick={() => {
+                setMobileOpen(false);
+                setLockedModule(moduleKey);
+              }}
+              onMouseEnter={() => setHoverKey(m.key)}
+              onMouseLeave={() => setHoverKey((k) => (k === m.key ? null : k))}
+              className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted/70 transition-all duration-150 ${
+                collapsed ? "justify-center" : ""
+              } ${hovered ? "bg-white/[0.04]" : ""}`}
+            >
+              <Icon size={18} strokeWidth={1.75} className="shrink-0 opacity-50" />
+              {!collapsed && <span className="flex-1 truncate">{m.title}</span>}
+              <Lock size={13} strokeWidth={2} className="shrink-0 text-muted/60" />
+            </button>
+          );
+        }
+
         return (
           <Link
             key={m.key}
@@ -371,6 +429,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }}
         />
       )}
+
+      <PlanLockModal moduleKey={lockedModule} onClose={() => setLockedModule(null)} />
     </div>
   );
 }

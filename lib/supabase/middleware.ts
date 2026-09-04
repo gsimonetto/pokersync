@@ -1,5 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isModuleUnlocked, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
@@ -94,6 +95,41 @@ export async function updateSession(request: NextRequest) {
       sameSite: "lax",
       path: "/",
     });
+
+    // Trava real de plano: o menu (components/app-shell.tsx) so' esconde
+    // visualmente o modulo bloqueado -- isso e' cosmetico e roda no
+    // navegador, entao nao impede ninguem de digitar a URL direto (ex:
+    // /revisor). Aqui, no servidor, e' onde o bloqueio vale de verdade
+    // pra qualquer jeito de chegar na rota.
+    const moduleKey = resolveModuleForRoute(pathname);
+    if (moduleKey) {
+      const { data: planRow } = await supabase.from("user_plans").select("plan").maybeSingle();
+      const plan = toPlanId(planRow?.plan);
+      let allowed = isModuleUnlocked(plan, moduleKey);
+
+      // "Meu Time" tem uma excecao: um jogador convidado por um coach
+      // com plano Team enxerga o time mesmo com plano pessoal free ou
+      // individual -- o acesso vem da associacao ao time (team_members),
+      // nao do proprio plano. Mesma regra que ja valia pra CRIAR time
+      // (planoPermiteCriarTime em lib/services/team-service.ts), agora
+      // tambem pra acessar um time do qual ja se e' membro.
+      if (!allowed && moduleKey === "time") {
+        const { data: membership } = await supabase
+          .from("team_members")
+          .select("user_id")
+          .eq("user_id", user.id)
+          .maybeSingle();
+        allowed = Boolean(membership);
+      }
+
+      if (!allowed) {
+        const redirect = NextResponse.redirect(new URL(`/modulos?locked=${moduleKey}`, request.url));
+        response.cookies.getAll().forEach((cookie) => {
+          redirect.cookies.set(cookie);
+        });
+        return redirect;
+      }
+    }
   }
 
   return response;
