@@ -299,6 +299,30 @@ export function RevisorSessao({
     });
   }, [filteredHands]);
 
+  // Navegacao manual entre maos (pedido explicito: "ir pra proxima mao"
+  // dentro do proprio chip de controles da mesa, no modo tela-cheia do
+  // celular) -- mesma lista FILTRADA de goToNextHand acima, mas aqui e'
+  // um clique deliberado do jogador, nao uma recuperacao automatica de
+  // erro. Indice atual computado a cada render (lista pequena, sem
+  // necessidade de memoizar) pra saber se ha mao anterior/seguinte.
+  const currentHandIndex = filteredHands.findIndex((f) => f.hand.id === selectedId);
+  const hasPrevHand = currentHandIndex > 0;
+  const hasNextHand = currentHandIndex !== -1 && currentHandIndex < filteredHands.length - 1;
+  const goToPrevHandManual = useCallback(() => {
+    setSelectedId((current) => {
+      const idx = filteredHands.findIndex((f) => f.hand.id === current);
+      if (idx <= 0) return current;
+      return filteredHands[idx - 1].hand.id;
+    });
+  }, [filteredHands]);
+  const goToNextHandManual = useCallback(() => {
+    setSelectedId((current) => {
+      const idx = filteredHands.findIndex((f) => f.hand.id === current);
+      if (idx === -1 || idx >= filteredHands.length - 1) return current;
+      return filteredHands[idx + 1].hand.id;
+    });
+  }, [filteredHands]);
+
   if (loading) {
     return (
       <div style={{ fontFamily: F, padding: 24, display: "flex", justifyContent: "center", color: "rgba(255,255,255,0.4)" }}>
@@ -525,6 +549,8 @@ export function RevisorSessao({
       onOpenHand={() => selectedId && onOpenHand(selectedId)}
       onFatalError={goToNextHand}
       actionsSlot={isMobile ? actionsSlotEl : undefined}
+      onPrevHand={hasPrevHand ? goToPrevHandManual : undefined}
+      onNextHand={hasNextHand ? goToNextHandManual : undefined}
     />
   ) : selectedId && parsedForSelected === null ? (
     <div

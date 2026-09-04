@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
+import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { ShareHandModal } from "./share-hand-modal";
@@ -47,6 +47,17 @@ const SUPPORTED_DRILL_POSITIONS = new Set(["BB", "BTN", "SB"]);
 // play automatico" — sem seletor visivel na tela, so um valor razoavel
 // fixo em codigo).
 const AUTOPLAY_MS = 900;
+
+// Estilo comum dos 5 botoes do chip unico de navegacao no celular (ver
+// dock de mesa-cheia abaixo) -- cada um so' precisa dizer se esta
+// desabilitado, o resto (tamanho/formato/transparencia) e' identico.
+function navDockBtnStyle(disabled: boolean): React.CSSProperties {
+  return {
+    display: "flex", alignItems: "center", justifyContent: "center",
+    background: "transparent", border: 0, color: disabled ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)",
+    borderRadius: 999, width: 34, height: 34, cursor: disabled ? "not-allowed" : "pointer", flexShrink: 0,
+  };
+}
 
 // Chip estático (não clicável) — mesmo visual do ChipButton, usado pra
 // exibir info (torneio/blinds) em vez de disparar ação.
@@ -183,6 +194,8 @@ export function RevisorHandTable({
   onOpenHand,
   onFatalError,
   actionsSlot,
+  onPrevHand,
+  onNextHand,
 }: {
   parsedHand: ParsedHand;
   // Nome do torneio sendo revisado — exibido no header da mesa. Opcional
@@ -219,6 +232,13 @@ export function RevisorHandTable({
   // desktop (ou quando ausente) os botoes continuam no header normal da
   // mesa, sem mudanca de comportamento.
   actionsSlot?: HTMLElement | null;
+  // Navegar pra mao anterior/seguinte da sessao -- pedido explicito: o
+  // chip unico de controles no celular ganha "ir pra proxima mao" (e
+  // anterior) alem dos passos dentro da mesma mao. Omitido = botao
+  // correspondente fica desabilitado (RevisorSessao so passa a funcao
+  // quando existe mesmo mao anterior/seguinte na lista filtrada).
+  onPrevHand?: () => void;
+  onNextHand?: () => void;
 }) {
   // Retangulo em pe' no celular (mesmo par calibrado do modo mesa-cheia
   // do Treino: aspectRatio "3/5" + cornerRadius "10%/6%" -- cada
@@ -363,15 +383,14 @@ export function RevisorHandTable({
     return { fromPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-${ev.posLabel}` };
   }, [replayState, stepIndex]);
 
-  // Hero desloca um pouco pra esquerda no celular (pedido explicito,
-  // mesmo truque do modo mesa-cheia do Treino: fullscreenSeatLayout com
-  // x:42 em vez de 50) -- abre espaco a direita pro dock de navegacao
-  // (anterior/play/proximo), que ocupa o mesmo canto onde o Treino
-  // encaixa os botoes de aposta. So' o assento do hero muda; os demais
-  // (posicionados por computeRealSeatLayout) ficam como estao.
+  // Hero desloca pro canto inferior esquerdo no celular -- MESMOS
+  // valores do modo mesa-cheia do Treino (fullscreenSeatLayout: x:28,
+  // y:88, ver rfi-jam-drill.tsx), pedido explicito: "quero iguais". So'
+  // o assento do hero muda; os demais (posicionados por
+  // computeRealSeatLayout) ficam como estao.
   const mobileSeatLayout = useMemo(() => {
     if (!replayState) return null;
-    return replayState.seatLayout.map((s) => (s.isHero ? { ...s, x: 38 } : s));
+    return replayState.seatLayout.map((s) => (s.isHero ? { ...s, x: 28, y: 88 } : s));
   }, [replayState]);
 
   const nextStep = useCallback(() => {
@@ -490,32 +509,46 @@ export function RevisorHandTable({
   // seu proprio bookmark (o mesmo campo, mesma acao) -- mostrar os dois
   // ao mesmo tempo na mesma tela seria redundante.
   const canSave = !!reviewId && !!onOpenHand;
+  const isLastStep = replayState.stepIndex >= replayState.stepCount - 1;
 
   return (
     <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
       <div
-        style={{
-          background: "#050505",
-          borderRadius: 14,
-          border: "1px solid rgba(255,255,255,0.08)",
-          padding: 10,
-          // overflow:hidden — bug corrigido: sem isso, conteudo de seat
-          // (chip de nome, fichas paradas) que se acumula conforme a acao
-          // avanca podia vazar visualmente pra fora da caixa. Agora fica
-          // sempre travada no tamanho definido, clipando qualquer excesso.
-          overflow: "hidden",
-          // flex:1 + minHeight:0 (pedido explicito: "aumentar a mesa no
-          // mesmo tamanho da lista de maos... nao devera conter espaco
-          // em branco em baixo") — antes a mesa tinha altura FIXA por
-          // breakpoint (360/420/500/520px) que nao acompanhava a altura
-          // real da coluna (a lista de maos ao lado usa flex:1 e enche
-          // o espaco todo). Agora o card da mesa cresce junto com a
-          // coluna, ate a altura real disponivel na tela.
-          display: "flex",
-          flexDirection: "column",
-          flex: 1,
-          minHeight: 0,
-        }}
+        style={
+          isMobile
+            ? // No celular a mesa vive dentro do portal em tela cheia
+              // (ja preto, ver revisor-sessao.tsx) -- pedido explicito:
+              // "a mesa do treino ainda esta maior, quero o mesmo
+              // tamanho". O card decorativo (fundo/borda/padding 10px)
+              // abaixo, usado no desktop, tirava exatamente esse espaco
+              // do calculo de aspectRatio do PokerTable -- o Treino, no
+              // proprio modo mesa-cheia, NAO tem esse card por cima (so'
+              // um <div flex:1> puro dentro do preto do portal). Sem ele
+              // aqui tambem, a mesa usa a mesma area util que o Treino.
+              { display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }
+            : {
+                background: "#050505",
+                borderRadius: 14,
+                border: "1px solid rgba(255,255,255,0.08)",
+                padding: 10,
+                // overflow:hidden — bug corrigido: sem isso, conteudo de seat
+                // (chip de nome, fichas paradas) que se acumula conforme a acao
+                // avanca podia vazar visualmente pra fora da caixa. Agora fica
+                // sempre travada no tamanho definido, clipando qualquer excesso.
+                overflow: "hidden",
+                // flex:1 + minHeight:0 (pedido explicito: "aumentar a mesa no
+                // mesmo tamanho da lista de maos... nao devera conter espaco
+                // em branco em baixo") — antes a mesa tinha altura FIXA por
+                // breakpoint (360/420/500/520px) que nao acompanhava a altura
+                // real da coluna (a lista de maos ao lado usa flex:1 e enche
+                // o espaco todo). Agora o card da mesa cresce junto com a
+                // coluna, ate a altura real disponivel na tela.
+                display: "flex",
+                flexDirection: "column",
+                flex: 1,
+                minHeight: 0,
+              }
+        }
       >
         {/* Header unico (pedido explicito: "refine os botoes do
             replayer e suba ele, ficando na mesma linha que as demais
@@ -632,85 +665,93 @@ export function RevisorHandTable({
             streetCommitments={replayState.streetCommitments}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
-            {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.75, heroScale: 1.25 } : {})}
+            {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.75, heroScale: 1.4 } : {})}
           />
 
           {isMobile && (
-            <>
-              {/* Blinds fosco sobre o board (pedido explicito: "tirar o
-                  nome do torneio, os BB pode colocar em cima do board de
-                  forma fosca, so' pra aparecer") -- pointer-events:none
-                  pra nunca capturar clique/toque que era pro board por
-                  tras. Fica no meio vertical da mesa, area que so' o
-                  board (ainda sem cartas no preflop) ocupa -- não
-                  sobrepõe assento, nome ou stack de ninguém. */}
-              <div
-                style={{
-                  position: "absolute", top: "40%", left: "50%", transform: "translate(-50%, -50%)",
-                  pointerEvents: "none", zIndex: 20,
-                  fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)",
-                  padding: "4px 10px", borderRadius: 999,
-                  background: "rgba(0,0,0,0.32)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)",
-                  whiteSpace: "nowrap",
-                }}
-              >
-                {parsedHand.smallBlind}/{parsedHand.bigBlind}
-              </div>
+            <div style={{ position: "absolute", right: 10, top: "90%", transform: "translateY(-100%)", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, zIndex: 40 }}>
+              {/* "Treinar esse spot" -- pedido explicito: "só no final da
+                  ação, em cima dos botões do player" -- so' aparece no
+                  ultimo passo da mao (nao faz sentido treinar um spot
+                  cuja acao ainda nao terminou de se revelar), empilhado
+                  ACIMA do chip de navegacao (mesma coluna, nunca
+                  sobrepondo). */}
+              {isLastStep && trainHref && (
+                <Link
+                  href={trainHref}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
+                    background: "rgba(255,255,255,0.92)", color: "#111111",
+                    borderRadius: 999, padding: "8px 10px",
+                    fontFamily: F, fontSize: 11, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap",
+                  }}
+                >
+                  <Target size={13} /> Treinar
+                </Link>
+              )}
 
-              {/* Dock de navegacao -- mesmo canto onde o Treino encaixa
-                  os botoes de aposta no modo mesa-cheia (right:10,
-                  ancorado por baixo em top:90%). O hero foi deslocado
-                  pra esquerda (mobileSeatLayout acima) exatamente pra
-                  abrir esse espaco -- nada aqui embaixo sobrepõe as
-                  cartas do hero. */}
-              <div style={{ position: "absolute", right: 10, top: "90%", transform: "translateY(-100%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, zIndex: 40 }}>
-                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", ...num }}>
-                  {replayState.stepIndex + 1}/{replayState.stepCount}
-                </span>
+              {/* Chip unico de navegacao (pedido explicito: "o player
+                  pode ser um chip unico com botao de voltar a mao
+                  anterior, voltar a acao, play automatico, avancar
+                  acao, ir pra proxima mao") -- 5 controles dentro do
+                  MESMO pill, em vez de circulos soltos. Mesmo canto
+                  onde o Treino encaixa os botoes de aposta no modo
+                  mesa-cheia dele (right:10, ancorado por baixo em
+                  top:90%); o hero foi deslocado pra esquerda
+                  (mobileSeatLayout acima) exatamente pra abrir esse
+                  espaco -- nada aqui sobrepõe as cartas do hero. */}
+              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 4, borderRadius: 999, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                <button
+                  onClick={onPrevHand}
+                  disabled={!onPrevHand}
+                  aria-label="Mão anterior"
+                  title="Mão anterior"
+                  style={navDockBtnStyle(!onPrevHand)}
+                >
+                  <ChevronsLeft size={15} />
+                </button>
                 <button
                   onClick={prevStep}
                   disabled={replayState.stepIndex === 0}
                   aria-label="Passo anterior"
                   title="Anterior (←)"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.14)",
-                    color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)",
-                    borderRadius: 999, width: 34, height: 34, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
-                  }}
+                  style={navDockBtnStyle(replayState.stepIndex === 0)}
                 >
-                  <ChevronLeft size={16} />
+                  <ChevronLeft size={15} />
                 </button>
                 <button
                   onClick={() => setAutoplay((v) => !v)}
-                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                  disabled={isLastStep}
                   aria-label={autoplay ? "Pausar" : "Reproduzir"}
                   title={autoplay ? "Pausar (espaço)" : "Reproduzir (espaço)"}
                   style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    background: autoplay ? "rgba(52,211,153,0.22)" : "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.14)",
-                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.85)",
-                    borderRadius: 999, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+                    ...navDockBtnStyle(isLastStep),
+                    background: autoplay ? "rgba(52,211,153,0.22)" : "transparent",
+                    color: isLastStep ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.85)",
                   }}
                 >
                   {autoplay ? <Pause size={14} /> : <Play size={14} />}
                 </button>
                 <button
                   onClick={nextStep}
-                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                  disabled={isLastStep}
                   aria-label="Próximo passo"
                   title="Próximo (→)"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center",
-                    background: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.14)",
-                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : "#111111",
-                    borderRadius: 999, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-                  }}
+                  style={navDockBtnStyle(isLastStep)}
                 >
-                  <ChevronRight size={16} />
+                  <ChevronRight size={15} />
+                </button>
+                <button
+                  onClick={onNextHand}
+                  disabled={!onNextHand}
+                  aria-label="Próxima mão"
+                  title="Próxima mão"
+                  style={navDockBtnStyle(!onNextHand)}
+                >
+                  <ChevronsRight size={15} />
                 </button>
               </div>
-            </>
+            </div>
           )}
         </div>
       </div>
@@ -754,30 +795,35 @@ export function RevisorHandTable({
           actionsSlot
         )}
 
-      <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
-        {trainHref ? (
-          <Link
-            href={trainHref}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.25)",
-              color: "#FFFFFF", borderRadius: 10, padding: "8px 14px",
-              fontFamily: F, fontSize: 12.5, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap",
-            }}
-          >
-            <Target size={13} /> Treinar esse spot
-          </Link>
-        ) : (
-          situationAction !== "pending" && (
-            <span
-              title="Sem drill correspondente pra essa rua/posição/situação"
-              style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap" }}
+      {/* No celular, "Treinar esse spot" virou parte do chip de
+          navegacao (so' aparece no ultimo passo, ver acima) -- essa
+          linha abaixo da mesa e' so' desktop. */}
+      {!isMobile && (
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
+          {trainHref ? (
+            <Link
+              href={trainHref}
+              style={{
+                display: "flex", alignItems: "center", gap: 6,
+                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.25)",
+                color: "#FFFFFF", borderRadius: 10, padding: "8px 14px",
+                fontFamily: F, fontSize: 12.5, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap",
+              }}
             >
-              Sem drill correspondente
-            </span>
-          )
-        )}
-      </div>
+              <Target size={13} /> Treinar esse spot
+            </Link>
+          ) : (
+            situationAction !== "pending" && (
+              <span
+                title="Sem drill correspondente pra essa rua/posição/situação"
+                style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap" }}
+              >
+                Sem drill correspondente
+              </span>
+            )
+          )}
+        </div>
+      )}
 
       {reviewId && (
         <ShareHandModal open={shareModalOpen} reviewId={reviewId} onClose={() => setShareModalOpen(false)} />
