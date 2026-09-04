@@ -312,8 +312,8 @@ export function TreeEditor({ id, tabs }: { id: string; tabs?: React.ReactNode })
 
       {nodes.length > 0 && (
         <p className="mb-3 text-xs text-muted">
-          Quando um passo tem mais de uma continuação, cada uma é um caminho diferente (ex: "BB Defende" e "BB Folda"
-          saindo do mesmo "BTN Open") — não uma sequência.
+          Quando um passo tem mais de uma continuação, cada uma é um caminho diferente (ex: &quot;BB Defende&quot; e &quot;BB Folda&quot;
+          saindo do mesmo &quot;BTN Open&quot;) — não uma sequência.
         </p>
       )}
 

@@ -234,6 +234,7 @@ export async function listReviews(
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? []).map((r: any) => ({
     ...r,
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
     thumb: r.hand_review_images?.[0]?.storage_path || null,
   }));

@@ -69,7 +69,7 @@ export function MultiBoardAnalyzer({
 
       {open && (
         <div className="border-t border-hairline p-3">
-          <p className="mb-2 text-[11px] text-muted">Filtrar por textura do flop (estilo Flopzilla) — deixe "Qualquer" pra amostrar todo tipo de board.</p>
+          <p className="mb-2 text-[11px] text-muted">Filtrar por textura do flop (estilo Flopzilla) — deixe &quot;Qualquer&quot; pra amostrar todo tipo de board.</p>
 
           <div className="mb-3 grid grid-cols-2 gap-1.5">
             <select

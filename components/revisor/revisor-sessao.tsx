@@ -492,7 +492,7 @@ export function RevisorSessao({
             >
               <AlertTriangle size={22} color={T.warn} />
               <p style={{ color: "rgba(255,255,255,0.5)", fontSize: 12.5, textAlign: "center", maxWidth: 380 }}>
-                Essa mão não tem hand history parseável — abra em "Analisar mão" pra revisar sem a mesa visual.
+                Essa mão não tem hand history parseável — abra em &quot;Analisar mão&quot; pra revisar sem a mesa visual.
               </p>
               <button
                 onClick={() => selectedId && onOpenHand(selectedId)}

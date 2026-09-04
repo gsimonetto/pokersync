@@ -28,8 +28,8 @@ export async function fetchMyAchievements(): Promise<Achievement[]> {
     .order("unlocked_at", { ascending: true });
   if (error) throw error;
 
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
   return (data ?? [])
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
     .map((r: any) => {
       const a = r.achievements;
       if (!a) return null;

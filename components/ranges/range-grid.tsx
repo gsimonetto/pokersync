@@ -378,7 +378,7 @@ export function RangeGrid({
   }, [readOnly, past, future, value, mixMode]);
 
   const summary = useMemo(() => {
-    let combos = { fold: 0, call: 0, raise: 0 };
+    const combos = { fold: 0, call: 0, raise: 0 };
     let activeHands = 0;
     for (let row = 0; row < RANKS.length; row++) {
       for (let col = 0; col < RANKS.length; col++) {

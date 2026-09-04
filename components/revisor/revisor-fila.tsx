@@ -156,6 +156,7 @@ export function RevisorFila({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows: ReviewListItem[] = (data ?? []).map((r: any) => ({
         ...r,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
         thumb: r.hand_review_images?.[0]?.storage_path || null,
       }));
@@ -216,6 +217,7 @@ export function RevisorFila({
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows: ReviewListItem[] = (data ?? []).map((r: any) => ({
         ...r,
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
         thumb: r.hand_review_images?.[0]?.storage_path || null,
       }));

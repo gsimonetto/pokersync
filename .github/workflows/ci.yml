@@ -18,10 +18,9 @@ jobs:
       - name: Instala dependências
         run: npm ci
 
-      # "npm run lint" ainda nao esta configurado neste projeto (sem
-      # .eslintrc, eslint nem esta nas dependencias) -- next lint cai
-      # num questionario interativo, que travaria a esteira. Fica de
-      # fora ate o lint ser configurado de verdade (ver prioridades).
+      - name: Lint
+        run: npm run lint
+
       - name: Build
         env:
           # Valores ficticios -- o build (geracao das paginas) nao

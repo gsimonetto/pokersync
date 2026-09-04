@@ -283,7 +283,7 @@ export function StatisticsTab({
       <Painel titulo="Estrutura de premiação" icone={<Award size={14} className="icon-glow text-training" />}>
         <p className="mb-3 text-xs leading-relaxed text-muted">
           Pré-requisito pro cálculo de cEV/ICM abaixo — sem saber quanto cada colocação pagou, não dá pra calcular quanto sua
-          decisão "deveria" valer em $. Hoje é só manual; quando o agente desktop buscar isso sozinho, aparece aqui do mesmo jeito
+          decisão &quot;deveria&quot; valer em $. Hoje é só manual; quando o agente desktop buscar isso sozinho, aparece aqui do mesmo jeito
           (mesmo torneio, sem tela nova).
         </p>
 
