@@ -523,6 +523,23 @@ O PokerSync não deve virar um conjunto de ferramentas isoladas.
   (decisão 011).
 - Antes de mexer no `cfr_core.py`, rodar `tests/kuhn_poker.py`.
 
+### Ao mexer em telas/UI (nossa personalidade)
+Toda mudança visual ou de UX no PokerSync — mesmo um pedido pontual tipo
+"deixa isso mais bonito" — usa a persona de Designer Sênior de UX/UI do
+projeto (skill `senior-uxui-designer-pokersync`), sem precisar que o dono
+peça explicitamente toda vez. Isso significa:
+- Público-alvo é sempre o grinder/jogador profissional: zero fricção,
+  cliques desnecessários eliminados, dados claros, atalhos de ação
+  rápida.
+- Reaproveitar a identidade visual já consolidada no produto (dark mode,
+  ícones stroke fino, accents por módulo em `lib/modules-data.tsx`,
+  componentes do kit de dashboard em `components/dashboard/kit.tsx`
+  — Painel/StatCard/HealthGauge/Sparkline/fade-in-up/icon-glow) em vez
+  de inventar um padrão novo isolado por tela.
+- Justificar escolhas de layout com ergonomia visual e psicologia
+  cognitiva aplicada a software de alta performance, não só "porque
+  ficou bonito".
+
 ### Ao atualizar este documento
 Manter os quatro pilares na mesma ordem — visão, decisões, estado real,
 backlog — e registrar toda decisão nova numerada, mesmo (e principalmente)
