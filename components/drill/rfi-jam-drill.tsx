@@ -9,6 +9,7 @@ import { PokerTable, type TableHand, type SeatState } from "@/components/drill/p
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
 import { fetchTrainingAccuracy } from "@/lib/services/drill-service";
+import { Chip } from "@/components/chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import { FilterChip as SharedFilterChip } from "@/components/ui/filter-chip";
@@ -24,6 +25,17 @@ import {
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const F = '"Space Grotesk", sans-serif';
+
+// Cor do Chip do placar acumulado (ver Chip em components/chip.tsx) --
+// mesmas 3 faixas usadas no resto do produto pra sinalizar bom/medio/
+// ruim (--color-positive/evolution/negative em app/globals.css). Sem
+// mao nenhuma jogada ainda fica neutro, nem verde nem vermelho.
+function accuracyChipColor(total: number, pct: number): string {
+  if (total === 0) return "#8A8A8A";
+  if (pct >= 70) return "#22c55e";
+  if (pct >= 40) return "#f59e0b";
+  return "#e0555a";
+}
 
 function allLabels(): string[] {
   const out: string[] = [];
@@ -1090,10 +1102,12 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
               <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
                 {heroPos} vs {villainPos} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>· {stackBb}bb</span>
               </span>
-              <span style={{ marginLeft: "auto", fontSize: 12, color: "rgba(255,255,255,0.5)" }}>
-                {stats.hits}/{stats.total}
-                {stats.total > 0 ? ` · ${sessionPct}%` : ""}
-              </span>
+              <div style={{ marginLeft: "auto" }}>
+                <Chip color={accuracyChipColor(stats.total, sessionPct)} size="sm">
+                  {stats.hits}/{stats.total}
+                  {stats.total > 0 ? ` · ${sessionPct}%` : ""}
+                </Chip>
+              </div>
             </div>
 
             <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
@@ -1198,9 +1212,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
         </span>
 
         <div className="ps-tr-session" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
-          <span style={{ fontFamily: F, fontSize: 13, color: "rgba(255,255,255,0.55)" }}>
+          <Chip color={accuracyChipColor(stats.total, sessionPct)}>
             {stats.hits}/{stats.total} ótimas{stats.total > 0 ? ` · ${sessionPct}%` : ""}
-          </span>
+          </Chip>
         </div>
 
         {tabs}
