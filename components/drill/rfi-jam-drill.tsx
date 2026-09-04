@@ -12,6 +12,7 @@ import { fetchTrainingAccuracy } from "@/lib/services/drill-service";
 import { Chip } from "@/components/chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { FilterChip as SharedFilterChip } from "@/components/ui/filter-chip";
 import {
   ALL_POSITIONS,
@@ -241,23 +242,9 @@ function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color:
   );
 }
 
-// Breakpoint identico ao usado em treino-responsive-styles.tsx (768px) —
-// so' abaixo dele que a gaveta de filtros vira modal e o modo mesa-cheia
-// (fullscreen) existe. addEventListener("change", ...) reage a rotacao
-// de tela/redimensionamento sem precisar de um listener de resize solto.
-function useIsMobile(): boolean {
-  const [isMobile, setIsMobile] = useState(
-    () => typeof window !== "undefined" && window.matchMedia("(max-width: 768px)").matches
-  );
-  useEffect(() => {
-    const mq = window.matchMedia("(max-width: 768px)");
-    const onChange = () => setIsMobile(mq.matches);
-    onChange();
-    mq.addEventListener("change", onChange);
-    return () => mq.removeEventListener("change", onChange);
-  }, []);
-  return isMobile;
-}
+// useIsMobile extraido pra lib/hooks/use-is-mobile.ts (era local aqui) --
+// mesmo breakpoint (768px) agora compartilhado com o Revisor de Maos,
+// que passou a precisar da mesma deteccao (ver revisor-hand-table.tsx).
 
 // Mesma logica de acerto/erro do VerdictFlash, mas em destaque na mesa
 // (pedido explicito: "animacao rapida no centro da tela") -- e' o

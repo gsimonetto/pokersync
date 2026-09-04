@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
+import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { ShareHandModal } from "./share-hand-modal";
 import { OpponentStatsModal } from "./opponent-stats-modal";
 import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
@@ -175,6 +176,17 @@ export function RevisorHandTable({
   // ex: RevisorDetalhe).
   onFatalError?: () => void;
 }) {
+  // Retangulo em pe' no celular (mesmo par calibrado do modo mesa-cheia
+  // do Treino: aspectRatio "3/5" + cornerRadius "10%/6%" -- cada
+  // proporcao precisa do proprio par pra nao formar "bico" nos cantos,
+  // ver comentario em poker-table.tsx). Pedido explicito: "seguir o
+  // mesmo padrao" do Treino no celular -- causa raiz do problema
+  // original era o aspectRatio 8/5 (deitado) sobrando LARGURA travada
+  // pela tela estreita e desperdicando a altura toda disponivel, deixando
+  // a mesa pequena com espaco morto em volta. Nomes/stats dos jogadores
+  // continuam vindo do PokerTable normalmente -- so' o formato muda.
+  const isMobile = useIsMobile();
+
   const [stepIndex, setStepIndex] = useState(0);
   const previousStepRef = useRef(0);
   const [autoplay, setAutoplay] = useState(false);
@@ -557,6 +569,7 @@ export function RevisorHandTable({
             streetCommitments={replayState.streetCommitments}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
+            {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.75, heroScale: 1.25 } : {})}
           />
         </div>
       </div>
