@@ -233,26 +233,49 @@ export async function deleteTransaction(id: string) {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToGoal(r: any): Goal {
-  return { id: r.id, type: r.type, period: r.period, target: Number(r.target) || 0, unit: r.unit, active: !!r.active };
+  return {
+    id: r.id,
+    type: r.type,
+    period: r.period,
+    target: Number(r.target) || 0,
+    unit: r.unit,
+    active: !!r.active,
+    deadline: r.deadline,
+  };
 }
 
+// Traz tudo (nao so' active=true) -- Ativas/Finalizadas e' decidido no
+// cliente comparando deadline com hoje (goalIsFinalizada em calc.ts),
+// sem precisar de uma segunda query.
 export async function fetchGoals(): Promise<Goal[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("bankroll_goals")
     .select("*")
-    .eq("active", true)
-    .order("created_at", { ascending: true });
+    .order("deadline", { ascending: false });
   if (error) throw error;
   return (data || []).map(rowToGoal);
 }
 
-export async function addGoal(g: { type: GoalType; period: GoalPeriod; target: number; unit: string }): Promise<Goal> {
+export async function addGoal(g: {
+  type: GoalType;
+  period: GoalPeriod;
+  target: number;
+  unit: string;
+  deadline: string;
+}): Promise<Goal> {
   const supabase = createClient();
   const userId = await getUserId();
   const { data, error } = await supabase
     .from("bankroll_goals")
-    .insert({ user_id: userId, type: g.type, period: g.period, target: Number(g.target) || 0, unit: g.unit })
+    .insert({
+      user_id: userId,
+      type: g.type,
+      period: g.period,
+      target: Number(g.target) || 0,
+      unit: g.unit,
+      deadline: g.deadline,
+    })
     .select()
     .single();
   if (error) throw error;

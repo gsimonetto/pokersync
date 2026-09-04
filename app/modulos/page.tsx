@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Target, Trophy, type LucideIcon } from "lucide-react";
+import { ArrowRight, Target, Trophy, MessageSquare, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/client";
@@ -17,6 +17,13 @@ import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
 import { StatCardGrid, statBar, toneFromRange } from "@/components/analysis/shared";
+import { ModuleCardShell } from "@/components/module-card-shell";
+import { Modal } from "@/components/ui/modal";
+import { MinhasMetasModalBody } from "@/components/goals/minhas-metas-modal";
+import { RecadosCoachModalBody } from "@/components/goals/recados-coach-modal";
+import { fetchGoals } from "@/lib/services/bankroll-service";
+import { fetchPlayerGoals, fetchPlayerAlerts } from "@/lib/services/team-service";
+import { todayISO } from "@/lib/bankroll/format";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -60,6 +67,50 @@ export default function ModulosPage() {
   const [avgBuyin, setAvgBuyin] = useState<number | null>(null);
   const [totalGanhos, setTotalGanhos] = useState<number | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
+
+  const [metasModalOpen, setMetasModalOpen] = useState(false);
+  const [coachModalOpen, setCoachModalOpen] = useState(false);
+  const [metasDot, setMetasDot] = useState(false);
+  const [coachDot, setCoachDot] = useState(false);
+
+  // Bolinha discreta nos cards abaixo: so' liga quando tem algo que
+  // vale a pena abrir pra ver -- meta pessoal com prazo proximo (<=2
+  // dias) pro card de Metas; meta do coach proxima do prazo ou alerta
+  // dos ultimos 3 dias pro card de Recados. Busca leve, separada do que
+  // a modal carrega quando abre (essa so' checa, nao renderiza nada).
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      const hoje = todayISO();
+      const emDoisDias = new Date();
+      emDoisDias.setDate(emDoisDias.getDate() + 2);
+      const limiteISO = emDoisDias.toISOString().slice(0, 10);
+
+      try {
+        const goals = await fetchGoals();
+        if (!alive) return;
+        setMetasDot(goals.some((g) => g.deadline >= hoje && g.deadline <= limiteISO));
+      } catch {
+        // sem permissao/erro de rede: card fica sem bolinha, nao quebra a tela
+      }
+
+      const { data: userData } = await createClient().auth.getUser();
+      const meId = userData.user?.id;
+      if (!meId) return;
+      try {
+        const [metas, alertas] = await Promise.all([fetchPlayerGoals(meId), fetchPlayerAlerts(meId)]);
+        if (!alive) return;
+        const metaProxima = metas.some((m) => !m.finalizada && m.deadline >= hoje && m.deadline <= limiteISO);
+        const alertaRecente = alertas.some((a) => Date.now() - new Date(a.createdAt).getTime() < 3 * 86400000);
+        setCoachDot(metaProxima || alertaRecente);
+      } catch {
+        // sem time/sem permissao: card de Recados nem aparece (ver JSX)
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   useEffect(() => {
     let alive = true;
@@ -338,7 +389,72 @@ export default function ModulosPage() {
             hand history estruturada.
           </p>
         </section>
+
+        {/* Minhas Metas + Recados do Coach: preenche o espaço que sobrava
+            depois das Frequências. Mesmo padrao visual dos cards de modulo
+            (ModuleCardShell) de antes do redesenho -- aqui abrem modal em
+            vez de navegar. Sem time, so' o card de Metas aparece (ocupa a
+            linha inteira sozinho, sem buraco). */}
+        <div className={`grid gap-3 ${team ? "sm:grid-cols-2" : "sm:grid-cols-1"}`}>
+          <button onClick={() => setMetasModalOpen(true)} className="block text-left">
+            <ModuleCardShell accent="#E0954C" available>
+              <div
+                aria-hidden="true"
+                className="acc-glow pointer-events-none absolute -left-10 -top-10 size-32 rounded-full blur-2xl"
+              />
+              <div className="relative flex items-start justify-between gap-2">
+                <div className="relative shrink-0">
+                  <div className="acc-border flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                    <Target size={20} className="acc-fg" />
+                  </div>
+                  {metasDot && (
+                    <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
+                  )}
+                </div>
+                <ArrowRight size={16} className="acc-fg text-muted opacity-0 transition-all duration-200 group-hover:opacity-100" />
+              </div>
+              <div className="relative mt-4">
+                <h3 className="acc-fg text-sm font-semibold text-ink">Minhas Metas</h3>
+                <p className="mt-1 text-xs leading-relaxed text-muted">Volume, estudo e prazo de conclusão.</p>
+              </div>
+            </ModuleCardShell>
+          </button>
+
+          {team && (
+            <button onClick={() => setCoachModalOpen(true)} className="block text-left">
+              <ModuleCardShell accent="#7C83E0" available>
+                <div
+                  aria-hidden="true"
+                  className="acc-glow pointer-events-none absolute -left-10 -top-10 size-32 rounded-full blur-2xl"
+                />
+                <div className="relative flex items-start justify-between gap-2">
+                  <div className="relative shrink-0">
+                    <div className="acc-border flex h-10 w-10 items-center justify-center rounded-lg border border-hairline bg-elevated">
+                      <MessageSquare size={20} className="acc-fg" />
+                    </div>
+                    {coachDot && (
+                      <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
+                    )}
+                  </div>
+                  <ArrowRight size={16} className="acc-fg text-muted opacity-0 transition-all duration-200 group-hover:opacity-100" />
+                </div>
+                <div className="relative mt-4">
+                  <h3 className="acc-fg text-sm font-semibold text-ink">Recados do Coach</h3>
+                  <p className="mt-1 text-xs leading-relaxed text-muted">Metas, funil, checklist, alertas e comentários.</p>
+                </div>
+              </ModuleCardShell>
+            </button>
+          )}
+        </div>
       </main>
+
+      <Modal open={metasModalOpen} onClose={() => setMetasModalOpen(false)} title="Minhas Metas" wide>
+        <MinhasMetasModalBody />
+      </Modal>
+
+      <Modal open={coachModalOpen} onClose={() => setCoachModalOpen(false)} title="Recados do Coach" wide>
+        <RecadosCoachModalBody />
+      </Modal>
     </AppShell>
   );
 }

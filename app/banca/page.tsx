@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart, Bot } from "lucide-react";
-import type { Session, Transaction, TransactionType, Goal, GoalType, GoalPeriod, StudyLog, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
-import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, goalProgress, brmReading, thresholdFor, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
+import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart, Bot, Target } from "lucide-react";
+import type { Session, Transaction, TransactionType, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
+import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, brmReading, thresholdFor, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { niceTicks } from "@/lib/format";
@@ -18,6 +18,8 @@ import { getUsdBrlRate } from "@/lib/services/fx-service";
 import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { FilterPopover } from "@/components/ui/filter-popover";
+import { Modal } from "@/components/ui/modal";
+import { MinhasMetasModalBody } from "@/components/goals/minhas-metas-modal";
 import {
   fetchSessions,
   fetchSettings,
@@ -27,11 +29,6 @@ import {
   fetchTransactions,
   addTransaction as apiAddTransaction,
   deleteTransaction as apiDeleteTransaction,
-  fetchGoals,
-  addGoal as apiAddGoal,
-  deleteGoal as apiDeleteGoal,
-  fetchStudyLogs,
-  addStudyLog as apiAddStudyLog,
   fetchBrmThresholds,
   saveBrmThreshold as apiSaveBrmThreshold,
   fetchAnnotations,
@@ -102,8 +99,6 @@ const TX_LABELS: Record<TransactionType, string> = {
 export default function BankrollPage() {
   const [sessions, setSessions] = useState<Session[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [goals, setGoals] = useState<Goal[]>([]);
-  const [studyLogs, setStudyLogs] = useState<StudyLog[]>([]);
   const [brmThresholds, setBrmThresholds] = useState<BrmThreshold[]>([]);
   const [bankroll, setBankroll] = useState(0);
   const [range, setRange] = useState<RangeOption>("all");
@@ -152,10 +147,6 @@ export default function BankrollPage() {
   const [historyBuyin, setHistoryBuyin] = useState<string>("all");
   const [historyImported, setHistoryImported] = useState<"all" | "yes" | "no">("all");
 
-  const [goalType, setGoalType] = useState<GoalType>("volume");
-  const [goalPeriod, setGoalPeriod] = useState<GoalPeriod>("semanal");
-  const [goalTarget, setGoalTarget] = useState("");
-
   const [sessionModalOpen, setSessionModalOpen] = useState(false);
   // id da sessao sendo editada (null = o modal esta em modo "registrar")
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
@@ -185,12 +176,10 @@ export default function BankrollPage() {
     let alive = true;
     (async () => {
       try {
-        const [s, cfg, tx, gl, sl, brm, annos, agentTourn, payouts] = await Promise.all([
+        const [s, cfg, tx, brm, annos, agentTourn, payouts] = await Promise.all([
           fetchSessions(),
           fetchSettings(),
           fetchTransactions(),
-          fetchGoals(),
-          fetchStudyLogs(),
           fetchBrmThresholds(),
           fetchAnnotations(),
           fetchTournamentSessions(),
@@ -200,8 +189,6 @@ export default function BankrollPage() {
         setSessions(s);
         setBankroll(cfg.bankroll);
         setTransactions(tx);
-        setGoals(gl);
-        setStudyLogs(sl);
         setBrmThresholds(brm);
         setAnnotations(annos);
         setAgentTournaments(agentTourn);
@@ -495,12 +482,6 @@ export default function BankrollPage() {
     }
     return [...base].reverse();
   }, [platformSessions, historyFormat, historyRange, historyBuyin, historyImported]);
-  // Metas: dá pra criar (form abaixo, handleAddGoal) mas a lista/progresso
-  // e a remoção ainda não têm UI -- goalsProgress e handleRemoveGoal ficam
-  // aqui prontos, esperando essa tela ser desenhada.
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  const goalsProgress = useMemo(() => goals.map((g) => goalProgress(g, sessions, studyLogs)), [goals, sessions, studyLogs]);
-
   // Quantas maos foram revisadas por sessao -- antes o vinculo so existia
   // no sentido revisor->banca (session_id gravado na mao), a banca nunca
   // mostrava nada de volta. So busca pras sessoes realmente visiveis na
@@ -702,44 +683,6 @@ export default function BankrollPage() {
     } catch {
       setErr("Nao foi possivel excluir a transacao. Restaurando.");
       setTransactions(backup);
-    }
-  }
-
-  async function handleAddGoal() {
-    if (!goalTarget) return;
-    const unit = goalType === "volume" ? "sessoes" : "horas";
-    try {
-      const saved = await apiAddGoal({ type: goalType, period: goalPeriod, target: Number(goalTarget), unit });
-      setGoals((prev) => [...prev, saved]);
-      setGoalTarget("");
-      setGoalsModalOpen(false);
-    } catch {
-      setErr("Nao foi possivel criar a meta.");
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function handleRemoveGoal(id: string) {
-    const backup = goals;
-    setGoals((prev) => prev.filter((g) => g.id !== id));
-    try {
-      await apiDeleteGoal(id);
-    } catch {
-      setErr("Nao foi possivel remover a meta. Restaurando.");
-      setGoals(backup);
-    }
-  }
-
-  // eslint-disable-next-line @typescript-eslint/no-unused-vars
-  async function handleQuickStudy(minutes: number) {
-    const draft: StudyLog = { id: `tmp-${Date.now()}`, date: todayISO(), minutes };
-    setStudyLogs((prev) => [...prev, draft]);
-    try {
-      const saved = await apiAddStudyLog(draft);
-      setStudyLogs((prev) => prev.map((x) => (x.id === draft.id ? saved : x)));
-    } catch {
-      setErr("Nao foi possivel registrar o estudo.");
-      setStudyLogs((prev) => prev.filter((x) => x.id !== draft.id));
     }
   }
 
@@ -1081,6 +1024,18 @@ export default function BankrollPage() {
               ) : (
                 <p className="mt-1.5 text-[11px] text-muted">Registre sessões pra ver sua leitura de BRM.</p>
               )}
+            </button>
+
+            <button
+              onClick={() => setGoalsModalOpen(true)}
+              className="rounded-lg border border-hairline bg-elevated p-4 text-left transition-colors hover:border-training/40"
+              title="Ver e criar metas"
+            >
+              <div className="flex items-center gap-1.5">
+                <Target size={12} className="text-training" />
+                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Metas</p>
+              </div>
+              <p className="mt-1.5 text-[11px] text-muted">Volume, estudo e prazo de conclusão.</p>
             </button>
           </div>
 
@@ -1474,29 +1429,8 @@ export default function BankrollPage() {
         </div>
       )}
 
-      <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Nova meta">
-        <div className="grid grid-cols-1 gap-2 sm:grid-cols-4">
-          <select value={goalType} onChange={(e) => setGoalType(e.target.value as GoalType)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm outline-none transition-colors focus:border-ink/40 sm:col-span-2">
-            <option value="volume">Volume (sessoes)</option>
-            <option value="estudo">Estudo (horas)</option>
-          </select>
-          <select value={goalPeriod} onChange={(e) => setGoalPeriod(e.target.value as GoalPeriod)} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm outline-none transition-colors focus:border-ink/40">
-            <option value="semanal">Semanal</option>
-            <option value="mensal">Mensal</option>
-          </select>
-          <input
-            placeholder="Meta (numero)"
-            value={goalTarget}
-            onChange={(e) => setGoalTarget(e.target.value)}
-            className="rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm outline-none transition-colors focus:border-ink/40"
-          />
-          <button
-            onClick={handleAddGoal}
-            className="rounded-lg bg-ink py-2.5 text-sm font-semibold text-void transition-colors hover:opacity-90 sm:col-span-4"
-          >
-            Criar meta
-          </button>
-        </div>
+      <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Minhas Metas" wide>
+        <MinhasMetasModalBody />
       </Modal>
 
       <Modal open={brmModalOpen} onClose={() => setBrmModalOpen(false)} title="BRM — moveup / movedown">
@@ -2098,54 +2032,6 @@ function useCoachTipMemoria() {
   return { registrarVistas, dispensar, visivel };
 }
 
-function Modal({
-  open,
-  onClose,
-  title,
-  children,
-}: {
-  open: boolean;
-  onClose: () => void;
-  title: string;
-  children: React.ReactNode;
-}) {
-  useEffect(() => {
-    if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, [open, onClose]);
-
-  if (!open) return null;
-  return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-lg animate-[modalIn_.16s_ease-out] rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
-        <div className="flex items-center justify-between">
-          <h2 className="text-lg font-semibold text-ink">{title}</h2>
-          <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink" aria-label="Fechar">
-            <X size={16} />
-          </button>
-        </div>
-        <div className="mt-4">{children}</div>
-      </div>
-      <style jsx global>{`
-        @keyframes modalIn {
-          from {
-            opacity: 0;
-            transform: translateY(-10px);
-          }
-          to {
-            opacity: 1;
-            transform: translateY(0);
-          }
-        }
-      `}</style>
-    </div>
-  );
-}
 
 const Y_TICKS = 4;
 

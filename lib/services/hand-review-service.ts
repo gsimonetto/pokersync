@@ -945,3 +945,69 @@ export async function fetchReceivedShares(): Promise<ReceivedShare[]> {
     };
   });
 }
+
+// ============================================================
+// Comentarios recentes de coach nas MINHAS maos (pro card "Recados do
+// Coach" da tela inicial) -- espelha fetchReceivedShares acima, so' que
+// do lado inverso (shared_by = eu) e filtrando comentarios que nao sao
+// meus. RLS de hand_review_share_comments ja restringe aos dois
+// participantes de cada compartilhamento, entao so' precisa excluir
+// meus proprios comentarios aqui.
+// ============================================================
+
+export interface RecentCoachComment {
+  id: string;
+  reviewId: string;
+  reviewTitle: string;
+  authorName: string;
+  body: string;
+  createdAt: string;
+}
+
+export async function fetchRecentCoachComments(limit = 5): Promise<RecentCoachComment[]> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  const meId = userData.user?.id;
+  if (!meId) return [];
+
+  const { data: shares, error: sErr } = await supabase
+    .from("hand_review_shares")
+    .select("id, review_id")
+    .eq("shared_by", meId);
+  if (sErr) throw sErr;
+  const shareIds = (shares ?? []).map((s) => s.id);
+  if (shareIds.length === 0) return [];
+
+  const { data: comments, error: cErr } = await supabase
+    .from("hand_review_share_comments")
+    .select("id, share_id, author_id, body, created_at")
+    .in("share_id", shareIds)
+    .neq("author_id", meId)
+    .order("created_at", { ascending: false })
+    .limit(limit);
+  if (cErr) throw cErr;
+  if (!comments || comments.length === 0) return [];
+
+  const reviewIdByShare = new Map((shares ?? []).map((s) => [s.id, s.review_id]));
+  const reviewIds = [...new Set(comments.map((c) => reviewIdByShare.get(c.share_id)).filter((id): id is string => !!id))];
+  const authorIds = [...new Set(comments.map((c) => c.author_id))];
+
+  const [{ data: reviews }, { data: profiles }] = await Promise.all([
+    supabase.from("hand_reviews").select("id, title").in("id", reviewIds),
+    supabase.from("profiles").select("id, nome, apelido").in("id", authorIds),
+  ]);
+
+  return comments.map((c) => {
+    const reviewId = reviewIdByShare.get(c.share_id) ?? "";
+    const r = (reviews ?? []).find((x) => x.id === reviewId);
+    const p = (profiles ?? []).find((x) => x.id === c.author_id);
+    return {
+      id: c.id,
+      reviewId,
+      reviewTitle: r?.title || "Mão sem título",
+      authorName: p?.apelido || p?.nome || "Coach",
+      body: c.body,
+      createdAt: c.created_at,
+    };
+  });
+}

@@ -69,6 +69,10 @@ export interface Goal {
   target: number;
   unit: string;
   active: boolean;
+  // Prazo definido na criacao (obrigatorio no banco desde 2026-09-04:
+  // meta nao pode ficar avulsa). "finalizada" = prazo passou, batendo o
+  // alvo ou nao -- decide sozinho, sem precisar de job/trigger.
+  deadline: string;
 }
 
 export interface StudyLog {
