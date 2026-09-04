@@ -2,12 +2,16 @@
 
 import { Suspense, useEffect, useRef, useState } from "react";
 import { useSearchParams } from "next/navigation";
-import { Target, X } from "lucide-react";
+import Link from "next/link";
+import { Lock, Target, X } from "lucide-react";
 import { RfiJamDrill } from "@/components/drill/rfi-jam-drill";
 import { AppShell } from "@/components/app-shell";
 import { F } from "@/lib/poker/drill-theme";
-import { fetchSuggestionTarget } from "@/lib/services/drill-service";
+import { fetchSuggestionTarget, fetchTodayTrainingCount } from "@/lib/services/drill-service";
 import { fetchSessions } from "@/lib/services/bankroll-service";
+import { fetchMyPlanId } from "@/lib/services/plan-service";
+import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
+import { getModuleLimitFor } from "@/lib/plans/plans-data";
 import { groupStats } from "@/lib/bankroll/calc";
 import { fmtPct, TOURNEY_FORMATS } from "@/lib/bankroll/format";
 
@@ -95,6 +99,67 @@ function useStackFromUrl(): number | undefined {
   return Number.isFinite(n) && n > 0 ? n : undefined;
 }
 
+// Limite diario do Free (10 sessoes/dia, ver PLANS.free.modules.drill.limit
+// em lib/plans/plans-data.ts). "loading" nunca libera nem trava por conta
+// propria -- so' decide depois que plano + contagem de hoje chegam, pra nao
+// deixar o jogador comecar um drill que o banco vai recusar salvar no final
+// (trigger training_sessions_check_free_limit).
+interface DailyTrainingLimit {
+  status: "loading" | "ok" | "locked";
+  // Free (limit.random em PLANS.free.modules.drill): sorteia sozinho e
+  // nao deixa escolher o spot, mesmo antes de bater as 10/dia.
+  filtersLocked: boolean;
+}
+
+function useDailyTrainingLimit(): DailyTrainingLimit {
+  const [state, setState] = useState<DailyTrainingLimit>({ status: "loading", filtersLocked: false });
+  useEffect(() => {
+    let alive = true;
+    Promise.all([fetchMyPlanId(), fetchTodayTrainingCount(), fetchHasActiveTeamAccess()])
+      .then(([plan, count, hasTeamAccess]) => {
+        if (!alive) return;
+        // Membro ativo de time usa o acesso do time -- sem limite, sem
+        // sorteio forcado, mesmo que o proprio plano ainda diga 'free'.
+        const limit = getModuleLimitFor(plan, "drill", hasTeamAccess);
+        setState({
+          status: limit && count >= limit.amount ? "locked" : "ok",
+          filtersLocked: Boolean(limit?.random),
+        });
+      })
+      .catch(() => {
+        // erro ao checar plano/contagem nao pode travar quem tem direito
+        if (alive) setState({ status: "ok", filtersLocked: false });
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return state;
+}
+
+function TrainingLimitCard() {
+  return (
+    <div className="flex h-full flex-col items-center justify-center gap-4 p-8 text-center">
+      <div className="grid size-12 place-items-center rounded-full border border-hairline bg-elevated text-muted">
+        <Lock size={20} />
+      </div>
+      <div>
+        <h2 className="text-base font-semibold text-ink">Limite diário do Free atingido</h2>
+        <p className="mt-1.5 max-w-sm text-sm leading-relaxed text-muted">
+          Você já treinou suas 10 sessões de hoje. Volte amanhã ou faça upgrade pra treinar sem limite, escolhendo o
+          próprio spot em vez de esperar o sorteio do dia.
+        </p>
+      </div>
+      <Link
+        href="/planos"
+        className="inline-flex items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
+      >
+        Ver planos
+      </Link>
+    </div>
+  );
+}
+
 function TreinoShell() {
   // Altura disponível medida, não chutada. O card usava
   // `calc(100vh - 32px)`, ignorando o header global do app que fica
@@ -113,6 +178,7 @@ function TreinoShell() {
   const leakTip = useBankrollLeakTip();
   const suggestion = useSuggestedSpot();
   const stackFromUrl = useStackFromUrl();
+  const { status: dailyLimit, filtersLocked } = useDailyTrainingLimit();
   const [tipDismissed, setTipDismissed] = useState(false);
   const [appliedStackBb, setAppliedStackBb] = useState<number | undefined>(undefined);
 
@@ -252,10 +318,15 @@ function TreinoShell() {
         )}
 
         <div style={{ flex: 1, minHeight: 0 }}>
-          <RfiJamDrill
-            initialMatchup={suggestion?.matchup}
-            initialStackBb={suggestion?.stackBb ?? appliedStackBb ?? stackFromUrl}
-          />
+          {dailyLimit === "locked" ? (
+            <TrainingLimitCard />
+          ) : dailyLimit === "ok" ? (
+            <RfiJamDrill
+              initialMatchup={suggestion?.matchup}
+              initialStackBb={suggestion?.stackBb ?? appliedStackBb ?? stackFromUrl}
+              filtersLocked={filtersLocked}
+            />
+          ) : null}
         </div>
       </div>
     </div>

@@ -1,4 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
+import { isModuleUnlocked, toPlanId } from "@/lib/plans/plans-data";
+import { fetchMyPlanId } from "@/lib/services/plan-service";
 
 // ============================================================
 // Modo Team — base (time, papeis, convites por token)
@@ -138,13 +140,25 @@ async function getUserId(): Promise<string> {
 // ============================================================
 
 export async function fetchMyPlan(): Promise<string> {
-  const supabase = createClient();
-  const { data } = await supabase.from("user_plans").select("plan").maybeSingle();
-  return data?.plan ?? "free";
+  return fetchMyPlanId();
 }
 
 export function planoPermiteCriarTime(plan: string): boolean {
-  return plan === "team" || plan === "master";
+  return isModuleUnlocked(toPlanId(plan), "time");
+}
+
+// Acesso em cascata (ver isModuleUnlockedFor/isAddonUnlockedFor em
+// lib/plans/plans-data.ts): so' membro ATIVO usa o acesso do time --
+// 'pendente' ainda nao foi aprovado, so' enxerga a fila de espera em
+// /time, nada mais. Filtro por user_id e' obrigatorio (nao so' opcional):
+// a RLS de team_members libera TODO membro do mesmo time, sem o filtro
+// o .maybeSingle() quebra com "multiple rows" pra qualquer time com mais
+// de 1 pessoa.
+export async function fetchHasActiveTeamAccess(): Promise<boolean> {
+  const supabase = createClient();
+  const meId = await getUserId();
+  const { data } = await supabase.from("team_members").select("status").eq("user_id", meId).maybeSingle();
+  return data?.status === "ativo";
 }
 
 // ============================================================

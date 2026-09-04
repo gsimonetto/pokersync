@@ -1,5 +1,11 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { isAddonUnlocked, isModuleUnlocked, resolveAddonForRoute, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
+
+// Nao usa isModuleUnlockedFor/isAddonUnlockedFor daqui: essas ja assumem
+// hasTeamAccess resolvido, mas aqui so' vale a pena consultar
+// team_members quando o proprio plano JA falhou (ver bloco abaixo) --
+// pouparia uma query no caso comum (usuario com plano que ja libera).
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
@@ -94,6 +100,57 @@ export async function updateSession(request: NextRequest) {
       sameSite: "lax",
       path: "/",
     });
+
+    // Trava real de plano: o menu (components/app-shell.tsx) so' esconde
+    // visualmente o modulo bloqueado -- isso e' cosmetico e roda no
+    // navegador, entao nao impede ninguem de digitar a URL direto (ex:
+    // /revisor). Aqui, no servidor, e' onde o bloqueio vale de verdade
+    // pra qualquer jeito de chegar na rota.
+    const moduleKey = resolveModuleForRoute(pathname);
+    // "radar" e' addon, nao modulo (ver AddonKey em lib/plans/plans-data.ts)
+    // -- so' entra aqui quando moduleKey nao resolveu nada, os dois
+    // conjuntos de rotas nunca se sobrepoem.
+    const addonKey = moduleKey ? null : resolveAddonForRoute(pathname);
+
+    if (moduleKey || addonKey) {
+      const { data: planRow } = await supabase.from("user_plans").select("plan, radar_addon").maybeSingle();
+      const plan = toPlanId(planRow?.plan);
+      let allowed = moduleKey
+        ? isModuleUnlocked(plan, moduleKey)
+        : isAddonUnlocked(plan, addonKey!, Boolean(planRow?.radar_addon));
+
+      // Acesso em cascata do Time: um jogador vinculado a um time usa o
+      // acesso do time, nao o proprio (ver isModuleUnlockedFor em
+      // lib/plans/plans-data.ts) -- so' consulta team_members quando o
+      // proprio plano ja falhou, pra nao gastar query em toda rota pra
+      // quem ja tem acesso pelo plano.
+      if (!allowed) {
+        const { data: membership } = await supabase
+          .from("team_members")
+          .select("status")
+          .eq("user_id", user.id)
+          .maybeSingle();
+
+        if (membership?.status === "ativo") {
+          // Membro ATIVO: acesso completo, igual a quem paga Team
+          // Pro/Elite diretamente -- vale pra qualquer modulo ou o addon.
+          allowed = true;
+        } else if (moduleKey === "time" && membership) {
+          // "Meu Time" tem uma segunda excecao: membro 'pendente' (ainda
+          // na fila de aprovacao) precisa ver a propria tela de espera,
+          // mesmo sem cascata completa ainda.
+          allowed = true;
+        }
+      }
+
+      if (!allowed) {
+        const redirect = NextResponse.redirect(new URL(`/modulos?locked=${moduleKey ?? addonKey}`, request.url));
+        response.cookies.getAll().forEach((cookie) => {
+          redirect.cookies.set(cookie);
+        });
+        return redirect;
+      }
+    }
   }
 
   return response;
