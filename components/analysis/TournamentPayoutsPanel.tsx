@@ -4,7 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Check, Loader2, Bot, PenLine } from "lucide-react";
 import { upsertTournamentPayout, type TournamentPayout, type PayoutPlace } from "@/lib/services/tournament-payout-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
-import { EmptyState } from "@/components/analysis/shared";
+import { EmptyState } from "@/components/dashboard/kit";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 

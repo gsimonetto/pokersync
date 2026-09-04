@@ -21,7 +21,7 @@ import {
   ChevronDown,
   Monitor,
 } from "lucide-react";
-import { Painel, StatList, Bloqueado } from "@/components/analysis/shared";
+import { Painel, StatList, Bloqueado } from "@/components/dashboard/kit";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { TournamentPayoutsPanel } from "@/components/analysis/TournamentPayoutsPanel";
 import { buyinBucketOf } from "@/lib/services/analysis-service";

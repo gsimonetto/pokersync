@@ -17,7 +17,7 @@ import {
   rangeCoaching,
   statBar,
   revisorHandsHref,
-} from "@/components/analysis/shared";
+} from "@/components/dashboard/kit";
 import { computePreflopMetrics, computeMetricTrend, PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PreflopMetrics, PreflopMetricsByPosition, ReferenceProfile } from "@/types/analysis";
 

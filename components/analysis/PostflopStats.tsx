@@ -13,7 +13,7 @@ import {
   toneFromRange,
   rangeCoaching,
   statBar,
-} from "@/components/analysis/shared";
+} from "@/components/dashboard/kit";
 import { computePostflopMetrics, computeMetricTrend, POSTFLOP_REFERENCE } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, PostflopMetrics, ReferenceProfile } from "@/types/analysis";
 
