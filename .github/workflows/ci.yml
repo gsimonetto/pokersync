@@ -1,0 +1,32 @@
+name: CI
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+
+      - name: Instala dependências
+        run: npm ci
+
+      # "npm run lint" ainda nao esta configurado neste projeto (sem
+      # .eslintrc, eslint nem esta nas dependencias) -- next lint cai
+      # num questionario interativo, que travaria a esteira. Fica de
+      # fora ate o lint ser configurado de verdade (ver prioridades).
+      - name: Build
+        env:
+          # Valores ficticios -- o build (geracao das paginas) nao
+          # depende de conexao real com o Supabase, so' precisa que as
+          # variaveis existam pro codigo nao quebrar em tempo de build.
+          NEXT_PUBLIC_SUPABASE_URL: "https://example.supabase.co"
+          NEXT_PUBLIC_SUPABASE_ANON_KEY: "dummy-key-para-build"
+        run: npm run build
