@@ -40,11 +40,6 @@ export function PlanLockModal({ moduleKey, onClose }: { moduleKey: ModuleKey | "
           ))}
         </ul>
 
-        <p className="rounded-lg border border-hairline bg-elevated p-3 text-xs leading-relaxed text-muted">
-          <span className="font-semibold text-ink">Diferencial PokerSync: </span>
-          {copy.differential}
-        </p>
-
         {isRadar && (
           <p className="text-sm text-ink">
             Complemento avulso — <strong>{BRL.format(ADDON_PRICES.radar / 100)}/mês</strong>
