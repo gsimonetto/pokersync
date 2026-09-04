@@ -6,8 +6,19 @@ import { getDecision, type HandDecision, type RangeHands } from "@/components/ra
 import { getRange, listRanges, type RangeListItem } from "@/lib/services/range-service";
 import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { logDrillAnswer, fetchRangeDrillAccuracy } from "@/lib/services/range-journal-service";
+import { Chip } from "@/components/chip";
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
+
+// Cor do Chip do placar acumulado (mesmas faixas do Modo Treino, ver
+// accuracyChipColor em rfi-jam-drill.tsx).
+function accuracyChipColor(total: number, pct: number): string {
+  if (total === 0) return "#8A8A8A";
+  if (pct >= 70) return "#22c55e";
+  if (pct >= 40) return "#f59e0b";
+  return "#e0555a";
+}
+
 type PaintAction = "fold" | "call" | "raise";
 const ACTIONS: { type: PaintAction; label: string; key: string }[] = [
   { type: "fold", label: "Fold", key: "Q" },
@@ -192,9 +203,9 @@ export function RangeDrill({ initialRangeId = null }: { initialRangeId?: string 
           ))}
         </select>
         {stats.total > 0 && (
-          <p className="text-sm text-muted">
+          <Chip color={accuracyChipColor(stats.total, sessionPct)}>
             {stats.hits}/{stats.total} ótimas · {sessionPct}%
-          </p>
+          </Chip>
         )}
       </div>
 
