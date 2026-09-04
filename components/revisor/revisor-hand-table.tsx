@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
@@ -181,6 +182,7 @@ export function RevisorHandTable({
   reviewId,
   onOpenHand,
   onFatalError,
+  actionsSlot,
 }: {
   parsedHand: ParsedHand;
   // Nome do torneio sendo revisado — exibido no header da mesa. Opcional
@@ -209,6 +211,14 @@ export function RevisorHandTable({
   // (usado por quem chama RevisorHandTable fora de uma fila navegavel,
   // ex: RevisorDetalhe).
   onFatalError?: () => void;
+  // Alvo (DOM node) pra onde os botoes Salvar/Compartilhar/Analisar sao
+  // portados no celular (createPortal), em vez de renderizarem dentro do
+  // proprio card da mesa -- pedido explicito: "os icones precisam ficar
+  // ao lado do filtro la em cima". Quem fornece esse node e' o
+  // RevisorSessao, no modo tela-cheia (ver revisor-sessao.tsx). No
+  // desktop (ou quando ausente) os botoes continuam no header normal da
+  // mesa, sem mudanca de comportamento.
+  actionsSlot?: HTMLElement | null;
 }) {
   // Retangulo em pe' no celular (mesmo par calibrado do modo mesa-cheia
   // do Treino: aspectRatio "3/5" + cornerRadius "10%/6%" -- cada
@@ -352,6 +362,17 @@ export function RevisorHandTable({
     const amountBB = Math.round((ev.chipsAdded / replayState.bbUnit) * 10) / 10;
     return { fromPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-${ev.posLabel}` };
   }, [replayState, stepIndex]);
+
+  // Hero desloca um pouco pra esquerda no celular (pedido explicito,
+  // mesmo truque do modo mesa-cheia do Treino: fullscreenSeatLayout com
+  // x:42 em vez de 50) -- abre espaco a direita pro dock de navegacao
+  // (anterior/play/proximo), que ocupa o mesmo canto onde o Treino
+  // encaixa os botoes de aposta. So' o assento do hero muda; os demais
+  // (posicionados por computeRealSeatLayout) ficam como estao.
+  const mobileSeatLayout = useMemo(() => {
+    if (!replayState) return null;
+    return replayState.seatLayout.map((s) => (s.isHero ? { ...s, x: 38 } : s));
+  }, [replayState]);
 
   const nextStep = useCallback(() => {
     if (!replayState || stepIndex >= replayState.stepCount - 1) {
@@ -503,118 +524,235 @@ export function RevisorHandTable({
             refinados (menores, mesmo padrao visual dos chips) + acoes
             (Compartilhar/Analisar) a direita. Tudo numa unica linha
             flex com wrap — em telas largas fica tudo lado a lado; em
-            telas estreitas quebra em 2 linhas sem misturar grupos. */}
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
-            <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} />
-            <InfoChip
-              icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
-              label={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`}
-            />
-          </div>
-
-          <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
-            {/* Controles de navegacao/autoplay — refinados (28px, era
-                34px) e movidos pra dentro da mesma linha do header,
-                junto do resto das informacoes (pedido explicito).
-                Seletor de velocidade continua removido — autoplay roda
-                em ritmo fixo. */}
-            <div style={{ display: "flex", alignItems: "center", gap: 3, padding: 3, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
-              <button
-                onClick={prevStep}
-                disabled={replayState.stepIndex === 0}
-                aria-label="Passo anterior"
-                title="Anterior (←)"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
-                  color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
-                  borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
-                }}
-              >
-                <ChevronLeft size={13} />
-              </button>
-
-              <button
-                onClick={() => setAutoplay((v) => !v)}
-                disabled={replayState.stepIndex >= replayState.stepCount - 1}
-                aria-label={autoplay ? "Pausar" : "Reproduzir"}
-                title={autoplay ? "Pausar (espaço)" : "Reproduzir (espaço)"}
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", border: 0,
-                  background: autoplay ? "rgba(52,211,153,0.18)" : "transparent",
-                  color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.75)",
-                  borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-                }}
-              >
-                {autoplay ? <Pause size={11} /> : <Play size={11} />}
-              </button>
-
-              <button
-                onClick={nextStep}
-                disabled={replayState.stepIndex >= replayState.stepCount - 1}
-                aria-label="Próximo passo"
-                title="Próximo (→)"
-                style={{
-                  display: "flex", alignItems: "center", justifyContent: "center", border: 0,
-                  background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "rgba(255,255,255,0.85)",
-                  color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : "#111111",
-                  borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-                }}
-              >
-                <ChevronRight size={13} />
-              </button>
-
-              <span style={{ marginLeft: 3, marginRight: 5, fontSize: 10.5, color: "rgba(255,255,255,0.4)", ...num }}>
-                {replayState.stepIndex + 1}/{replayState.stepCount}
-              </span>
+            telas estreitas quebra em 2 linhas sem misturar grupos.
+            NO CELULAR esse header inteiro some daqui (pedido explicito:
+            "retire essas informações da mesa") -- vira overlay sobre a
+            propria mesa (blinds fosco + dock de navegacao) e os 3
+            botoes de acao migram pro topo da tela via `actionsSlot`,
+            ver abaixo. */}
+        {!isMobile && (
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+              <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} />
+              <InfoChip
+                icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
+                label={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`}
+              />
             </div>
 
-            {canSave && (
-              <ChipButton
-                icon={<Bookmark size={13} fill={saved ? "currentColor" : "none"} />}
-                label={saved ? "Salvo" : "Salvar"}
-                title={saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
-                onClick={toggleSaved}
-                disabled={savingSpot}
-                iconOnly={isMobile}
-              />
-            )}
-            {canShare && (
-              <ChipButton
-                icon={<Share2 size={13} />}
-                label="Compartilhar"
-                title="Compartilhar essa mão com o coach"
-                onClick={() => setShareModalOpen(true)}
-                iconOnly={isMobile}
-              />
-            )}
-            {canAnalyze && (
-              <ChipButton
-                icon={<Target size={13} />}
-                label="Analisar mão"
-                onClick={onOpenHand}
-                title="Analisar essa mão em detalhe"
-                iconOnly={isMobile}
-              />
-            )}
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>
+              {/* Controles de navegacao/autoplay — refinados (28px, era
+                  34px) e movidos pra dentro da mesma linha do header,
+                  junto do resto das informacoes (pedido explicito).
+                  Seletor de velocidade continua removido — autoplay roda
+                  em ritmo fixo. */}
+              <div style={{ display: "flex", alignItems: "center", gap: 3, padding: 3, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
+                <button
+                  onClick={prevStep}
+                  disabled={replayState.stepIndex === 0}
+                  aria-label="Passo anterior"
+                  title="Anterior (←)"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
+                    color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
+                    borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronLeft size={13} />
+                </button>
+
+                <button
+                  onClick={() => setAutoplay((v) => !v)}
+                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                  aria-label={autoplay ? "Pausar" : "Reproduzir"}
+                  title={autoplay ? "Pausar (espaço)" : "Reproduzir (espaço)"}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", border: 0,
+                    background: autoplay ? "rgba(52,211,153,0.18)" : "transparent",
+                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.75)",
+                    borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {autoplay ? <Pause size={11} /> : <Play size={11} />}
+                </button>
+
+                <button
+                  onClick={nextStep}
+                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                  aria-label="Próximo passo"
+                  title="Próximo (→)"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", border: 0,
+                    background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "rgba(255,255,255,0.85)",
+                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : "#111111",
+                    borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronRight size={13} />
+                </button>
+
+                <span style={{ marginLeft: 3, marginRight: 5, fontSize: 10.5, color: "rgba(255,255,255,0.4)", ...num }}>
+                  {replayState.stepIndex + 1}/{replayState.stepCount}
+                </span>
+              </div>
+
+              {canSave && (
+                <ChipButton
+                  icon={<Bookmark size={13} fill={saved ? "currentColor" : "none"} />}
+                  label={saved ? "Salvo" : "Salvar"}
+                  title={saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
+                  onClick={toggleSaved}
+                  disabled={savingSpot}
+                />
+              )}
+              {canShare && (
+                <ChipButton
+                  icon={<Share2 size={13} />}
+                  label="Compartilhar"
+                  title="Compartilhar essa mão com o coach"
+                  onClick={() => setShareModalOpen(true)}
+                />
+              )}
+              {canAnalyze && (
+                <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" />
+              )}
+            </div>
           </div>
-        </div>
+        )}
 
         {/* Altura responsiva por breakpoint (className, nao inline) — fixa
             e diferente por formato: menor no celular, media no tablet,
-            maior no desktop. */}
-        <div style={{ flex: 1, minHeight: 0 }}>
+            maior no desktop. position:relative pra sustentar os overlays
+            do modo mobile (blinds fosco + dock de navegacao) abaixo. */}
+        <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
           <PokerTable
             hand={replayState.tableHand}
-            seats={replayState.seatLayout}
+            seats={isMobile && mobileSeatLayout ? mobileSeatLayout : replayState.seatLayout}
             chipAnimation={chipAnimation}
             streetCommitments={replayState.streetCommitments}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
             {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.75, heroScale: 1.25 } : {})}
           />
+
+          {isMobile && (
+            <>
+              {/* Blinds fosco sobre o board (pedido explicito: "tirar o
+                  nome do torneio, os BB pode colocar em cima do board de
+                  forma fosca, so' pra aparecer") -- pointer-events:none
+                  pra nunca capturar clique/toque que era pro board por
+                  tras. Fica no meio vertical da mesa, area que so' o
+                  board (ainda sem cartas no preflop) ocupa -- não
+                  sobrepõe assento, nome ou stack de ninguém. */}
+              <div
+                style={{
+                  position: "absolute", top: "40%", left: "50%", transform: "translate(-50%, -50%)",
+                  pointerEvents: "none", zIndex: 20,
+                  fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.55)",
+                  padding: "4px 10px", borderRadius: 999,
+                  background: "rgba(0,0,0,0.32)", backdropFilter: "blur(3px)", WebkitBackdropFilter: "blur(3px)",
+                  whiteSpace: "nowrap",
+                }}
+              >
+                {parsedHand.smallBlind}/{parsedHand.bigBlind}
+              </div>
+
+              {/* Dock de navegacao -- mesmo canto onde o Treino encaixa
+                  os botoes de aposta no modo mesa-cheia (right:10,
+                  ancorado por baixo em top:90%). O hero foi deslocado
+                  pra esquerda (mobileSeatLayout acima) exatamente pra
+                  abrir esse espaco -- nada aqui embaixo sobrepõe as
+                  cartas do hero. */}
+              <div style={{ position: "absolute", right: 10, top: "90%", transform: "translateY(-100%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, zIndex: 40 }}>
+                <span style={{ fontSize: 10, color: "rgba(255,255,255,0.4)", ...num }}>
+                  {replayState.stepIndex + 1}/{replayState.stepCount}
+                </span>
+                <button
+                  onClick={prevStep}
+                  disabled={replayState.stepIndex === 0}
+                  aria-label="Passo anterior"
+                  title="Anterior (←)"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.14)",
+                    color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)",
+                    borderRadius: 999, width: 34, height: 34, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronLeft size={16} />
+                </button>
+                <button
+                  onClick={() => setAutoplay((v) => !v)}
+                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                  aria-label={autoplay ? "Pausar" : "Reproduzir"}
+                  title={autoplay ? "Pausar (espaço)" : "Reproduzir (espaço)"}
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: autoplay ? "rgba(52,211,153,0.22)" : "rgba(0,0,0,0.45)", border: "1px solid rgba(255,255,255,0.14)",
+                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.85)",
+                    borderRadius: 999, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  {autoplay ? <Pause size={14} /> : <Play size={14} />}
+                </button>
+                <button
+                  onClick={nextStep}
+                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
+                  aria-label="Próximo passo"
+                  title="Próximo (→)"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center",
+                    background: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(0,0,0,0.25)" : "rgba(255,255,255,0.9)", border: "1px solid rgba(255,255,255,0.14)",
+                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : "#111111",
+                    borderRadius: 999, width: 34, height: 34, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronRight size={16} />
+                </button>
+              </div>
+            </>
+          )}
         </div>
       </div>
+
+      {/* Salvar/Compartilhar/Analisar no celular: portados pro slot que
+          RevisorSessao renderiza no topo da tela, ao lado do botao de
+          filtro (pedido explicito) -- em vez de competir por espaco
+          dentro do card da mesa. */}
+      {isMobile && actionsSlot &&
+        createPortal(
+          <>
+            {canSave && (
+              <ChipButton
+                icon={<Bookmark size={15} fill={saved ? "currentColor" : "none"} />}
+                label={saved ? "Salvo" : "Salvar"}
+                title={saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
+                onClick={toggleSaved}
+                disabled={savingSpot}
+                iconOnly
+              />
+            )}
+            {canShare && (
+              <ChipButton
+                icon={<Share2 size={15} />}
+                label="Compartilhar"
+                title="Compartilhar essa mão com o coach"
+                onClick={() => setShareModalOpen(true)}
+                iconOnly
+              />
+            )}
+            {canAnalyze && (
+              <ChipButton
+                icon={<Target size={15} />}
+                label="Analisar mão"
+                onClick={onOpenHand}
+                title="Analisar essa mão em detalhe"
+                iconOnly
+              />
+            )}
+          </>,
+          actionsSlot
+        )}
 
       <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
         {trainHref ? (
