@@ -7,6 +7,13 @@ import { listRanges, type RangeHands, type RangeListItem } from "@/lib/services/
 import { listTrees, type TreeListItem } from "@/lib/services/strategy-tree-service";
 import { RangeGridPreview } from "@/components/ranges/range-grid-preview";
 import { FilterChip } from "@/components/ui/filter-chip";
+import { ACCENT } from "@/lib/modules-data";
+
+// Range e arvore usam a identidade real do modulo (ACCENT.pink, ver
+// lib/modules-data.tsx) em vez do roxo emprestado do Revisor -- arvore
+// ganha um tom proprio (indigo, o mesmo do Meu Time) so' pra diferenciar
+// os dois tipos de item num piscar de olhos dentro da mesma grade.
+const KIND_ACCENT = { range: ACCENT.pink, tree: ACCENT.indigo } as const;
 
 // Temas sugeridos como atalho — aparecem mesmo com 0 itens, pra sinalizar
 // que sao categorias validas do produto (o usuario so precisa comecar a
@@ -139,17 +146,20 @@ export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtered.map((item) => (
+        {filtered.map((item, idx) => {
+          const accent = KIND_ACCENT[item.kind];
+          return (
           <button
             key={`${item.kind}-${item.id}`}
             onClick={() => openItem(item)}
-            className="rounded-xl border border-hairline bg-surface p-4 text-left"
+            style={{ animationDelay: `${Math.min(idx, 10) * 30}ms`, borderColor: `${accent}30` }}
+            className="fade-in-up group rounded-xl border bg-surface p-4 text-left transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
           >
             <div className="mb-1 flex items-center gap-2">
               {item.kind === "range" ? (
-                <Layers size={14} className="text-review" />
+                <Layers size={14} style={{ color: accent }} />
               ) : (
-                <GitBranch size={14} className="text-review" />
+                <GitBranch size={14} style={{ color: accent }} />
               )}
               <span className="text-[10px] uppercase tracking-wide text-muted">
                 {item.kind === "range" ? "Range" : "Árvore"}
@@ -179,7 +189,8 @@ export function Biblioteca({ tabs }: { tabs?: React.ReactNode }) {
               </div>
             )}
           </button>
-        ))}
+          );
+        })}
       </div>
     </div>
   );
