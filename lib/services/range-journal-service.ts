@@ -153,3 +153,20 @@ export async function fetchJournalData(): Promise<JournalData> {
     streakDays: computeStreak(rows),
   };
 }
+
+// Acerto/erro ACUMULADO do jogador em todo o historico de
+// range_drill_answers -- mesmo padrao de fetchTrainingAccuracy em
+// lib/services/drill-service.ts (Modo Treino): o placar "X/Y otimas"
+// mostrado no cabecalho do Construtor de Ranges (range-drill.tsx) nao
+// pode reiniciar a cada login/troca de range, tem que ser o total de
+// sempre.
+export async function fetchRangeDrillAccuracy(): Promise<{ hits: number; total: number }> {
+  const supabase = createClient();
+  const [totalRes, hitsRes] = await Promise.all([
+    supabase.from("range_drill_answers").select("id", { count: "exact", head: true }),
+    supabase.from("range_drill_answers").select("id", { count: "exact", head: true }).eq("hit", true),
+  ]);
+  if (totalRes.error) throw totalRes.error;
+  if (hitsRes.error) throw hitsRes.error;
+  return { hits: hitsRes.count ?? 0, total: totalRes.count ?? 0 };
+}
