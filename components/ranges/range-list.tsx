@@ -6,6 +6,7 @@ import { Plus, Copy, Trash2, Layers, Search, Upload } from "lucide-react";
 import { listRanges, deleteRange, duplicateRange, createRange, parseRangeImport, type RangeListItem } from "@/lib/services/range-service";
 import { RangeGridPreview } from "@/components/ranges/range-grid-preview";
 import { useConfirm } from "@/components/confirm-dialog";
+import { ACCENT } from "@/lib/modules-data";
 
 export function RangeList() {
   const router = useRouter();
@@ -176,7 +177,9 @@ export function RangeList() {
 
       {!loading && items.length === 0 && (
         <div className="rounded-xl border border-hairline bg-surface p-10 text-center">
-          <Layers size={28} className="mx-auto mb-3 text-muted" />
+          <span className="mx-auto mb-3 grid h-12 w-12 place-items-center rounded-full border" style={{ borderColor: `${ACCENT.pink}40`, background: `${ACCENT.pink}12` }}>
+            <Layers size={22} className="icon-glow" style={{ color: ACCENT.pink }} strokeWidth={1.5} />
+          </span>
           <p className="text-sm text-muted">
             Nenhum range criado ainda. Comece montando um range do zero.
           </p>
@@ -190,10 +193,11 @@ export function RangeList() {
       )}
 
       <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
-        {filtrados.map((r) => (
+        {filtrados.map((r, idx) => (
           <div
             key={r.id}
-            className="group relative rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-hairline"
+            style={{ animationDelay: `${Math.min(idx, 10) * 30}ms`, borderColor: `${ACCENT.pink}30` }}
+            className="fade-in-up group relative rounded-xl border bg-surface p-4 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
           >
             <button
               onClick={() => router.push(`/ranges/${r.id}`)}
