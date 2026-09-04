@@ -1,10 +1,11 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
-import { AlertTriangle, Loader2, ChevronRight, Search, X } from "lucide-react";
+import { AlertTriangle, Loader2, ChevronRight, Search, X, List } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard } from "@/components/drill/card";
+import { RevisorResponsiveStyles } from "./revisor-responsive-styles";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { F, T } from "@/lib/poker/drill-theme";
@@ -129,12 +130,24 @@ export function RevisorSessao({
 
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [gridHeight, setGridHeight] = useState<number | null>(null);
+  // Offset do topo do grid, exposto como CSS var pro breakpoint mobile
+  // (ver revisor-responsive-styles.tsx) -- mesmo mecanismo do Treino
+  // (--ps-treino-top em treino-responsive-styles.tsx), usado la' pra
+  // travar a altura em 100dvh sem estourar a tela pra baixo do topo.
+  const [topOffset, setTopOffset] = useState(0);
+  // Gaveta da lista de maos no mobile (pedido explicito: "adapte o
+  // revisor de maos igual ao modo treino") -- mesmo padrao da gaveta de
+  // filtros do Treino: lista some por padrao no celular, abre como
+  // overlay deslizante, fecha sozinha ao selecionar uma mao (a mesa e' o
+  // destino, nao a lista).
+  const [listOpen, setListOpen] = useState(false);
 
   useEffect(() => {
     function measure() {
       const el = gridRef.current;
       if (!el) return;
       const top = el.getBoundingClientRect().top + window.scrollY;
+      setTopOffset(top);
       setGridHeight(Math.max(GRID_MIN_HEIGHT, window.innerHeight - top - BOTTOM_PADDING_PX));
     }
     measure();
@@ -293,15 +306,48 @@ export function RevisorSessao({
   }
 
   return (
-    <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14 }}>
+    <div
+      className="ps-rv-page"
+      style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 14, ["--ps-rv-top" as string]: `${topOffset}px` }}
+    >
+      <RevisorResponsiveStyles />
+
+      {/* Botao "Mãos" — so existe visualmente no mobile (ver
+          revisor-responsive-styles.tsx), abre a lista como gaveta
+          deslizante em vez de disputar espaco com a mesa numa coluna de
+          220px espremida. Mesmo padrao do botao de filtros do Treino. */}
+      <button
+        onClick={() => setListOpen(true)}
+        className="ps-rv-list-toggle"
+        style={{
+          all: "unset", cursor: "pointer", display: "none", alignItems: "center", gap: 6,
+          fontFamily: F, fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.85)",
+          padding: "8px 12px", borderRadius: 10, border: "1px solid rgba(255,255,255,0.14)",
+          background: "rgba(255,255,255,0.04)", flexShrink: 0, width: "fit-content",
+        }}
+      >
+        <List size={14} />
+        Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
+      </button>
+
+      {/* Backdrop da gaveta — so aparece com a gaveta aberta no mobile. */}
+      <div
+        className={`ps-rv-list-backdrop${listOpen ? " ps-rv-list-backdrop--open" : ""}`}
+        onClick={() => setListOpen(false)}
+        style={{ display: "none" }}
+      />
+
       {/* Master-detail: coluna esquerda com maos, coluna direita com mesa.
           Altura TRAVADA (nao so minHeight) — pedido explicito: "a mesa
           some quando desce a listagem". Com altura fixa + overflow proprio
           em cada coluna, a lista rola por dentro e a mesa nunca sai da
           tela. Colunas 220px / 1fr (era 260px) — mesa ganha mais espaco,
-          "precisa ser maior, ocupar mais espaço". */}
+          "precisa ser maior, ocupar mais espaço". No mobile (ver
+          revisor-responsive-styles.tsx) vira 1 coluna so' — a lista sai
+          do fluxo e vira a gaveta acima. */}
       <div
         ref={gridRef}
+        className="ps-rv-body"
         style={{
           display: "grid",
           gridTemplateColumns: "220px 1fr",
@@ -311,6 +357,7 @@ export function RevisorSessao({
         }}
       >
         <aside
+          className={`ps-rv-list${listOpen ? " ps-rv-list--open" : ""}`}
           style={{
             borderRadius: 14,
             background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
@@ -326,21 +373,35 @@ export function RevisorSessao({
               <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
                 Mãos ({filteredHands.length}{filteredHands.length !== hands.length ? `/${hands.length}` : ""})
               </span>
-              <button
-                onClick={() => {
-                  setSearchOpen((v) => !v);
-                  if (searchOpen) setSearchQuery("");
-                }}
-                title="Buscar mãos"
-                style={{
-                  all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
-                  width: 22, height: 22, borderRadius: 6,
-                  background: searchOpen ? "rgba(255,255,255,0.14)" : "transparent",
-                  color: searchOpen ? "#FFFFFF" : "rgba(255,255,255,0.4)",
-                }}
-              >
-                <Search size={13} />
-              </button>
+              <div style={{ display: "flex", alignItems: "center", gap: 4 }}>
+                <button
+                  onClick={() => {
+                    setSearchOpen((v) => !v);
+                    if (searchOpen) setSearchQuery("");
+                  }}
+                  title="Buscar mãos"
+                  style={{
+                    all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
+                    width: 22, height: 22, borderRadius: 6,
+                    background: searchOpen ? "rgba(255,255,255,0.14)" : "transparent",
+                    color: searchOpen ? "#FFFFFF" : "rgba(255,255,255,0.4)",
+                  }}
+                >
+                  <Search size={13} />
+                </button>
+                {/* Fechar a gaveta — so existe visualmente no mobile. */}
+                <button
+                  onClick={() => setListOpen(false)}
+                  title="Fechar"
+                  className="ps-rv-list-close"
+                  style={{
+                    all: "unset", cursor: "pointer", display: "none", placeItems: "center",
+                    width: 22, height: 22, borderRadius: 6, color: "rgba(255,255,255,0.5)",
+                  }}
+                >
+                  <X size={14} />
+                </button>
+              </div>
             </div>
 
             {/* "Só com ação" agora é um toggle sempre visível (pedido
@@ -441,7 +502,13 @@ export function RevisorSessao({
               return (
                 <button
                   key={h.id}
-                  onClick={() => setSelectedId(h.id)}
+                  onClick={() => {
+                    setSelectedId(h.id);
+                    // No mobile a lista e' uma gaveta -- selecionar uma
+                    // mao fecha ela sozinha pra revelar a mesa na hora,
+                    // sem precisar de um segundo toque no X.
+                    setListOpen(false);
+                  }}
                   style={{
                     all: "unset", cursor: "pointer", display: "block", width: "100%",
                     padding: "10px 14px",
@@ -499,7 +566,7 @@ export function RevisorSessao({
             cortava os botoes (que ficam embaixo da mesa) junto com o
             excesso. "auto" so cria uma rolagem interna nesse caso raro,
             nunca esconde os controles. */}
-        <section style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
+        <section className="ps-rv-table-col" style={{ minWidth: 0, minHeight: 0, display: "flex", flexDirection: "column", gap: 10, overflow: "auto" }}>
           {selectedId && parsedForSelected ? (
             <RevisorHandTable
               parsedHand={parsedForSelected}
