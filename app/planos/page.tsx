@@ -2,16 +2,35 @@
 
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { Check, Loader2, Lock, Radar as RadarIcon, Users } from "lucide-react";
+import { Check, Loader2, Lock, Radar as RadarIcon, Users, Sparkles } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
 import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
 import { ADDON_PRICES, PLAN_IDS, PLANS, SELF_SERVE_PLAN_IDS, isAddonUnlockedFor, type PlanId, type ModuleKey } from "@/lib/plans/plans-data";
 import { MODULE_COPY, RADAR_COPY } from "@/lib/plans/module-copy";
+import { ACCENT, modules as MODULE_DEFS } from "@/lib/modules-data";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
 const MODULE_ORDER: ModuleKey[] = ["drill", "bankroll", "revisor", "hub", "time", "performance", "ranges"];
+
+// Icone + accent real de cada modulo (mesmo usado no card do Dashboard,
+// ver lib/modules-data.tsx) -- antes o checklist so tinha Check/Lock
+// genericos, sem ligacao visual nenhuma com a identidade de cada modulo
+// espalhada pelo resto do produto.
+const MODULE_ICON = Object.fromEntries(MODULE_DEFS.map((m) => [m.key, m])) as Record<string, (typeof MODULE_DEFS)[number]>;
+
+// Cada plano ganha uma identidade de cor propria (pedido explicito: "use
+// mais cores") -- Free fica neutro (nao e' produto premium), Individual
+// usa o azul ja consagrado como "meu plano" (--color-training), Team/Team
+// Elite sobem em intensidade (indigo do Meu Time -> dourado premium),
+// espelhando a progressao real de valor entre os planos.
+const PLAN_ACCENT: Record<PlanId, string> = {
+  free: "#8b93a3",
+  individual: "#3b82f6",
+  team: ACCENT.indigo,
+  team_pro: ACCENT.gold,
+};
 
 // "plan:<PlanId>" ou "addon:radar" -- identifica o que esta em checkout
 // no momento (so' um por vez, os botoes desabilitam entre si).
@@ -94,20 +113,44 @@ function PlanosContent() {
       )}
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        {PLAN_IDS.map((id) => {
+        {PLAN_IDS.map((id, idx) => {
           const plan = PLANS[id];
           const isMine = myPlan === id;
           const selfServe = SELF_SERVE_PLAN_IDS.includes(id);
           const target: CheckoutTarget = `plan:${id}`;
+          const accent = PLAN_ACCENT[id];
+          // Individual e' o unico plano de autoatendimento hoje -- ganha o
+          // selo "Mais popular" pra guiar o olhar em vez da grade inteira
+          // competir em pe de igualdade.
+          const destaque = selfServe && !isMine;
           return (
             <div
               key={id}
-              className={`flex flex-col gap-4 rounded-xl border p-5 ${
-                isMine ? "border-training bg-training/5" : "border-hairline bg-surface"
+              style={{
+                animationDelay: `${idx * 60}ms`,
+                borderColor: isMine ? `${accent}80` : destaque ? `${accent}50` : undefined,
+                background: isMine ? `${accent}0d` : undefined,
+                boxShadow: isMine || destaque ? `0 0 0 1px ${accent}20, 0 12px 28px -16px ${accent}55` : undefined,
+              }}
+              className={`fade-in-up group relative flex flex-col gap-4 overflow-hidden rounded-xl border p-5 transition-all duration-200 hover:-translate-y-1 ${
+                isMine || destaque ? "" : "border-hairline bg-surface hover:border-white/20"
               }`}
             >
+              {/* Barra de acento no topo -- reforca a identidade de cor do
+                  plano sem precisar colorir o card inteiro. */}
+              <div className="pointer-events-none absolute inset-x-0 top-0 h-[3px]" style={{ background: accent }} />
+
+              {destaque && (
+                <span
+                  className="absolute right-4 top-4 flex items-center gap-1 rounded-full px-2 py-0.5 text-[9px] font-bold uppercase tracking-[0.06em]"
+                  style={{ color: accent, background: `${accent}1A`, border: `1px solid ${accent}40` }}
+                >
+                  <Sparkles size={10} /> Mais popular
+                </span>
+              )}
+
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted/60">{plan.name}</p>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: accent }}>{plan.name}</p>
                 <p className="mt-1 text-2xl font-bold text-ink">
                   {plan.priceCents === 0 ? "Grátis" : BRL.format((plan.priceCents ?? 0) / 100)}
                   {plan.priceCents ? <span className="text-sm font-normal text-muted"> /mês</span> : null}
@@ -122,9 +165,13 @@ function PlanosContent() {
               <ul className="flex flex-1 flex-col gap-2">
                 {MODULE_ORDER.map((key) => {
                   const access = plan.modules[key];
+                  const mod = MODULE_ICON[key];
+                  const Icon = mod?.icon;
                   return (
                     <li key={key} className="flex items-center gap-2 text-xs">
-                      {access.unlocked ? (
+                      {access.unlocked && Icon ? (
+                        <Icon size={13} className="shrink-0" style={{ color: mod.accent }} />
+                      ) : access.unlocked ? (
                         <Check size={13} className="shrink-0 text-positive" />
                       ) : (
                         <Lock size={12} className="shrink-0 text-muted/50" />
@@ -138,7 +185,7 @@ function PlanosContent() {
                 })}
                 <li className="flex items-center gap-2 text-xs">
                   {plan.addons.radar ? (
-                    <Check size={13} className="shrink-0 text-positive" />
+                    <RadarIcon size={13} className="shrink-0" style={{ color: ACCENT.gold }} />
                   ) : (
                     <Lock size={12} className="shrink-0 text-muted/50" />
                   )}
@@ -150,7 +197,10 @@ function PlanosContent() {
               </ul>
 
               {isMine ? (
-                <span className="rounded-lg border border-training/40 bg-training/10 px-3 py-1.5 text-center text-xs font-semibold text-training">
+                <span
+                  className="rounded-lg border px-3 py-1.5 text-center text-xs font-semibold"
+                  style={{ color: accent, borderColor: `${accent}40`, background: `${accent}1A` }}
+                >
                   Seu plano atual
                 </span>
               ) : selfServe ? (
@@ -174,10 +224,13 @@ function PlanosContent() {
 
       {/* Radar nao e' plano -- e' complemento avulso, comprado a parte por
           quem esta num plano que nao inclui (ver isAddonUnlocked). */}
-      <div className="mt-4 flex flex-col gap-3 rounded-xl border border-hairline bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+      <div
+        className="fade-in-up mt-4 flex flex-col gap-3 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between"
+        style={{ animationDelay: "260ms", borderColor: `${ACCENT.gold}30`, background: `radial-gradient(circle at 0% 0%, ${ACCENT.gold}0d, transparent 60%)` }}
+      >
         <div className="flex items-center gap-3">
           <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#E8B93C]/30 bg-[#E8B93C]/10 text-[#E8B93C]">
-            <RadarIcon size={18} />
+            <RadarIcon size={18} className="icon-glow" />
           </div>
           <div>
             <p className="text-sm font-semibold text-ink">
