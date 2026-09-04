@@ -1098,9 +1098,14 @@ export interface PlayerGoal {
   active: boolean;
   createdAt: string;
   createdBy: string;
+  // Prazo definido na criacao (obrigatorio desde a decisao 2026-09-04:
+  // meta sem prazo fica avulsa). Passado esse dia, "finalizada" vira
+  // true independente de "atingida" -- sao dois conceitos diferentes.
+  deadline: string;
   progress: number;
   janelaDias: number;
   atingida: boolean;
+  finalizada: boolean;
 }
 
 export async function fetchPlayerGoals(playerId: string): Promise<PlayerGoal[]> {
@@ -1116,9 +1121,11 @@ export async function fetchPlayerGoals(playerId: string): Promise<PlayerGoal[]> 
     active: r.active,
     createdAt: r.created_at,
     createdBy: r.created_by,
+    deadline: r.deadline,
     progress: r.progress ?? 0,
     janelaDias: r.janela_dias,
     atingida: Boolean(r.atingida),
+    finalizada: Boolean(r.finalizada),
   }));
 }
 
@@ -1126,7 +1133,8 @@ export async function createPlayerGoal(
   playerId: string,
   metric: GoalMetric,
   period: GoalPeriod,
-  target: number
+  target: number,
+  deadline: string
 ): Promise<string> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("create_player_goal", {
@@ -1134,6 +1142,7 @@ export async function createPlayerGoal(
     p_metric: metric,
     p_period: period,
     p_target: target,
+    p_deadline: deadline,
   });
   if (error) throw error;
   return data as string;
