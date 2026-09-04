@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart, Bot, Target } from "lucide-react";
+import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart, Bot } from "lucide-react";
 import type { Session, Transaction, TransactionType, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, brmReading, thresholdFor, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
 import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
@@ -19,7 +19,6 @@ import { AppShell } from "@/components/app-shell";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { Modal } from "@/components/ui/modal";
-import { MinhasMetasModalBody } from "@/components/goals/minhas-metas-modal";
 import {
   fetchSessions,
   fetchSettings,
@@ -151,7 +150,6 @@ export default function BankrollPage() {
   // id da sessao sendo editada (null = o modal esta em modo "registrar")
   const [editingSessionId, setEditingSessionId] = useState<string | null>(null);
   const [txModalOpen, setTxModalOpen] = useState(false);
-  const [goalsModalOpen, setGoalsModalOpen] = useState(false);
   const [brmModalOpen, setBrmModalOpen] = useState(false);
   const [calcFormat, setCalcFormat] = useState<BrmFormat>("Cash");
   const [calcBuyIn, setCalcBuyIn] = useState("");
@@ -1032,18 +1030,6 @@ export default function BankrollPage() {
                 <p className="mt-1.5 text-[11px] text-muted">Registre sessões pra ver sua leitura de BRM.</p>
               )}
             </button>
-
-            <button
-              onClick={() => setGoalsModalOpen(true)}
-              className="rounded-lg border border-hairline bg-elevated p-4 text-left transition-colors hover:border-training/40"
-              title="Ver e criar metas"
-            >
-              <div className="flex items-center gap-1.5">
-                <Target size={12} className="text-training" />
-                <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted">Metas</p>
-              </div>
-              <p className="mt-1.5 text-[11px] text-muted">Volume, estudo e prazo de conclusão.</p>
-            </button>
           </div>
 
           {tiltStats && tiltStats.tiltN > 0 && (
@@ -1435,10 +1421,6 @@ export default function BankrollPage() {
           </Painel>
         </div>
       )}
-
-      <Modal open={goalsModalOpen} onClose={() => setGoalsModalOpen(false)} title="Minhas Metas" wide>
-        <MinhasMetasModalBody />
-      </Modal>
 
       <Modal open={brmModalOpen} onClose={() => setBrmModalOpen(false)} title="BRM — moveup / movedown">
         <div className="rounded-lg border border-hairline bg-elevated p-3">
