@@ -4,12 +4,14 @@ import { useId, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 
-// Blocos reusados pelas 5 abas do módulo de Análise — mesmo "Painel"
-// (rounded-xl border-hairline bg-surface) que app/performance/page.tsx já
-// usa, centralizado aqui porque as 5 abas precisam dele em paralelo (uma
-// única tela, não 5 telas isoladas reinventando o card cada uma). Entra
-// com um fade + leve subida (framer-motion) em vez de aparecer estático,
-// pra dar mais vida à troca de aba/sub-aba.
+// Kit de dashboard do PokerSync — nasceu dentro do módulo de Análise
+// (Player Evolution), mas o "Painel" (rounded-xl border-hairline
+// bg-surface, fade + leve subida ao montar), StatCard/StatCardGrid,
+// HealthGauge, Sparkline e o sistema de cor por tom não têm nada de
+// específico de análise de mão -- por isso moraram pra cá (era
+// components/analysis/shared.tsx), pra qualquer módulo do produto usar
+// o mesmo acabamento visual em vez de cada tela reinventar o próprio
+// card/gráfico/glow do zero.
 export function Painel({
   titulo,
   icone,
@@ -414,7 +416,7 @@ function StatCard({
 // preenchida com gradiente + traço animado (desenha ao entrar em tela) e
 // um ponto pulsando no último valor, pra chamar mais atenção que uma
 // polyline estática.
-function Sparkline({ points, tone }: { points: number[]; tone?: Tone }) {
+export function Sparkline({ points, tone }: { points: number[]; tone?: Tone }) {
   const w = 56;
   const h = 20;
   const gradientId = useId();

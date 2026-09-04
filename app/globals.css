@@ -121,6 +121,22 @@ select option {
   .icon-glow { animation: none; filter: drop-shadow(0 0 3px currentColor); }
 }
 
+/* Entrada padrao de card/banner (fade + leve subida) -- extraida do Hub
+   (nascia la' como `hubFadeInUp`, escopada so' aquela pagina) pra virar
+   utilitario global, ja que o mesmo efeito faz sentido em qualquer
+   modulo que precise de um card/aviso entrando na tela sem ser um corte
+   seco. */
+@keyframes fade-in-up {
+  from { opacity: 0; transform: translateY(6px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-in-up {
+  animation: fade-in-up 0.3s ease-out both;
+}
+@media (prefers-reduced-motion: reduce) {
+  .fade-in-up { animation: none; }
+}
+
 /* Utilitarios de acento: a cor vem da custom property --acc definida
    inline no elemento. Espelha exatamente o design de referencia (v0). */
 .acc-card {
