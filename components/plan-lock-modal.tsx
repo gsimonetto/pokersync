@@ -4,7 +4,7 @@ import Link from "next/link";
 import { Lock, Check } from "lucide-react";
 import { Modal } from "@/components/ui/modal";
 import { MODULE_COPY, RADAR_COPY } from "@/lib/plans/module-copy";
-import { cheapestPlanUnlocking, cheapestPlanUnlockingAddon, type ModuleKey } from "@/lib/plans/plans-data";
+import { ADDON_PRICES, cheapestPlanUnlocking, cheapestPlanUnlockingAddon, type ModuleKey } from "@/lib/plans/plans-data";
 
 const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 
@@ -45,21 +45,33 @@ export function PlanLockModal({ moduleKey, onClose }: { moduleKey: ModuleKey | "
           {copy.differential}
         </p>
 
-        {plan && (
-          <div className="flex flex-col gap-3 border-t border-hairline pt-4 sm:flex-row sm:items-center sm:justify-between">
+        {isRadar && (
+          <p className="text-sm text-ink">
+            Complemento avulso — <strong>{BRL.format(ADDON_PRICES.radar / 100)}/mês</strong>
+            {plan ? (
+              <>
+                {" "}
+                (já incluso a partir do plano <strong>{plan.name}</strong>)
+              </>
+            ) : null}
+          </p>
+        )}
+
+        <div className="flex flex-col gap-3 border-t border-hairline pt-4 sm:flex-row sm:items-center sm:justify-between">
+          {!isRadar && plan && (
             <p className="text-sm text-ink">
               Disponível a partir do plano <strong>{plan.name}</strong>
               {plan.priceCents ? ` — ${BRL.format(plan.priceCents / 100)}/mês` : ""}
             </p>
-            <Link
-              href="/planos"
-              onClick={onClose}
-              className="inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
-            >
-              Ver planos
-            </Link>
-          </div>
-        )}
+          )}
+          <Link
+            href="/planos"
+            onClick={onClose}
+            className="ml-auto inline-flex shrink-0 items-center justify-center rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
+          >
+            {isRadar ? "Ver planos e complementos" : "Ver planos"}
+          </Link>
+        </div>
       </div>
     </Modal>
   );

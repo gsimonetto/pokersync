@@ -14,6 +14,21 @@ async function setUserPlan(userId: string, planId: PlanId) {
   if (error) console.error("Falha ao gravar plano vindo do Stripe:", error);
 }
 
+async function setRadarAddon(userId: string, active: boolean) {
+  const supabase = createServiceClient();
+  const { error } = await supabase.from("user_plans").upsert({ user_id: userId, radar_addon: active });
+  if (error) console.error("Falha ao gravar addon Radar vindo do Stripe:", error);
+}
+
+// Resolve o que um evento de assinatura (session ou subscription) esta
+// tratando -- plano base OU addon avulso. Sao duas Checkout Sessions (e
+// duas subscriptions no Stripe) distintas: comprar Radar nao mexe no
+// plano, trocar de plano nao mexe no Radar. Ver app/api/billing/checkout.
+function metadataOf(obj: Stripe.Checkout.Session | Stripe.Subscription): { userId?: string; planId?: string; addonId?: string } {
+  const userId = obj.metadata?.user_id ?? ("client_reference_id" in obj ? (obj.client_reference_id ?? undefined) : undefined);
+  return { userId, planId: obj.metadata?.plan_id, addonId: obj.metadata?.addon_id };
+}
+
 // Webhook do Stripe -- fonte de verdade de quem realmente pagou. Enquanto
 // STRIPE_WEBHOOK_SECRET nao existir (conta em validacao), devolve 503:
 // nenhum evento chega mesmo, o endpoint so' precisa estar pronto pra
@@ -45,23 +60,25 @@ export async function POST(request: NextRequest) {
   }
 
   if (event.type === "checkout.session.completed") {
-    const session = event.data.object as Stripe.Checkout.Session;
-    const userId = session.metadata?.user_id ?? session.client_reference_id ?? undefined;
-    const planId = session.metadata?.plan_id;
+    const { userId, planId, addonId } = metadataOf(event.data.object as Stripe.Checkout.Session);
     if (userId && isPlanId(planId)) {
       await setUserPlan(userId, planId);
+    } else if (userId && addonId === "radar") {
+      await setRadarAddon(userId, true);
     } else {
-      console.error("checkout.session.completed sem user_id/plan_id valido:", session.id);
+      console.error("checkout.session.completed sem user_id/plan_id/addon_id valido:", (event.data.object as Stripe.Checkout.Session).id);
     }
   }
 
-  // Assinatura cancelada/expirada -- rebaixa pra Free em vez de deixar o
-  // usuario preso num plano pago que parou de ser cobrado.
+  // Assinatura cancelada/expirada -- plano volta pra Free (nunca deixa o
+  // usuario preso num plano pago que parou de ser cobrado); addon so'
+  // desliga o proprio addon, sem mexer no plano base.
   if (event.type === "customer.subscription.deleted") {
-    const subscription = event.data.object as Stripe.Subscription;
-    const userId = subscription.metadata?.user_id;
-    if (userId) {
+    const { userId, planId, addonId } = metadataOf(event.data.object as Stripe.Subscription);
+    if (userId && isPlanId(planId)) {
       await setUserPlan(userId, "free");
+    } else if (userId && addonId === "radar") {
+      await setRadarAddon(userId, false);
     }
   }
 

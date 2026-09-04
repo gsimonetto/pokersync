@@ -1,6 +1,6 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
-import { hasAddon, isModuleUnlocked, resolveAddonForRoute, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
+import { isAddonUnlocked, isModuleUnlocked, resolveAddonForRoute, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
 
 type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
@@ -108,9 +108,11 @@ export async function updateSession(request: NextRequest) {
     const addonKey = moduleKey ? null : resolveAddonForRoute(pathname);
 
     if (moduleKey || addonKey) {
-      const { data: planRow } = await supabase.from("user_plans").select("plan").maybeSingle();
+      const { data: planRow } = await supabase.from("user_plans").select("plan, radar_addon").maybeSingle();
       const plan = toPlanId(planRow?.plan);
-      let allowed = moduleKey ? isModuleUnlocked(plan, moduleKey) : hasAddon(plan, addonKey!);
+      let allowed = moduleKey
+        ? isModuleUnlocked(plan, moduleKey)
+        : isAddonUnlocked(plan, addonKey!, Boolean(planRow?.radar_addon));
 
       // "Meu Time" tem uma excecao: um jogador convidado por um coach
       // com plano Team enxerga o time mesmo com plano pessoal free ou

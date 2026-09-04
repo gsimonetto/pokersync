@@ -98,5 +98,5 @@ export const RADAR_COPY: ModuleCopy = {
     "Só reenvia o que mudou desde a última varredura",
     "Alimenta Revisor e Player Evolution sem colar hand history na mão",
   ],
-  differential: "Complemento vendido à parte — disponível a partir do Individual Pro.",
+  differential: "Complemento vendido à parte para o Individual — já incluso nos planos Team.",
 };

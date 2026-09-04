@@ -6,14 +6,26 @@
 // `user_plans.plan` (Supabase) guarda qual `PlanId` o usuario esta -- esse
 // arquivo e' quem decide o que cada `PlanId` significa em termos de acesso.
 
-export type PlanId = "free" | "individual" | "individual_pro" | "team" | "team_pro";
+export type PlanId = "free" | "individual" | "team" | "team_pro";
 
 export type ModuleKey = "drill" | "bankroll" | "revisor" | "hub" | "time" | "performance" | "ranges";
 
-// Radar PokerSync ainda nao e' um card em `lib/modules-data.tsx` -- e'
-// vendido como complemento avulso (add-on), por isso fica fora da matriz
-// de modulos e tem a propria checagem (`hasAddon`).
+// Radar PokerSync nao e' um card em `lib/modules-data.tsx` -- e' vendido
+// como complemento avulso (add-on), por isso fica fora da matriz de
+// modulos. Diferente dos modulos (que so' dependem do plano), o Radar
+// pode vir incluso no plano (Team/Team Pro, ver `hasAddon`) OU comprado
+// avulso por quem esta num plano que nao inclui (Individual, hoje R$100 --
+// ver `ADDON_PRICES` e a coluna `user_plans.radar_addon`). Por isso a
+// checagem de acesso de verdade e' `isAddonUnlocked`, nao `hasAddon`
+// sozinho.
 export type AddonKey = "radar";
+
+// Preco do addon avulso, em centavos -- so' existe pra quem NAO ja tem o
+// addon incluso no plano (ver hasAddon). Igual a PlanDef.priceCents, usa
+// centavos pra nao arredondar errado.
+export const ADDON_PRICES: Record<AddonKey, number> = {
+  radar: 10000,
+};
 
 export interface ModuleLimit {
   amount: number;
@@ -79,17 +91,11 @@ export const PLANS: Record<PlanId, PlanDef> = {
   individual: {
     id: "individual",
     name: "Individual",
-    priceCents: 9990,
+    priceCents: 14900,
     modules: INDIVIDUAL_MODULES,
+    // Radar nao vem incluso -- compra avulsa por ADDON_PRICES.radar
+    // (ver isAddonUnlocked, que soma esta flag com user_plans.radar_addon).
     addons: { radar: false },
-  },
-  individual_pro: {
-    id: "individual_pro",
-    name: "Individual Pro",
-    priceCents: 19990,
-    modules: INDIVIDUAL_MODULES,
-    // Unica diferenca hoje entre Individual e Individual Pro: o Radar.
-    addons: { radar: true },
   },
   team: {
     id: "team",
@@ -109,14 +115,14 @@ export const PLANS: Record<PlanId, PlanDef> = {
   },
 };
 
-export const PLAN_IDS: PlanId[] = ["free", "individual", "individual_pro", "team", "team_pro"];
+export const PLAN_IDS: PlanId[] = ["free", "individual", "team", "team_pro"];
 
 // Planos com botao de assinatura self-service em /planos (ver
 // lib/billing/stripe.ts, que mapeia cada um pro proprio Price ID). Os
 // planos Team ficam de fora por enquanto -- normalmente fecham por
 // contato direto antes de existir um fluxo de convite em massa pra vaga
 // de jogador; mover pra ca quando isso mudar, sem tocar em mais nada.
-export const SELF_SERVE_PLAN_IDS: PlanId[] = ["individual", "individual_pro"];
+export const SELF_SERVE_PLAN_IDS: PlanId[] = ["individual"];
 
 function isPlanId(value: string): value is PlanId {
   return (PLAN_IDS as string[]).includes(value);
@@ -138,8 +144,19 @@ export function getModuleLimit(plan: PlanId, module: ModuleKey): ModuleLimit | n
   return PLANS[plan].modules[module].limit ?? null;
 }
 
+// "Incluso no plano" (Team/Team Pro trazem Radar de fabrica). NAO cobre
+// compra avulsa -- pra checagem de acesso de verdade, usar
+// isAddonUnlocked.
 export function hasAddon(plan: PlanId, addon: AddonKey): boolean {
   return PLANS[plan].addons[addon];
+}
+
+// Checagem de acesso de verdade: incluso no plano OU comprado avulso
+// (user_plans.radar_addon, ver fetchHasRadarAddon em
+// lib/services/plan-service.ts). `purchased` default false pra quem
+// ainda nao tem esse dado carregado.
+export function isAddonUnlocked(plan: PlanId, addon: AddonKey, purchased = false): boolean {
+  return hasAddon(plan, addon) || purchased;
 }
 
 // Plano mais barato (na ordem de PLAN_IDS, que ja e' crescente por preco)

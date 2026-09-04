@@ -17,8 +17,8 @@ import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { fetchTeamUnreadCount, fetchMyMembership } from "@/lib/services/team-service";
 import { fetchFriendUnreadCount } from "@/lib/services/friend-service";
-import { fetchMyPlanId } from "@/lib/services/plan-service";
-import { hasAddon, isModuleUnlocked, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
+import { fetchMyPlanState } from "@/lib/services/plan-service";
+import { isAddonUnlocked, isModuleUnlocked, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
 import { modules } from "@/lib/modules-data";
 
 type OpenMenu = "notifications" | "help" | "profile" | "chats" | null;
@@ -92,6 +92,8 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // aqui e' so' pra nao deixar o jogador clicar num link que o servidor
   // vai barrar de qualquer jeito.
   const [plan, setPlan] = useState<PlanId | null>(null);
+  // Radar comprado avulso, independente do plano (ver isAddonUnlocked).
+  const [radarAddon, setRadarAddon] = useState(false);
   // Membro de time (mesmo que o time pertenca a outra pessoa) enxerga
   // "Meu Time" mesmo com plano pessoal que nao libera o modulo --
   // mesma excecao aplicada no middleware.
@@ -120,7 +122,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         supabase.from("user_progress").select("level").maybeSingle(),
         fetchUnreadCount(),
         fetchAllChatUnread(),
-        fetchMyPlanId(),
+        fetchMyPlanState(),
         fetchMyMembership(),
       ]);
       if (!alive) return;
@@ -128,7 +130,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
       if (unreadChatsRes.status === "fulfilled") setUnreadChats(unreadChatsRes.value);
-      if (planRes.status === "fulfilled") setPlan(planRes.value);
+      if (planRes.status === "fulfilled") {
+        setPlan(planRes.value.plan);
+        setRadarAddon(planRes.value.radarAddon);
+      }
       if (membershipRes.status === "fulfilled") setHasTeamMembership(membershipRes.value !== null);
     })();
     return () => {
@@ -205,7 +210,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         const locked =
           plan !== null &&
           (moduleKey === "radar"
-            ? !hasAddon(plan, "radar")
+            ? !isAddonUnlocked(plan, "radar", radarAddon)
             : !isModuleUnlocked(plan, moduleKey) && !(moduleKey === "time" && hasTeamMembership));
 
         if (locked) {
