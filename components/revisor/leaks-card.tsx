@@ -35,9 +35,9 @@ export function LeaksCard({ onPractice }: { onPractice?: (leak: Leak) => void })
   if (loading || leaks.length === 0) return null;
 
   return (
-    <div className="mb-4 rounded-xl border border-evolution/30 bg-gradient-to-b from-evolution/[0.08] to-review/[0.06] p-3.5">
+    <div className="fade-in-up mb-4 rounded-xl border border-evolution/30 bg-gradient-to-b from-evolution/[0.08] to-review/[0.06] p-3.5">
       <div className="mb-2.5 flex items-center gap-2">
-        <AlertTriangle size={16} className="text-evolution" />
+        <AlertTriangle size={16} className="icon-glow text-evolution" />
         <h3 className="text-[13px] font-semibold text-ink">Leaks recorrentes (30 dias)</h3>
       </div>
       <ul className="flex flex-col gap-2">
@@ -48,7 +48,11 @@ export function LeaksCard({ onPractice }: { onPractice?: (leak: Leak) => void })
           // vazia seria pior do que nao mostrar botao nenhum.
           const treinavel = Boolean(l.drill_id) && suggestionHasDrills(l.filter_config, facets);
           return (
-            <li key={i} className="flex items-center justify-between rounded-lg bg-black/40 p-2.5">
+            <li
+              key={i}
+              style={{ animationDelay: `${i * 40}ms` }}
+              className="fade-in-up flex items-center justify-between rounded-lg bg-black/40 p-2.5 transition-colors duration-150 hover:bg-black/55"
+            >
               <div className="flex min-w-0 flex-1 flex-col gap-0.5">
                 <span className="text-sm font-medium text-ink">{l.reason_label}</span>
                 <span className="text-[10px] text-muted">
@@ -59,7 +63,7 @@ export function LeaksCard({ onPractice }: { onPractice?: (leak: Leak) => void })
               {treinavel && onPractice && (
                 <button
                   onClick={() => onPractice(l)}
-                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-review/40 px-2.5 py-1.5 text-[11px] font-semibold text-review"
+                  className="flex shrink-0 items-center gap-1.5 rounded-lg border border-review/40 px-2.5 py-1.5 text-[11px] font-semibold text-review transition-colors hover:border-review hover:bg-review/10"
                   aria-label="Treinar esse leak"
                 >
                   <PlayCircle size={15} />

@@ -322,8 +322,8 @@ export function RevisorFila({
           </div>
         ) : (
           <ul className="flex flex-col gap-2.5">
-            {filteredItems.map((r) => (
-              <ReviewCard key={r.id} item={r} thumb={filteredThumbs[r.id]} onOpen={() => onOpen(r.id)} />
+            {filteredItems.map((r, idx) => (
+              <ReviewCard key={r.id} item={r} thumb={filteredThumbs[r.id]} onOpen={() => onOpen(r.id)} delayMs={Math.min(idx, 10) * 30} />
             ))}
           </ul>
         )}
@@ -334,7 +334,7 @@ export function RevisorFila({
   return (
     <div>
       {summary && summary.totalReviews > 0 && (
-        <div className="mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
+        <div className="fade-in-up mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
           <SummaryStat icon={Hash} label="Mãos (30d)" value={String(summary.totalReviews)} accent="#5AA6E0" />
           <SummaryStat icon={CheckCircle2} label="Concluídas" value={String(summary.totalConcluded)} accent="#10b981" />
           <SummaryStat icon={CheckCircle2} label="Acertei" value={String(summary.totalCorrect)} accent="#10b981" />
@@ -455,13 +455,14 @@ export function RevisorFila({
             </div>
           ) : (
             <ul className="flex flex-col gap-2.5">
-              {filteredSessions.map((s) => {
+              {filteredSessions.map((s, idx) => {
                 const showsBounty = s.kind === "tournament" && (s.format_type === "pko" || s.format_type === "mystery");
                 return (
                   <li
                     key={s.id}
                     onClick={() => onOpenSession(s.id)}
-                    className="flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/40"
+                    style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
+                    className="fade-in-up flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 transition-all duration-150 hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-lg"
                   >
                     <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-void">
                       {/* Icone generico de torneio virou "Flag" (pedido
@@ -562,8 +563,8 @@ export function RevisorFila({
             </div>
           ) : (
             <ul className="flex flex-col gap-2.5">
-              {items.map((r) => (
-                <ReviewCard key={r.id} item={r} thumb={thumbs[r.id]} onOpen={() => onOpen(r.id)} onDelete={() => handleDelete(r.id)} />
+              {items.map((r, idx) => (
+                <ReviewCard key={r.id} item={r} thumb={thumbs[r.id]} onOpen={() => onOpen(r.id)} onDelete={() => handleDelete(r.id)} delayMs={Math.min(idx, 10) * 30} />
               ))}
             </ul>
           )}
@@ -602,16 +603,22 @@ function ReviewCard({
   thumb,
   onOpen,
   onDelete,
+  delayMs = 0,
 }: {
   item: ReviewListItem;
   thumb: string | null | undefined;
   onOpen: () => void;
   onDelete?: () => void;
+  delayMs?: number;
 }) {
   const meta = STATUS_META[r.status] || STATUS_META.pendente;
   const StatusIcon = meta.Icon;
   return (
-    <li onClick={onOpen} className="flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-colors hover:border-ink/40">
+    <li
+      onClick={onOpen}
+      style={{ animationDelay: `${delayMs}ms` }}
+      className="fade-in-up flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-lg"
+    >
       <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">
         {thumb ? (
           // eslint-disable-next-line @next/next/no-img-element
@@ -682,7 +689,10 @@ function SummaryStat({
   accent: string;
 }) {
   return (
-    <div className="rounded-lg border border-hairline bg-surface p-2.5">
+    <div
+      className="rounded-lg border bg-surface p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
+      style={{ borderColor: `${accent}30` }}
+    >
       <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
         <Icon size={11} className="icon-glow" style={{ color: accent }} />
         {label}
