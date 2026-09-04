@@ -46,7 +46,10 @@ const SUPPORTED_DRILL_POSITIONS = new Set(["BB", "BTN", "SB"]);
 // Velocidade do autoplay fixa (pedido explicito: "tirar a velocidade do
 // play automatico" — sem seletor visivel na tela, so um valor razoavel
 // fixo em codigo).
-const AUTOPLAY_MS = 900;
+// Pedido explicito: "o play automatico pode ser um pouco menos rapido"
+// -- 900ms passava rapido demais pra acompanhar mesa cheia (8 assentos,
+// mais acao por rua). 1500ms da tempo de ler a acao antes de avancar.
+const AUTOPLAY_MS = 1500;
 
 // Estilo comum dos 5 botoes do chip unico de navegacao no celular (ver
 // dock de mesa-cheia abaixo) -- cada um so' precisa dizer se esta
@@ -383,14 +386,43 @@ export function RevisorHandTable({
     return { fromPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-${ev.posLabel}` };
   }, [replayState, stepIndex]);
 
+  // Flash de FOLD/CHECK no proprio assento (pedido explicito: "quero uma
+  // animacao de quando o jogador dar check ou fold... igual e' com os
+  // blinds hoje") -- bet/call/raise ja tinham a ChipAnimation acima;
+  // isFold/label:"check" vem prontos do projector (ver StepEvent em
+  // hand-replay-projector.ts), so' precisa filtrar os outros kinds/tipos
+  // de acao (raise, call, post) que ja tem seu proprio destaque.
+  const actionFlash = useMemo(() => {
+    if (!replayState) return null;
+    const ev = replayState.currentEvent;
+    if (!ev || ev.kind !== "action" || !replayState.isAdvancing) return null;
+    if (ev.isFold) return { fromPosLabel: ev.posLabel, kind: "fold" as const, key: `${stepIndex}-${ev.posLabel}` };
+    if (ev.label === "check") return { fromPosLabel: ev.posLabel, kind: "check" as const, key: `${stepIndex}-${ev.posLabel}` };
+    return null;
+  }, [replayState, stepIndex]);
+
   // Hero desloca pro canto inferior esquerdo no celular -- MESMOS
   // valores do modo mesa-cheia do Treino (fullscreenSeatLayout: x:28,
-  // y:88, ver rfi-jam-drill.tsx), pedido explicito: "quero iguais". So'
-  // o assento do hero muda; os demais (posicionados por
-  // computeRealSeatLayout) ficam como estao.
+  // y:88, ver rfi-jam-drill.tsx), pedido explicito: "quero iguais".
+  //
+  // Os demais assentos (vindos de computeRealSeatLayout, calibrados pro
+  // anel LANDSCAPE 8/5) encolhem 18% em torno do centro da mesa no
+  // celular -- pedidos explicitos: "cartas cortadas dos vilões pra fora
+  // da mesa" (o anel original deixa os assentos das bordas quase colados
+  // no contorno do retangulo EM PE, que e' bem mais estreito) e "da pra
+  // diminuir um pouco o layout dos vilões em mesa cheia pra caber tudo".
+  // O vizinho imediato a esquerda do hero (index 1 no anel -- ver
+  // comentario de rotacao em computeRealSeatLayout) ainda sobe mais um
+  // pouco: e' o unico que ficava colado nas cartas do proprio hero.
   const mobileSeatLayout = useMemo(() => {
     if (!replayState) return null;
-    return replayState.seatLayout.map((s) => (s.isHero ? { ...s, x: 28, y: 88 } : s));
+    const SHRINK = 0.82;
+    return replayState.seatLayout.map((s, i) => {
+      if (s.isHero) return { ...s, x: 28, y: 88 };
+      let y = 46 + (s.y - 46) * SHRINK;
+      if (i === 1) y -= 10;
+      return { ...s, x: 50 + (s.x - 50) * SHRINK, y };
+    });
   }, [replayState]);
 
   const nextStep = useCallback(() => {
@@ -662,14 +694,15 @@ export function RevisorHandTable({
             hand={replayState.tableHand}
             seats={isMobile && mobileSeatLayout ? mobileSeatLayout : replayState.seatLayout}
             chipAnimation={chipAnimation}
+            actionFlash={actionFlash}
             streetCommitments={replayState.streetCommitments}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
-            {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.75, heroScale: 1.4 } : {})}
+            {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.6, heroScale: 1.4 } : {})}
           />
 
           {isMobile && (
-            <div style={{ position: "absolute", right: 10, top: "90%", transform: "translateY(-100%)", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, zIndex: 40 }}>
+            <div style={{ position: "absolute", right: 8, bottom: 8, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, zIndex: 40 }}>
               {/* "Treinar esse spot" -- pedido explicito: "só no final da
                   ação, em cima dos botões do player" -- so' aparece no
                   ultimo passo da mao (nao faz sentido treinar um spot
@@ -694,13 +727,16 @@ export function RevisorHandTable({
                   pode ser um chip unico com botao de voltar a mao
                   anterior, voltar a acao, play automatico, avancar
                   acao, ir pra proxima mao") -- 5 controles dentro do
-                  MESMO pill, em vez de circulos soltos. Mesmo canto
-                  onde o Treino encaixa os botoes de aposta no modo
-                  mesa-cheia dele (right:10, ancorado por baixo em
-                  top:90%); o hero foi deslocado pra esquerda
-                  (mobileSeatLayout acima) exatamente pra abrir esse
-                  espaco -- nada aqui sobrepõe as cartas do hero. */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 2, padding: 4, borderRadius: 999, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.14)" }}>
+                  MESMO pill, em vez de circulos soltos. HORIZONTAL (era
+                  vertical) e ancorado no canto inferior direito (era uma
+                  coluna alta ancorada em top:90%, que cobria boa parte
+                  da lateral direita da mesa e acabava por cima do
+                  vizinho de mesa cheia que senta ali) -- pedido
+                  explicito: "deixar deitado pra não sobrepor o vilão da
+                  direita". Nessa altura (rodape' da mesa, mesma linha do
+                  hero deslocado pra esquerda) nao ha nenhum assento por
+                  perto. */}
+              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, padding: 4, borderRadius: 999, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.14)" }}>
                 <button
                   onClick={onPrevHand}
                   disabled={!onPrevHand}
