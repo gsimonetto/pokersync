@@ -2,15 +2,14 @@ import type { ModuleKey } from "./plans-data";
 
 // Texto de venda de cada modulo bloqueado -- usado na modal que abre
 // quando o jogador clica num item travado do menu (components/app-shell.tsx)
-// e na pagina /planos. Foco no que ajuda o jogador (nao em feature tecnica
-// solta) e no que diferencia do resto do mercado, seguindo o mesmo tom do
-// resto do produto (ver POKERSYNC.md, secao 6, pra descricao real de cada
-// modulo).
+// e na pagina /planos. `benefits` e' a lista COMPLETA do que o modulo
+// realmente tem (ver POKERSYNC.md, secao 6, pra descricao real de cada
+// modulo) -- pedido explicito: nada de bloco de "diferencial" separado,
+// so' os checks, direto.
 export interface ModuleCopy {
   title: string;
   blurb: string;
   benefits: string[];
-  differential: string;
 }
 
 export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
@@ -18,71 +17,97 @@ export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
     title: "Modo Treino",
     blurb: "Treine spots de ranges e frequências GTO fora da mesa, no seu ritmo.",
     benefits: [
-      "Filtros por posição, stack e tipo de spot",
-      "XP e combo de acertos a cada drill",
-      "Sugestão automática de treino a partir dos seus próprios leaks",
+      "Drills de RFI/Jam por posição, stack e situação",
+      "Motor GTO próprio (CFR + ICM), sem depender de solver externo",
+      "Sugestão automática de treino a partir dos leaks do Revisor",
+      "Sugestão baseada na performance da Banca (ex: leak de stack curto)",
+      "Drill com suas próprias ranges, criadas no Construtor",
+      "XP, combo de acertos e missões a cada drill",
     ],
-    differential: "O motor GTO é próprio do PokerSync — os spots vêm do mesmo lugar que valida sua evolução.",
   },
   bankroll: {
     title: "Gestor de Banca",
     blurb: "Controle de risco, fluxo de caixa e evolução da sua banca num só lugar.",
     benefits: [
-      "Fechamento de sessão com humor, tilt e diário",
+      "Registro de sessão com fechamento (humor, tilt, diário)",
       "Metas de volume e de estudo",
+      "Dashboard de evolução com heatmap de volume",
+      "Fluxo de caixa: depósitos, saques e caixinha",
       "R$/hora e bb/hora com intervalo de confiança",
+      "Histórico com filtros por formato e período",
+      "Rake, rakeback e suporte a múltiplas moedas",
+      "Staking e backing com markup",
+      "BRM com limites de risco por formato",
+      "Alertas de banca e anotações no gráfico",
     ],
-    differential: "Vai além de saldo: rake/rakeback, staking, multi-moeda e alertas de banca, tudo integrado.",
   },
   revisor: {
     title: "Revisor de Mãos",
     blurb: "Revise as mãos que te incomodaram e entenda o porquê, sem depender de solver externo.",
     benefits: [
       "Captura rápida (menos de 30s) por hand history ou print",
-      "Perguntas guiadas que te fazem pensar antes da resposta",
+      "Etiquetas por situação (3-bet, ICM, PKO, hero call...)",
+      "Fila de revisão e histórico completo",
+      "Perguntas guiadas antes do veredito",
       "Veredito baseado na aderência às suas próprias ranges",
+      "Registro de aprendizado por mão",
+      "Sugestão automática de drill a partir do leak identificado",
+      "Replay de mão com atalhos de teclado",
+      "Avaliação detalhada por rua (flop, turn, river)",
+      "Compartilhar mão com o time e thread de coach",
     ],
-    differential: "Não é um repositório de mãos: cada revisão vira aprendizado registrado e alimenta sugestões de treino.",
   },
   hub: {
     title: "Hub de Evolução",
     blurb: "XP, missões diárias, ranking e temporadas com prêmio — seu progresso, visível.",
     benefits: [
-      "XP toda vez que você treina, revisa ou joga",
+      "XP de tudo que você faz: treino, banca e revisão",
       "Missões diárias e combo de acertos",
-      "Ranking com pódio e eventos por temporada",
+      "Níveis e ranking com pódio",
+      "Temporadas com prêmio",
+      "Participação nos eventos do Hub",
+      "Notificações de progresso",
     ],
-    differential: "O XP nasce do que você realmente faz nos outros módulos — não é um contador solto.",
   },
   time: {
     title: "Meu Time",
     blurb: "Gerencie um grupo de jogadores: metas, alertas e evolução consolidada em um painel de coach.",
     benefits: [
+      "Cadastro de time e convite de jogadores",
+      "Papéis e permissões (admin, coach, jogador)",
       "Dashboard do coach com funil de metas e calendário",
+      "Metas por jogador com acompanhamento",
+      "Métricas consolidadas: financeiro, atividade e leaks",
       "Alertas automáticos de leak por jogador",
-      "Papéis e permissões (admin, coach, jogador) com chat integrado",
+      "Chat integrado com o time",
     ],
-    differential: "Pensado pra quem acompanha mais de um jogador — a mesma base de dados do individual, agora em escala.",
   },
   performance: {
     title: "Player Evolution",
     blurb: "Raio-x da sua evolução: ROI, volume, tendências e leaks que viram ação.",
     benefits: [
+      "ROI, ABI, volume e lucro",
+      "Evolução temporal e comparação de períodos",
+      "Insights acionáveis, não só números soltos",
       "Matriz 13×13 de preflop com heatmap",
       "Análise pós-flop por rua (c-bet, fold-to-cbet, check-raise)",
-      "Leak Finder que te leva direto pro replay da mão",
+      "Estatísticas por posição e por torneio",
+      "Leak Finder que leva direto pro replay da mão",
+      "Importação manual ou automática (via Radar)",
     ],
-    differential: "Um leak identificado aqui vira sugestão de treino automaticamente — não fica só no relatório.",
   },
   ranges: {
     title: "Construtor de Ranges",
     blurb: "Monte suas próprias ranges e árvores de decisão como material de estudo.",
     benefits: [
-      "Editor de ranges e árvores com versionamento",
-      "Comparador de ranges e calculadora de equity",
+      "Editor de ranges e árvores de decisão com versionamento",
+      "Importar mão do Revisor e checar aderência de range",
+      "Range vira drill automaticamente no Treino",
+      "Comparador de ranges",
+      "Calculadora de equity",
       "Analisador de board (textura single e multiway)",
+      "Biblioteca de time e journal de decisões",
     ],
-    differential: "Integra com o Revisor (aderência à sua range real) e o Treino (a range vira drill sozinha).",
   },
 };
 
@@ -96,7 +121,7 @@ export const RADAR_COPY: ModuleCopy = {
   benefits: [
     "Detecta PokerStars, GGPoker, PartyPoker, 888poker e ACR automaticamente",
     "Só reenvia o que mudou desde a última varredura",
-    "Alimenta Revisor e Player Evolution sem colar hand history na mão",
+    "Sincroniza direto com Revisor e Player Evolution",
+    "Roda em segundo plano, sem precisar abrir o app",
   ],
-  differential: "Complemento vendido à parte para o Individual — já incluso nos planos Team.",
 };
