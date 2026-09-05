@@ -386,42 +386,48 @@ export function RevisorHandTable({
     return { fromPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-${ev.posLabel}` };
   }, [replayState, stepIndex]);
 
-  // Flash de FOLD/CHECK no proprio assento (pedido explicito: "quero uma
-  // animacao de quando o jogador dar check ou fold... igual e' com os
-  // blinds hoje") -- bet/call/raise ja tinham a ChipAnimation acima;
-  // isFold/label:"check" vem prontos do projector (ver StepEvent em
-  // hand-replay-projector.ts), so' precisa filtrar os outros kinds/tipos
-  // de acao (raise, call, post) que ja tem seu proprio destaque.
-  const actionFlash = useMemo(() => {
+  // Ficha do pote indo até o vencedor (pedido explicito: "quando alguém
+  // ganhar o pote, ter animação dos blinds indo até o vencedor e somando
+  // ao stack") -- so' dispara no step do evento "award" (ultimo step da
+  // mao). O stack do vencedor ja soma o valor nesse mesmo step (ver
+  // hand-replay-projector.ts), essa animacao so' torna visivel o
+  // dinheiro se movendo ate' la'.
+  const potAwardAnimation = useMemo(() => {
     if (!replayState) return null;
     const ev = replayState.currentEvent;
-    if (!ev || ev.kind !== "action" || !replayState.isAdvancing) return null;
-    if (ev.isFold) return { fromPosLabel: ev.posLabel, kind: "fold" as const, key: `${stepIndex}-${ev.posLabel}` };
-    if (ev.label === "check") return { fromPosLabel: ev.posLabel, kind: "check" as const, key: `${stepIndex}-${ev.posLabel}` };
-    return null;
+    if (!ev || ev.kind !== "award" || !replayState.isAdvancing) return null;
+    const amountBB = Math.round((ev.amount / replayState.bbUnit) * 10) / 10;
+    return { toPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-award-${ev.posLabel}` };
   }, [replayState, stepIndex]);
 
   // Hero desloca pro canto inferior esquerdo no celular -- MESMOS
   // valores do modo mesa-cheia do Treino (fullscreenSeatLayout: x:28,
   // y:88, ver rfi-jam-drill.tsx), pedido explicito: "quero iguais".
   //
-  // Os demais assentos (vindos de computeRealSeatLayout, calibrados pro
-  // anel LANDSCAPE 8/5) encolhem 18% em torno do centro da mesa no
-  // celular -- pedidos explicitos: "cartas cortadas dos vilões pra fora
-  // da mesa" (o anel original deixa os assentos das bordas quase colados
-  // no contorno do retangulo EM PE, que e' bem mais estreito) e "da pra
-  // diminuir um pouco o layout dos vilões em mesa cheia pra caber tudo".
-  // O vizinho imediato a esquerda do hero (index 1 no anel -- ver
-  // comentario de rotacao em computeRealSeatLayout) ainda sobe mais um
-  // pouco: e' o unico que ficava colado nas cartas do proprio hero.
+  // Os demais assentos ficam na BORDA da mesa, exatamente como no
+  // desktop (vindos de computeRealSeatLayout) -- pedido explicito: "as
+  // posições no revisor precisam ficar na borda... na última correção
+  // você empurrou todos pro meio e não quero assim". Em vez de encolher
+  // TODO mundo 18% em torno do centro (jeito antigo), so' os assentos
+  // que de fato encostariam na moldura arredondada do retangulo EM PE
+  // (bem mais estreito que o desktop) ganham um puxão pontual e sutil
+  // pra dentro, so' no eixo horizontal (EDGE_MARGIN) -- os demais ficam
+  // exatamente onde o anel real os posiciona.
+  const EDGE_MARGIN = 12;
   const mobileSeatLayout = useMemo(() => {
     if (!replayState) return null;
-    const SHRINK = 0.82;
     return replayState.seatLayout.map((s, i) => {
       if (s.isHero) return { ...s, x: 28, y: 88 };
-      let y = 46 + (s.y - 46) * SHRINK;
+      let x = s.x;
+      if (x < EDGE_MARGIN) x = EDGE_MARGIN;
+      else if (x > 100 - EDGE_MARGIN) x = 100 - EDGE_MARGIN;
+      let y = s.y;
+      // Unico ajuste que sobra além da borda: o vizinho imediato à
+      // esquerda do hero (index 1 no anel) fica colado nas cartas do
+      // próprio hero -- não é corte na borda da mesa, é sobreposição
+      // com o assento vizinho, por isso continua tratado à parte.
       if (i === 1) y -= 10;
-      return { ...s, x: 50 + (s.x - 50) * SHRINK, y };
+      return { ...s, x, y };
     });
   }, [replayState]);
 
@@ -694,7 +700,7 @@ export function RevisorHandTable({
             hand={replayState.tableHand}
             seats={isMobile && mobileSeatLayout ? mobileSeatLayout : replayState.seatLayout}
             chipAnimation={chipAnimation}
-            actionFlash={actionFlash}
+            potAwardAnimation={potAwardAnimation}
             streetCommitments={replayState.streetCommitments}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}

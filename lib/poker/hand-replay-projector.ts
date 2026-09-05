@@ -24,6 +24,13 @@ export type StepEvent =
       label: string; // "raise to 3bb", "call 8bb", "fold" — texto pra history bar (ja em BB)
       chipsAdded: number; // dinheiro que ENTROU no pote nesse step (0 pra fold/check) — RAW, nao bb
       isFold: boolean; // afeta status do seat pro proximo step em diante
+      // Tipo do chip persistente no assento (ver ACT em drill-theme.ts) —
+      // "allin" substitui bet/call/raise quando a acao deixa o jogador
+      // all-in (pedido explicito: "check/fold/allin como chips").
+      badgeType: "fold" | "check" | "call" | "bet" | "raise" | "allin";
+      // Valor em bb pra mostrar dentro do chip — ausente pra fold/check
+      // (sem tamanho pra exibir).
+      badgeSizeBB?: number;
     }
   | { kind: "deal"; street: Exclude<StreetName, "preflop">; newCards: string[] }
   | {
@@ -115,6 +122,37 @@ function actionLabel(a: ParsedAction, bbUnit: number): string {
     default:
       return a.action;
   }
+}
+
+// Mapa acao-do-parser -> tipo de chip visual (ver ACT em drill-theme.ts).
+// "allin" e' um caso especial: substitui bet/call/raise quando a propria
+// acao deixa o jogador all-in (a.isAllIn) — fold/check nunca viram allin
+// (nao faz sentido dar fold ou check estando all-in, ninguem tem mais
+// ficha pra decidir).
+const BADGE_TYPE_BY_ACTION: Record<string, "fold" | "check" | "call" | "bet" | "raise"> = {
+  folds: "fold",
+  checks: "check",
+  calls: "call",
+  bets: "bet",
+  raises: "raise",
+};
+
+// Resolve o chip persistente que fica no assento apos a acao (pedido
+// explicito: "as informacoes de check/fold/allin coloque como chips" —
+// mesmo estilo visual do chip de bet/call/raise, ja existente). Tamanho
+// exibido segue o mesmo criterio da history bar (actionLabel): total pro
+// raise (raiseTo), valor da propria acao pro bet/call, ausente pro
+// fold/check.
+function resolveBadge(a: ParsedAction, bbUnit: number): { badgeType: "fold" | "check" | "call" | "bet" | "raise" | "allin"; badgeSizeBB?: number } {
+  const base = BADGE_TYPE_BY_ACTION[a.action] ?? "check";
+  const badgeType = a.isAllIn && (a.action === "bets" || a.action === "calls" || a.action === "raises") ? "allin" : base;
+  const badgeSizeBB =
+    a.action === "raises"
+      ? toBBAmount(a.raiseTo ?? 0, bbUnit)
+      : a.action === "bets" || a.action === "calls"
+      ? toBBAmount(a.amount ?? 0, bbUnit)
+      : undefined;
+  return { badgeType, badgeSizeBB };
 }
 
 // Calcula quanto entra no pote pra uma acao especifica DENTRO de uma rua.
@@ -226,6 +264,7 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
       if (chipsAdded > 0) {
         committed.set(a.player, (committed.get(a.player) ?? 0) + chipsAdded);
       }
+      const { badgeType, badgeSizeBB } = resolveBadge(a, bbUnit);
 
       events.push({
         kind: "action",
@@ -234,6 +273,8 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
         label: actionLabel(a, bbUnit),
         chipsAdded,
         isFold: a.action === "folds",
+        badgeType,
+        badgeSizeBB,
       });
     }
   }
@@ -272,12 +313,21 @@ function buildInitialState(hand: ParsedHand): {
   foldedPlayers: Set<string>;
   revealedCards: Map<string, string[]>;
   boardShown: string[];
+  chipsOutByPlayer: Map<string, number>;
 } {
   let pot = 0;
+  // Blinds e antes já saem do stack do jogador ANTES do step 0 (mesa
+  // "pronta pra jogar") — precisam entrar na contabilidade de quanto
+  // cada jogador já colocou na mesa, senão o stack exibido no step 0 já
+  // nasce errado (bug corrigido abaixo: ver chipsOutByPlayer).
+  const chipsOutByPlayer = new Map<string, number>();
   const preflop = hand.streets.find((s) => s.name === "preflop");
   if (preflop) {
     for (const a of preflop.actions) {
-      if (a.action === "posts") pot += a.amount ?? 0;
+      if (a.action === "posts") {
+        pot += a.amount ?? 0;
+        chipsOutByPlayer.set(a.player, (chipsOutByPlayer.get(a.player) ?? 0) + (a.amount ?? 0));
+      }
     }
   }
   return {
@@ -285,6 +335,7 @@ function buildInitialState(hand: ParsedHand): {
     foldedPlayers: new Set<string>(),
     revealedCards: new Map<string, string[]>(),
     boardShown: [],
+    chipsOutByPlayer,
   };
 }
 
@@ -325,6 +376,25 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
   const revealed = new Map<string, string[]>(initial.revealedCards);
   let boardShown: string[] = [...initial.boardShown];
   let currentEvent: StepEvent | null = null;
+  // Quanto cada jogador (por nome) já tirou do próprio stack ao longo de
+  // TODA a mão (não reseta por rua, ao contrário de streetCommitted) —
+  // e quanto já recebeu de volta ao ganhar o pote. Junto com
+  // startingChips, é o que corrige o bug de "o stack continua estático":
+  // antes o stack exibido nunca descontava aposta nenhuma.
+  const chipsOutByPlayer = new Map<string, number>(initial.chipsOutByPlayer);
+  const chipsWonByPlayer = new Map<string, number>();
+
+  // Chip persistente no assento (pedido explicito: "check/fold/allin
+  // como chips" + "no river não tem essa animação, precisamos colocar").
+  // Dois grupos por causa da diferenca de "vida util" de cada tipo:
+  // - roundBadgeByPlayer: check/bet/call/raise so valem NESSA rua —
+  //   reseta a cada "deal" (nova rua começa com decisões novas).
+  // - lockedBadgeByPlayer: fold/all-in NUNCA resetam — o jogador nao
+  //   decide mais nada pro resto da mao, entao o chip precisa continuar
+  //   visivel em toda rua seguinte (inclusive no river, quando a mao
+  //   corre sem mais nenhuma acao depois de um all-in mais cedo).
+  let roundBadgeByPlayer = new Map<string, { type: string; size?: number }>();
+  const lockedBadgeByPlayer = new Map<string, { type: string; size?: number }>();
 
   // Committed-na-rua-atual por posLabel (nao por nome — a UI so conhece
   // posLabel). Reseta toda vez que cruza um "deal" (nova rua comeca).
@@ -347,23 +417,36 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
   for (let i = 0; i < clampedIndex; i++) {
     const e = events[i];
     switch (e.kind) {
-      case "action":
+      case "action": {
         pot += e.chipsAdded;
         if (e.isFold) folded.add(e.player);
         if (e.chipsAdded > 0) {
           streetCommitted.set(e.posLabel, (streetCommitted.get(e.posLabel) ?? 0) + e.chipsAdded);
+          chipsOutByPlayer.set(e.player, (chipsOutByPlayer.get(e.player) ?? 0) + e.chipsAdded);
+        }
+        const badge = { type: e.badgeType, size: e.badgeSizeBB };
+        if (e.badgeType === "fold" || e.badgeType === "allin") {
+          lockedBadgeByPlayer.set(e.player, badge);
+        } else {
+          roundBadgeByPlayer.set(e.player, badge);
         }
         break;
+      }
       case "deal":
         boardShown = [...boardShown, ...e.newCards];
         // Rua nova comeca — pilhas de fichas da rua anterior "vao pro
         // pote" (ja estao contadas em `pot`) e o chao fica limpo de novo.
         streetCommitted = new Map();
+        roundBadgeByPlayer = new Map();
         break;
       case "showdown":
         revealed.set(e.player, e.cards);
         break;
       case "award":
+        // Pote vai pro vencedor -- o stack dele soma esse valor a partir
+        // desse step (ver seats[...].stack mais abaixo), no mesmo passo
+        // em que a animação de fichas indo até ele acontece na UI.
+        chipsWonByPlayer.set(e.player, (chipsWonByPlayer.get(e.player) ?? 0) + e.amount);
         break;
     }
     if (i === clampedIndex - 1) currentEvent = e;
@@ -401,10 +484,22 @@ export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousS
     const revealedForVillain = revealed.get(slot.playerName);
     const isActing = actingPlayer === slot.playerName;
 
+    // Stack exibido = stack inicial - tudo que esse jogador já colocou na
+    // mesa até esse step (blinds/antes/bets/calls/raises, líquido de
+    // aposta não-igualada devolvida) + o que ele já recebeu de volta ao
+    // ganhar o pote (só no step do "award"). Bug corrigido: antes sempre
+    // mostrava startingChips cru, o stack nunca se mexia na tela.
+    const chipsOut = chipsOutByPlayer.get(slot.playerName) ?? 0;
+    const chipsWon = chipsWonByPlayer.get(slot.playerName) ?? 0;
+    // Chip de acao no assento (fold/check/call/bet/raise/allin) — locked
+    // (fold/allin) tem prioridade e nunca some; round (check/bet/call/
+    // raise) so' vale enquanto a rua atual nao vira.
+    const badge = lockedBadgeByPlayer.get(slot.playerName) ?? roundBadgeByPlayer.get(slot.playerName);
     seats[slot.posLabel] = {
       status: isFolded ? "folded" : isActing ? "acting" : "live",
-      stack: toBB(seatData.startingChips),
+      stack: toBB(seatData.startingChips - chipsOut + chipsWon),
       cards: slot.isHero ? hand.heroCards ?? undefined : revealedForVillain,
+      action: badge ? { type: badge.type, size: badge.size } : null,
     };
   }
 
