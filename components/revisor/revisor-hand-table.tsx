@@ -263,6 +263,32 @@ export function RevisorHandTable({
   // continuam vindo do PokerTable normalmente -- so' o formato muda.
   const isMobile = useIsMobile();
 
+  // FIX (2026-09): "deixe a mesa responsiva também ao clicar no analisar
+  // mão pois precisa adaptar aquele espaço menor" -- RevisorDetalhe
+  // ("Analisar mão") encaixa essa mesa numa coluna de grid mais estreita
+  // (0.8fr/1.5fr, ao lado das perguntas) do que a tela de sessão, que
+  // ocupa a largura inteira. `isMobile` só reage à largura da TELA
+  // (device), não à largura real do CARD onde a mesa está encaixada --
+  // um desktop comum já bastava pra deixar essa coluna estreita sem
+  // nunca virar "mobile". Mede a largura real do card (ResizeObserver,
+  // mesma tecnica de useSeatScale em poker-table.tsx) e troca pro
+  // formato mais alto/estreito (já usado no celular) sempre que ela cai
+  // abaixo do limiar -- funciona tanto no celular quanto numa coluna de
+  // desktop apertada, sem depender do tipo de aparelho.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (!width) return;
+      setCompact(width < 560);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const [stepIndex, setStepIndex] = useState(0);
   const previousStepRef = useRef(0);
   const [autoplay, setAutoplay] = useState(false);
@@ -557,6 +583,7 @@ export function RevisorHandTable({
   return (
     <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
       <div
+        ref={cardRef}
         style={
           isMobile
             ? // No celular a mesa vive dentro do portal em tela cheia
@@ -704,7 +731,17 @@ export function RevisorHandTable({
             streetCommitments={replayState.streetCommitments}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
-            {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.6, heroScale: 1.4 } : {})}
+            {...(isMobile
+              ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.6, heroScale: 1.4 }
+              : // Coluna estreita no desktop (ex: "Analisar mão") -- mesma
+                // ideia do celular (retangulo mais alto, piso de escala
+                // mais folgado), mas sem mover o hero pro canto (isso e'
+                // so' do modo tela-cheia do celular, ver mobileSeatLayout
+                // acima) -- os assentos continuam na borda calculada
+                // normal, so' o formato da mesa em volta deles muda.
+                compact
+                ? { aspectRatio: "4 / 5", cornerRadius: "10% / 8%", minSeatScale: 0.5 }
+                : {})}
           />
 
           {isMobile && (

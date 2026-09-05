@@ -34,6 +34,12 @@ const SIZES = {
   // Fonte/gap/offset proprios e menores pra essa carta caber sem
   // sobrepor, sem esconder nenhum elemento.
   mini: { w: 34, h: 48, rank: 9, cornerSuit: 7, bigCenter: 15, cornerOffset: 3, cornerGap: 1 },
+  // Cartas dos vilões na mesa (reveladas no showdown ou viradas/silhueta)
+  // -- pedido explicito: "diminua as cartas dos vilões... de forma
+  // sutil não diminua tanto". ~18% menor que "board" (mesma proporção),
+  // suficiente pra aliviar o layout sem ficar minúscula feito "mini"
+  // (que é quase 40% menor, pensada pra preview em lista, não pra mesa).
+  villain: { w: 46, h: 66, rank: 14, cornerSuit: 10, bigCenter: 31, cornerOffset: 5, cornerGap: 2 },
 };
 
 type Size = keyof typeof SIZES;

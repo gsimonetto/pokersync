@@ -308,8 +308,8 @@ function CommittedChip({ seat, amount, scale, heroScale = 1 }: { seat: SeatLayou
 // gira sentido anti-horario = topo da carta pende pra esquerda), mas o
 // angulo total (6deg pra 2 cartas = 3deg pra cada lado) era sutil demais
 // pra ficar perceptivel — subiu pra 10deg (5deg por carta em duplas).
-const CARD_OVERLAP_PX: Record<Size, number> = { board: 30, hero: 44, mini: 20 } as const;
-type Size = "board" | "hero" | "mini";
+const CARD_OVERLAP_PX: Record<Size, number> = { board: 30, hero: 44, mini: 20, villain: 25 } as const;
+type Size = "board" | "hero" | "mini" | "villain";
 
 function CardFan({ cards, size, fanDeg = 10 }: { cards: (string | null)[]; size: Size; fanDeg?: number }) {
   const overlap = CARD_OVERLAP_PX[size];
@@ -358,8 +358,12 @@ function CardSilhouette() {
   return (
     <div
       style={{
-        width: 56,
-        height: 80,
+        // Mesmo tamanho de "villain" em card.tsx (pedido explicito:
+        // "diminua as cartas dos vilões... de forma sutil") -- a
+        // silhueta representa a mesma carta virada do vilão que essas
+        // dimensoes, so' sem rank/naipe visivel.
+        width: 46,
+        height: 66,
         borderRadius: 6,
         border: "1.5px solid rgba(255,255,255,0.22)",
         background: [
@@ -373,11 +377,12 @@ function CardSilhouette() {
 }
 
 // Mesmo leque/sobreposicao do CardFan, so' que com a silhueta acima em
-// vez de cartas reais -- reusa CARD_OVERLAP_PX.board pra ficar visualmente
-// identico ao par de cartas reveladas (mesmo tamanho, mesmo espacamento),
-// trocando so' o conteudo interno de cada carta.
+// vez de cartas reais -- reusa CARD_OVERLAP_PX.villain pra ficar
+// visualmente identico ao par de cartas reveladas do vilao (mesmo
+// tamanho, mesmo espacamento), trocando so' o conteudo interno de cada
+// carta.
 function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
-  const overlap = CARD_OVERLAP_PX.board;
+  const overlap = CARD_OVERLAP_PX.villain;
   return (
     <div style={{ display: "flex" }}>
       {[0, 1].map((i) => (
@@ -624,7 +629,7 @@ function Seat({
             const showGhostCards = !revealedVillainCards && !empty && status !== "folded";
             const cardsBlock = revealedVillainCards ? (
               <div style={{ position: "relative", zIndex: 1, transform: CARD_BEHIND_NAME_TRANSFORM.above }}>
-                <CardFan cards={cards!} size="board" />
+                <CardFan cards={cards!} size="villain" />
               </div>
             ) : showGhostCards ? (
               // FIX (pedido explicito): sem opacity aqui -- opacity no

@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Save, CheckCircle2, Lightbulb, Target, Loader2, Scale, Share2, Check as CheckIcon, Trophy, Tag as TagIcon, Plus, Users, Link2, Wallet, Gauge, Bookmark } from "lucide-react";
+import { Save, CheckCircle2, Lightbulb, Target, Loader2, Scale, Share2, Trophy, Tag as TagIcon, Plus, Link2, Wallet, Gauge, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
@@ -21,7 +21,6 @@ import {
   fetchTags,
   createUserTag,
   updateReviewTags,
-  fetchTeamCoaches,
   fetchRecentBankrollSessions,
   fetchBankrollSessionById,
   linkReviewToSession,
@@ -33,7 +32,6 @@ import {
   type Street,
   type ManualTicket,
   type Tag,
-  type TeamCoach,
   type BankrollSessionOption,
 } from "@/lib/services/hand-review-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
@@ -43,55 +41,6 @@ import { ShareHandModal } from "./share-hand-modal";
 
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
-
-function ShareButton({ review, parsedHand }: { review: ReviewDetail; parsedHand: ParsedHand | null }) {
-  const [copied, setCopied] = useState(false);
-
-  function buildShareText(): string {
-    const lines: string[] = [];
-    lines.push(review.title || "Mão de poker — PokerSync");
-    if (parsedHand) {
-      if (parsedHand.heroPosition) lines.push(`Posição: ${parsedHand.heroPosition}`);
-      if (parsedHand.smallBlind && parsedHand.bigBlind) lines.push(`Blinds: ${parsedHand.smallBlind}/${parsedHand.bigBlind}`);
-      if (parsedHand.board.length) lines.push(`Board: ${parsedHand.board.join(" ")}`);
-      if (parsedHand.pot != null) lines.push(`Pote: ${parsedHand.pot}`);
-    }
-    if (review.learning_note) lines.push(`\nAprendizado: ${review.learning_note}`);
-    lines.push("\nRevisado no PokerSync");
-    return lines.join("\n");
-  }
-
-  async function handleShare() {
-    const text = buildShareText();
-    // eslint-disable-next-line @typescript-eslint/no-explicit-any
-    const nav = navigator as any;
-    if (nav.share) {
-      try {
-        await nav.share({ title: review.title || "Mão de poker", text });
-        return;
-      } catch {
-        return;
-      }
-    }
-    try {
-      await navigator.clipboard.writeText(text);
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
-    } catch {
-      // silencioso
-    }
-  }
-
-  return (
-    <button
-      onClick={handleShare}
-      className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink"
-    >
-      {copied ? <CheckIcon size={14} className="text-positive" /> : <Share2 size={14} />}
-      {copied ? "Copiado" : "Compartilhar"}
-    </button>
-  );
-}
 
 export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack: () => void }) {
   const [userId, setUserId] = useState<string | null>(null);
@@ -145,13 +94,13 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [newTagLabel, setNewTagLabel] = useState("");
   const [savingTags, setSavingTags] = useState(false);
 
-  // Compartilhar com o coach do time (base minima de Times: role coach/
-  // jogador em team_members) — mesmo formato de replayer no lado do
-  // coach, via notificacao com deep-link.
-  const [teamCoaches, setTeamCoaches] = useState<TeamCoach[]>([]);
-  // Modal de compartilhamento (mesma infra que o botao "Compartilhar" do
-  // Hand Replayer ja usa, ver share-hand-modal.tsx) -- reusado aqui pra
-  // nao ter dois jeitos diferentes de mandar mao pro coach na mesma tela.
+  // Modal de compartilhamento com o coach do time (base minima de Times:
+  // role coach/jogador em team_members) -- unico jeito de compartilhar
+  // mao nessa tela agora (pedido explicito: "existem 2 botões de
+  // compartilhar" -- o botao generico de compartilhamento nativo do
+  // aparelho saiu, so' sobra esse). A propria modal (ShareHandModal) ja
+  // busca os coaches do time e mostra um aviso se o jogador nao tiver
+  // nenhum vinculado, entao essa tela nao precisa saber disso de antemao.
   const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // Vinculo com sessao de banca -- antes era write-only na criacao da
@@ -191,9 +140,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       if (uid) {
         fetchTags()
           .then(setAllTags)
-          .catch(() => {});
-        fetchTeamCoaches(uid)
-          .then(setTeamCoaches)
           .catch(() => {});
       }
     })();
@@ -420,11 +366,11 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   // sem modal): a street aberta e' a escolha manual do jogador (openIdx),
   // ou por padrao a primeira ainda sem nota -- assim que ele bate uma nota
   // a proxima abre sozinha (a "acao rapida": um toque avanca, nao precisa
-  // abrir/fechar nada a parte). allStreetsRated tambem gate o CTA de
-  // "Enviar ao coach", que so' faz sentido depois da revisao completa.
+  // abrir/fechar nada a parte). O gate de "so' pode enviar ao coach com
+  // as 4 streets avaliadas" mora dentro do proprio ShareHandModal agora
+  // (ver share-hand-modal.tsx) -- essa tela so' precisa abrir a modal.
   const firstUnratedIdx = streetEvals.findIndex((e) => !e.self_rating);
   const effectiveOpenIdx = openIdx !== null ? openIdx : firstUnratedIdx;
-  const allStreetsRated = streetEvals.length === STREETS.length && streetEvals.every((e) => e.self_rating);
   const isPrintOnly = review.source === "print" || (!review.hand_history && review.parsed_data?.kind !== "parsed");
 
   // Secoes mais compactas (pedido explicito: "diminua as perguntas") —
@@ -746,25 +692,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             Concluir revisão
           </button>
         </div>
-
-        {/* Enviar ao coach: acao final do fluxo (pedido explicito), so'
-            habilita depois que as 4 streets tem nota -- essa e' a unica
-            parte obrigatoria; tags, aprendizado, drill e as perguntas
-            guiadas continuam opcionais. Abre a MESMA modal que o botao
-            "Compartilhar" da mesa ja usa, pra so existir um jeito de
-            compartilhar mao com o coach no produto inteiro. */}
-        {teamCoaches.length > 0 && (
-          <button
-            type="button"
-            onClick={() => setShareModalOpen(true)}
-            disabled={!allStreetsRated}
-            title={allStreetsRated ? undefined : "Avalie as 4 streets (pré-flop/flop/turn/river) acima pra liberar o envio"}
-            className="flex items-center justify-center gap-2 rounded-[10px] border border-training/40 bg-training/10 px-4 py-3 text-sm font-semibold text-training transition-colors hover:bg-training/20 disabled:cursor-not-allowed disabled:opacity-40"
-          >
-            <Users size={16} />
-            Enviar ao coach
-          </button>
-        )}
       </footer>
     </>
   );
@@ -900,7 +827,20 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             <Bookmark size={15} fill={review.saved ? "currentColor" : "none"} />
           </button>
 
-          <ShareButton review={review} parsedHand={parsedHandForTable} />
+          {/* Compartilhar -- unico jeito de compartilhar mao nessa tela
+              agora (pedido explicito: "existem 2 botões de compartilhar"
+              -- o botao generico de compartilhamento nativo saiu, essa e'
+              a MESMA modal usada em toda a Revisor de Mãos, ver
+              share-hand-modal.tsx). Ela mesma busca os coaches do time e
+              mostra um aviso se nao houver nenhum -- essa tela nao
+              precisa checar isso de antemao. */}
+          <button
+            onClick={() => setShareModalOpen(true)}
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink"
+          >
+            <Share2 size={14} />
+            Compartilhar
+          </button>
         </div>
       </div>
 
@@ -916,11 +856,13 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         <div className="grid grid-cols-1 gap-4 lg:grid-cols-[0.8fr_1.5fr]">
           <div>{secondaryContent}</div>
           <div>
-            {/* reviewId habilita o botao "Compartilhar" nativo da mesa --
-                antes ficava oculto aqui (so' existia dentro da fila/sessao),
-                entao a unica forma de compartilhar era o bloco abaixo da
-                autoavaliacao. Agora os dois levam pra mesma modal. */}
-            <RevisorHandTable parsedHand={parsedHandForTable} reviewId={reviewId} />
+            {/* Sem reviewId/onOpenHand aqui de proposito -- essa tela JA
+                É "Analisar mão" (destino do botão "Analisar mão" da
+                mesa em outros contextos), então os botões "Salvar" e
+                "Compartilhar" nativos da mesa ficam ocultos (o header
+                acima já tem os seus próprios). Evita duplicar a mesma
+                ação duas vezes na mesma tela. */}
+            <RevisorHandTable parsedHand={parsedHandForTable} />
           </div>
         </div>
       ) : (
