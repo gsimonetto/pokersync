@@ -56,4 +56,5 @@ export const ACT: Record<string, { label: string; fg: string; bd: string; bg: st
   call: { label: "Call", fg: "#4ADE80", bd: "rgba(34,197,94,.50)", bg: "rgba(34,197,94,.16)" },
   bet: { label: "Bet", fg: "#FDBA74", bd: "rgba(249,115,22,.55)", bg: "rgba(249,115,22,.18)" },
   raise: { label: "Raise", fg: "#FCA5A5", bd: "rgba(239,68,68,.55)", bg: "rgba(239,68,68,.18)" },
+  allin: { label: "All-in", fg: "#FDE047", bd: "rgba(250,204,21,.6)", bg: "rgba(250,204,21,.20)" },
 };

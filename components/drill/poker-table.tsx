@@ -434,7 +434,12 @@ function Seat({
 
   const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
-      {!acting && <ActionBadge action={action} pot={pot} />}
+      {/* key muda toda vez que a acao muda (novo fold/check/bet/allin) --
+          forca o React a remontar o chip, disparando o "fadeInUp" de novo
+          em vez de so' trocar o texto sem animar (pedido explicito:
+          "check/fold/allin como chips" -- o chip precisa "chegar" com a
+          mesma animacao de qualquer outro chip da mesa). */}
+      {!acting && action && <ActionBadge key={`${action.type}-${action.size ?? ""}`} action={action} pot={pot} />}
     </div>
   );
 
@@ -690,56 +695,55 @@ function ChipAnimation({
   );
 }
 
-// Flash de Check/Fold — pedido explicito: "quero uma animacao de quando
-// o jogador dar check ou fold pra ficar visualmente facil, igual e' com
-// os blinds hoje". Bet/call/raise ja tem a ChipAnimation (ficha voando
-// ate o pote, bem chamativa); check e fold nao movem ficha nenhuma,
-// entao ganham o mesmo nivel de destaque de um jeito proprio: um rotulo
-// grande, colorido (mesma paleta do ACT em drill-theme.ts) que estoura
-// no proprio assento e desaparece -- nao precisa viajar ate o pote
-// porque check/fold nao movem fichas.
-const ACTION_FLASH_META: Record<"fold" | "check", { label: string; color: string }> = {
-  fold: { label: "FOLD", color: "#94A3B8" },
-  check: { label: "CHECK", color: "#7DD3FC" },
-};
-
-function ActionFlash({
-  seat,
-  kind,
+// Ficha do pote indo até o vencedor -- pedido explicito: "quando alguém
+// ganhar o pote, ter animação dos blinds indo até o vencedor e somando
+// ao stack". Mesmo keyframe de viagem (chipTravel) da ChipAnimation
+// acima, só que na direção OPOSTA: parte do centro da mesa (onde o pote
+// fica) até o assento do vencedor, em vez de um assento até o centro. O
+// stack já soma o valor recebido nesse mesmo step (ver
+// hand-replay-projector.ts, chipsWonByPlayer) -- essa animação só torna
+// visível o dinheiro se movendo até lá.
+function PotAwardAnimation({
+  toSeat,
+  amount,
   animKey,
   scale,
 }: {
-  seat: SeatLayoutSlot;
-  kind: "fold" | "check";
+  toSeat: SeatLayoutSlot;
+  amount: number;
   animKey: string | number;
   scale: number;
 }) {
-  const meta = ACTION_FLASH_META[kind];
+  const dx = toSeat.x - TABLE_CENTER.x;
+  const dy = toSeat.y - TABLE_CENTER.y;
   return (
     <div
       key={animKey}
       style={{
         position: "absolute",
-        left: `${seat.x}%`,
-        top: `${seat.y}%`,
-        transform: `translate(-50%, -50%) scale(${scale})`,
-        zIndex: 30,
+        left: `${TABLE_CENTER.x}%`,
+        top: `${TABLE_CENTER.y}%`,
+        transform: `scale(${scale})`,
+        zIndex: 6,
         pointerEvents: "none",
+        ["--chip-dx" as string]: `${dx}%`,
+        ["--chip-dy" as string]: `${dy}%`,
       }}
     >
       <div
         style={{
-          fontFamily: F,
-          fontWeight: 800,
-          fontSize: 22,
-          letterSpacing: 0.5,
-          color: meta.color,
-          textShadow: `0 0 18px ${meta.color}, 0 2px 6px rgba(0,0,0,.7)`,
-          whiteSpace: "nowrap",
-          animation: "actionFlashPop 650ms ease-out forwards",
+          position: "absolute",
+          left: 0,
+          top: 0,
+          animation: "chipTravel 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
         }}
       >
-        {meta.label}
+        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
+          <PotChipStack />
+          <span style={{ fontFamily: F, fontSize: 13, fontWeight: 700, color: "#FCD34D", ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
+            +{amount}bb
+          </span>
+        </div>
       </div>
     </div>
   );
@@ -778,6 +782,7 @@ export function PokerTable({
   hand,
   seats,
   chipAnimation,
+  potAwardAnimation,
   streetCommitments,
   variant = "replay",
   // Retangulo deitado (8/5) por padrao -- mesa normal na tela toda em
@@ -809,11 +814,14 @@ export function PokerTable({
   // ranges GTO e nao tem esse conceito.
   opponentStats,
   onOpponentClick,
-  actionFlash,
 }: {
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
   chipAnimation?: { fromPosLabel: string; amount: number; key: string | number } | null;
+  // Ficha do pote viajando ATÉ o vencedor (ver PotAwardAnimation acima) --
+  // ausente em qualquer consumidor que nao passe (ex: Treino), sem
+  // mudanca de comportamento pra quem nao usa.
+  potAwardAnimation?: { toPosLabel: string; amount: number; key: string | number } | null;
   streetCommitments?: Record<string, number>;
   variant?: TableVariant;
   aspectRatio?: string;
@@ -822,15 +830,11 @@ export function PokerTable({
   cornerRadius?: string;
   opponentStats?: Record<string, OpponentStats>;
   onOpponentClick?: (playerName: string) => void;
-  // Flash de "FOLD"/"CHECK" no proprio assento (ver ActionFlash acima) --
-  // ausente em qualquer consumidor que nao passe (ex: Treino), sem
-  // mudanca de comportamento pra quem nao usa.
-  actionFlash?: { fromPosLabel: string; kind: "fold" | "check"; key: string | number } | null;
 }) {
   const active = !!hand;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
-  const flashFromSeat = actionFlash ? seats.find((s) => s.posLabel === actionFlash.fromPosLabel) : null;
+  const awardToSeat = potAwardAnimation ? seats.find((s) => s.posLabel === potAwardAnimation.toPosLabel) : null;
   const felt = FELT_PALETTES[variant];
   const tableBoxRef = useRef<HTMLDivElement>(null);
   const seatScale = useSeatScale(tableBoxRef, minSeatScale);
@@ -860,12 +864,6 @@ export function PokerTable({
           15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
           85% { opacity: 1; transform: translate(calc(-50% + var(--chip-dx)), calc(-50% + var(--chip-dy))) scale(1); }
           100% { opacity: 0; transform: translate(calc(-50% + var(--chip-dx)), calc(-50% + var(--chip-dy))) scale(0.85); }
-        }
-        @keyframes actionFlashPop {
-          0%   { opacity: 0; transform: scale(0.4); }
-          25%  { opacity: 1; transform: scale(1.18); }
-          45%  { opacity: 1; transform: scale(1); }
-          100% { opacity: 0; transform: scale(1) translateY(-18px); }
         }
       `}</style>
 
@@ -1065,8 +1063,8 @@ export function PokerTable({
           <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} scale={seatScale} />
         )}
 
-        {actionFlash && flashFromSeat && (
-          <ActionFlash seat={flashFromSeat} kind={actionFlash.kind} animKey={actionFlash.key} scale={seatScale} />
+        {potAwardAnimation && awardToSeat && potAwardAnimation.amount > 0 && (
+          <PotAwardAnimation toSeat={awardToSeat} amount={potAwardAnimation.amount} animKey={potAwardAnimation.key} scale={seatScale} />
         )}
       </div>
     </div>
