@@ -551,6 +551,11 @@ export function RevisorSessao({
       actionsSlot={isMobile ? actionsSlotEl : undefined}
       onPrevHand={hasPrevHand ? goToPrevHandManual : undefined}
       onNextHand={hasNextHand ? goToNextHandManual : undefined}
+      // RevisorHandTable so' renderiza esse botao no proprio header
+      // desktop (ver isMobile la' dentro) -- no celular o modo tela-cheia
+      // acima ja tem seu proprio ArrowLeft, entao passar aqui sem
+      // condicional nao duplica nada.
+      onBack={onBack}
     />
   ) : selectedId && parsedForSelected === null ? (
     <div

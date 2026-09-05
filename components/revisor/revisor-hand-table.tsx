@@ -3,10 +3,9 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Share2, Trophy, Layers } from "lucide-react";
+import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Trophy, Layers, ArrowLeft } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
-import { ShareHandModal } from "./share-hand-modal";
 import { OpponentStatsModal } from "./opponent-stats-modal";
 import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
 import { fetchOpponentsStatsForHand, type OpponentStats } from "@/lib/services/opponent-stats-service";
@@ -199,6 +198,7 @@ export function RevisorHandTable({
   actionsSlot,
   onPrevHand,
   onNextHand,
+  onBack,
 }: {
   parsedHand: ParsedHand;
   // Nome do torneio sendo revisado — exibido no header da mesa. Opcional
@@ -206,11 +206,11 @@ export function RevisorHandTable({
   // (ex: usos fora do contexto de sessao); se ausente, o header so nao
   // mostra o nome (nunca quebra o layout).
   tournamentName?: string | null;
-  // Id da hand_review correspondente — necessario pro botao "Compartilhar"
-  // abrir a modal de perguntas guiadas (ShareHandModal) e pra salvar as
-  // respostas/compartilhar via hand_review_shares (mesma infra que
-  // "Analisar mão" ja usa). Se ausente, o botao "Compartilhar" fica
-  // oculto (igual ao padrao ja usado em onOpenHand/canAnalyze).
+  // Id da hand_review correspondente — necessario pro botao "Salvar" (ver
+  // canSave abaixo). Compartilhar saiu daqui (pedido explicito: "manter
+  // apenas o compartilhamento dentro do botão analisar mão") -- quem
+  // quiser compartilhar a mao abre "Analisar mão" (RevisorDetalhe), que
+  // ja tem seu proprio botao de compartilhar.
   reviewId?: string;
   // Chamado quando o jogador clica em "Analisar mão" no header — leva
   // pra RevisorDetalhe (perguntas guiadas, self-eval, drill suggestion).
@@ -242,6 +242,15 @@ export function RevisorHandTable({
   // quando existe mesmo mao anterior/seguinte na lista filtrada).
   onPrevHand?: () => void;
   onNextHand?: () => void;
+  // Voltar pra fila de sessões -- pedido explicito: "botão de voltar
+  // aparecer ao lado do nome do torneio, tirando de lá de cima" (antes
+  // vivia numa linha separada, so' pro pai da pagina, empurrando todo o
+  // conteudo pra baixo). So' renderiza no desktop -- no celular o modo
+  // tela-cheia (RevisorSessao) ja tem seu proprio botao de voltar fora
+  // desse componente. Omitido = nenhum botao aparece aqui (usado por
+  // quem chama RevisorHandTable fora de uma sessao navegavel, ex:
+  // RevisorDetalhe, que ja tem seu proprio jeito de voltar).
+  onBack?: () => void;
 }) {
   // Retangulo em pe' no celular (mesmo par calibrado do modo mesa-cheia
   // do Treino: aspectRatio "3/5" + cornerRadius "10%/6%" -- cada
@@ -254,12 +263,35 @@ export function RevisorHandTable({
   // continuam vindo do PokerTable normalmente -- so' o formato muda.
   const isMobile = useIsMobile();
 
+  // FIX (2026-09): "deixe a mesa responsiva também ao clicar no analisar
+  // mão pois precisa adaptar aquele espaço menor" -- RevisorDetalhe
+  // ("Analisar mão") encaixa essa mesa numa coluna de grid mais estreita
+  // (0.8fr/1.5fr, ao lado das perguntas) do que a tela de sessão, que
+  // ocupa a largura inteira. `isMobile` só reage à largura da TELA
+  // (device), não à largura real do CARD onde a mesa está encaixada --
+  // um desktop comum já bastava pra deixar essa coluna estreita sem
+  // nunca virar "mobile". Mede a largura real do card (ResizeObserver,
+  // mesma tecnica de useSeatScale em poker-table.tsx) e troca pro
+  // formato mais alto/estreito (já usado no celular) sempre que ela cai
+  // abaixo do limiar -- funciona tanto no celular quanto numa coluna de
+  // desktop apertada, sem depender do tipo de aparelho.
+  const cardRef = useRef<HTMLDivElement>(null);
+  const [compact, setCompact] = useState(false);
+  useEffect(() => {
+    const el = cardRef.current;
+    if (!el) return;
+    const observer = new ResizeObserver((entries) => {
+      const width = entries[0]?.contentRect.width;
+      if (!width) return;
+      setCompact(width < 560);
+    });
+    observer.observe(el);
+    return () => observer.disconnect();
+  }, []);
+
   const [stepIndex, setStepIndex] = useState(0);
   const previousStepRef = useRef(0);
   const [autoplay, setAutoplay] = useState(false);
-  // Modal de compartilhamento (pedido explicito) — abre com as mesmas
-  // perguntas guiadas do "Analisar mão"; ver share-hand-modal.tsx.
-  const [shareModalOpen, setShareModalOpen] = useState(false);
 
   // "Salvar spot" direto na mesa (pedido explicito, 2026-08): antes so
   // existia dentro de "Analisar mão" (RevisorDetalhe) -- pra maos de
@@ -540,7 +572,6 @@ export function RevisorHandTable({
   }
 
   const canAnalyze = !!replayState && !!onOpenHand;
-  const canShare = !!reviewId;
   // So aparece quando ha pra onde "Analisar mao" levar (onOpenHand) --
   // ou seja, quando esta tela e' a mesa de navegacao de uma sessao
   // (RevisorSessao), nao a propria RevisorDetalhe. La' o header ja tem
@@ -552,6 +583,7 @@ export function RevisorHandTable({
   return (
     <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
       <div
+        ref={cardRef}
         style={
           isMobile
             ? // No celular a mesa vive dentro do portal em tela cheia
@@ -604,6 +636,9 @@ export function RevisorHandTable({
         {!isMobile && (
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+              {onBack && (
+                <ChipButton icon={<ArrowLeft size={13} />} label="Voltar" onClick={onBack} title="Voltar pra fila de mãos" iconOnly />
+              )}
               <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} />
               <InfoChip
                 icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
@@ -676,14 +711,6 @@ export function RevisorHandTable({
                   disabled={savingSpot}
                 />
               )}
-              {canShare && (
-                <ChipButton
-                  icon={<Share2 size={13} />}
-                  label="Compartilhar"
-                  title="Compartilhar essa mão com o coach"
-                  onClick={() => setShareModalOpen(true)}
-                />
-              )}
               {canAnalyze && (
                 <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" />
               )}
@@ -704,7 +731,17 @@ export function RevisorHandTable({
             streetCommitments={replayState.streetCommitments}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
-            {...(isMobile ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.6, heroScale: 1.4 } : {})}
+            {...(isMobile
+              ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.6, heroScale: 1.4 }
+              : // Coluna estreita no desktop (ex: "Analisar mão") -- mesma
+                // ideia do celular (retangulo mais alto, piso de escala
+                // mais folgado), mas sem mover o hero pro canto (isso e'
+                // so' do modo tela-cheia do celular, ver mobileSeatLayout
+                // acima) -- os assentos continuam na borda calculada
+                // normal, so' o formato da mesa em volta deles muda.
+                compact
+                ? { aspectRatio: "4 / 5", cornerRadius: "10% / 8%", minSeatScale: 0.5 }
+                : {})}
           />
 
           {isMobile && (
@@ -815,15 +852,6 @@ export function RevisorHandTable({
                 iconOnly
               />
             )}
-            {canShare && (
-              <ChipButton
-                icon={<Share2 size={15} />}
-                label="Compartilhar"
-                title="Compartilhar essa mão com o coach"
-                onClick={() => setShareModalOpen(true)}
-                iconOnly
-              />
-            )}
             {canAnalyze && (
               <ChipButton
                 icon={<Target size={15} />}
@@ -841,7 +869,19 @@ export function RevisorHandTable({
           navegacao (so' aparece no ultimo passo, ver acima) -- essa
           linha abaixo da mesa e' so' desktop. */}
       {!isMobile && (
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0 }}>
+        // FIX (2026-09): "quando aparece o board a mesa da uma leve
+        // piscada redimensionando" -- o link "Treinar esse spot" (com
+        // padding 8px/14px + borda) e o texto "Sem drill correspondente"
+        // (sem padding nem borda) tinham alturas bem diferentes. Como
+        // esse row fica ACIMA da caixa da mesa (flex:1) no mesmo container
+        // flex, a troca de um pro outro -- que acontece bem na hora que o
+        // flop revela (trainHref so' existe pos-flop) -- mudava a altura
+        // disponivel pra mesa, disparando o ResizeObserver de
+        // useSeatScale e recalculando a escala visual de repente. Mesmo
+        // padding/borda (so' com cor transparente no estado "sem drill")
+        // fixa a altura da linha igual nos dois casos, entao a mesa nunca
+        // precisa remedir.
+        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0, minHeight: 37 }}>
           {trainHref ? (
             <Link
               href={trainHref}
@@ -858,17 +898,17 @@ export function RevisorHandTable({
             situationAction !== "pending" && (
               <span
                 title="Sem drill correspondente pra essa rua/posição/situação"
-                style={{ fontSize: 11, color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap" }}
+                style={{
+                  display: "flex", alignItems: "center",
+                  border: "1px solid transparent", borderRadius: 10, padding: "8px 14px",
+                  fontSize: 11, color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap",
+                }}
               >
                 Sem drill correspondente
               </span>
             )
           )}
         </div>
-      )}
-
-      {reviewId && (
-        <ShareHandModal open={shareModalOpen} reviewId={reviewId} onClose={() => setShareModalOpen(false)} />
       )}
 
       <OpponentStatsModal stats={opponentClicked} onClose={() => setOpponentClicked(null)} />
