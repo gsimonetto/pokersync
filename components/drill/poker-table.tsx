@@ -432,14 +432,24 @@ function Seat({
   // TRANSFORM) e da ficha de aposta (CommittedChip).
   const layout: React.CSSProperties = { flexDirection: "column", alignItems: "center", gap: hero ? 6 : 0 };
 
+  // So' fold/check/allin viram chip fixo embaixo do jogador -- pedido
+  // explicito: "retire a informação de call e raise fixa em baixo do
+  // jogador, esta atrapalhando o layout, tanto do desktop quanto app".
+  // Call/bet/raise tem texto de largura variavel (valor + "· X% pot"),
+  // que overflow'ava o card do assento; fold/check/allin sao curtos e
+  // sem esse sufixo, sem o mesmo problema. A ficha de aposta em si
+  // continua aparecendo do jeito de sempre via CommittedChip (o valor em
+  // bb flutuando em frente ao assento), so' esse chip fixo embaixo do
+  // nome que sai pra call/bet/raise.
+  const showBadge = action && (action.type === "fold" || action.type === "check" || action.type === "allin");
   const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
-      {/* key muda toda vez que a acao muda (novo fold/check/bet/allin) --
+      {/* key muda toda vez que a acao muda (novo fold/check/allin) --
           forca o React a remontar o chip, disparando o "fadeInUp" de novo
           em vez de so' trocar o texto sem animar (pedido explicito:
           "check/fold/allin como chips" -- o chip precisa "chegar" com a
           mesma animacao de qualquer outro chip da mesa). */}
-      {!acting && action && <ActionBadge key={`${action.type}-${action.size ?? ""}`} action={action} pot={pot} />}
+      {!acting && showBadge && <ActionBadge key={`${action.type}-${action.size ?? ""}`} action={action} pot={pot} />}
     </div>
   );
 
