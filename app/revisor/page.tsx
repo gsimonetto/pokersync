@@ -119,7 +119,13 @@ function RevisorPageInner() {
             ]}
           />
         )}
-        {(screen === "nova" || screen === "sessao" || screen === "detalhe") && (
+        {/* "sessao" saiu daqui (pedido explicito: "botão de voltar
+            aparecer ao lado do nome do torneio, tirando de lá de cima,
+            pode subir mais o layout pra preencher aquele espaço") -- o
+            botao de voltar da sessao agora vive dentro do header da
+            propria mesa (RevisorHandTable), ao lado do chip do torneio,
+            no lugar dessa linha solta que so' empurrava tudo pra baixo. */}
+        {(screen === "nova" || screen === "detalhe") && (
           <button
             onClick={screen === "detalhe" ? backFromDetalhe : goFila}
             aria-label="Voltar"

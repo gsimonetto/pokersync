@@ -28,7 +28,17 @@ export type SeatLayoutSlot = {
 // inicializado AQUI EM CIMA porque RING_COORDS chama ellipseSeatCoords
 // no carregamento do modulo, antes de qualquer `const` mais abaixo no
 // arquivo existir (erro de TDZ do JS se ficasse perto da funcao).
-const SUPERELLIPSE_EXPONENT = 4;
+// FIX (2026-09): pedido explicito ("tem muito espaço sobrando" ao lado
+// dos assentos DIAGONAIS no desktop, ex: UTG+1/BB/HJ/BTN numa mesa
+// 8-max) -- com expoente 4, esses assentos ficam a so' ~85% do raio
+// horizontal (os puramente laterais, tipo SB/MP, vao a 100% do raio),
+// deixando um vao vazio entre eles e o canto arredondado da mesa. Um
+// expoente maior "achata" a curva mais cedo em direcao aos cantos,
+// levando os assentos diagonais um pouco mais pra fora (mais perto do
+// canto) sem mudar os assentos que ja estao exatamente nos eixos
+// (topo/base/laterais puras, onde cos ou sin ja valem 0 ou ±1
+// independente do expoente).
+const SUPERELLIPSE_EXPONENT = 6;
 
 // FIX (2026-09): as coordenadas do anel eram "chutadas" a mao (valores
 // fixos por assento), sem seguir uma elipse de verdade — cada uma podia
