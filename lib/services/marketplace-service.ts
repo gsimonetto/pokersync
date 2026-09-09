@@ -19,6 +19,7 @@ export interface Listing {
   teamName: string;
   teamAccent: string;
   teamLogoUrl: string | null;
+  teamBannerUrl: string | null;
   createdBy: string;
   title: string;
   description: string | null;
@@ -54,13 +55,14 @@ async function getUserId(): Promise<string> {
 }
 
 function mapListing(row: Record<string, unknown>): Listing {
-  const team = row.teams as { name: string; accent: string; logo_url: string | null } | null;
+  const team = row.teams as { name: string; accent: string; logo_url: string | null; banner_url: string | null } | null;
   return {
     id: row.id as string,
     teamId: row.team_id as string,
     teamName: team?.name ?? "Time",
     teamAccent: team?.accent ?? "#5AA6E0",
     teamLogoUrl: team?.logo_url ?? null,
+    teamBannerUrl: team?.banner_url ?? null,
     createdBy: row.created_by as string,
     title: row.title as string,
     description: (row.description as string) ?? null,
@@ -77,7 +79,7 @@ function mapListing(row: Record<string, unknown>): Listing {
   };
 }
 
-const LISTING_SELECT = "*, teams(name, accent, logo_url)";
+const LISTING_SELECT = "*, teams(name, accent, logo_url, banner_url)";
 
 // Feed publico — so vagas abertas, mais recentes primeiro.
 export async function fetchOpenListings(): Promise<Listing[]> {
