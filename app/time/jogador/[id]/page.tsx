@@ -9,7 +9,6 @@ import { ScoreRing } from "@/components/ui/score-ring";
 import { PeriodSelector, PrintButton } from "@/components/period-selector";
 import { PlayerDetailBody } from "@/components/time/player-detail-body";
 import { TeamPrintStyles } from "@/components/time/print-styles";
-import { createClient } from "@/lib/supabase/client";
 import {
   calcularScore,
   calcularTendencia,
@@ -23,7 +22,6 @@ import {
   fetchPlayerScoreHistory,
   fetchPlayerSharedHands,
   fetchPlayerStakingSessions,
-  fetchMyMembership,
   traduzErroTime,
   type FinancialDay,
   type PlayerActivityDay,
@@ -61,14 +59,12 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const [staking, setStaking] = useState<PlayerStakingSession[]>([]);
   const [historicoScore, setHistoricoScore] = useState<PlayerScoreHistoryPoint[]>([]);
   const [evolutionStats, setEvolutionStats] = useState<PlayerEvolutionStats | null>(null);
-  const [meuId, setMeuId] = useState<string | null>(null);
-  const [meuPapel, setMeuPapel] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, fin, stk, hist, evo, mem, auth] = await Promise.all([
+      const [d, a, l, m, al, fin, stk, hist, evo] = await Promise.all([
         fetchPlayerDetail(id, dias),
         fetchPlayerActivity(id, dias),
         fetchPlayerLeaks(id, dias),
@@ -78,8 +74,6 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
         fetchPlayerStakingSessions(id).catch(() => []),
         fetchPlayerScoreHistory(id, dias).catch(() => []),
         fetchPlayerEvolutionStats(id, dias).catch(() => null),
-        fetchMyMembership().catch(() => null),
-        createClient().auth.getUser(),
       ]);
       setP(d);
       setAtividade(a);
@@ -90,8 +84,6 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
       setStaking(stk);
       setHistoricoScore(hist);
       setEvolutionStats(evo);
-      setMeuPapel(mem?.role ?? null);
-      setMeuId(auth.data.user?.id ?? null);
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -163,7 +155,10 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
           staking={staking}
           historicoScore={historicoScore}
           evolutionStats={evolutionStats}
-          podeGerenciarMetas={meuPapel === "admin" || (meuPapel === "coach" && p.coachId === meuId)}
+          // Metas so' se criam/editam pelo card do jogador no Funil (controle
+          // centralizado num unico lugar) -- aqui e' so' leitura, mesmo pra
+          // quem e' admin/coach do jogador. Ver components/time/tab-kanban.tsx.
+          podeGerenciarMetas={false}
         />
       )}
     </main>
