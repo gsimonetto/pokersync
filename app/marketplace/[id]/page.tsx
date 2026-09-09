@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import { useParams } from "next/navigation";
-import { Briefcase, Loader2, Lock, Unlock } from "lucide-react";
+import { Briefcase, Loader2, Lock, Unlock, Star } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { SpeedGauge } from "@/components/dashboard/kit";
@@ -13,6 +13,9 @@ import {
   fetchMatchScore,
   fetchMyApplicationForListing,
   fetchApplicationsForListing,
+  fetchTeamStats,
+  fetchMyFavoriteIds,
+  toggleFavorite,
   applyToListing,
   withdrawApplication,
   closeListing,
@@ -22,6 +25,7 @@ import {
   type Listing,
   type MyApplication,
   type ApplicationSummary,
+  type TeamMarketplaceStats,
 } from "@/lib/services/marketplace-service";
 
 export default function ListingDetailPage() {
@@ -31,6 +35,8 @@ export default function ListingDetailPage() {
   const [matchScore, setMatchScore] = useState<number | null>(null);
   const [minhaCandidatura, setMinhaCandidatura] = useState<MyApplication | null>(null);
   const [candidatos, setCandidatos] = useState<ApplicationSummary[] | null>(null);
+  const [stats, setStats] = useState<TeamMarketplaceStats | null>(null);
+  const [favorito, setFavorito] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const carregar = useCallback(async () => {
@@ -38,6 +44,9 @@ export default function ListingDetailPage() {
       const l = await fetchListing(id);
       setListing(l);
       if (!l) return;
+
+      fetchTeamStats(l.teamId).then(setStats).catch(() => {});
+      fetchMyFavoriteIds().then((ids) => setFavorito(ids.has(l.id))).catch(() => {});
 
       const team = await fetchMyTeam().catch(() => null);
       setMyTeam(team);
@@ -57,6 +66,16 @@ export default function ListingDetailPage() {
       setErro((e as Error)?.message ?? "Não foi possível carregar a vaga.");
     }
   }, [id]);
+
+  async function onToggleFavorite() {
+    if (!listing) return;
+    setFavorito((v) => !v);
+    try {
+      await toggleFavorite(listing.id, !favorito);
+    } catch {
+      setFavorito((v) => !v);
+    }
+  }
 
   useEffect(() => {
     carregar();
@@ -102,15 +121,47 @@ export default function ListingDetailPage() {
                   <p className="text-sm text-muted">{listing.teamName}</p>
                 </div>
               </div>
-              <div className="flex gap-2">
+              <div className="flex items-center gap-2">
                 <Chip color="#5AA6E0">{FORMAT_LABEL[listing.format]}</Chip>
                 <Chip color={listing.status === "aberta" ? "#2FB89A" : "#8A94A3"}>
                   {listing.status === "aberta" ? "Aberta" : "Fechada"}
                 </Chip>
+                {!souGerente && (
+                  <button
+                    type="button"
+                    onClick={onToggleFavorite}
+                    title={favorito ? "Remover dos favoritos" : "Favoritar vaga"}
+                    aria-label={favorito ? "Remover dos favoritos" : "Favoritar vaga"}
+                    className={`grid size-8 shrink-0 place-items-center rounded-lg border transition-colors ${
+                      favorito ? "border-evolution/50 bg-evolution/10 text-evolution" : "border-hairline text-muted hover:text-ink"
+                    }`}
+                  >
+                    <Star size={14} fill={favorito ? "currentColor" : "none"} />
+                  </button>
+                )}
               </div>
             </div>
 
             {listing.description && <p className="mt-4 text-sm leading-relaxed text-ink/85">{listing.description}</p>}
+
+            {stats && stats.totalCandidaturas > 0 && (
+              <div className="mt-3 flex flex-wrap gap-x-5 gap-y-1 text-[12px] text-muted">
+                <span>
+                  <b className="text-ink">{stats.totalVagas}</b> vaga{stats.totalVagas === 1 ? "" : "s"} publicada
+                  {stats.totalVagas === 1 ? "" : "s"}
+                </span>
+                {stats.taxaAceitePct !== null && (
+                  <span>
+                    Taxa de aceite <b className="text-ink">{stats.taxaAceitePct}%</b>
+                  </span>
+                )}
+                {stats.tempoMedioRespostaDias !== null && (
+                  <span>
+                    Responde em média em <b className="text-ink">{stats.tempoMedioRespostaDias}d</b>
+                  </span>
+                )}
+              </div>
+            )}
 
             <div className="mt-4 flex flex-wrap gap-x-6 gap-y-2 border-t border-hairline pt-4 text-[13px] text-muted">
               {listing.buyInMin !== null && listing.buyInMax !== null && (

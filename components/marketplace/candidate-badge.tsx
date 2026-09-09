@@ -108,6 +108,25 @@ export function CandidateBadge({
           </div>
         </div>
 
+        {snap.historicoTimes.length > 0 && (
+          <div className="mt-4 border-t border-hairline pt-4">
+            <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Histórico em outros times</p>
+            <ul className="flex flex-wrap gap-2">
+              {snap.historicoTimes.map((h, i) => (
+                <li
+                  key={i}
+                  className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[11.5px] text-ink/85"
+                  title="Só duração e papel — sem dado financeiro ou de performance do time anterior"
+                >
+                  {h.teamName} · {h.role === "admin" ? "admin" : h.role === "coach" ? "coach" : "jogador"} ·{" "}
+                  <span className="font-semibold">{h.months} {h.months === 1 ? "mês" : "meses"}</span>
+                  <span className="text-muted"> · saiu há {h.endedMonthsAgo === 0 ? "menos de 1 mês" : `${h.endedMonthsAgo} ${h.endedMonthsAgo === 1 ? "mês" : "meses"}`}</span>
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+
         <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-hairline pt-4">
           <SpeedGauge score={snap.matchScore} idealMin={idealMin} size={120} label="Match com a vaga" />
 
