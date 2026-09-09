@@ -1,4 +1,4 @@
-import { Target, TrendingUp, BookOpen, LineChart, Layers, Users, Trophy, Radar as RadarIcon } from "lucide-react";
+import { Target, TrendingUp, BookOpen, LineChart, Layers, Users, Trophy, Radar as RadarIcon, Briefcase } from "lucide-react";
 import type { ModuleDef } from "@/components/module-card";
 
 export const ACCENT = {
@@ -10,6 +10,7 @@ export const ACCENT = {
   cyan: "#22D3EE",
   indigo: "#6366F1",
   gold: "#E8B93C",
+  orange: "#F59E0B",
 };
 
 // Espelha o array `modules` de src/components/Dashboard.jsx (projeto Vite).
@@ -80,6 +81,15 @@ export const modules: ModuleDef[] = [
     accent: ACCENT.pink,
     available: true,
     href: "/ranges",
+  },
+  {
+    key: "marketplace",
+    icon: Briefcase,
+    title: "Vagas",
+    subtitle: "Times buscando jogadores",
+    accent: ACCENT.orange,
+    available: true,
+    href: "/marketplace",
   },
   {
     // "radar" nao e' um ModuleKey (lib/plans/plans-data.ts) -- e' um
