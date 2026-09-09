@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArchiveRestore, ArrowLeft, BarChart3, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, Clock3, GripVertical, ListChecks, Loader2, MessageSquare, Paperclip, Plus, Search, Settings2, SlidersHorizontal, Sparkles, Tag, Target, Trash2, Trophy, UserPlus, Users, X } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, ArrowLeft, BarChart3, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, Clock3, GripVertical, ListChecks, Loader2, MessageSquare, Paperclip, Pencil, Plus, Search, Settings, SlidersHorizontal, Sparkles, Tag, Target, Trash2, Trophy, UserPlus, Users, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
@@ -421,7 +421,12 @@ export function TabKanban({
               aria-label="Configurações do funil"
               title="Configurações do funil"
             >
-              <Settings2 size={15} />
+              {/* Icone de engrenagem simples (Settings), nao o de sliders
+                  (Settings2) -- pedido explicito: o icone antigo tinha 2
+                  "pontinhos" parecido demais com o SlidersHorizontal (3
+                  pontinhos) do filtro logo ao lado, dando a impressao de
+                  dois filtros na mesma barra em vez de filtro + config. */}
+              <Settings size={15} />
             </button>
           )}
           <button
@@ -1656,7 +1661,7 @@ function ModalConfigFunil({
       <div className="max-h-[90vh] w-full max-w-lg overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
         <div className="flex items-center justify-between">
           <h2 className="flex items-center gap-2 text-base font-semibold">
-            <Settings2 size={17} />
+            <Settings size={17} />
             Configurações do funil
           </h2>
           <button onClick={onFechar} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
@@ -1715,7 +1720,7 @@ function ModalConfigFunil({
                     </button>
                     <button onClick={() => abrirEdicao(f)} aria-label={`Editar ${f.name}`}
                       className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-ink">
-                      <Settings2 size={13} />
+                      <Pencil size={13} />
                     </button>
                     <button onClick={() => excluir(f)} aria-label={`Excluir ${f.name}`}
                       className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-negative">

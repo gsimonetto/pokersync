@@ -1,9 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { Upload, ChevronDown, Filter, SlidersHorizontal, X } from "lucide-react";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { SegmentedControl } from "@/components/ui/segmented-control";
+import { FilterPopover } from "@/components/ui/filter-popover";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import { ManualImportPanel } from "@/components/analysis/ManualImportPanel";
@@ -34,11 +34,14 @@ type ModalityValue = "all" | "mtt" | "cash";
 // (ModalPortal) em vez de um bloco full-width que empurrava o conteudo
 // pra baixo ou um dropdown ancorado no botao.
 //
-// Modalidade (MTT/Cash) sai do grupo generico de chips e vira um
-// segmented control proprio, sempre visivel -- e' o filtro que decide
-// qual "regua" de referencia (PREFLOP_REFERENCE/POSTFLOP_REFERENCE)
-// as outras abas usam (ver computeReferenceProfile), entao merece
-// destaque em vez de ficar escondido dentro do dropdown "Filtros".
+// Modalidade (MTT/Cash) e' o filtro secundario (icone Filter, diferente
+// do SlidersHorizontal de "Mais filtros" -- padrao do produto: icone
+// principal x icone secundario nunca repetem o mesmo desenho) -- decide
+// qual "regua" de referencia (PREFLOP_REFERENCE/POSTFLOP_REFERENCE) as
+// outras abas usam (ver computeReferenceProfile). Antes era um
+// SegmentedControl solto na barra, de altura diferente dos dois botoes
+// de icone ao lado (SlidersHorizontal h-7/Importar) -- ali que morava o
+// desalinhamento reportado.
 export function AnalysisFilters({
   filters,
   onChange,
@@ -67,15 +70,14 @@ export function AnalysisFilters({
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <SegmentedControl
-        value={modality}
-        onChange={handleModalityChange}
-        options={[
-          { value: "all", label: "Todos" },
-          { value: "mtt", label: "MTT" },
-          { value: "cash", label: "Cash" },
-        ]}
-      />
+      <FilterPopover icon={Filter} label="Modalidade" active={modality !== "all"}>
+        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted/70">Modalidade</p>
+        <div className="flex flex-wrap gap-1.5">
+          <FilterChip label="Todos" active={modality === "all"} onClick={() => handleModalityChange("all")} />
+          <FilterChip label="MTT" active={modality === "mtt"} onClick={() => handleModalityChange("mtt")} />
+          <FilterChip label="Cash" active={modality === "cash"} onClick={() => handleModalityChange("cash")} />
+        </div>
+      </FilterPopover>
 
       <button
         type="button"
