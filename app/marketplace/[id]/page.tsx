@@ -16,6 +16,7 @@ import {
   fetchTeamStats,
   fetchMyFavoriteIds,
   toggleFavorite,
+  isListingOpen,
   applyToListing,
   withdrawApplication,
   closeListing,
@@ -123,8 +124,8 @@ export default function ListingDetailPage() {
               </div>
               <div className="flex items-center gap-2">
                 <Chip color="#5AA6E0">{FORMAT_LABEL[listing.format]}</Chip>
-                <Chip color={listing.status === "aberta" ? "#2FB89A" : "#8A94A3"}>
-                  {listing.status === "aberta" ? "Aberta" : "Fechada"}
+                <Chip color={isListingOpen(listing) ? "#2FB89A" : listing.status === "aberta" ? "#E0B24C" : "#8A94A3"}>
+                  {isListingOpen(listing) ? "Aberta" : listing.status === "aberta" ? "Expirada" : "Fechada"}
                 </Chip>
                 {!souGerente && (
                   <button
@@ -184,11 +185,17 @@ export default function ListingDetailPage() {
                   Volume mínimo <b className="text-ink">{listing.minVolumeSessionsMonth} sessões/mês</b>
                 </span>
               )}
+              {listing.expiresAt && (
+                <span>
+                  {isListingOpen(listing) ? "Encerra em" : "Encerrou em"}{" "}
+                  <b className="text-ink">{new Date(listing.expiresAt).toLocaleDateString("pt-BR")}</b>
+                </span>
+              )}
             </div>
 
             {souGerente && (
               <div className="mt-4 flex justify-end border-t border-hairline pt-4">
-                {listing.status === "aberta" ? (
+                {isListingOpen(listing) ? (
                   <button
                     onClick={() => closeListing(listing.id).then(carregar)}
                     className="inline-flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-1.5 text-xs font-semibold text-muted transition-colors hover:bg-elevated"
@@ -316,7 +323,7 @@ function ApplySection({
               </button>
             )}
           </div>
-        ) : listing.status === "aberta" ? (
+        ) : isListingOpen(listing) ? (
           <div className="flex w-full flex-col gap-2 sm:max-w-xs">
             <textarea
               value={mensagem}
@@ -336,7 +343,9 @@ function ApplySection({
             {erro && <p className="text-xs text-negative">{erro}</p>}
           </div>
         ) : (
-          <p className="text-sm text-muted">Esta vaga está fechada.</p>
+          <p className="text-sm text-muted">
+            {listing.status === "aberta" ? "O prazo dessa vaga encerrou." : "Esta vaga está fechada."}
+          </p>
         )}
       </div>
     </section>

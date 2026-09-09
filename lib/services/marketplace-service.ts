@@ -33,6 +33,7 @@ export interface Listing {
   status: ListingStatus;
   createdAt: string;
   closedAt: string | null;
+  expiresAt: string | null;
 }
 
 export interface NewListingInput {
@@ -45,6 +46,17 @@ export interface NewListingInput {
   minRoiPct?: number | null;
   minVolumeSessionsMonth?: number | null;
   minScoreGeral?: number | null;
+  expiresAt?: string | null;
+}
+
+// Vaga expirada nao vira "fechada" no banco sozinha (sem cron) -- toda
+// tela que decide o que mostrar/permitir usa esta funcao em vez de
+// checar listing.status direto, senao uma vaga vencida continuaria
+// parecendo aberta ate alguem clicar em "Fechar vaga" manualmente.
+export function isListingOpen(listing: Pick<Listing, "status" | "expiresAt">): boolean {
+  if (listing.status !== "aberta") return false;
+  if (listing.expiresAt && new Date(listing.expiresAt) <= new Date()) return false;
+  return true;
 }
 
 async function getUserId(): Promise<string> {
@@ -76,12 +88,14 @@ function mapListing(row: Record<string, unknown>): Listing {
     status: row.status as ListingStatus,
     createdAt: row.created_at as string,
     closedAt: (row.closed_at as string) ?? null,
+    expiresAt: (row.expires_at as string) ?? null,
   };
 }
 
 const LISTING_SELECT = "*, teams(name, accent, logo_url, banner_url)";
 
-// Feed publico — so vagas abertas, mais recentes primeiro.
+// Feed publico — so vagas efetivamente abertas (nao expiradas), mais
+// recentes primeiro.
 export async function fetchOpenListings(): Promise<Listing[]> {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -90,7 +104,7 @@ export async function fetchOpenListings(): Promise<Listing[]> {
     .eq("status", "aberta")
     .order("created_at", { ascending: false });
   if (error) throw error;
-  return (data ?? []).map(mapListing);
+  return (data ?? []).map(mapListing).filter(isListingOpen);
 }
 
 // Vagas do proprio time (abertas e fechadas) — pra quem gerencia.
@@ -129,6 +143,7 @@ export async function createListing(teamId: string, input: NewListingInput): Pro
       min_roi_pct: input.minRoiPct ?? null,
       min_volume_sessions_month: input.minVolumeSessionsMonth ?? null,
       min_score_geral: input.minScoreGeral ?? null,
+      expires_at: input.expiresAt ?? null,
     })
     .select("id")
     .single();
@@ -145,9 +160,15 @@ export async function closeListing(id: string): Promise<void> {
   if (error) throw error;
 }
 
+// Reabrir tambem limpa a validade -- senao uma vaga expirada voltaria
+// "aberta" no banco mas continuaria escondida em todo lugar que checa
+// isListingOpen, sem nenhuma pista visivel do porque.
 export async function reopenListing(id: string): Promise<void> {
   const supabase = createClient();
-  const { error } = await supabase.from("marketplace_listings").update({ status: "aberta", closed_at: null }).eq("id", id);
+  const { error } = await supabase
+    .from("marketplace_listings")
+    .update({ status: "aberta", closed_at: null, expires_at: null })
+    .eq("id", id);
   if (error) throw error;
 }
 
@@ -169,6 +190,7 @@ export interface MyApplication {
   status: ApplicationStatus;
   matchScore: number | null;
   message: string | null;
+  decisionNote: string | null;
   createdAt: string;
   updatedAt: string;
   listing: Listing;
@@ -178,7 +200,9 @@ export async function fetchMyApplications(): Promise<MyApplication[]> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("marketplace_applications")
-    .select(`id, listing_id, status, match_score, message, created_at, updated_at, marketplace_listings(${LISTING_SELECT})`)
+    .select(
+      `id, listing_id, status, match_score, message, decision_note, created_at, updated_at, marketplace_listings(${LISTING_SELECT})`
+    )
     .order("created_at", { ascending: false });
   if (error) throw error;
   return (data ?? []).map((row: Record<string, unknown>) => ({
@@ -187,6 +211,7 @@ export async function fetchMyApplications(): Promise<MyApplication[]> {
     status: row.status as ApplicationStatus,
     matchScore: (row.match_score as number) ?? null,
     message: (row.message as string) ?? null,
+    decisionNote: (row.decision_note as string) ?? null,
     createdAt: row.created_at as string,
     updatedAt: row.updated_at as string,
     listing: mapListing(row.marketplace_listings as Record<string, unknown>),
@@ -220,11 +245,12 @@ const MARKETPLACE_ERROS: Record<string, string> = {
   SEM_PERMISSAO: "Você não tem permissão para decidir essa candidatura.",
 };
 
-export async function decideApplication(applicationId: string, decision: "aceita" | "recusada"): Promise<void> {
+export async function decideApplication(applicationId: string, decision: "aceita" | "recusada", reason?: string): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.rpc("marketplace_decide_application", {
     p_application_id: applicationId,
     p_decision: decision,
+    p_reason: reason ?? null,
   });
   if (error) throw new Error(MARKETPLACE_ERROS[error.message] ?? error.message);
 }
