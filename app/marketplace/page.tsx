@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Users2, ChevronRight, Loader2, Star, SlidersHorizontal, Clock } from "lucide-react";
+import { Plus, Users2, ChevronRight, Loader2, Star, SlidersHorizontal, Clock, BellRing } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -14,6 +14,8 @@ import {
   fetchMatchScore,
   fetchMyFavoriteIds,
   toggleFavorite,
+  fetchLookingForTeam,
+  setLookingForTeam,
   isListingOpen,
   type Listing,
   type ListingFormat,
@@ -52,6 +54,8 @@ export default function MarketplacePage() {
   const [minhasVagas, setMinhasVagas] = useState<Listing[]>([]);
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
   const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS);
+  const [procurando, setProcurando] = useState<boolean | null>(null);
+  const [salvandoProcurando, setSalvandoProcurando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
   const podeGerenciar = myTeam?.role === "admin" || myTeam?.role === "coach";
@@ -60,15 +64,17 @@ export default function MarketplacePage() {
     let alive = true;
     (async () => {
       try {
-        const [open, team, favs] = await Promise.all([
+        const [open, team, favs, lookingForTeam] = await Promise.all([
           fetchOpenListings(),
           fetchMyTeam().catch(() => null),
           fetchMyFavoriteIds().catch(() => new Set<string>()),
+          fetchLookingForTeam().catch(() => false),
         ]);
         if (!alive) return;
         setListings(open);
         setMyTeam(team);
         setFavoritos(favs);
+        setProcurando(lookingForTeam);
         if (team && (team.role === "admin" || team.role === "coach")) {
           fetchMyTeamListings(team.team.id).then((l) => alive && setMinhasVagas(l));
         }
@@ -124,6 +130,20 @@ export default function MarketplacePage() {
   const filtrosAtivos =
     filtros.formats.length + (filtros.buyInMax ? 1 : 0) + (filtros.stakingMin ? 1 : 0) + (filtros.somenteFavoritos ? 1 : 0);
 
+  async function onToggleProcurando() {
+    if (procurando === null) return;
+    const novo = !procurando;
+    setSalvandoProcurando(true);
+    setProcurando(novo);
+    try {
+      await setLookingForTeam(novo);
+    } catch {
+      setProcurando(!novo);
+    } finally {
+      setSalvandoProcurando(false);
+    }
+  }
+
   const encerrandoEmBreve = useMemo(
     () => outrasVagas.filter((l) => { const d = diasParaExpirar(l.expiresAt); return d !== null && d <= 3; }),
     [outrasVagas]
@@ -153,6 +173,37 @@ export default function MarketplacePage() {
               </Link>
             )}
           </div>
+
+          {!myTeam && procurando !== null && (
+            <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-hairline bg-elevated p-4">
+              <div className="flex items-start gap-3">
+                <BellRing size={18} className={`mt-0.5 shrink-0 ${procurando ? "text-evolution" : "text-muted"}`} />
+                <div>
+                  <p className="text-sm font-semibold text-ink">Procurando time?</p>
+                  <p className="text-xs text-muted">
+                    Ativado, você recebe notificação só quando surgir uma vaga nova com bom match com o seu perfil —
+                    sem isso, ninguém te avisa automaticamente.
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                role="switch"
+                aria-checked={procurando}
+                onClick={onToggleProcurando}
+                disabled={salvandoProcurando}
+                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
+                  procurando ? "bg-evolution" : "bg-hairline"
+                }`}
+              >
+                <span
+                  className={`absolute top-0.5 size-5 rounded-full bg-white transition-transform ${
+                    procurando ? "translate-x-[22px]" : "translate-x-0.5"
+                  }`}
+                />
+              </button>
+            </div>
+          )}
 
           {podeGerenciar && minhasVagas.length > 0 && (
             <section>
