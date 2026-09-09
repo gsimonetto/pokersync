@@ -116,8 +116,13 @@ export function HeroStrip({ items }: { items: HeroStripItem[] }) {
               )}
             </div>
             <div className="mt-1.5 flex items-end justify-between gap-2">
-              <p className={`text-2xl font-bold leading-none tracking-tight tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</p>
-              {it.trend && it.trend.length >= 2 && <Sparkline points={it.trend} tone={it.tone} />}
+              <p className={`min-w-0 truncate text-2xl font-bold leading-none tracking-tight tabular-nums ${it.value ? cor : "text-muted/30"}`}>{it.value ?? "—"}</p>
+              {/* So' cabe a partir de sm: 2 colunas no mobile deixam ~127px
+                  pro valor + sparkline juntos -- um valor de 5-6 digitos
+                  em text-2xl bold ja' come quase tudo, e o sparkline
+                  (overflow-visible de proposito, pro pulso do ultimo ponto
+                  nao cortar) vazava pra fora do card (bug reportado). */}
+              {it.trend && it.trend.length >= 2 && <Sparkline points={it.trend} tone={it.tone} className="hidden sm:block" />}
             </div>
             {it.bar && it.value && <ReferenceBar bar={it.bar} tone={it.tone} className="mt-2.5" />}
             <AnimatePresence>
@@ -509,7 +514,7 @@ function StatCard({
 // preenchida com gradiente + traço animado (desenha ao entrar em tela) e
 // um ponto pulsando no último valor, pra chamar mais atenção que uma
 // polyline estática.
-export function Sparkline({ points, tone }: { points: number[]; tone?: Tone }) {
+export function Sparkline({ points, tone, className }: { points: number[]; tone?: Tone; className?: string }) {
   const w = 56;
   const h = 20;
   const gradientId = useId();
@@ -527,7 +532,13 @@ export function Sparkline({ points, tone }: { points: number[]; tone?: Tone }) {
   const stroke = tone ? TONE_STROKE[tone] : "currentColor";
 
   return (
-    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="shrink-0 overflow-visible text-muted/60" aria-hidden="true">
+    <svg
+      width={w}
+      height={h}
+      viewBox={`0 0 ${w} ${h}`}
+      className={`shrink-0 overflow-visible text-muted/60 ${className ?? ""}`}
+      aria-hidden="true"
+    >
       <defs>
         <linearGradient id={gradientId} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0%" stopColor={stroke} stopOpacity={0.35} />
