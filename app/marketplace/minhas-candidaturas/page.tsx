@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Loader2, ChevronRight } from "lucide-react";
+import { Loader2, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { fetchMyApplications, FORMAT_LABEL, APPLICATION_STATUS_LABEL, type MyApplication } from "@/lib/services/marketplace-service";
@@ -26,26 +26,18 @@ export default function MinhasCandidaturasPage() {
 
   return (
     <AppShell>
-      <main className="w-full px-4 py-6 md:px-6 md:py-10">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6">
-          <div className="flex items-center gap-3">
-            <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500">
-              <Briefcase size={22} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-ink">Minhas candidaturas</h1>
-              <p className="text-sm text-muted">Acompanhe o status das vagas em que você se candidatou.</p>
-            </div>
-          </div>
+      <main className="w-full px-6 py-10 text-ink">
+        {erro && (
+          <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
+        )}
 
-          {erro && <p className="rounded-xl border border-negative/30 bg-negative/10 p-4 text-sm text-negative">{erro}</p>}
-
+        <div className="mx-auto max-w-2xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
           {apps === null ? (
-            <div className="flex items-center justify-center rounded-xl border border-hairline bg-surface p-10">
+            <div className="flex items-center justify-center rounded-lg border border-hairline bg-elevated p-10">
               <Loader2 size={18} className="animate-spin text-muted" />
             </div>
           ) : apps.length === 0 ? (
-            <div className="rounded-xl border border-hairline bg-surface p-6 text-center text-sm text-muted">
+            <div className="rounded-lg border border-hairline bg-elevated p-6 text-center text-sm text-muted">
               Você ainda não se candidatou a nenhuma vaga.{" "}
               <Link href="/marketplace" className="font-semibold text-ink underline-offset-2 hover:underline">
                 Ver vagas abertas
@@ -57,7 +49,7 @@ export default function MinhasCandidaturasPage() {
                 <Link
                   key={a.id}
                   href={`/marketplace/${a.listingId}`}
-                  className="flex items-center gap-4 rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-white/15"
+                  className="flex items-center gap-4 rounded-lg border border-hairline bg-elevated p-4 transition-colors hover:border-white/15"
                 >
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-2">

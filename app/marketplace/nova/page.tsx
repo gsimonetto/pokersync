@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Briefcase, Loader2 } from "lucide-react";
+import { Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
 import { createListing, type ListingFormat } from "@/lib/services/marketplace-service";
@@ -74,8 +74,8 @@ export default function NovaVagaPage() {
   if (!podeCriar) {
     return (
       <AppShell>
-        <main className="w-full px-4 py-10 md:px-6">
-          <div className="mx-auto max-w-lg rounded-xl border border-hairline bg-surface p-6 text-center">
+        <main className="w-full px-6 py-10">
+          <div className="mx-auto max-w-lg rounded-2xl border border-hairline bg-surface p-6 text-center">
             <p className="text-sm text-muted">
               Só administradores ou coaches de um time podem publicar vagas no Marketplace.
             </p>
@@ -87,19 +87,13 @@ export default function NovaVagaPage() {
 
   return (
     <AppShell>
-      <main className="w-full px-4 py-6 md:px-6 md:py-10">
-        <div className="mx-auto flex max-w-lg flex-col gap-6">
-          <div className="flex items-center gap-3">
-            <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500">
-              <Briefcase size={22} />
-            </div>
-            <div>
-              <h1 className="text-xl font-bold text-ink">Nova vaga</h1>
-              <p className="text-sm text-muted">Publicada em nome de {team.team.name}.</p>
-            </div>
-          </div>
+      <main className="w-full px-6 py-10 text-ink">
+        <div className="mx-auto max-w-lg rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
+          <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/70">
+            Publicada em nome de {team.team.name}
+          </p>
 
-          <form onSubmit={onSubmit} className="flex flex-col gap-4 rounded-xl border border-hairline bg-surface p-5">
+          <form onSubmit={onSubmit} className="flex flex-col gap-4">
             <Field label="Título">
               <input
                 required
