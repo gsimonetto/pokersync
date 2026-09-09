@@ -27,6 +27,7 @@ export default function NovaVagaPage() {
   const [minRoiPct, setMinRoiPct] = useState("");
   const [minVolume, setMinVolume] = useState("");
   const [minScore, setMinScore] = useState("");
+  const [validadeDias, setValidadeDias] = useState("");
 
   useEffect(() => {
     fetchMyTeam()
@@ -43,6 +44,8 @@ export default function NovaVagaPage() {
     setErro(null);
     try {
       const num = (v: string) => (v.trim() === "" ? null : Number(v));
+      const dias = num(validadeDias);
+      const expiresAt = dias ? new Date(Date.now() + dias * 86_400_000).toISOString() : null;
       const id = await createListing(team.team.id, {
         title,
         description: description || undefined,
@@ -53,6 +56,7 @@ export default function NovaVagaPage() {
         minRoiPct: num(minRoiPct),
         minVolumeSessionsMonth: num(minVolume),
         minScoreGeral: num(minScore),
+        expiresAt,
       });
       router.push(`/marketplace/${id}`);
     } catch (e) {
@@ -133,9 +137,21 @@ export default function NovaVagaPage() {
               </Field>
             </div>
 
-            <Field label="% de Staking oferecido">
-              <input type="number" min="0" max="100" value={stakingPct} onChange={(e) => setStakingPct(e.target.value)} className="input" />
-            </Field>
+            <div className="grid grid-cols-2 gap-4">
+              <Field label="% de Staking oferecido">
+                <input type="number" min="0" max="100" value={stakingPct} onChange={(e) => setStakingPct(e.target.value)} className="input" />
+              </Field>
+              <Field label="Vaga expira em (dias, opcional)">
+                <input
+                  type="number"
+                  min="1"
+                  value={validadeDias}
+                  onChange={(e) => setValidadeDias(e.target.value)}
+                  placeholder="Sem prazo"
+                  className="input"
+                />
+              </Field>
+            </div>
 
             <p className="mt-1 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/70">
               Requisitos mínimos (usados no match score do jogador)

@@ -59,6 +59,9 @@ export default function MinhasCandidaturasPage() {
                       </Chip>
                     </div>
                     <p className="mt-0.5 truncate text-xs text-muted">{a.listing.teamName}</p>
+                    {a.status === "recusada" && a.decisionNote && (
+                      <p className="mt-1 text-xs italic text-muted">&ldquo;{a.decisionNote}&rdquo;</p>
+                    )}
                   </div>
                   {a.matchScore !== null && (
                     <div className="shrink-0 text-right">

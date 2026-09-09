@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Users2, ChevronRight, Loader2, Star, SlidersHorizontal } from "lucide-react";
+import { Plus, Users2, ChevronRight, Loader2, Star, SlidersHorizontal, Clock } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -14,10 +14,18 @@ import {
   fetchMatchScore,
   fetchMyFavoriteIds,
   toggleFavorite,
+  isListingOpen,
   type Listing,
   type ListingFormat,
   FORMAT_LABEL,
 } from "@/lib/services/marketplace-service";
+
+const UM_DIA_MS = 86_400_000;
+
+function diasParaExpirar(expiresAt: string | null): number | null {
+  if (!expiresAt) return null;
+  return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / UM_DIA_MS);
+}
 
 const FORMATS: ListingFormat[] = ["MTT", "Cash", "SNG", "Spin"];
 
@@ -116,6 +124,11 @@ export default function MarketplacePage() {
   const filtrosAtivos =
     filtros.formats.length + (filtros.buyInMax ? 1 : 0) + (filtros.stakingMin ? 1 : 0) + (filtros.somenteFavoritos ? 1 : 0);
 
+  const encerrandoEmBreve = useMemo(
+    () => outrasVagas.filter((l) => { const d = diasParaExpirar(l.expiresAt); return d !== null && d <= 3; }),
+    [outrasVagas]
+  );
+
   return (
     <AppShell>
       <main className="w-full px-6 py-10 text-ink">
@@ -152,7 +165,20 @@ export default function MarketplacePage() {
             </section>
           )}
 
-          <section className={podeGerenciar && minhasVagas.length > 0 ? "mt-6" : undefined}>
+          {encerrandoEmBreve.length > 0 && (
+            <section className={podeGerenciar && minhasVagas.length > 0 ? "mt-6" : undefined}>
+              <h2 className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-evolution">
+                <Clock size={12} /> Encerrando em breve
+              </h2>
+              <div className="flex flex-col gap-3">
+                {encerrandoEmBreve.map((l) => (
+                  <ListingCard key={l.id} listing={l} matchScore={scores[l.id] ?? null} favorito={favoritos.has(l.id)} onToggleFavorite={() => onToggleFavorite(l.id)} />
+                ))}
+              </div>
+            </section>
+          )}
+
+          <section className={(podeGerenciar && minhasVagas.length > 0) || encerrandoEmBreve.length > 0 ? "mt-6" : undefined}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/70">Vagas abertas</h2>
               <FilterPopover active={filtrosAtivos > 0} label="Filtros" icon={SlidersHorizontal}>
@@ -278,8 +304,8 @@ function ListingCard({
               {FORMAT_LABEL[listing.format]}
             </Chip>
             {showStatus && (
-              <Chip color={listing.status === "aberta" ? "#2FB89A" : "#8A94A3"} size="sm">
-                {listing.status === "aberta" ? "Aberta" : "Fechada"}
+              <Chip color={isListingOpen(listing) ? "#2FB89A" : listing.status === "aberta" ? "#E0B24C" : "#8A94A3"} size="sm">
+                {isListingOpen(listing) ? "Aberta" : listing.status === "aberta" ? "Expirada" : "Fechada"}
               </Chip>
             )}
           </div>
@@ -287,6 +313,11 @@ function ListingCard({
             {listing.teamName}
             {listing.buyInMin !== null && listing.buyInMax !== null && ` · Buy-in R$ ${listing.buyInMin} – R$ ${listing.buyInMax}`}
             {listing.stakingPct !== null && ` · Staking ${listing.stakingPct}%`}
+            {isListingOpen(listing) &&
+              (() => {
+                const dias = diasParaExpirar(listing.expiresAt);
+                return dias !== null ? ` · Encerra em ${dias <= 0 ? "menos de 1 dia" : `${dias}d`}` : "";
+              })()}
           </p>
         </div>
         {matchScore !== null && matchScore !== undefined && (

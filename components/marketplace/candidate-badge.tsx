@@ -39,6 +39,8 @@ export function CandidateBadge({
   const [snap, setSnap] = useState<CandidateSnapshot | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [decidindo, setDecidindo] = useState<"aceita" | "recusada" | null>(null);
+  const [recusando, setRecusando] = useState(false);
+  const [motivo, setMotivo] = useState("");
 
   useEffect(() => {
     let alive = true;
@@ -50,10 +52,10 @@ export function CandidateBadge({
     };
   }, [applicationId]);
 
-  async function decidir(decisao: "aceita" | "recusada") {
+  async function decidir(decisao: "aceita" | "recusada", reason?: string) {
     setDecidindo(decisao);
     try {
-      await decideApplication(applicationId, decisao);
+      await decideApplication(applicationId, decisao, reason);
       onDecided?.(decisao);
     } catch (e) {
       setErro((e as Error)?.message ?? "Não foi possível registrar a decisão.");
@@ -131,14 +133,14 @@ export function CandidateBadge({
         <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-hairline pt-4">
           <SpeedGauge score={snap.matchScore} idealMin={idealMin} size={120} label="Match com a vaga" />
 
-          {podeDecidir && snap.status === "pendente" && (
+          {podeDecidir && snap.status === "pendente" && !recusando && (
             <div className="flex gap-2">
               <button
-                onClick={() => decidir("recusada")}
+                onClick={() => setRecusando(true)}
                 disabled={decidindo !== null}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-muted transition-colors hover:border-negative/40 hover:text-negative disabled:opacity-50"
               >
-                {decidindo === "recusada" ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                <X size={14} />
                 Recusar
               </button>
               <button
@@ -149,6 +151,39 @@ export function CandidateBadge({
                 {decidindo === "aceita" ? <Loader2 size={14} className="animate-spin" /> : <Check size={14} />}
                 Aceitar
               </button>
+            </div>
+          )}
+
+          {podeDecidir && snap.status === "pendente" && recusando && (
+            <div className="flex w-full flex-col gap-2 sm:max-w-xs">
+              <textarea
+                value={motivo}
+                onChange={(e) => setMotivo(e.target.value)}
+                rows={2}
+                placeholder="Motivo da recusa (opcional, vai pro jogador)"
+                className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink"
+                autoFocus
+              />
+              <div className="flex gap-2">
+                <button
+                  onClick={() => {
+                    setRecusando(false);
+                    setMotivo("");
+                  }}
+                  disabled={decidindo !== null}
+                  className="rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-muted transition-colors hover:bg-elevated disabled:opacity-50"
+                >
+                  Cancelar
+                </button>
+                <button
+                  onClick={() => decidir("recusada", motivo || undefined)}
+                  disabled={decidindo !== null}
+                  className="inline-flex flex-1 items-center justify-center gap-1.5 rounded-lg bg-negative px-3 py-2 text-sm font-semibold text-void transition-opacity hover:opacity-90 disabled:opacity-50"
+                >
+                  {decidindo === "recusada" ? <Loader2 size={14} className="animate-spin" /> : <X size={14} />}
+                  Confirmar recusa
+                </button>
+              </div>
             </div>
           )}
 
