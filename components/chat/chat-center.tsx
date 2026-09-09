@@ -4,12 +4,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, MessageCircle, Plus, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar } from "@/components/avatar";
+import { Chip } from "@/components/chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import { MessageBubble, type ChatMessageLike } from "@/components/chat/message-bubble";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import {
+  fetchContactTeamNames,
   fetchMyTeamCached,
   fetchTeamThread,
   fetchTeamThreads,
@@ -54,6 +56,10 @@ interface Contato {
   avatarUrl: string | null;
   relacao: Relacao;
   role?: string;
+  /** Time atual do contato -- null quando ele nao tem time. Sempre
+      mostrado como chip (pedido explicito), inclusive na aba Time (o
+      mesmo time de quem esta vendo, mas reforca visualmente). */
+  teamName: string | null;
   online: boolean;
   lastMessage?: string;
   lastAt?: string;
@@ -85,6 +91,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendThreads, setFriendThreads] = useState<FriendThreadSummary[]>([]);
   const [pedidos, setPedidos] = useState<FriendRequest[]>([]);
+  const [amigoTeamNames, setAmigoTeamNames] = useState<Map<string, string>>(new Map());
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
@@ -138,6 +145,13 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
           .then(setPresenceMap)
           .catch(() => {});
       }
+
+      const idsAmigos = fList.map((f) => f.userId);
+      if (idsAmigos.length) {
+        fetchContactTeamNames(idsAmigos)
+          .then(setAmigoTeamNames)
+          .catch(() => {});
+      }
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -165,6 +179,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
           avatarUrl: m.avatarUrl,
           relacao: "time" as const,
           role: m.role,
+          teamName: team.team.name,
           online: isOnline(presenceMap.get(m.userId) ?? null),
           lastMessage: t?.lastMessage,
           lastAt: t?.lastAt,
@@ -186,6 +201,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
           avatarId: f.avatarId,
           avatarUrl: f.avatarUrl,
           relacao: "amigo" as const,
+          teamName: amigoTeamNames.get(f.userId) ?? null,
           online: isOnline(f.lastSeenAt),
           lastMessage: t?.lastMessage,
           lastAt: t?.lastAt,
@@ -194,7 +210,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
         };
       })
       .sort(ordenarContatos);
-  }, [friends, friendThreads]);
+  }, [friends, friendThreads, amigoTeamNames]);
 
   const filtroEfetivo: Relacao = team ? filtro : "amigo";
   const contatos = filtroEfetivo === "time" ? contatosTime : contatosAmigos;
@@ -416,6 +432,11 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
                           <p className="truncate text-[13px] font-medium text-ink">{c.nome}</p>
                           {c.lastAt && <span className="shrink-0 text-[10px] text-muted">{formatarQuando(c.lastAt)}</span>}
                         </div>
+                        {c.teamName && (
+                          <Chip color="#5AA6E0" size="sm" className="mt-0.5">
+                            {c.teamName}
+                          </Chip>
+                        )}
                         <div className="flex items-center justify-between gap-2">
                           <p className="truncate text-[12px] text-muted">
                             {c.lastMessage ? `${c.lastIsMine ? "Você: " : ""}${c.lastMessage}` : "Sem mensagens ainda"}
@@ -460,7 +481,14 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
-                    <p className="truncate text-sm font-semibold text-ink">{contatoAtivo.nome}</p>
+                    <div className="flex flex-wrap items-center gap-1.5">
+                      <p className="truncate text-sm font-semibold text-ink">{contatoAtivo.nome}</p>
+                      {contatoAtivo.teamName && (
+                        <Chip color="#5AA6E0" size="sm">
+                          {contatoAtivo.teamName}
+                        </Chip>
+                      )}
+                    </div>
                     <p className="text-xs text-muted">
                       {contatoAtivo.online ? "Online" : contatoAtivo.relacao === "time" ? "Time" : "Amigo"}
                     </p>

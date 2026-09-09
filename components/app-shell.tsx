@@ -272,46 +272,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </Link>
         );
       })}
-
-      {/* Chat saiu do topbar (components/top-nav.tsx tinha o mesmo botao)
-          pra virar item do menu lateral, com cor propria (nenhum modulo
-          usa laranja ainda) -- pedido explicito de reorganizacao dos
-          icones do topo. Abre o mesmo ChatCenter de sempre, so' mudou
-          de onde se clica. */}
-      <button
-        type="button"
-        title={collapsed ? "Chat" : undefined}
-        onClick={() => {
-          setMobileOpen(false);
-          toggleMenu("chats");
-        }}
-        onMouseEnter={() => setHoverKey("chat")}
-        onMouseLeave={() => setHoverKey((k) => (k === "chat" ? null : k))}
-        className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium transition-all duration-150 ${
-          collapsed ? "justify-center" : ""
-        } ${openMenu === "chats" || hoverKey === "chat" ? "text-ink" : "text-muted"}`}
-        style={{
-          background: hoverKey === "chat" ? `${CHAT_ACCENT}1A` : openMenu === "chats" ? "rgba(255,255,255,0.06)" : undefined,
-          boxShadow: hoverKey === "chat" ? `0 0 14px ${CHAT_ACCENT}55, 0 0 2px ${CHAT_ACCENT}` : undefined,
-        }}
-      >
-        <span
-          className="absolute inset-y-1.5 left-0 w-[3px] rounded-full transition-opacity"
-          style={{ background: CHAT_ACCENT, opacity: openMenu === "chats" || hoverKey === "chat" ? 1 : 0 }}
-        />
-        <MessageCircle
-          size={18}
-          strokeWidth={1.75}
-          className="shrink-0"
-          style={{ color: openMenu === "chats" || hoverKey === "chat" ? CHAT_ACCENT : undefined }}
-        />
-        {!collapsed && <span className="flex-1 truncate">Chat</span>}
-        {!collapsed && unreadChats > 0 && (
-          <span className="grid min-w-[18px] shrink-0 place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
-            {unreadChats > 9 ? "9+" : unreadChats}
-          </span>
-        )}
-      </button>
     </>
   );
 
@@ -494,6 +454,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
         <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
       </div>
+
+      {/* Chat virou botao flutuante (pedido explicito) em vez de item de
+          menu -- fica disponivel por cima de qualquer modulo, nao so' das
+          telas que tem espaco na sidebar pra ele. Some enquanto o
+          ChatCenter esta aberto (o proprio modal ja cobre a tela). */}
+      {openMenu !== "chats" && (
+        <button
+          type="button"
+          onClick={() => toggleMenu("chats")}
+          aria-label={unreadChats > 0 ? `Abrir chat, ${unreadChats} mensagem${unreadChats === 1 ? "" : "s"} não lida${unreadChats === 1 ? "" : "s"}` : "Abrir chat"}
+          title="Chat"
+          className="fixed bottom-5 right-5 z-40 grid size-14 place-items-center rounded-full shadow-lg shadow-black/50 transition-transform hover:scale-105 print:hidden"
+          style={{ background: CHAT_ACCENT, boxShadow: `0 6px 20px -4px ${CHAT_ACCENT}80` }}
+        >
+          <MessageCircle size={24} strokeWidth={2} className="text-void" />
+          {unreadChats > 0 && (
+            <span className="absolute -right-1 -top-1 grid min-w-[22px] place-items-center rounded-full border-2 border-void bg-evolution px-1 text-[11px] font-bold leading-[19px] text-void">
+              {unreadChats > 9 ? "9+" : unreadChats}
+            </span>
+          )}
+        </button>
+      )}
 
       {openMenu === "chats" && (
         <ChatCenter
