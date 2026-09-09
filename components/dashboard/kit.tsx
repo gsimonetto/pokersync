@@ -45,9 +45,13 @@ export function Painel({
 export function MetricCard({ label, value, sample, tone }: { label: string; value: string | null; sample?: number; tone?: Tone }) {
   const cor = tone ? TONE_TEXT_CLASS[tone] : "text-ink";
   return (
-    <div className="rounded-lg border border-hairline bg-elevated p-3.5">
+    <div className="min-w-0 rounded-lg border border-hairline bg-elevated p-3.5">
       <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">{label}</p>
-      <p className={`mt-1 text-xl font-bold leading-none tabular-nums ${value ? cor : "text-muted/30"}`}>{value ?? "—"}</p>
+      {/* break-words -- sem isso, um valor comprido sem espaço (ex.
+          "-R$ 1.234,56") forca a coluna do grid a crescer pro tamanho do
+          numero inteiro (min-content), estourando a grade no celular em
+          vez de so' quebrar linha. */}
+      <p className={`mt-1 break-words text-xl font-bold leading-none tabular-nums ${value ? cor : "text-muted/30"}`}>{value ?? "—"}</p>
       {sample !== undefined && <p className="mt-1.5 text-[11px] text-muted/70">{sample} {sample === 1 ? "amostra" : "amostras"}</p>}
     </div>
   );
@@ -490,7 +494,7 @@ function StatCard({
   const cor = tone ? TONE_TEXT_CLASS[tone] : "text-ink";
   return (
     <div
-      className="relative rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)]"
+      className="relative min-w-0 rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)]"
       title={hint}
     >
       {category && (
@@ -500,7 +504,9 @@ function StatCard({
         {Icon && <Icon size={11} className="icon-glow shrink-0" />}
         <span>{label}</span>
       </p>
-      <p className={`mt-1.5 text-lg font-bold leading-none tabular-nums ${value ? cor : "text-muted/30"}`}>{value ?? "—"}</p>
+      {/* break-words pelo mesmo motivo do MetricCard -- numero comprido
+          sem espaço nao pode forçar a coluna do grid a crescer. */}
+      <p className={`mt-1.5 break-words text-lg font-bold leading-none tabular-nums ${value ? cor : "text-muted/30"}`}>{value ?? "—"}</p>
       {bar && value && <ReferenceBar bar={bar} tone={tone} className="mt-2" />}
     </div>
   );

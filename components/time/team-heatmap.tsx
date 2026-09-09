@@ -50,9 +50,15 @@ export function TeamHeatmap({ dados }: { dados: FinancialDay[] }) {
         <p className="text-sm text-muted">Sem jogos registrados no período.</p>
       ) : (
         <>
-          <div className="flex justify-center gap-[5px] overflow-x-auto pb-1">
+          {/* justify-start, nao justify-center: centralizar um conteudo
+              mais largo que o container dentro de uma faixa com
+              overflow-x-auto deixa metade cortada dos dois lados sem
+              nenhuma pista visivel de que da' pra rolar -- parecia
+              "quebrado" no celular. Celula menor abaixo de sm pra caber
+              mais semanas sem precisar rolar tanto. */}
+          <div className="flex justify-start gap-[3px] overflow-x-auto pb-1 sm:gap-[5px]">
             {weeks.map((week, wi) => (
-              <div key={wi} className="flex flex-col gap-[5px]">
+              <div key={wi} className="flex flex-col gap-[3px] sm:gap-[5px]">
                 {week.map(({ date, d }) => {
                   const dia = porDia.get(date);
                   const future = d > today;
@@ -62,7 +68,7 @@ export function TeamHeatmap({ dados }: { dados: FinancialDay[] }) {
                       key={date}
                       onMouseEnter={() => !future && setHoverKey(date)}
                       onMouseLeave={() => setHoverKey((k) => (k === date ? null : k))}
-                      className="size-[20px] rounded-[4px] transition-all duration-150 hover:scale-125 hover:z-10"
+                      className="size-[13px] shrink-0 rounded-[3px] transition-all duration-150 hover:scale-125 hover:z-10 sm:size-[20px] sm:rounded-[4px]"
                       style={{
                         background: future ? "transparent" : cor,
                         boxShadow: !future && dia && dia.sessoes > 0 && hoverKey === date ? `0 0 10px 1px ${cor}` : "none",
