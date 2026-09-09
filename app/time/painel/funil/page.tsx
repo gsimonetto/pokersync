@@ -84,6 +84,7 @@ export default function FunilPage() {
             jogadores={jogadores}
             coaches={coaches}
             isAdmin={time.role === "admin"}
+            meuUserId={time.members.find((m) => m.isMe)?.userId ?? null}
             backHref="/time/painel"
             onErro={setErro}
             onAgendarConversa={setAgendarPlayerId}

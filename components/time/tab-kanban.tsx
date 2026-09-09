@@ -2,10 +2,12 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArchiveRestore, ArrowLeft, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, Clock3, GripVertical, ListChecks, Loader2, MessageSquare, Paperclip, Plus, Search, Settings2, SlidersHorizontal, Sparkles, Tag, Trash2, Trophy, UserPlus, X } from "lucide-react";
+import { AlertTriangle, ArchiveRestore, ArrowLeft, BarChart3, CalendarCheck, CalendarPlus, CheckCircle2, CheckSquare, ChevronLeft, ChevronRight, Circle, Clock3, GripVertical, ListChecks, Loader2, MessageSquare, Paperclip, Plus, Search, Settings2, SlidersHorizontal, Sparkles, Tag, Target, Trash2, Trophy, UserPlus, Users, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
+import { MetasCard } from "@/components/time/metas-card";
+import { StatCardGrid } from "@/components/dashboard/kit";
 import { EmojiPickerButton } from "@/components/emoji-picker";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import {
@@ -69,6 +71,7 @@ export function TabKanban({
   jogadores,
   coaches,
   isAdmin,
+  meuUserId,
   backHref,
   onErro,
   onAgendarConversa,
@@ -78,6 +81,10 @@ export function TabKanban({
   coaches: { userId: string; nome: string }[];
   /** So' admin mexe em fases (mesma regra da RLS de team_funnel_phases). */
   isAdmin: boolean;
+  /** Pra saber se quem esta olhando e' o coach responsavel pelo jogador do
+   * card (admin sempre pode; coach so' pode gerenciar meta do proprio
+   * jogador) -- ver podeGerenciarMetas no ModalCard. */
+  meuUserId: string | null;
   /** Sem AppHeader nesta pagina — o voltar mora na propria barra de filtros. */
   backHref?: string;
   onErro: (s: string) => void;
@@ -105,7 +112,7 @@ export function TabKanban({
   const [soMetasConcluidas, setSoMetasConcluidas] = useState(false);
   const [busca, setBusca] = useState("");
 
-  const [modo, setModo] = useState<"board" | "arquivados">("board");
+  const [modo, setModo] = useState<"board" | "visao-geral" | "arquivados">("board");
   const [arquivados, setArquivados] = useState<ArchivedCard[]>([]);
   const [carregandoArquivados, setCarregandoArquivados] = useState(false);
 
@@ -218,6 +225,53 @@ export function TabKanban({
     return m;
   }, [fases, cardsFiltrados]);
 
+  // Visao Geral: numeros do funil inteiro, sem passar pelos filtros do
+  // board (pedido explicito: "ver o geral de TODOS os cards") -- usa
+  // "cards", nao "cardsFiltrados". Tudo calculado em cima do que a tela
+  // ja' carregou (mesmo principio do modulo de Analise: sem RPC nova pra
+  // um numero que da' pra somar no cliente).
+  const DIAS_PARADO = 14;
+  const estatisticas = useMemo(() => {
+    const agora = Date.now();
+    let prontos = 0;
+    let comPendencia = 0;
+    let parados = 0;
+    cards.forEach((c) => {
+      if (progressoPronto(c)) prontos += 1;
+      const chk = checklistPorCard.get(c.cardId);
+      if (chk && chk.total > 0 && chk.done < chk.total) comPendencia += 1;
+      const dias = (agora - new Date(c.movedAt).getTime()) / 86_400_000;
+      if (dias >= DIAS_PARADO) parados += 1;
+    });
+
+    const porFase = fases.map((f) => ({
+      fase: f,
+      total: cardsPorFase.get(f.id)?.length ?? 0,
+    }));
+
+    const porCoach = coaches
+      .map((coach) => {
+        const cardsDoCoach = cards.filter((c) => porNome.get(c.playerId)?.coachId === coach.userId);
+        const pendentesDoCoach = cardsDoCoach.filter((c) => {
+          const chk = checklistPorCard.get(c.cardId);
+          return chk && chk.total > 0 && chk.done < chk.total;
+        }).length;
+        return { coach, total: cardsDoCoach.length, pendentes: pendentesDoCoach };
+      })
+      .filter((c) => c.total > 0)
+      .sort((a, b) => b.total - a.total);
+
+    return {
+      total: cards.length,
+      semCard: jogadoresSemCard.length,
+      prontos,
+      comPendencia,
+      parados,
+      porFase,
+      porCoach,
+    };
+  }, [cards, fases, cardsPorFase, checklistPorCard, coaches, porNome, jogadoresSemCard]);
+
   async function criarFasesPadrao() {
     setCriandoFases(true);
     try {
@@ -267,6 +321,7 @@ export function TabKanban({
           onChange={setModo}
           options={[
             { value: "board", label: "Board" },
+            { value: "visao-geral", label: <><BarChart3 size={13} /> Visão geral</> },
             { value: "arquivados", label: <><ArchiveRestore size={13} /> Arquivados</> },
           ]}
         />
@@ -391,6 +446,8 @@ export function TabKanban({
           fases={fases}
           onErro={onErro}
         />
+      ) : modo === "visao-geral" ? (
+        <PainelEstatisticasFunil estatisticas={estatisticas} diasParado={DIAS_PARADO} />
       ) : (
       /* Board ocupa o resto da altura disponivel (flex-1, min-h-[420px]
          de piso pra viewport curta) em vez de altura fixa -- pedido
@@ -552,6 +609,7 @@ export function TabKanban({
           fases={fases}
           jogador={porNome.get(cardAberto.playerId)}
           labelsDoTime={labelsDoTime}
+          podeGerenciarMetas={isAdmin || (Boolean(meuUserId) && porNome.get(cardAberto.playerId)?.coachId === meuUserId)}
           onFechar={() => setCardAberto(null)}
           onChange={async () => {
             await carregar();
@@ -611,6 +669,7 @@ function ModalCard({
   fases,
   jogador,
   labelsDoTime,
+  podeGerenciarMetas,
   onFechar,
   onChange,
   onErro,
@@ -620,6 +679,11 @@ function ModalCard({
   fases: FunnelPhase[];
   jogador?: TeamDashboardRow;
   labelsDoTime: TeamLabel[];
+  /** Admin do time ou o coach responsavel por esse jogador -- so' quem
+   * pode criar/remover meta aqui (unico lugar do produto que envia
+   * meta/tarefa pro jogador, ver player-detail-body.tsx e
+   * app/time/jogador/[id]/page.tsx, que agora so' leem). */
+  podeGerenciarMetas: boolean;
   onFechar: () => void;
   onChange: () => void;
   onErro: (s: string) => void;
@@ -861,6 +925,15 @@ function ModalCard({
             </Campo>
           </div>
           <p className="-mt-2 text-[11px] text-muted">O valor atual só é mostrado no card — se a meta é subir ou descer esse número é você quem decide.</p>
+
+          {/* Metas com prazo (treinos/mãos por semana ou mês) -- unico lugar
+              do produto que cria/edita isso agora. Antes dava pra criar
+              tambem pela aba Jogadores e pela ficha /time/jogador/[id],
+              espalhando "o que eu mandei pra esse jogador" em 3 lugares
+              diferentes sem controle nenhum -- pedido explicito pra
+              centralizar tudo aqui, onde o card ja' concentra fase, alvos,
+              checklist e anotacao. */}
+          <MetasCard playerId={card.playerId} podeGerenciar={podeGerenciarMetas} />
 
           <Campo label="Anotação de evolução">
             <textarea value={notas} onChange={(e) => setNotas(e.target.value)} rows={3} maxLength={500}
@@ -1320,6 +1393,93 @@ function ModalAdicionar({
 // Arquivados: quem saiu do funil ativo (formado ou removido do time),
 // sem sumir da vista — restaurar manda de volta pra uma fase escolhida.
 // ------------------------------------------------------------
+// Painel "Visão geral" (pedido explicito: "ter um lugar pra ver o geral
+// de todos os cards, painel focado nas estatisticas do funil") -- numeros
+// do funil inteiro (todas as fases, todos os coaches), pra responder "como
+// esta o time" sem abrir card por card. Fica ao lado do Board dentro do
+// mesmo SegmentedControl, nao em pagina separada -- mesmo local onde o
+// coach ja' esta olhando o funil.
+function PainelEstatisticasFunil({
+  estatisticas,
+  diasParado,
+}: {
+  estatisticas: {
+    total: number;
+    semCard: number;
+    prontos: number;
+    comPendencia: number;
+    parados: number;
+    porFase: { fase: FunnelPhase; total: number }[];
+    porCoach: { coach: { userId: string; nome: string }; total: number; pendentes: number }[];
+  };
+  diasParado: number;
+}) {
+  const { total, semCard, prontos, comPendencia, parados, porFase, porCoach } = estatisticas;
+
+  if (total === 0) {
+    return (
+      <section className="rounded-xl border border-hairline bg-surface p-6 text-center">
+        <BarChart3 size={22} className="mx-auto text-muted" />
+        <p className="mt-2 text-sm text-muted">Nenhum jogador no funil ainda — as estatísticas aparecem assim que o primeiro card for criado.</p>
+      </section>
+    );
+  }
+
+  return (
+    <div className="flex-1 space-y-5 overflow-y-auto pb-3">
+      <StatCardGrid
+        items={[
+          { label: "No funil", value: String(total), icon: Users, hint: "Jogadores com card ativo no funil" },
+          { label: "Sem card ainda", value: String(semCard), icon: UserPlus, tone: semCard > 0 ? "abaixo" : undefined, hint: "Jogadores do time que ainda não entraram no funil" },
+          { label: "Com meta batida", value: `${Math.round((prontos / total) * 100)}%`, icon: Target, tone: "bom", hint: `${prontos} de ${total} cards já bateram o alvo de drills/reviews` },
+          { label: "Com tarefa pendente", value: `${Math.round((comPendencia / total) * 100)}%`, icon: CheckSquare, tone: comPendencia > 0 ? "abaixo" : undefined, hint: `${comPendencia} de ${total} cards têm item de checklist em aberto` },
+          { label: `Parados há ${diasParado}+ dias`, value: String(parados), icon: Clock3, tone: parados > 0 ? "abaixo" : undefined, hint: "Cards sem mudar de fase há muito tempo — candidatos a uma conversa" },
+        ]}
+      />
+
+      <section className="rounded-xl border border-hairline bg-surface p-5">
+        <h3 className="mb-3 text-sm font-semibold">Distribuição por fase</h3>
+        <div className="space-y-2.5">
+          {porFase.map(({ fase, total: totalFase }) => {
+            const pct = total > 0 ? Math.round((totalFase / total) * 100) : 0;
+            return (
+              <div key={fase.id}>
+                <div className="mb-1 flex items-center justify-between text-[12.5px]">
+                  <span className="flex items-center gap-1.5">
+                    <span className="h-2 w-2 rounded-full" style={{ backgroundColor: fase.color }} />
+                    {fase.name}
+                  </span>
+                  <span className="tnum text-muted">{totalFase} ({pct}%)</span>
+                </div>
+                <div className="h-1.5 w-full overflow-hidden rounded-full bg-elevated">
+                  <div className="h-full rounded-full transition-all" style={{ width: `${Math.max(2, pct)}%`, backgroundColor: fase.color }} />
+                </div>
+              </div>
+            );
+          })}
+        </div>
+      </section>
+
+      {porCoach.length > 0 && (
+        <section className="rounded-xl border border-hairline bg-surface p-5">
+          <h3 className="mb-3 text-sm font-semibold">Por coach</h3>
+          <ul className="divide-y divide-hairline">
+            {porCoach.map(({ coach, total: totalCoach, pendentes }) => (
+              <li key={coach.userId} className="flex items-center justify-between gap-3 py-2 text-[13px]">
+                <span className="truncate font-medium">{coach.nome}</span>
+                <span className="shrink-0 text-muted">
+                  {totalCoach} jogador{totalCoach === 1 ? "" : "es"}
+                  {pendentes > 0 && <span className="ml-2 text-negative">{pendentes} c/ tarefa pendente</span>}
+                </span>
+              </li>
+            ))}
+          </ul>
+        </section>
+      )}
+    </div>
+  );
+}
+
 function ListaArquivados({
   arquivados,
   carregando,

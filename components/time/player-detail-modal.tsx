@@ -47,13 +47,9 @@ const PERIODOS = [
 // por link direto (notificacao, deep-link do Assistente fora deste contexto).
 export function PlayerDetailModal({
   playerId,
-  meuUserId,
-  meuPapel,
   onFechar,
 }: {
   playerId: string;
-  meuUserId: string | null;
-  meuPapel: string | null;
   onFechar: () => void;
 }) {
   const [dias, setDias] = useState(30);
@@ -168,7 +164,10 @@ export function PlayerDetailModal({
                 staking={staking}
                 historicoScore={historicoScore}
                 evolutionStats={evolutionStats}
-                podeGerenciarMetas={meuPapel === "admin" || (meuPapel === "coach" && p.coachId === meuUserId)}
+                // Metas so' se criam/editam pelo card do jogador no Funil --
+                // aqui (ficha aberta pela aba Jogadores) e' so' leitura. Ver
+                // components/time/tab-kanban.tsx.
+                podeGerenciarMetas={false}
                 hrefMaoCompartilhada={(reviewId) => `/revisor?shared=${reviewId}`}
               />
             )}

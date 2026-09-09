@@ -59,8 +59,6 @@ export function TabJogadores({
   coaches,
   leaks,
   dias,
-  meuUserId,
-  meuPapel,
   onAtribuido,
   onChange,
   onErro,
@@ -74,8 +72,6 @@ export function TabJogadores({
   coaches: { userId: string; nome: string }[];
   leaks: TeamLeak[];
   dias: number;
-  meuUserId?: string | null;
-  meuPapel?: string | null;
   onAtribuido: () => void;
   onChange: () => void;
   onErro: (s: string) => void;
@@ -314,12 +310,7 @@ export function TabJogadores({
       </section>
 
       {fichaAberta && (
-        <PlayerDetailModal
-          playerId={fichaAberta}
-          meuUserId={meuUserId ?? null}
-          meuPapel={meuPapel ?? null}
-          onFechar={() => setFichaAberta(null)}
-        />
+        <PlayerDetailModal playerId={fichaAberta} onFechar={() => setFichaAberta(null)} />
       )}
     </div>
   );

@@ -305,7 +305,6 @@ function PainelConteudo() {
                 <TabJogadores teamId={time.team.id} jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
                   podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
                   leaks={leaks} dias={dias}
-                  meuUserId={time.members.find((m) => m.isMe)?.userId ?? null} meuPapel={time.role}
                   onAtribuido={carregar}
                   onChange={carregar} onErro={setErro} />
               )}
