@@ -109,6 +109,16 @@ export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
       "Biblioteca de time e journal de decisões",
     ],
   },
+  marketplace: {
+    title: "Vagas",
+    blurb: "Times publicam vagas, você se candidata com um clique — e vê como se compara antes de mandar.",
+    benefits: [
+      "Vagas abertas de MTT, Cash, SNG e Spin com requisitos claros",
+      "Match score comparando seu ROI, volume e evolução com a vaga",
+      "Candidatura com mensagem, acompanhamento de status num só lugar",
+      "Time vê o crachá completo do candidato (Player Evolution) antes de decidir",
+    ],
+  },
 };
 
 // Radar PokerSync = o agente desktop (repo proprio gsimonetto/pokersync-agent,

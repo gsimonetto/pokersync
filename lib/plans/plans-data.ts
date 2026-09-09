@@ -8,7 +8,7 @@
 
 export type PlanId = "free" | "individual" | "team" | "team_pro";
 
-export type ModuleKey = "drill" | "bankroll" | "revisor" | "hub" | "time" | "performance" | "ranges";
+export type ModuleKey = "drill" | "bankroll" | "revisor" | "hub" | "time" | "performance" | "ranges" | "marketplace";
 
 // Radar PokerSync nao e' um card em `lib/modules-data.tsx` -- e' vendido
 // como complemento avulso (add-on), por isso fica fora da matriz de
@@ -62,6 +62,7 @@ const TEAM_MODULES: Record<ModuleKey, ModuleAccess> = {
   time: { unlocked: true },
   performance: { unlocked: true },
   ranges: { unlocked: true },
+  marketplace: { unlocked: true },
 };
 
 const INDIVIDUAL_MODULES: Record<ModuleKey, ModuleAccess> = {
@@ -85,6 +86,11 @@ export const PLANS: Record<PlanId, PlanDef> = {
       time: { unlocked: false },
       performance: { unlocked: false },
       ranges: { unlocked: false },
+      // Marketplace fica aberto mesmo no Free -- é o jogador sem time que
+      // mais precisa navegar vagas; publicar vaga já é restrito a quem
+      // tem time (gate de "is_team_manager" fica no service/RPC), não
+      // precisa duplicar essa regra aqui no plano.
+      marketplace: { unlocked: true },
     },
     addons: { radar: false },
   },
@@ -222,6 +228,7 @@ export const MODULE_ROUTES: { prefix: string; module: ModuleKey; exclude?: strin
   // lib/supabase/middleware.ts): o convidado ainda nao tem plano nem
   // sessao resolvida quando abre o link do convite.
   { prefix: "/time", module: "time", exclude: ["/time/convite"] },
+  { prefix: "/marketplace", module: "marketplace" },
 ];
 
 export function resolveModuleForRoute(pathname: string): ModuleKey | null {

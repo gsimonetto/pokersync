@@ -220,6 +220,99 @@ export function HealthGauge({ items }: { items: { value: number | null; min: num
   );
 }
 
+// Velocímetro de score — arco semicircular com ponteiro, zonas coloridas
+// (fraco/na faixa/ideal) e um "palitinho" (tick) marcando onde começa a
+// faixa ideal. Usado no Marketplace de vagas pro match score do
+// candidato: pedido explícito de "marcador de velocidade do carro" em
+// vez do anel circular do HealthGauge — aqui o que importa é comparar o
+// score contra um limiar mínimo, não compor várias métricas num só
+// número.
+export function SpeedGauge({
+  score,
+  idealMin = 70,
+  size = 148,
+  label,
+}: {
+  score: number;
+  /** A partir de qual valor o score é considerado "dentro do ideal" — vira o tick no arco. */
+  idealMin?: number;
+  size?: number;
+  label?: string;
+}) {
+  const clamped = Math.max(0, Math.min(100, Math.round(score)));
+  const cx = size / 2;
+  const cy = size / 2;
+  const r = size / 2 - 14;
+  // Arco de 180° a 360° (semicírculo virado pra cima), em coordenadas SVG padrão.
+  const angleFor = (v: number) => 180 + (v / 100) * 180;
+  const pointOn = (v: number, radius: number) => {
+    const a = (angleFor(v) * Math.PI) / 180;
+    return { x: cx + radius * Math.cos(a), y: cy + radius * Math.sin(a) };
+  };
+
+  const zones: { from: number; to: number; color: string }[] = [
+    { from: 0, to: idealMin, color: "var(--color-negative)" },
+    { from: idealMin, to: 100, color: "var(--color-positive)" },
+  ];
+
+  const needleAngle = angleFor(clamped);
+  const needleLen = r - 6;
+  const needleTip = {
+    x: cx + needleLen * Math.cos((needleAngle * Math.PI) / 180),
+    y: cy + needleLen * Math.sin((needleAngle * Math.PI) / 180),
+  };
+  const tick = pointOn(idealMin, r);
+  const tickInner = pointOn(idealMin, r - 10);
+
+  const dentroDoIdeal = clamped >= idealMin;
+  const cor = dentroDoIdeal ? "text-positive" : "text-negative";
+
+  return (
+    <div className="flex flex-col items-center" style={{ width: size }}>
+      <svg width={size} height={size / 2 + 20} viewBox={`0 0 ${size} ${size / 2 + 20}`}>
+        {zones.map((z, i) => {
+          const p1 = pointOn(z.from, r);
+          const p2 = pointOn(z.to, r);
+          const largeArc = z.to - z.from > 50 ? 1 : 0;
+          return (
+            <path
+              key={i}
+              d={`M ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArc} 1 ${p2.x} ${p2.y}`}
+              fill="none"
+              stroke={z.color}
+              strokeOpacity={0.35}
+              strokeWidth={10}
+              strokeLinecap="round"
+            />
+          );
+        })}
+        {/* Tick marcando o início da faixa ideal — o "palitinho" pedido. */}
+        <line x1={tickInner.x} y1={tickInner.y} x2={tick.x} y2={tick.y} stroke="var(--color-ink)" strokeWidth={2.5} strokeLinecap="round" />
+        <motion.line
+          x1={cx}
+          y1={cy}
+          x2={needleTip.x}
+          y2={needleTip.y}
+          stroke={dentroDoIdeal ? "var(--color-positive)" : "var(--color-negative)"}
+          strokeWidth={3}
+          strokeLinecap="round"
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          transition={{ duration: 0.6, ease: "easeOut" }}
+          style={{ filter: `drop-shadow(0 0 4px ${dentroDoIdeal ? "var(--color-positive)" : "var(--color-negative)"})` }}
+        />
+        <circle cx={cx} cy={cy} r={4.5} fill="var(--color-ink)" />
+      </svg>
+      <div className="-mt-2 flex flex-col items-center">
+        <span className={`text-2xl font-bold leading-none tabular-nums ${cor}`}>{clamped}</span>
+        <span className="mt-1 text-[10px] font-semibold uppercase tracking-wider text-muted/70">
+          {label ?? (dentroDoIdeal ? "Dentro do ideal" : "Fora do ideal")}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // Cabeçalho de subseção dentro de um Painel — separa grupos de métricas
 // relacionadas sem abrir um novo card pra cada grupo (evita a "poluição"
 // de muitos cards pequenos competindo por atenção na mesma tela).
