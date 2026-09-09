@@ -18,7 +18,7 @@ export default function AgentLoginConcluido() {
 
   const valid = Boolean(accessToken && refreshToken && state);
   const deepLink = valid
-    ? `pokersync-agent://auth?${new URLSearchParams({
+    ? `radar-pokersync://auth?${new URLSearchParams({
         access_token: accessToken!,
         refresh_token: refreshToken!,
         state: state!,
@@ -28,7 +28,7 @@ export default function AgentLoginConcluido() {
   useEffect(() => {
     if (!deepLink) return;
     // Tenta abrir o agente sozinho. Se o SO souber tratar o esquema
-    // pokersync-agent://, a aba fica pra trás e o app abre em foco — se
+    // radar-pokersync://, a aba fica pra trás e o app abre em foco — se
     // não souber, isso é inofensivo (o navegador ignora silenciosamente
     // ou mostra o próprio aviso de "link desconhecido").
     window.location.href = deepLink;
@@ -59,7 +59,7 @@ export default function AgentLoginConcluido() {
             <div>
               <h1 className="text-base font-semibold">Link inválido</h1>
               <p className="text-sm text-muted mt-1">
-                Volte pro PokerSync Agent e tente entrar com Google de novo.
+                Volte pro Radar PokerSync e tente entrar com Google de novo.
               </p>
             </div>
           ) : (
@@ -69,7 +69,7 @@ export default function AgentLoginConcluido() {
                 <span className="text-sm font-semibold">Login confirmado</span>
               </div>
               <p className="text-sm text-muted mt-1">
-                {showFallback ? "Voltando pro PokerSync Agent..." : "Abrindo o PokerSync Agent..."}
+                {showFallback ? "Voltando pro Radar PokerSync..." : "Abrindo o Radar PokerSync..."}
               </p>
             </div>
           )}
@@ -78,7 +78,7 @@ export default function AgentLoginConcluido() {
         {valid && showFallback && (
           <div className="border-t border-hairline pt-5 text-left">
             <p className="text-xs text-muted mb-3">
-              Não abriu sozinho? Copie o link abaixo e cole no PokerSync Agent — na tela de login, em{" "}
+              Não abriu sozinho? Copie o link abaixo e cole no Radar PokerSync — na tela de login, em{" "}
               <strong className="text-ink">&quot;Colar link de login&quot;</strong>.
             </p>
             <button

@@ -1,4 +1,4 @@
-// Status real do PokerSync Agent (app desktop) pro jogador conectado —
+// Status real do Radar PokerSync (app desktop) pro jogador conectado —
 // usado pelo card "Importação automática" na Gestão de Banca. Não há
 // canal ao vivo entre o navegador e o agente (são processos separados);
 // o que dá pra mostrar de verdade é o que o próprio agente já grava no

@@ -36,7 +36,7 @@ export default function AgentLoginForm() {
 
   const [isLoading, setIsLoading] = useState(false);
   const [err, setErr] = useState(
-    state ? "" : "Link inválido — abra o login pelo botão \"Entrar com Google\" dentro do PokerSync Agent."
+    state ? "" : "Link inválido — abra o login pelo botão \"Entrar com Google\" dentro do Radar PokerSync."
   );
   // Dispara sozinho assim que a página abre — o jogador já clicou em
   // "Entrar com Google" dentro do agente pra chegar até aqui, então pedir
@@ -81,7 +81,7 @@ export default function AgentLoginForm() {
         <div className="flex flex-col items-center space-y-4 mb-6">
           <Logo className="h-12 w-auto" />
           <div>
-            <h1 className="text-base font-semibold">Entrar no PokerSync Agent</h1>
+            <h1 className="text-base font-semibold">Entrar no Radar PokerSync</h1>
             <p className="text-sm text-muted mt-1">
               {deviceName ? `Autorizando "${deviceName}"` : "Autorizando o agente desktop"} com sua conta PokerSync.
             </p>
@@ -112,7 +112,7 @@ export default function AgentLoginForm() {
         </button>
 
         <p className="text-xs text-muted mt-6">
-          Essa janela fecha sozinha depois do login. Se nada acontecer, volte pro PokerSync Agent.
+          Essa janela fecha sozinha depois do login. Se nada acontecer, volte pro Radar PokerSync.
         </p>
       </div>
     </div>

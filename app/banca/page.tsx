@@ -202,7 +202,7 @@ export default function BankrollPage() {
     };
   }, []);
 
-  // Independente do carregamento principal — status do PokerSync Agent é
+  // Independente do carregamento principal — status do Radar PokerSync é
   // só um complemento informativo, não pode derrubar a tela inteira se a
   // consulta falhar.
   useEffect(() => {
@@ -1337,7 +1337,7 @@ export default function BankrollPage() {
         <Painel
           titulo="Importação automática"
           icone={<Bot size={14} className="icon-glow text-training" />}
-          hint="Mãos e torneios chegam sozinhos aqui pelo PokerSync Agent, rodando no seu computador — sem precisar colar hand history nem clicar em importar."
+          hint="Mãos e torneios chegam sozinhos aqui pelo Radar PokerSync, rodando no seu computador — sem precisar colar hand history nem clicar em importar."
           divisor
           className="flex h-[140px] flex-col"
         >
@@ -1367,7 +1367,7 @@ export default function BankrollPage() {
             <div>
               <p className="text-sm text-ink">Nenhum agente sincronizando ainda.</p>
               <p className="mt-1 text-[11.5px] text-muted">
-                Instale o PokerSync Agent no seu computador pra importar mãos e torneios automaticamente — hoje o
+                Instale o Radar PokerSync no seu computador pra importar mãos e torneios automaticamente — hoje o
                 único jeito de trazer dados pra cá sem ele é colar hand history na mão em{" "}
                 <Link href="/performance" className="text-training hover:underline">
                   Player Evolution → Importar

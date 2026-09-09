@@ -32,7 +32,7 @@ export async function GET(request: Request) {
     if (!error) {
       // Fluxo 2b: esse login começou no agente desktop (ver
       // app/agent-login/page.tsx). Não redireciona direto pro deep link
-      // (pokersync-agent://auth) — registro de esquema customizado
+      // (radar-pokersync://auth) — registro de esquema customizado
       // depende de COMO o instalador rodou em cada SO (varia até entre
       // .deb e AppImage no Linux), e quando falha o navegador só fica
       // "carregando" pra sempre, sem erro nenhum pro usuário ver
