@@ -214,13 +214,19 @@ export async function withdrawApplication(applicationId: string): Promise<void> 
   if (error) throw error;
 }
 
+const MARKETPLACE_ERROS: Record<string, string> = {
+  JOGADOR_JA_TEM_TIME: "Esse jogador já faz parte de outro time — ele precisa sair de lá antes de entrar no seu.",
+  CANDIDATURA_NAO_PENDENTE: "Essa candidatura já foi decidida.",
+  SEM_PERMISSAO: "Você não tem permissão para decidir essa candidatura.",
+};
+
 export async function decideApplication(applicationId: string, decision: "aceita" | "recusada"): Promise<void> {
   const supabase = createClient();
   const { error } = await supabase.rpc("marketplace_decide_application", {
     p_application_id: applicationId,
     p_decision: decision,
   });
-  if (error) throw error;
+  if (error) throw new Error(MARKETPLACE_ERROS[error.message] ?? error.message);
 }
 
 export interface ApplicationSummary {
@@ -277,6 +283,16 @@ export interface CandidateSnapshot {
   status: ApplicationStatus;
   message: string | null;
   appliedAt: string;
+  historicoTimes: TeamHistoryEntry[];
+}
+
+// Uma passagem por outro time — so' papel e duracao, nunca resultado
+// financeiro/performance daquele time (pedido explicito: nada sensivel).
+export interface TeamHistoryEntry {
+  teamName: string;
+  role: string;
+  months: number;
+  endedMonthsAgo: number;
 }
 
 export async function fetchCandidateSnapshot(applicationId: string): Promise<CandidateSnapshot> {
@@ -305,6 +321,65 @@ export async function fetchCandidateSnapshot(applicationId: string): Promise<Can
     status: r.status,
     message: r.message,
     appliedAt: r.applied_at,
+    historicoTimes: ((r.historico_times ?? []) as Record<string, unknown>[]).map((h) => ({
+      teamName: h.teamName as string,
+      role: h.role as string,
+      months: h.months as number,
+      endedMonthsAgo: h.endedMonthsAgo as number,
+    })),
+  };
+}
+
+// ============================================================
+// Favoritos — jogador marca vaga pra comparar depois.
+// ============================================================
+
+export async function fetchMyFavoriteIds(): Promise<Set<string>> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("marketplace_favorites").select("listing_id");
+  if (error) throw error;
+  return new Set((data ?? []).map((r: { listing_id: string }) => r.listing_id));
+}
+
+export async function toggleFavorite(listingId: string, favorito: boolean): Promise<void> {
+  const supabase = createClient();
+  if (favorito) {
+    const userId = await getUserId();
+    const { error } = await supabase.from("marketplace_favorites").insert({ user_id: userId, listing_id: listingId });
+    if (error) throw error;
+  } else {
+    const { error } = await supabase.from("marketplace_favorites").delete().eq("listing_id", listingId);
+    if (error) throw error;
+  }
+}
+
+// ============================================================
+// Estatisticas publicas do time no Marketplace — so' agregados
+// (nenhuma identidade de candidato), ajuda o jogador a avaliar o time
+// antes de se candidatar.
+// ============================================================
+
+export interface TeamMarketplaceStats {
+  totalVagas: number;
+  vagasAbertas: number;
+  totalCandidaturas: number;
+  aceitas: number;
+  taxaAceitePct: number | null;
+  tempoMedioRespostaDias: number | null;
+}
+
+export async function fetchTeamStats(teamId: string): Promise<TeamMarketplaceStats> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("marketplace_team_stats", { p_team_id: teamId });
+  if (error) throw error;
+  const r = Array.isArray(data) ? data[0] : data;
+  return {
+    totalVagas: r?.total_vagas ?? 0,
+    vagasAbertas: r?.vagas_abertas ?? 0,
+    totalCandidaturas: r?.total_candidaturas ?? 0,
+    aceitas: r?.aceitas ?? 0,
+    taxaAceitePct: r?.taxa_aceite_pct ?? null,
+    tempoMedioRespostaDias: r?.tempo_medio_resposta_dias ?? null,
   };
 }
 
