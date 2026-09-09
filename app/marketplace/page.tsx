@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Briefcase, Plus, Users2, ChevronRight, Loader2, Star, SlidersHorizontal } from "lucide-react";
+import { Plus, Users2, ChevronRight, Loader2, Star, SlidersHorizontal } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -118,37 +118,28 @@ export default function MarketplacePage() {
 
   return (
     <AppShell>
-      <main className="w-full px-4 py-6 md:px-6 md:py-10">
-        <div className="mx-auto flex max-w-4xl flex-col gap-6">
-          <div className="flex flex-wrap items-center justify-between gap-3">
-            <div className="flex items-center gap-3">
-              <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500">
-                <Briefcase size={22} />
-              </div>
-              <div>
-                <h1 className="text-xl font-bold text-ink">Marketplace de Vagas</h1>
-                <p className="text-sm text-muted">Times publicam vagas, você se candidata com um clique.</p>
-              </div>
-            </div>
-            <div className="flex gap-2">
-              <Link
-                href="/marketplace/minhas-candidaturas"
-                className="rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-elevated"
-              >
-                Minhas candidaturas
-              </Link>
-              {podeGerenciar && (
-                <Link
-                  href="/marketplace/nova"
-                  className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
-                >
-                  <Plus size={14} /> Nova vaga
-                </Link>
-              )}
-            </div>
-          </div>
+      <main className="w-full px-6 py-10 text-ink">
+        {erro && (
+          <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
+        )}
 
-          {erro && <p className="rounded-xl border border-negative/30 bg-negative/10 p-4 text-sm text-negative">{erro}</p>}
+        <div className="mx-auto max-w-4xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
+          <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
+            <Link
+              href="/marketplace/minhas-candidaturas"
+              className="rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-elevated"
+            >
+              Minhas candidaturas
+            </Link>
+            {podeGerenciar && (
+              <Link
+                href="/marketplace/nova"
+                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
+              >
+                <Plus size={14} /> Nova vaga
+              </Link>
+            )}
+          </div>
 
           {podeGerenciar && minhasVagas.length > 0 && (
             <section>
@@ -161,7 +152,7 @@ export default function MarketplacePage() {
             </section>
           )}
 
-          <section>
+          <section className={podeGerenciar && minhasVagas.length > 0 ? "mt-6" : undefined}>
             <div className="mb-3 flex items-center justify-between gap-2">
               <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/70">Vagas abertas</h2>
               <FilterPopover active={filtrosAtivos > 0} label="Filtros" icon={SlidersHorizontal}>
@@ -222,11 +213,11 @@ export default function MarketplacePage() {
             </div>
 
             {listings === null ? (
-              <div className="flex items-center justify-center rounded-xl border border-hairline bg-surface p-10">
+              <div className="flex items-center justify-center rounded-lg border border-hairline bg-elevated p-10">
                 <Loader2 size={18} className="animate-spin text-muted" />
               </div>
             ) : outrasVagas.length === 0 ? (
-              <p className="rounded-xl border border-hairline bg-surface p-6 text-sm text-muted">
+              <p className="rounded-lg border border-hairline bg-elevated p-6 text-sm text-muted">
                 {filtrosAtivos > 0 ? "Nenhuma vaga corresponde aos filtros." : "Nenhuma vaga aberta no momento. Volte mais tarde."}
               </p>
             ) : (
@@ -263,7 +254,7 @@ function ListingCard({
   onToggleFavorite?: () => void;
 }) {
   return (
-    <div className="flex items-center gap-2 rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-white/15">
+    <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated p-4 transition-colors hover:border-white/15">
       <Link href={`/marketplace/${listing.id}`} className="flex min-w-0 flex-1 items-center gap-4">
         {listing.teamBannerUrl ? (
           // eslint-disable-next-line @next/next/no-img-element
