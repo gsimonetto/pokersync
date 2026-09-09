@@ -174,6 +174,17 @@ const CACHE_TTL_MS = 15_000;
 let myTeamCache: { data: MyTeam | null; ts: number } | null = null;
 const dashboardCache = new Map<number, { data: TeamDashboardRow[]; ts: number }>();
 
+// Nome do time atual de cada usuario, so' pro chip "faz parte do Time X"
+// na Central de Conversas -- RPC decide quem pode ver o que (proprio
+// time, amigo aceito ou o proprio usuario), ver contact_team_names.
+export async function fetchContactTeamNames(userIds: string[]): Promise<Map<string, string>> {
+  if (userIds.length === 0) return new Map();
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("contact_team_names", { p_user_ids: userIds });
+  if (error) throw error;
+  return new Map((data ?? []).map((r: { user_id: string; team_name: string }) => [r.user_id, r.team_name]));
+}
+
 export async function fetchMyTeamCached(): Promise<MyTeam | null> {
   if (myTeamCache && Date.now() - myTeamCache.ts < CACHE_TTL_MS) return myTeamCache.data;
   const data = await fetchMyTeam();
