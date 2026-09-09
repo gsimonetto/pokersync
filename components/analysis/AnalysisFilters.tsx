@@ -1,9 +1,8 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, ChevronDown, Filter, SlidersHorizontal, X } from "lucide-react";
+import { Upload, ChevronDown, SlidersHorizontal, X } from "lucide-react";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { FilterPopover } from "@/components/ui/filter-popover";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import { ManualImportPanel } from "@/components/analysis/ManualImportPanel";
@@ -34,14 +33,16 @@ type ModalityValue = "all" | "mtt" | "cash";
 // (ModalPortal) em vez de um bloco full-width que empurrava o conteudo
 // pra baixo ou um dropdown ancorado no botao.
 //
-// Modalidade (MTT/Cash) e' o filtro secundario (icone Filter, diferente
-// do SlidersHorizontal de "Mais filtros" -- padrao do produto: icone
-// principal x icone secundario nunca repetem o mesmo desenho) -- decide
-// qual "regua" de referencia (PREFLOP_REFERENCE/POSTFLOP_REFERENCE) as
-// outras abas usam (ver computeReferenceProfile). Antes era um
-// SegmentedControl solto na barra, de altura diferente dos dois botoes
-// de icone ao lado (SlidersHorizontal h-7/Importar) -- ali que morava o
-// desalinhamento reportado.
+// O filtro principal da tela e' a propria navegacao (abas Visao Geral/
+// Preflop/Postflop/Torneios/Leak Finder, ver TabNav) -- todo o resto
+// (Modalidade incluida) e' filtro secundario, atras de UM icone so'
+// (SlidersHorizontal), pedido explicito pra nao competir com as abas.
+// Modalidade decide qual "regua" de referencia
+// (PREFLOP_REFERENCE/POSTFLOP_REFERENCE) as outras abas usam (ver
+// computeReferenceProfile) -- por isso mora no topo do modal, antes dos
+// outros 4 grupos, mas dentro do mesmo painel, nao num icone separado
+// (era um SegmentedControl solto na barra antes, de altura diferente
+// dos botoes de icone ao lado -- causa do desalinhamento reportado).
 export function AnalysisFilters({
   filters,
   onChange,
@@ -61,24 +62,20 @@ export function AnalysisFilters({
   const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
-  const activeCount = filters.stackDepths.length + filters.stages.length + filters.positions.length + filters.preflopActions.length;
-
   const modality: ModalityValue = filters.formats.length === 1 ? (filters.formats[0] as ModalityValue) : "all";
+  const activeCount =
+    (modality !== "all" ? 1 : 0) +
+    filters.stackDepths.length +
+    filters.stages.length +
+    filters.positions.length +
+    filters.preflopActions.length;
+
   function handleModalityChange(v: ModalityValue) {
     onChange({ ...filters, formats: v === "all" ? [] : [v] });
   }
 
   return (
     <div className="flex flex-wrap items-center gap-2">
-      <FilterPopover icon={Filter} label="Modalidade" active={modality !== "all"}>
-        <p className="mb-1 text-[10px] font-bold uppercase tracking-wide text-muted/70">Modalidade</p>
-        <div className="flex flex-wrap gap-1.5">
-          <FilterChip label="Todos" active={modality === "all"} onClick={() => handleModalityChange("all")} />
-          <FilterChip label="MTT" active={modality === "mtt"} onClick={() => handleModalityChange("mtt")} />
-          <FilterChip label="Cash" active={modality === "cash"} onClick={() => handleModalityChange("cash")} />
-        </div>
-      </FilterPopover>
-
       <button
         type="button"
         onClick={() => setMoreOpen(true)}
@@ -99,6 +96,12 @@ export function AnalysisFilters({
       {moreOpen && (
         <MoreFiltersModal onClose={() => setMoreOpen(false)}>
           <div className="space-y-3">
+            <FilterGroup label="Modalidade">
+              <FilterChip label="Todos" active={modality === "all"} onClick={() => handleModalityChange("all")} />
+              <FilterChip label="MTT" active={modality === "mtt"} onClick={() => handleModalityChange("mtt")} />
+              <FilterChip label="Cash" active={modality === "cash"} onClick={() => handleModalityChange("cash")} />
+            </FilterGroup>
+
             <FilterGroup label="Profundidade de stack">
               {(Object.keys(STACK_DEPTH_LABEL) as StackDepthBucket[]).map((s) => (
                 <FilterChip
@@ -152,7 +155,7 @@ export function AnalysisFilters({
             {activeCount > 0 && (
               <button
                 type="button"
-                onClick={() => onChange({ ...filters, stackDepths: [], stages: [], positions: [], preflopActions: [] })}
+                onClick={() => onChange({ ...filters, formats: [], stackDepths: [], stages: [], positions: [], preflopActions: [] })}
                 className="text-[11.5px] font-semibold text-muted hover:text-ink"
               >
                 Limpar filtros
