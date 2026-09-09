@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, X, Loader2 } from "lucide-react";
+import Link from "next/link";
+import { Check, X, Loader2, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { SpeedGauge } from "@/components/dashboard/kit";
 import { Chip } from "@/components/chip";
@@ -149,6 +150,19 @@ export function CandidateBadge({
                 Aceitar
               </button>
             </div>
+          )}
+
+          {/* Aceito virou colega de time nesse exato momento (ou ja' era
+              de antes) -- atalho direto pro chat em vez do coach ter que
+              procurar o contato na Central de Conversas depois. */}
+          {snap.status === "aceita" && (
+            <Link
+              href={`/marketplace?chat=${snap.userId}`}
+              className="inline-flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-elevated"
+            >
+              <MessageCircle size={14} />
+              Conversar
+            </Link>
           )}
         </div>
       </div>
