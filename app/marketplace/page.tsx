@@ -132,12 +132,21 @@ function ListingCard({ listing, matchScore, showStatus }: { listing: Listing; ma
       href={`/marketplace/${listing.id}`}
       className="flex items-center gap-4 rounded-xl border border-hairline bg-surface p-4 transition-colors hover:border-white/15"
     >
-      <div
-        className="grid size-11 shrink-0 place-items-center rounded-lg border"
-        style={{ borderColor: `${listing.teamAccent}55`, background: `${listing.teamAccent}1A`, color: listing.teamAccent }}
-      >
-        <Users2 size={18} />
-      </div>
+      {listing.teamBannerUrl ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img
+          src={listing.teamBannerUrl}
+          alt={listing.teamName}
+          className="h-11 w-16 shrink-0 rounded-lg border border-hairline object-cover sm:h-12 sm:w-20"
+        />
+      ) : (
+        <div
+          className="grid size-11 shrink-0 place-items-center rounded-lg border"
+          style={{ borderColor: `${listing.teamAccent}55`, background: `${listing.teamAccent}1A`, color: listing.teamAccent }}
+        >
+          <Users2 size={18} />
+        </div>
+      )}
       <div className="min-w-0 flex-1">
         <div className="flex flex-wrap items-center gap-2">
           <p className="truncate font-semibold text-ink">{listing.title}</p>
