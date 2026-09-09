@@ -520,14 +520,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   const bump = useCallback(() => setRoundSeed((n) => n + 1), []);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
-  // Filtros SEMPRE comecam abertos, desktop ou celular (pedido explicito:
-  // "quando abrir o modo treino ja deve vir aberto o filtro pro jogador
-  // escolher qual sera o treino") -- antes so' o desktop abria assim; no
-  // celular a gaveta comecava fechada. No desktop isso e' so' o painel
-  // lateral (sempre foi assim); no celular vira a gaveta modal (ver
-  // treino-responsive-styles.tsx), fechada so' depois que o jogador
-  // aplica um filtro (ver handleApplyFilters mais abaixo).
-  const [filtersOpen, setFiltersOpen] = useState(!filtersLocked);
+  // Filtros SEMPRE comecam fechados, atras do icone (SlidersHorizontal),
+  // desktop ou celular -- padrao adotado em todo modulo com filtro
+  // (mesmo icone/logica do FilterPopover usado em Banca e no Funil do
+  // Time): o jogador ve o spot atual (heroPos vs villainPos · stackBb,
+  // sempre visivel na barra) e so abre o painel se quiser trocar. Decisao
+  // anterior mantinha aberto por padrao (reveals antigos deste arquivo);
+  // revertida a pedido explicito pra unificar com o resto do produto.
+  const [filtersOpen, setFiltersOpen] = useState(false);
   const isMobile = useIsMobile();
 
   // Free: forca "Qualquer" nas 4 dimensoes uma unica vez, no mount --
