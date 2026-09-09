@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import type { LucideIcon } from "lucide-react";
+import { MobileTabsMenu, type MobileTabItem } from "@/components/ui/mobile-tabs-menu";
 
 // Barra de abas com sublinhado — mesmo padrao do Painel do Time
 // (Perfil do time / Estatisticas / Jogadores / ...): icone + rotulo,
@@ -65,18 +66,37 @@ export function TabNav<T extends string>({
   // do trailing resolve: as abas ficam centralizadas na tela de verdade,
   // igual aos outros modulos que nao tem trailing nenhum.
   if (trailing) {
-    // minmax(0, 1fr) nas duas pontas (em vez de 1fr puro) -- sem isso a
-    // ponta direita (que carrega os controles de verdade) nunca fica do
-    // mesmo tamanho da ponta esquerda (vazia), porque o minimo automatico
-    // de uma faixa "1fr" ainda respeita o conteudo dela. Com minmax(0, 1fr)
-    // as duas faixas dividem o espaço livre em partes iguais de fato,
-    // centralizando as abas na largura real da tela.
+    // No celular o grid de 3 colunas nao cabe (5 abas + icones de filtro +
+    // Importar competindo pela mesma linha estreita = tudo sobreposto,
+    // bug reportado no Player Evolution). Reusa o mesmo padrao ja' usado
+    // em Ranges/Painel do Time pra isso: MobileTabsMenu colapsa as abas
+    // (aba atual + hamburguer que abre a lista) numa linha só, e o
+    // `trailing` (filtros) ganha a linha de baixo pra si, largura cheia --
+    // nunca mais divide espaço com o rotulo das abas.
+    const mobileItems: MobileTabItem[] = options.map((o) =>
+      o.href
+        ? { key: o.value, label: o.label, icon: o.icon, badge: o.badge, href: o.href }
+        : { key: o.value, label: o.label, icon: o.icon, badge: o.badge, onSelect: () => onChange(o.value) }
+    );
     return (
-      <nav className={`relative grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-hairline ${className ?? ""}`}>
-        <div />
-        <div className="flex justify-center gap-1 overflow-x-auto">{tabs}</div>
-        <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 pb-1.5">{trailing}</div>
-      </nav>
+      <div className={className}>
+        <div className="sm:hidden">
+          <MobileTabsMenu title="Abas" items={mobileItems} activeKey={value} />
+          <div className="mt-2 flex flex-wrap items-center gap-2">{trailing}</div>
+        </div>
+
+        {/* minmax(0, 1fr) nas duas pontas (em vez de 1fr puro) -- sem isso a
+            ponta direita (que carrega os controles de verdade) nunca fica do
+            mesmo tamanho da ponta esquerda (vazia), porque o minimo automatico
+            de uma faixa "1fr" ainda respeita o conteudo dela. Com minmax(0, 1fr)
+            as duas faixas dividem o espaço livre em partes iguais de fato,
+            centralizando as abas na largura real da tela. */}
+        <nav className="relative hidden grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-2 border-b border-hairline sm:grid">
+          <div />
+          <div className="flex justify-center gap-1 overflow-x-auto">{tabs}</div>
+          <div className="flex min-w-0 shrink-0 items-center justify-end gap-2 pb-1.5">{trailing}</div>
+        </nav>
+      </div>
     );
   }
 
