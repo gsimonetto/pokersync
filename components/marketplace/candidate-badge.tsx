@@ -209,8 +209,8 @@ function Metric({ label, value, tone }: { label: string; value: string; tone?: "
   const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
   return (
     <div className="flex items-center justify-between gap-3 border-b border-hairline/50 pb-2">
-      <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">{label}</span>
-      <span className={`text-sm font-semibold tabular-nums ${cor}`}>{value}</span>
+      <span className="shrink-0 text-[10px] font-bold uppercase tracking-wider text-muted/60">{label}</span>
+      <span className={`min-w-0 break-words text-right text-sm font-semibold tabular-nums ${cor}`}>{value}</span>
     </div>
   );
 }

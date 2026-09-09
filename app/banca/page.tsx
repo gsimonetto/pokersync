@@ -2252,9 +2252,15 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
 
   return (
     <div className="mt-3 w-full">
-      <div className="flex justify-center gap-[8px] overflow-x-auto pb-1">
+      {/* justify-start, nao justify-center: centralizar um conteudo mais
+          largo que o container dentro de uma faixa com overflow-x-auto
+          deixa metade cortada dos dois lados sem nenhuma pista visivel
+          de que da' pra rolar -- parecia "quebrado" no celular. Celula
+          menor abaixo de sm pra caber mais semanas sem precisar rolar
+          tanto. */}
+      <div className="flex justify-start gap-[4px] overflow-x-auto pb-1 sm:gap-[8px]">
         {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[8px]">
+          <div key={wi} className="flex flex-col gap-[4px] sm:gap-[8px]">
             {week.map(({ date, d }) => {
               const a = activity[date];
               const future = d > today;
@@ -2263,7 +2269,7 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
                   key={date}
                   onMouseEnter={() => !future && setHoverKey(date)}
                   onMouseLeave={() => setHoverKey((k) => (k === date ? null : k))}
-                  className="size-[32px] rounded-[6px] transition-transform duration-100 hover:scale-110"
+                  className="size-[18px] shrink-0 rounded-[4px] transition-transform duration-100 hover:scale-110 sm:size-[32px] sm:rounded-[6px]"
                   style={{ background: future ? "transparent" : cellColor(a) }}
                   title={a ? `${date} · ${a.n} sessão(ões) · ${fmtSigned(a.net)}` : date}
                 />
