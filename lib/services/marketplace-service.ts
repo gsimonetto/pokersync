@@ -409,6 +409,28 @@ export async function fetchTeamStats(teamId: string): Promise<TeamMarketplaceSta
   };
 }
 
+// ============================================================
+// Opt-in do alerta de vaga compativel — sem isso, o gatilho
+// notify_high_match_candidates (banco) nem considera o jogador, mesmo
+// sem time. Fica em profiles.procurando_vaga por ser preferencia do
+// jogador, nao da vaga.
+// ============================================================
+
+export async function fetchLookingForTeam(): Promise<boolean> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { data, error } = await supabase.from("profiles").select("procurando_vaga").eq("id", userId).maybeSingle();
+  if (error) throw error;
+  return data?.procurando_vaga ?? false;
+}
+
+export async function setLookingForTeam(value: boolean): Promise<void> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { error } = await supabase.from("profiles").update({ procurando_vaga: value }).eq("id", userId);
+  if (error) throw error;
+}
+
 export const FORMAT_LABEL: Record<ListingFormat, string> = {
   MTT: "Torneio (MTT)",
   Cash: "Cash Game",
