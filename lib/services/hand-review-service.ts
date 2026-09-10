@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { parseSession, type ParsedHand } from "@/lib/poker/hand-parser";
+import type { ProfileCard } from "@/lib/services/profile-card-type";
 
 const BUCKET = "hand-reviews";
 const MAX_IMAGES = 3;
@@ -678,14 +679,12 @@ export async function fetchTeamCoaches(userId: string): Promise<TeamCoach[]> {
   if (rows.length === 0) return [];
 
   // Sem FK entre team_members e profiles — busca separada em vez de
-  // embed do PostgREST, junta no client.
-  const { data: profileRows, error: profErr } = await supabase
-    .from("profiles")
-    .select("id, nome, apelido")
-    .in(
-      "id",
-      rows.map((r) => r.user_id)
-    );
+  // embed do PostgREST, junta no client. public_profile_cards (RPC) em
+  // vez de .from("profiles") direto -- ver range-service.ts pro motivo
+  // (auditoria de seguranca: tabela so' deixa ler a propria linha agora).
+  const { data: profileRows, error: profErr } = (await supabase.rpc("public_profile_cards", {
+    p_ids: rows.map((r) => r.user_id),
+  })) as { data: ProfileCard[] | null; error: { message: string } | null };
   if (profErr) throw profErr;
 
   return rows.map((r) => {
@@ -765,7 +764,9 @@ export async function fetchShareThreads(reviewId: string): Promise<ShareThread[]
   if (rows.length === 0) return [];
 
   const otherIds = rows.map((r) => (r.shared_by === meId ? r.shared_with : r.shared_by));
-  const { data: profileRows } = await supabase.from("profiles").select("id, nome, apelido").in("id", otherIds);
+  const { data: profileRows } = (await supabase.rpc("public_profile_cards", { p_ids: otherIds })) as {
+    data: ProfileCard[] | null;
+  };
 
   return rows.map((r) => {
     const otherId = r.shared_by === meId ? r.shared_with : r.shared_by;
@@ -815,7 +816,9 @@ export async function fetchShareComments(shareId: string): Promise<ShareComment[
   if (rows.length === 0) return [];
 
   const ids = [...new Set(rows.map((r) => r.author_id))];
-  const { data: profileRows } = await supabase.from("profiles").select("id, nome, apelido").in("id", ids);
+  const { data: profileRows } = (await supabase.rpc("public_profile_cards", { p_ids: ids })) as {
+    data: ProfileCard[] | null;
+  };
 
   return rows.map((r) => {
     const p = (profileRows ?? []).find((row) => row.id === r.author_id);
@@ -914,12 +917,13 @@ export async function fetchReceivedShares(): Promise<ReceivedShare[]> {
   const reviewIds = [...new Set(shares.map((s) => s.review_id))];
   const playerIds = [...new Set(shares.map((s) => s.shared_by))];
 
-  const [{ data: reviews, error: rErr }, { data: profiles, error: pErr }] = await Promise.all([
+  const [{ data: reviews, error: rErr }, { data: profilesRaw, error: pErr }] = await Promise.all([
     supabase.from("hand_reviews").select("id, title, status, hand_session_id").in("id", reviewIds),
-    supabase.from("profiles").select("id, nome, apelido").in("id", playerIds),
+    supabase.rpc("public_profile_cards", { p_ids: playerIds }),
   ]);
   if (rErr) throw rErr;
   if (pErr) throw pErr;
+  const profiles = profilesRaw as ProfileCard[] | null;
 
   const sessionIds = [...new Set((reviews ?? []).map((r) => r.hand_session_id).filter((id): id is string => !!id))];
   const { data: sessions, error: hsErr } =
@@ -992,10 +996,11 @@ export async function fetchRecentCoachComments(limit = 5): Promise<RecentCoachCo
   const reviewIds = [...new Set(comments.map((c) => reviewIdByShare.get(c.share_id)).filter((id): id is string => !!id))];
   const authorIds = [...new Set(comments.map((c) => c.author_id))];
 
-  const [{ data: reviews }, { data: profiles }] = await Promise.all([
+  const [{ data: reviews }, { data: profilesRaw }] = await Promise.all([
     supabase.from("hand_reviews").select("id, title").in("id", reviewIds),
-    supabase.from("profiles").select("id, nome, apelido").in("id", authorIds),
+    supabase.rpc("public_profile_cards", { p_ids: authorIds }),
   ]);
+  const profiles = profilesRaw as ProfileCard[] | null;
 
   return comments.map((c) => {
     const reviewId = reviewIdByShare.get(c.share_id) ?? "";
