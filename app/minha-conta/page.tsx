@@ -2,9 +2,10 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CreditCard, FileText, Loader2, Radar as RadarIcon, Users } from "lucide-react";
+import { CreditCard, Eye, EyeOff, FileText, KeyRound, Loader2, Radar as RadarIcon, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useConfirm } from "@/components/confirm-dialog";
+import { createClient } from "@/lib/supabase/client";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
 import { fetchMyMembership } from "@/lib/services/team-service";
 import { ADDON_PRICES, PLANS, type PlanId } from "@/lib/plans/plans-data";
@@ -45,6 +46,15 @@ export default function MinhaContaPage() {
   const [cancelingTarget, setCancelingTarget] = useState<"plan" | "radar" | null>(null);
   const [msg, setMsg] = useState<string | null>(null);
 
+  // Login com Google nao cria senha nenhuma pro usuario -- sem isso, quem
+  // se cadastrou so' pelo Google fica preso a esse metodo pra sempre,
+  // mesmo a tela de login sempre ter mostrado e-mail/senha e Google juntos
+  // (pedido explicito: nunca travar "ou um ou outro"). `identities` do
+  // Supabase Auth diz quais provedores essa conta ja tem -- "email" so'
+  // aparece depois que alguem chama updateUser({ password }) ou se
+  // cadastrou por e-mail/senha desde o inicio.
+  const [temSenha, setTemSenha] = useState<boolean | null>(null);
+
   useEffect(() => {
     let alive = true;
     Promise.all([fetchMyPlanState(), fetchMyMembership().catch(() => null)])
@@ -58,6 +68,13 @@ export default function MinhaContaPage() {
       .finally(() => {
         if (alive) setLoading(false);
       });
+    createClient()
+      .auth.getUser()
+      .then(({ data }) => {
+        if (!alive) return;
+        setTemSenha((data.user?.identities ?? []).some((i) => i.provider === "email"));
+      })
+      .catch(() => alive && setTemSenha(null));
     return () => {
       alive = false;
     };
@@ -176,6 +193,11 @@ export default function MinhaContaPage() {
             )}
           </div>
 
+          {/* Senha de acesso -- quem entra so' pelo Google pode criar uma
+              senha aqui pra tambem poder entrar digitando e-mail/senha;
+              quem ja tem senha pode trocar. */}
+          {temSenha !== null && <SenhaCard temSenha={temSenha} onDefinida={() => setTemSenha(true)} />}
+
           {/* Radar */}
           <div className="flex items-center justify-between gap-3 rounded-xl border border-hairline bg-surface p-5">
             <div className="flex items-center gap-3">
@@ -254,5 +276,94 @@ export default function MinhaContaPage() {
         </div>
       </main>
     </AppShell>
+  );
+}
+
+function SenhaCard({ temSenha, onDefinida }: { temSenha: boolean; onDefinida: () => void }) {
+  const [senha, setSenha] = useState("");
+  const [confirmar, setConfirmar] = useState("");
+  const [mostrar, setMostrar] = useState(false);
+  const [salvando, setSalvando] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+  const [ok, setOk] = useState(false);
+
+  async function onSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    setErro(null);
+    if (senha.length < 6) return setErro("A senha precisa ter ao menos 6 caracteres.");
+    if (senha !== confirmar) return setErro("As senhas não conferem.");
+    setSalvando(true);
+    try {
+      const { error } = await createClient().auth.updateUser({ password: senha });
+      if (error) throw error;
+      setSenha("");
+      setConfirmar("");
+      setOk(true);
+      onDefinida();
+    } catch (e) {
+      setErro((e as Error)?.message || "Não foi possível salvar a senha.");
+    } finally {
+      setSalvando(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-hairline bg-surface p-5">
+      <div className="flex items-center gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
+          <KeyRound size={18} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-ink">Senha de acesso</p>
+          <p className="text-xs text-muted">
+            {temSenha
+              ? "Você já pode entrar com e-mail e senha, além do Google. Troque sua senha quando quiser."
+              : "Hoje você só entra com o Google. Crie uma senha pra também poder entrar digitando e-mail e senha — os dois continuam funcionando juntos."}
+          </p>
+        </div>
+      </div>
+
+      <form onSubmit={onSubmit} className="mt-4 flex flex-col gap-3 sm:flex-row sm:items-start sm:gap-2">
+        <div className="relative flex-1">
+          <input
+            type={mostrar ? "text" : "password"}
+            required
+            minLength={6}
+            value={senha}
+            onChange={(e) => setSenha(e.target.value)}
+            placeholder={temSenha ? "Nova senha" : "Criar senha"}
+            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 pr-9 text-sm text-ink placeholder-muted/50 outline-none focus:border-white/30"
+          />
+          <button
+            type="button"
+            onClick={() => setMostrar((s) => !s)}
+            aria-label={mostrar ? "Ocultar senha" : "Mostrar senha"}
+            className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted transition-colors hover:text-ink"
+          >
+            {mostrar ? <EyeOff size={15} /> : <Eye size={15} />}
+          </button>
+        </div>
+        <input
+          type={mostrar ? "text" : "password"}
+          required
+          minLength={6}
+          value={confirmar}
+          onChange={(e) => setConfirmar(e.target.value)}
+          placeholder="Confirmar senha"
+          className="flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink placeholder-muted/50 outline-none focus:border-white/30"
+        />
+        <button
+          type="submit"
+          disabled={salvando}
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90 disabled:opacity-50"
+        >
+          {salvando && <Loader2 size={14} className="animate-spin" />}
+          {temSenha ? "Trocar senha" : "Criar senha"}
+        </button>
+      </form>
+
+      {erro && <p className="mt-2 text-sm text-negative">{erro}</p>}
+      {ok && !erro && <p className="mt-2 text-sm text-positive">Senha salva! Já pode entrar com e-mail e senha também.</p>}
+    </div>
   );
 }

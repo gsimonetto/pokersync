@@ -13,6 +13,36 @@ export type ListingFormat = "MTT" | "Cash" | "SNG" | "Spin";
 export type ListingStatus = "aberta" | "fechada";
 export type ApplicationStatus = "pendente" | "aceita" | "recusada" | "retirada";
 
+// Categorização visual do feed (pedido explicito: "faça cards das vagas
+// separadas por MICRO / LOW / MEDIUM / HIGH STAKES / CASH GAME / SPIN").
+// Cash e Spin são categorias pelo próprio formato -- só MTT/SNG usam a
+// faixa de buy-in pra decidir o stake tier, porque são os únicos formatos
+// em que "quanto custa entrar" varia livremente vaga a vaga.
+export type StakeTier = "micro" | "low" | "medium" | "high" | "cash" | "spin";
+
+export const STAKE_TIER_LABEL: Record<StakeTier, string> = {
+  micro: "Micro Stakes",
+  low: "Low Stakes",
+  medium: "Medium Stakes",
+  high: "High Stakes",
+  cash: "Cash Game",
+  spin: "Spin",
+};
+
+// Ordem pedida explicitamente: MICRO / LOW / MEDIUM / HIGH STAKES /
+// CASH GAME / SPIN.
+export const STAKE_TIER_ORDER: StakeTier[] = ["micro", "low", "medium", "high", "cash", "spin"];
+
+export function stakeTierOf(listing: Pick<Listing, "format" | "buyInMin" | "buyInMax">): StakeTier {
+  if (listing.format === "Cash") return "cash";
+  if (listing.format === "Spin") return "spin";
+  const buyIn = listing.buyInMin ?? listing.buyInMax ?? 0;
+  if (buyIn < 10) return "micro";
+  if (buyIn < 50) return "low";
+  if (buyIn < 200) return "medium";
+  return "high";
+}
+
 export interface Listing {
   id: string;
   teamId: string;

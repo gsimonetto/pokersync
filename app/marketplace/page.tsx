@@ -7,6 +7,7 @@ import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { FilterPopover } from "@/components/ui/filter-popover";
+import { MarketplaceTabs } from "@/components/marketplace/marketplace-tabs";
 import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
 import {
   fetchOpenListings,
@@ -17,6 +18,9 @@ import {
   fetchLookingForTeam,
   setLookingForTeam,
   isListingOpen,
+  stakeTierOf,
+  STAKE_TIER_LABEL,
+  STAKE_TIER_ORDER,
   type Listing,
   type ListingFormat,
   FORMAT_LABEL,
@@ -149,6 +153,20 @@ export default function MarketplacePage() {
     [outrasVagas]
   );
 
+  // Feed principal separado por faixa de stakes (pedido explicito) --
+  // MICRO / LOW / MEDIUM / HIGH STAKES vêm do buy-in de MTT/SNG, CASH GAME
+  // e SPIN são o próprio formato (ver stakeTierOf em marketplace-service).
+  const vagasPorTier = useMemo(() => {
+    const grupos = new Map<string, Listing[]>();
+    for (const l of outrasVagas) {
+      const tier = stakeTierOf(l);
+      const atual = grupos.get(tier) ?? [];
+      atual.push(l);
+      grupos.set(tier, atual);
+    }
+    return STAKE_TIER_ORDER.map((tier) => ({ tier, vagas: grupos.get(tier) ?? [] })).filter((g) => g.vagas.length > 0);
+  }, [outrasVagas]);
+
   return (
     <AppShell>
       <main className="w-full px-6 py-10 text-ink">
@@ -156,23 +174,20 @@ export default function MarketplacePage() {
           <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
         )}
 
-        <div className="mx-auto max-w-4xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
-          <div className="mb-6 flex flex-wrap items-center justify-end gap-2">
-            <Link
-              href="/marketplace/minhas-candidaturas"
-              className="rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-elevated"
-            >
-              Minhas candidaturas
-            </Link>
-            {podeGerenciar && (
+        <div className="mx-auto max-w-6xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
+          <MarketplaceTabs active="vagas" podeGerenciar={podeGerenciar} />
+
+          <div className="mt-5">
+          {podeGerenciar && (
+            <div className="mb-6 flex justify-end">
               <Link
                 href="/marketplace/nova"
                 className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
               >
                 <Plus size={14} /> Nova vaga
               </Link>
-            )}
-          </div>
+            </div>
+          )}
 
           {!myTeam && procurando !== null && (
             <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-hairline bg-elevated p-4">
@@ -298,19 +313,29 @@ export default function MarketplacePage() {
                 {filtrosAtivos > 0 ? "Nenhuma vaga corresponde aos filtros." : "Nenhuma vaga aberta no momento. Volte mais tarde."}
               </p>
             ) : (
-              <div className="flex flex-col gap-3">
-                {outrasVagas.map((l) => (
-                  <ListingCard
-                    key={l.id}
-                    listing={l}
-                    matchScore={scores[l.id] ?? null}
-                    favorito={favoritos.has(l.id)}
-                    onToggleFavorite={() => onToggleFavorite(l.id)}
-                  />
+              <div className="flex flex-col gap-6">
+                {vagasPorTier.map(({ tier, vagas }) => (
+                  <div key={tier}>
+                    <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/50">
+                      {STAKE_TIER_LABEL[tier]}
+                    </h3>
+                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
+                      {vagas.map((l) => (
+                        <ListingCard
+                          key={l.id}
+                          listing={l}
+                          matchScore={scores[l.id] ?? null}
+                          favorito={favoritos.has(l.id)}
+                          onToggleFavorite={() => onToggleFavorite(l.id)}
+                        />
+                      ))}
+                    </div>
+                  </div>
                 ))}
               </div>
             )}
           </section>
+          </div>
         </div>
       </main>
     </AppShell>
