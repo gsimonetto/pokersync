@@ -174,7 +174,7 @@ export function TabJogadores({
       {lista.length === 0 ? (
         <p className="mt-6 text-sm text-muted">Nenhum jogador neste recorte.</p>
       ) : (
-        <ul className="mt-4 divide-y divide-hairline">
+        <ul className="mt-4 flex flex-col gap-2.5">
           {lista.map((j, idx) => {
             const d = diasSemAtividade(j.lastActivityAt);
             const inativo = d === null || d >= INATIVO_DIAS;
@@ -182,7 +182,11 @@ export function TabJogadores({
             const score = calcularScore(j);
             const aberto = expandidos.has(j.userId);
             return (
-              <li key={j.userId} className="py-2.5">
+              // Crachá do jogador -- mesmo tratamento visual (card com
+              // borda/fundo elevado) usado no Marketplace pro crachá do
+              // candidato, pra consistência entre as duas listas de
+              // pessoas do produto.
+              <li key={j.userId} className="rounded-lg border border-hairline bg-elevated p-3 transition-colors hover:border-white/15">
                 {/* Grid com colunas fixas compartilhadas por todas as linhas —
                     resolve o desalinhamento do layout anterior (flex por
                     linha fazia cada linha calcular suas proprias larguras).
@@ -271,7 +275,10 @@ export function TabJogadores({
                 </div>
 
                 {aberto && (
-                  <div className="mt-2.5 ml-[26px] rounded-lg border border-hairline bg-elevated px-3.5 py-3 sm:ml-[64px]">
+                  // Sem fundo/borda proprios: o card ja e' bg-elevated
+                  // agora, uma segunda caixa da mesma cor so' empilhava
+                  // contorno sem contraste -- um divisor simples basta.
+                  <div className="mt-2.5 ml-[26px] border-t border-hairline pt-3 sm:ml-[64px]">
                     <div className="grid grid-cols-4 gap-3 sm:max-w-xs">
                       <Metrica label="Treinos" valor={String(j.treinos)} />
                       <Metrica label="GTO" valor={pct === null ? "—" : `${pct}%`} />
