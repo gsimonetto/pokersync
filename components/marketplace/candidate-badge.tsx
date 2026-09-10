@@ -157,7 +157,18 @@ function CandidateDetail({
 
   return (
     <div>
-      {snap.message && <p className="text-sm italic text-muted">&ldquo;{snap.message}&rdquo;</p>}
+      {/* O modal so' tem o nome como titulo (Modal e' generico, nao leva
+          foto) -- a foto do jogador entra aqui, no topo do conteudo,
+          pra manter a identidade visual de "crachá" tambem no detalhe. */}
+      <div className="flex items-center gap-3">
+        <Avatar id={snap.avatarId} url={snap.avatarUrl} shape="square" size={56} />
+        <div className="min-w-0">
+          <p className="truncate text-base font-bold tracking-tight text-ink">{snap.apelido || snap.nome}</p>
+          {snap.apelido && snap.nome !== snap.apelido && <p className="truncate text-sm text-muted">{snap.nome}</p>}
+        </div>
+      </div>
+
+      {snap.message && <p className="mt-3 text-sm italic text-muted">&ldquo;{snap.message}&rdquo;</p>}
 
       {/* Disponibilidade -- vem do que o jogador preencheu em Minha
           Conta. Pro time, isso pesa tanto quanto os números: dado que
