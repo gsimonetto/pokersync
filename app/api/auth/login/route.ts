@@ -38,12 +38,28 @@ export async function POST(request: Request) {
   if (!emailLimit.allowed) return rateLimitResponse(emailLimit.retryAfterSeconds);
 
   const supabase = await createClient();
-  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
     return NextResponse.json(
       { ok: false, error: "Não foi possível entrar. Verifique suas credenciais." },
       { status: 401 }
     );
+  }
+
+  // Prova de consentimento (LGPD art. 8): a caixinha em handleRegister já
+  // barra o cadastro sem aceite, mas o e-mail precisa ser confirmado
+  // antes de existir sessão pra gravar -- por isso o registro fica pra
+  // este primeiro login bem-sucedido, não pro momento do cadastro em si.
+  // Erro aqui (ex.: já registrado pra essa versão -- conflito de chave
+  // primária) é esperado e ignorado de propósito.
+  if (data.user) {
+    await supabase
+      .from("user_consents")
+      .insert({ user_id: data.user.id, terms_version: "2026-09" })
+      .then(
+        () => {},
+        () => {}
+      );
   }
 
   return NextResponse.json({ ok: true });

@@ -147,6 +147,11 @@ export default function LoginForm() {
   const [whatsapp, setWhatsapp] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  // Versão dos Termos/Política em vigor -- muda o valor aqui (e no rodapé
+  // das duas páginas) quando o conteúdo for atualizado de forma
+  // relevante, pra distinguir quem aceitou qual versão em user_consents.
+  const TERMS_VERSION = "2026-09";
+  const [aceitouTermos, setAceitouTermos] = useState(false);
 
   const [err, setErr] = useState(
     expirado
@@ -223,6 +228,7 @@ export default function LoginForm() {
       return setErr("Preencha nome, apelido, WhatsApp, e-mail e senha.");
     }
     if (pass.length < 6) return setErr("A senha precisa ter ao menos 6 caracteres.");
+    if (!aceitouTermos) return setErr("Você precisa aceitar os Termos de Uso e a Política de Privacidade.");
     setIsLoading(true);
     try {
       const supabase = createClient();
@@ -232,6 +238,22 @@ export default function LoginForm() {
         options: { data: { nome: name, apelido: nickname, whatsapp } },
       });
       if (error) throw error;
+
+      // Prova de consentimento (LGPD art. 8) -- grava mesmo sem sessão
+      // persistida (signUp com confirmação de e-mail devolve um
+      // usuário mas às vezes sem cookie de sessão utilizável ainda;
+      // o insert usa o token retornado no próprio data.session quando
+      // existe, senão fica pendente até o primeiro login -- por isso
+      // login-form também tenta de novo no handleLogin abaixo).
+      if (data.user) {
+        await supabase
+          .from("user_consents")
+          .insert({ user_id: data.user.id, terms_version: TERMS_VERSION })
+          .then(
+            () => {},
+            () => {} // sem sessão ainda (confirmação de e-mail pendente) -- ver handleLogin
+          );
+      }
 
       if (data.session) {
         await supabase.auth.signOut();
@@ -391,6 +413,28 @@ export default function LoginForm() {
               }
             />
 
+            {isRegister && (
+              <label className="flex items-start gap-2 text-xs text-muted">
+                <input
+                  type="checkbox"
+                  checked={aceitouTermos}
+                  onChange={(e) => setAceitouTermos(e.target.checked)}
+                  className="mt-0.5 size-3.5 shrink-0 accent-white"
+                />
+                <span>
+                  Li e aceito os{" "}
+                  <a href="/termos" target="_blank" rel="noreferrer" className="text-ink underline hover:no-underline">
+                    Termos de Uso
+                  </a>{" "}
+                  e a{" "}
+                  <a href="/privacidade" target="_blank" rel="noreferrer" className="text-ink underline hover:no-underline">
+                    Política de Privacidade
+                  </a>
+                  .
+                </span>
+              </label>
+            )}
+
             <AnimatePresence mode="wait">
               {err && (
                 <motion.p
@@ -460,6 +504,21 @@ export default function LoginForm() {
                     </>
                   )}
                 </button>
+                {/* Quem nunca teve conta e entra por aqui está criando
+                    uma na hora (Supabase cria sozinho) -- não tem como
+                    mostrar a caixinha de aceite antes de um redirect pra
+                    fora do site, então o aviso fica aqui mesmo. */}
+                <p className="text-center text-[11px] text-muted/70">
+                  Ao continuar com o Google, você concorda com os{" "}
+                  <a href="/termos" target="_blank" rel="noreferrer" className="underline hover:no-underline">
+                    Termos de Uso
+                  </a>{" "}
+                  e a{" "}
+                  <a href="/privacidade" target="_blank" rel="noreferrer" className="underline hover:no-underline">
+                    Política de Privacidade
+                  </a>
+                  .
+                </p>
               </>
             )}
           </motion.form>

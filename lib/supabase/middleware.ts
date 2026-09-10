@@ -22,6 +22,10 @@ const PUBLIC_ROUTES = [
   // Sem isso o middleware redireciona pro /login antes da página carregar
   // e o convidado perde o contexto de qual time/papel está aceitando.
   "/time/convite",
+  // Termos e Política de Privacidade: precisam ser lidos antes (ou sem)
+  // login, inclusive por quem nunca criou conta.
+  "/termos",
+  "/privacidade",
   // API do agente desktop: autentica por header Authorization: Bearer
   // (lib/supabase/agent.ts), não por cookie de sessão do navegador — o
   // agente é um app nativo, não tem cookie nenhum. Sem isso aqui, TODA

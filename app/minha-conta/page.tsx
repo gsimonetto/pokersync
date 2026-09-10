@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CreditCard, Eye, EyeOff, FileText, KeyRound, Loader2, Radar as RadarIcon, Users } from "lucide-react";
+import { CreditCard, Download, Eye, EyeOff, FileText, KeyRound, Loader2, Radar as RadarIcon, ShieldCheck, Trash2, Users } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { useConfirm } from "@/components/confirm-dialog";
 import { createClient } from "@/lib/supabase/client";
@@ -273,9 +273,117 @@ export default function MinhaContaPage() {
               </ul>
             )}
           </div>
+          {/* Privacidade e dados (LGPD) */}
+          <PrivacidadeCard />
         </div>
       </main>
     </AppShell>
+  );
+}
+
+function PrivacidadeCard() {
+  const [exportando, setExportando] = useState(false);
+  const [confirmText, setConfirmText] = useState("");
+  const [excluindo, setExcluindo] = useState(false);
+  const [erro, setErro] = useState<string | null>(null);
+
+  async function baixarDados() {
+    setExportando(true);
+    setErro(null);
+    try {
+      const res = await fetch("/api/account/export");
+      if (!res.ok) throw new Error();
+      const blob = await res.blob();
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = "pokersync-meus-dados.json";
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(url);
+    } catch {
+      setErro("Não foi possível baixar seus dados agora. Tente de novo.");
+    } finally {
+      setExportando(false);
+    }
+  }
+
+  async function excluirConta() {
+    setExcluindo(true);
+    setErro(null);
+    try {
+      const res = await fetch("/api/account/delete", { method: "POST" });
+      const data = await res.json().catch(() => ({}));
+      if (!res.ok || !data.ok) throw new Error(data.error || "");
+      // Conta encerrada: some com o usuário pra fora do app de vez.
+      window.location.href = "/login";
+    } catch (e) {
+      setErro((e as Error)?.message || "Não foi possível excluir sua conta agora. Tente de novo ou fale com o suporte.");
+      setExcluindo(false);
+    }
+  }
+
+  return (
+    <div className="rounded-xl border border-hairline bg-surface p-5">
+      <div className="flex items-center gap-3">
+        <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
+          <ShieldCheck size={18} />
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-ink">Privacidade e dados</p>
+          <p className="text-xs text-muted">
+            Veja a{" "}
+            <Link href="/privacidade" className="text-training hover:underline">
+              Política de Privacidade
+            </Link>{" "}
+            ou exerça seus direitos sobre seus dados diretamente aqui.
+          </p>
+        </div>
+      </div>
+
+      <button
+        onClick={baixarDados}
+        disabled={exportando}
+        className="mt-4 inline-flex items-center gap-2 rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-elevated disabled:opacity-50"
+      >
+        {exportando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
+        Baixar meus dados
+      </button>
+
+      <div className="mt-5 border-t border-hairline pt-4">
+        <p className="flex items-center gap-1.5 text-sm font-semibold text-negative">
+          <Trash2 size={14} /> Excluir minha conta
+        </p>
+        <p className="mt-1 text-xs text-muted">
+          Apaga sua conta e seus dados pessoais do PokerSync (banca, mãos revisadas, treino, XP, times) de forma
+          permanente. Não dá pra desfazer. Conteúdo que você criou como coach/admin de um time não é apagado
+          automaticamente — fale com o suporte se precisar disso também.
+        </p>
+        <p className="mt-3 text-xs text-muted">
+          Digite <strong className="text-ink">EXCLUIR</strong> abaixo para confirmar:
+        </p>
+        <div className="mt-2 flex flex-col gap-2 sm:flex-row">
+          <input
+            type="text"
+            value={confirmText}
+            onChange={(e) => setConfirmText(e.target.value)}
+            placeholder="EXCLUIR"
+            className="w-full max-w-[180px] rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink placeholder-muted/50 outline-none focus:border-negative/50"
+          />
+          <button
+            onClick={excluirConta}
+            disabled={confirmText !== "EXCLUIR" || excluindo}
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-negative px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-negative/90 disabled:opacity-40"
+          >
+            {excluindo && <Loader2 size={14} className="animate-spin" />}
+            Excluir permanentemente
+          </button>
+        </div>
+      </div>
+
+      {erro && <p className="mt-3 text-sm text-negative">{erro}</p>}
+    </div>
   );
 }
 

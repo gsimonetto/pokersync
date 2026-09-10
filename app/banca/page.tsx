@@ -1672,6 +1672,10 @@ export default function BankrollPage() {
               onChange={(e) => setDiaryNote(e.target.value)}
               className="col-span-2 rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm"
             />
+            <p className="col-span-2 text-[11px] text-muted">
+              Evite incluir dados de saúde ou identificar outras pessoas aqui. Você pode editar ou apagar essa
+              anotação a qualquer momento.
+            </p>
           </div>
         )}
 
