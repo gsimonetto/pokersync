@@ -5,6 +5,7 @@
 // lib/services/agent-tournament-sync-service.ts em vez de mãos.
 import { authenticateAgentRequest, AgentAuthError } from "@/lib/supabase/agent";
 import { processAgentTournamentSync, type AgentTournamentSyncInput } from "@/lib/services/agent-tournament-sync-service";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const MAX_FILES_PER_REQUEST = 200;
 const MAX_FILE_SIZE = 1 * 1024 * 1024; // resumo de torneio é bem menor que hand history do dia inteiro
@@ -34,6 +35,9 @@ function isValidInput(body: unknown): body is AgentTournamentSyncInput {
 }
 
 export async function POST(request: Request) {
+  const ipLimit = rateLimit(`agent-sync-tournaments:${clientIp(request)}`, 20, 60_000);
+  if (!ipLimit.allowed) return rateLimitResponse(ipLimit.retryAfterSeconds);
+
   let user;
   let supabase;
   try {
@@ -45,6 +49,9 @@ export async function POST(request: Request) {
     console.error("[agent/sync-tournaments] auth", e);
     return Response.json({ ok: false, error: "Erro interno." }, { status: 500 });
   }
+
+  const userLimit = rateLimit(`agent-sync-tournaments:user:${user.id}`, 20, 60_000);
+  if (!userLimit.allowed) return rateLimitResponse(userLimit.retryAfterSeconds);
 
   let body: unknown;
   try {

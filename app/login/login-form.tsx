@@ -190,19 +190,29 @@ export default function LoginForm() {
     if (!email || !pass) return setErr("Informe e-mail e senha.");
     setIsLoading(true);
     try {
-      const supabase = createClient();
-      const { error } = await supabase.auth.signInWithPassword({ email, password: pass });
-      if (error) throw error;
+      // Passa pelo nosso servidor (não mais supabase.auth.signInWithPassword
+      // direto do navegador) -- é o que permite aplicar um limite real de
+      // tentativas do lado do servidor, ver app/api/auth/login/route.ts.
+      // A rota já grava os cookies de sessão na resposta.
+      const res = await fetch("/api/auth/login", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ email, password: pass }),
+      });
+      const data = await res.json().catch(() => ({ ok: false }));
+      if (!res.ok || !data.ok) {
+        setErr(data.error || "Não foi possível entrar. Verifique suas credenciais.");
+        setIsLoading(false);
+        return;
+      }
       // Hard navigation em vez de router.push: garante que a proxima
       // pagina carregue com os cookies de sessao recem-gravados
       // refletidos de verdade, sem depender de cache/estado do router
       // client-side (era o suspeito da falha "logar de novo" relatada
       // vindo de /login?expirado=1).
       window.location.href = redirectTo;
-    } catch (e) {
-      const message = e instanceof Error ? e.message : "";
-      setErr(message || "Não foi possível entrar. Verifique suas credenciais.");
-    } finally {
+    } catch {
+      setErr("Não foi possível entrar. Tente de novo.");
       setIsLoading(false);
     }
   }

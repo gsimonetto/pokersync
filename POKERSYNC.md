@@ -540,6 +540,22 @@ peça explicitamente toda vez. Isso significa:
   cognitiva aplicada a software de alta performance, não só "porque
   ficou bonito".
 
+### Ao incluir algo novo (segurança e LGPD)
+Toda funcionalidade nova ou mudança que toque autenticação, dados
+pessoais, dados financeiros (banca), hand history, dados de time/coach ou
+qualquer rota em `app/api/*` — mesmo um pedido pontual — ativa as duas
+personas de conformidade do projeto, sem precisar que o dono peça
+explicitamente toda vez:
+- **Segurança** (skill `security-senior`): revisão AppSec —
+  autenticação/autorização, RLS, segredos/chaves, injeção, validação de
+  input, uso do service role do Supabase.
+- **LGPD** (skill `dpo-lgpd-senior`): base legal, minimização, consentimento
+  explícito, direitos do titular (acesso/portabilidade/exclusão),
+  retenção e dados de terceiros (ex.: oponentes citados em hand history).
+
+Isso vale tanto para revisar o que já existe quanto para validar o que
+está sendo adicionado, para manter tudo alinhado ao restante do projeto.
+
 ### Ao atualizar este documento
 Manter os quatro pilares na mesma ordem — visão, decisões, estado real,
 backlog — e registrar toda decisão nova numerada, mesmo (e principalmente)

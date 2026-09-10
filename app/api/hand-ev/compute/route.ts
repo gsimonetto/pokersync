@@ -7,6 +7,7 @@
 import { createClient } from "@/lib/supabase/server";
 import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
+import { rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 // Campos em comum entre /hands/compute_cev (heads-up) e
 // /hands/compute_cev_multiway (3+ jogadores) -- só esses são gravados em
@@ -28,6 +29,12 @@ export async function POST(request: Request) {
     data: { user },
   } = await supabase.auth.getUser();
   if (!user) return Response.json({ ok: false, error: "Sessão expirada." }, { status: 401 });
+
+  // Cada chamada aqui repassa custo de computação pro motor externo
+  // (pokersync-solver) -- limite por usuário evita um clique repetido
+  // (ou um script) martelando o solver.
+  const limit = rateLimit(`hand-ev-compute:${user.id}`, 20, 60_000);
+  if (!limit.allowed) return rateLimitResponse(limit.retryAfterSeconds);
 
   let body: { handReviewId?: string };
   try {
