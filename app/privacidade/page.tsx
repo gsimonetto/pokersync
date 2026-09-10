@@ -9,10 +9,8 @@ export const metadata = { title: "Política de Privacidade — PokerSync" };
 // linguagem simples de propósito -- é o documento que qualquer usuário
 // pode abrir, não só quem entende termos jurídicos.
 //
-// ATENÇÃO ao publicar: os campos entre [colchetes] em "1. Quem trata
-// seus dados" são placeholder -- preencher com a identificação legal
-// real (nome/CPF ou razão social/CNPJ) antes de divulgar este link pra
-// usuários de verdade.
+// Identificação legal preenchida em 2026-09. Os e-mails de contato
+// ainda são placeholder -- ver seções 2 e 6.
 export default function PoliticaDePrivacidadePage() {
   return (
     <main className="min-h-screen bg-void px-4 py-10 text-ink">
@@ -32,7 +30,7 @@ export default function PoliticaDePrivacidadePage() {
         <div className="flex flex-col gap-6 text-sm leading-relaxed text-ink/90">
           <Secao titulo="1. Quem trata seus dados">
             <p>
-              O PokerSync é operado por <strong className="text-ink">[NOME COMPLETO DO RESPONSÁVEL], CPF nº [000.000.000-00]</strong>{" "}
+              O PokerSync é operado por <strong className="text-ink">Gustavo Felipe Siqueira Simonetto, CPF nº 073.536.659-47</strong>{" "}
               (&ldquo;nós&rdquo;), responsável pelo tratamento dos dados pessoais tratados nesta plataforma, nos termos da Lei
               Geral de Proteção de Dados (Lei nº 13.709/2018 — LGPD).
             </p>

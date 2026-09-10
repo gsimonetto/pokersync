@@ -4,8 +4,8 @@ import { Logo } from "@/components/logo";
 
 export const metadata = { title: "Termos de Uso — PokerSync" };
 
-// Mesmo padrão de app/privacidade/page.tsx -- ver o aviso sobre
-// [NOME COMPLETO DO RESPONSÁVEL] lá, vale aqui também.
+// Mesmo padrão visual de app/privacidade/page.tsx. O e-mail de contato
+// na seção 10 ainda é placeholder.
 export default function TermosDeUsoPage() {
   return (
     <main className="min-h-screen bg-void px-4 py-10 text-ink">
