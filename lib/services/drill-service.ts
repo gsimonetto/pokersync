@@ -277,3 +277,63 @@ export async function fetchTrainingAccuracy(): Promise<{ hits: number; total: nu
   if (hitsRes.error) throw hitsRes.error;
   return { hits: hitsRes.count ?? 0, total: totalRes.count ?? 0 };
 }
+
+// ---- Sessao diaria retomavel (filtros + progresso do bloco) -------------
+//
+// register_training (RPC chamada a cada mao, ver xp-service.registerTraining)
+// grava/atualiza uma unica linha em training_session_state por jogador,
+// reiniciando sozinha quando o dia muda. Aqui so' lemos essa linha, pra
+// saber se ha uma sessao de hoje pra retomar quando /treino abre.
+
+export interface RfiJamFilterState {
+  heroPos: string;
+  villainPos: string;
+  stackBb: number;
+  phaseKey: string;
+  heroAny: boolean;
+  villainAny: boolean;
+  stackAny: boolean;
+  phaseAny: boolean;
+}
+
+export interface TrainingSessionState {
+  filters: RfiJamFilterState;
+  handsPlayed: number;
+  hits: number;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function isValidFilterState(f: any): f is RfiJamFilterState {
+  return (
+    f &&
+    typeof f === "object" &&
+    typeof f.heroPos === "string" &&
+    typeof f.villainPos === "string" &&
+    typeof f.stackBb === "number" &&
+    typeof f.phaseKey === "string" &&
+    typeof f.heroAny === "boolean" &&
+    typeof f.villainAny === "boolean" &&
+    typeof f.stackAny === "boolean" &&
+    typeof f.phaseAny === "boolean"
+  );
+}
+
+// Retorna null quando nao ha sessao pra retomar: sem linha ainda, dia
+// diferente de hoje (a propria RPC ja reinicia a linha nesse caso, mas o
+// jogador pode abrir /treino antes de jogar a primeira mao do dia), ou
+// filtros salvos num formato que essa versao do app nao reconhece mais.
+export async function fetchSessionState(): Promise<TrainingSessionState | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase
+    .from("training_session_state")
+    .select("day, filters, hands_played, hits")
+    .maybeSingle();
+  if (error) throw error;
+  if (!data) return null;
+
+  const today = new Date().toISOString().slice(0, 10);
+  if (data.day !== today) return null;
+  if (!isValidFilterState(data.filters)) return null;
+
+  return { filters: data.filters, handsPlayed: data.hands_played ?? 0, hits: data.hits ?? 0 };
+}

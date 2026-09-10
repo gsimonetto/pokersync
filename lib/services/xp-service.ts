@@ -137,12 +137,19 @@ export async function registerTraining({
   evLoss,
   userAction,
   userSizing,
+  filters,
 }: {
   spotId?: string | null;
   verdict: string;
   evLoss: number;
   userAction?: string | null;
   userSizing?: number | null;
+  // Filtros correntes do drill (posicao/stack/situacao) -- a RPC guarda
+  // isso em training_session_state pra /treino conseguir retomar a
+  // sessao de hoje de onde o jogador parou. Sem isso ela so' incrementa
+  // o progresso, sem atualizar os filtros salvos.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  filters?: Record<string, any> | null;
 }) {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("register_training", {
@@ -151,6 +158,7 @@ export async function registerTraining({
     p_ev_loss: Number(evLoss) || 0,
     p_user_action: userAction || null,
     p_user_sizing: userSizing != null ? Number(userSizing) : null,
+    p_filters: filters ?? null,
   });
   if (error) throw error;
   return data?.[0];
