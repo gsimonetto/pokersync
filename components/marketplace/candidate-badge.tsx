@@ -168,13 +168,13 @@ function CandidateDetail({
         </div>
       </div>
 
-      {snap.message && <p className="mt-3 text-sm italic text-muted">&ldquo;{snap.message}&rdquo;</p>}
+      {snap.message && <p className="mt-4 text-sm italic text-muted">&ldquo;{snap.message}&rdquo;</p>}
 
       {/* Disponibilidade -- vem do que o jogador preencheu em Minha
           Conta. Pro time, isso pesa tanto quanto os números: dado que
           bate com a vaga mas incompatível de horário não serve. */}
       {(snap.tempoExperiencia || snap.horarioTreino || (snap.diasTreinoSemana && snap.diasTreinoSemana.length > 0)) && (
-        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-muted">
+        <div className="mt-4 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-muted">
           {snap.tempoExperiencia && (
             <span className="flex items-center gap-1.5">
               <Clock size={12} className="shrink-0 text-muted/70" />
@@ -198,23 +198,23 @@ function CandidateDetail({
         </div>
       )}
 
-      <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
-        <div className="flex flex-col gap-2.5">
+      <div className="mt-6 grid min-w-0 grid-cols-2 gap-x-6 gap-y-5 sm:grid-cols-4">
+        <div className="flex min-w-0 flex-col gap-3">
           <Metric label="Ganhos totais" value={snap.lucroAcumulado !== null ? BRL.format(snap.lucroAcumulado) : "—"} tone={snap.lucroAcumulado === null ? undefined : snap.lucroAcumulado >= 0 ? "bom" : "ruim"} />
           <Metric label="ROI acumulado" value={snap.roiPct !== null ? `${snap.roiPct >= 0 ? "+" : ""}${fmtPct(snap.roiPct)}` : "—"} tone={snap.roiPct === null ? undefined : snap.roiPct >= 0 ? "bom" : "ruim"} />
           <Metric label="Buy-in médio" value={snap.abiTorneio !== null ? BRL.format(snap.abiTorneio) : "—"} />
         </div>
-        <div className="flex flex-col gap-2.5">
+        <div className="flex min-w-0 flex-col gap-3">
           <Metric label="Partidas jogadas" value={String(snap.numSessoes ?? 0)} />
           <Metric label="Torneios / Cash" value={`${snap.numTorneios ?? 0} / ${snap.numCash ?? 0}`} />
           <Metric label="Score de evolução" value={snap.scoreGeral !== null ? String(Math.round(snap.scoreGeral)) : "—"} />
         </div>
-        <div className="flex flex-col gap-2.5">
+        <div className="flex min-w-0 flex-col gap-3">
           <Metric label="Sessões/semana" value={snap.frequenciaSemanalSessoes !== null ? snap.frequenciaSemanalSessoes.toFixed(1) : "—"} />
           <Metric label="Mãos etiquetadas" value={String(snap.hands)} />
           <Metric label="VPIP" value={fmtPct(snap.vpipPct)} />
         </div>
-        <div className="flex flex-col gap-2.5">
+        <div className="flex min-w-0 flex-col gap-3">
           <Metric label="PFR" value={fmtPct(snap.pfrPct)} />
           <Metric label="3-Bet" value={fmtPct(snap.threeBetPct)} />
           <Metric label="Aggression Factor" value={snap.aggressionFactor !== null ? snap.aggressionFactor.toFixed(2) : "—"} />
@@ -222,7 +222,7 @@ function CandidateDetail({
       </div>
 
       {snap.historicoTimes.length > 0 && (
-        <div className="mt-4 border-t border-hairline pt-4">
+        <div className="mt-6 border-t border-hairline pt-5">
           <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Histórico em outros times</p>
           <ul className="flex flex-wrap gap-2">
             {snap.historicoTimes.map((h, i) => (
@@ -242,7 +242,7 @@ function CandidateDetail({
 
       {erro && <p className="mt-3 text-sm text-negative">{erro}</p>}
 
-      <div className="mt-5 flex flex-wrap items-center justify-between gap-4 border-t border-hairline pt-4">
+      <div className="mt-6 flex flex-wrap items-center justify-between gap-4 border-t border-hairline pt-5">
         <SpeedGauge score={snap.matchScore} idealMin={idealMin} size={120} label="Match com a vaga" />
 
         {podeDecidir && snap.status === "pendente" && !recusando && (

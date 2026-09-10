@@ -5,6 +5,8 @@ import Link from "next/link";
 import { Loader2, ChevronRight } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
+import { MarketplaceTabs } from "@/components/marketplace/marketplace-tabs";
+import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
 import { fetchMyApplications, FORMAT_LABEL, APPLICATION_STATUS_LABEL, type MyApplication } from "@/lib/services/marketplace-service";
 
 const STATUS_COLOR: Record<MyApplication["status"], string> = {
@@ -16,12 +18,18 @@ const STATUS_COLOR: Record<MyApplication["status"], string> = {
 
 export default function MinhasCandidaturasPage() {
   const [apps, setApps] = useState<MyApplication[] | null>(null);
+  const [myTeam, setMyTeam] = useState<MyTeam | null>(null);
   const [erro, setErro] = useState<string | null>(null);
+
+  const podeGerenciar = myTeam?.role === "admin" || myTeam?.role === "coach";
 
   useEffect(() => {
     fetchMyApplications()
       .then(setApps)
       .catch((e) => setErro(e?.message ?? "Não foi possível carregar suas candidaturas."));
+    fetchMyTeam()
+      .then(setMyTeam)
+      .catch(() => setMyTeam(null));
   }, []);
 
   return (
@@ -31,7 +39,10 @@ export default function MinhasCandidaturasPage() {
           <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
         )}
 
-        <div className="mx-auto max-w-2xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
+        <div className="mx-auto max-w-6xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
+          <MarketplaceTabs active="candidaturas" podeGerenciar={podeGerenciar} />
+
+          <div className="mt-5">
           {apps === null ? (
             <div className="flex items-center justify-center rounded-lg border border-hairline bg-elevated p-10">
               <Loader2 size={18} className="animate-spin text-muted" />
@@ -44,7 +55,7 @@ export default function MinhasCandidaturasPage() {
               </Link>
             </div>
           ) : (
-            <div className="flex flex-col gap-3">
+            <div className="mx-auto flex max-w-2xl flex-col gap-3">
               {apps.map((a) => (
                 <Link
                   key={a.id}
@@ -77,6 +88,7 @@ export default function MinhasCandidaturasPage() {
               ))}
             </div>
           )}
+          </div>
         </div>
       </main>
     </AppShell>

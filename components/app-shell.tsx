@@ -3,13 +3,11 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, CreditCard, Crown, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, X } from "lucide-react";
+import { Bell, CircleHelp, CreditCard, Crown, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, Settings, Trophy, X } from "lucide-react";
 import { Logo } from "@/components/logo";
-import { Avatar } from "@/components/avatar";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { HelpMenu } from "@/components/help-menu";
 import { ProfileMenu } from "@/components/profile-menu";
-import { RankChip } from "@/components/ui/rank-chip";
 import { ChatCenter } from "@/components/chat/chat-center";
 import { PlanLockModal } from "@/components/plan-lock-modal";
 import { createClient } from "@/lib/supabase/client";
@@ -81,7 +79,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   const [pendingChatId, setPendingChatId] = useState<string | null>(null);
 
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [level, setLevel] = useState<number | null>(null);
   const [unread, setUnread] = useState(0);
   const [unreadChats, setUnreadChats] = useState(0);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
@@ -115,15 +112,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   useEffect(() => {
     let alive = true;
     (async () => {
-      let supabase: ReturnType<typeof createClient>;
       try {
-        supabase = createClient();
+        createClient();
       } catch {
         return;
       }
-      const [profileRes, progressRes, unreadRes, unreadChatsRes, planRes, membershipRes] = await Promise.allSettled([
+      const [profileRes, unreadRes, unreadChatsRes, planRes, membershipRes] = await Promise.allSettled([
         fetchProfile(),
-        supabase.from("user_progress").select("level").maybeSingle(),
         fetchUnreadCount(),
         fetchAllChatUnread(),
         fetchMyPlanState(),
@@ -131,7 +126,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       ]);
       if (!alive) return;
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
-      if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
       if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
       if (unreadChatsRes.status === "fulfilled") setUnreadChats(unreadChatsRes.value);
       if (planRes.status === "fulfilled") {
@@ -199,7 +193,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
 
   const nav = (
     <>
-      {modules.map((m) => {
+      {/* "hub" virou icone no topo (junto com Home/Notificacoes/Plano) e
+          "radar" passou pra dentro do Player Evolution -- nenhum dos dois
+          precisa mais de entrada propria no menu lateral. Continuam
+          existindo em modules-data.tsx porque outras telas (ex.: pagina
+          de planos) reaproveitam o icone/copy de "hub" de la. */}
+      {modules
+        .filter((m) => m.key !== "hub" && m.key !== "radar")
+        .map((m) => {
         const Icon = m.icon;
         const active = pathname === m.href;
         // Hover usa a cor do proprio modulo (m.accent) com o mesmo
@@ -275,8 +276,33 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     </>
   );
 
+  // Ajuda, Configurações (o antigo botão de perfil/avatar, que saiu do
+  // topo -- ver header abaixo) e Sair moram juntos no rodapé do menu
+  // lateral, pedido explícito. Os três abrem modais centralizados (não
+  // dropdown ancorado), então funcionam normalmente mesmo vindo do
+  // rodapé em vez do topo.
   const footer = (
     <>
+      <button
+        onClick={() => toggleMenu("help")}
+        title={collapsed ? "Ajuda" : undefined}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.06] hover:text-ink ${
+          collapsed ? "justify-center" : ""
+        }`}
+      >
+        <CircleHelp size={18} strokeWidth={1.75} className="shrink-0" />
+        {!collapsed && "Ajuda"}
+      </button>
+      <button
+        onClick={() => toggleMenu("profile")}
+        title={collapsed ? "Configurações" : undefined}
+        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.06] hover:text-ink ${
+          collapsed ? "justify-center" : ""
+        }`}
+      >
+        <Settings size={18} strokeWidth={1.75} className="shrink-0" />
+        {!collapsed && "Configurações"}
+      </button>
       <button
         onClick={handleLogout}
         title={collapsed ? "Sair" : undefined}
@@ -373,6 +399,40 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             >
               <Home className="size-[18px]" />
             </Link>
+            <Link
+              href="/hub"
+              className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
+                pathname === "/hub" ? "text-ink" : "text-muted"
+              }`}
+              aria-label="Hub de Evolução"
+              title="Hub de Evolução"
+            >
+              <Trophy className="size-[18px]" />
+            </Link>
+            <div className="relative">
+              <button
+                onClick={() => toggleMenu("notifications")}
+                className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
+                aria-label="Notificações"
+              >
+                <Bell className="size-[18px]" />
+                {unread > 0 && (
+                  <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
+                    {unread > 9 ? "9+" : unread}
+                  </span>
+                )}
+              </button>
+              {openMenu === "notifications" && (
+                <NotificationsMenu
+                  onClose={() => {
+                    setOpenMenu(null);
+                    fetchUnreadCount()
+                      .then(setUnread)
+                      .catch(() => {});
+                  }}
+                />
+              )}
+            </div>
             {/* Coroa (upsell) so' pra quem e' Free -- quem ja paga algo
                 (ou usa acesso de time) ve "Meu Plano" no lugar, pra
                 gerenciar em vez de ser empurrado pra comprar de novo. */}
@@ -399,53 +459,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <CreditCard className="size-[18px]" />
               </Link>
             )}
-            <div className="relative">
-              <button
-                onClick={() => toggleMenu("notifications")}
-                className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
-                aria-label="Notificações"
-              >
-                <Bell className="size-[18px]" />
-                {unread > 0 && (
-                  <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
-                    {unread > 9 ? "9+" : unread}
-                  </span>
-                )}
-              </button>
-              {openMenu === "notifications" && (
-                <NotificationsMenu
-                  onClose={() => {
-                    setOpenMenu(null);
-                    fetchUnreadCount()
-                      .then(setUnread)
-                      .catch(() => {});
-                  }}
-                />
-              )}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => toggleMenu("help")}
-                className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
-                aria-label="Ajuda"
-              >
-                <CircleHelp className="size-[18px]" />
-              </button>
-              {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
-            </div>
-            <div className="relative">
-              <button
-                onClick={() => toggleMenu("profile")}
-                aria-label="Perfil"
-                className="ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-elevated py-1 pl-1 pr-3 transition-colors hover:border-white/20"
-              >
-                <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={28} />
-                {level != null && <RankChip level={level} />}
-              </button>
-              {openMenu === "profile" && profile && (
-                <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />
-              )}
-            </div>
           </div>
           {/* espaçador simétrico ao botão de hamburguer, só pra manter os
               ícones centralizados também no mobile */}
@@ -486,6 +499,16 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             fetchAllChatUnread().then(setUnreadChats);
           }}
         />
+      )}
+
+      {/* Ajuda e Configuracoes agora abrem a partir dos botoes no rodape
+          do menu lateral (junto com Sair), entao os modais em si moram
+          aqui soltos na arvore -- ambos sao overlays fullscreen
+          centralizados, nao dropdowns ancorados, entao funcionam igual
+          vindo de qualquer lugar. */}
+      {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
+      {openMenu === "profile" && profile && (
+        <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />
       )}
 
       <PlanLockModal moduleKey={lockedModule} onClose={() => setLockedModule(null)} />

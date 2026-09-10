@@ -4,6 +4,7 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2 } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
+import { MarketplaceTabs } from "@/components/marketplace/marketplace-tabs";
 import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
 import { createListing, type ListingFormat } from "@/lib/services/marketplace-service";
 
@@ -92,7 +93,10 @@ export default function NovaVagaPage() {
   return (
     <AppShell>
       <main className="w-full px-6 py-10 text-ink">
-        <div className="mx-auto max-w-lg rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
+        <div className="mx-auto max-w-6xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
+          <MarketplaceTabs active="nova" podeGerenciar />
+
+          <div className="mx-auto mt-5 max-w-lg">
           <p className="mb-4 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/70">
             Publicada em nome de {team.team.name}
           </p>
@@ -181,6 +185,7 @@ export default function NovaVagaPage() {
               Publicar vaga
             </button>
           </form>
+          </div>
         </div>
       </main>
 

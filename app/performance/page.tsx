@@ -2,13 +2,18 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Target, Flame, BarChart3, MapPin } from "lucide-react";
+import { Target, Flame, BarChart3, MapPin, Radar as RadarIcon, Lock } from "lucide-react";
+import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { TabNav } from "@/components/ui/tab-nav";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
 import { PreflopPanel, PositionPanel } from "@/components/analysis/PreflopMatrix";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { StatisticsTab } from "@/components/analysis/StatisticsTab";
+import { RadarPanel } from "@/components/analysis/RadarPanel";
+import { fetchMyPlanState } from "@/lib/services/plan-service";
+import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
+import { isAddonUnlockedFor } from "@/lib/plans/plans-data";
 import {
   fetchAnalysisHandRows,
   applyAnalysisFilters,
@@ -34,13 +39,14 @@ import {
   type BuyinBucket,
 } from "@/types/analysis";
 
-type TabKey = "preflop" | "postflop" | "estatisticas" | "posicao";
+type TabKey = "preflop" | "postflop" | "estatisticas" | "posicao" | "radar";
 
 const TABS: { value: TabKey; label: string; icon: typeof Target }[] = [
   { value: "preflop", label: "Preflop", icon: Target },
   { value: "postflop", label: "Postflop", icon: Flame },
   { value: "estatisticas", label: "Estatísticas", icon: BarChart3 },
   { value: "posicao", label: "Por posição", icon: MapPin },
+  { value: "radar", label: "Radar", icon: RadarIcon },
 ];
 
 export default function PerformancePage() {
@@ -59,6 +65,19 @@ export default function PerformancePage() {
   // associado, ver comentário em fetchTournamentMetrics), por isso vive
   // separado do `filters` de cima (que filtra mãos preflop/postflop).
   const [tournamentBuyinFilter, setTournamentBuyinFilter] = useState<BuyinBucket[]>([]);
+  // Radar PokerSync e' addon, nao vem liberado por padrao em nenhum plano
+  // -- a aba existe pra todo mundo (pedido: "radar pokersync deve ficar
+  // dentro do player evolution"), mas o conteudo so' aparece pra quem tem
+  // o addon (mesma logica de lib/plans/plans-data.ts usada em app-shell.tsx).
+  const [radarUnlocked, setRadarUnlocked] = useState<boolean | null>(null);
+
+  useEffect(() => {
+    Promise.all([fetchMyPlanState(), fetchHasActiveTeamAccess()])
+      .then(([{ plan, radarAddon }, hasTeamAccess]) => {
+        setRadarUnlocked(isAddonUnlockedFor(plan, "radar", radarAddon, hasTeamAccess));
+      })
+      .catch(() => setRadarUnlocked(false));
+  }, []);
 
   async function loadAll() {
     setErro("");
@@ -174,7 +193,7 @@ export default function PerformancePage() {
             />
 
             <div className="mt-4">
-              {rows.length === 0 ? (
+              {rows.length === 0 && tab !== "radar" ? (
                 <p className="rounded-xl border border-dashed border-hairline p-6 text-center text-sm text-muted">
                   Sem mãos com hand history estruturada ainda. Importe acima ou aguarde a sincronização do agente desktop —
                   as métricas aparecem aqui automaticamente assim que houver dado.
@@ -206,6 +225,27 @@ export default function PerformancePage() {
                         availableBuyinBuckets={availableBuyinBuckets}
                       />
                     )}
+                    {tab === "radar" &&
+                      (radarUnlocked ? (
+                        <RadarPanel />
+                      ) : (
+                        <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-xl border border-dashed border-hairline p-8 text-center">
+                          <div className="grid size-12 place-items-center rounded-xl border border-hairline bg-elevated text-muted">
+                            <Lock size={20} />
+                          </div>
+                          <p className="text-sm font-semibold text-ink">Radar PokerSync é um complemento avulso</p>
+                          <p className="text-xs text-muted">
+                            Sincronize suas mãos automaticamente direto do seu computador, sem colar hand history na
+                            mão.
+                          </p>
+                          <Link
+                            href="/planos"
+                            className="mt-1 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
+                          >
+                            Ver planos e complementos
+                          </Link>
+                        </div>
+                      ))}
                   </motion.div>
                 </AnimatePresence>
               )}

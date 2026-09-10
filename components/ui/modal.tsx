@@ -33,7 +33,7 @@ export function Modal({
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
       <div
-        className={`relative w-full animate-[modalIn_.16s_ease-out] rounded-xl border border-hairline bg-surface p-5 shadow-2xl ${wide ? "max-w-xl" : "max-w-lg"}`}
+        className={`relative w-full animate-[modalIn_.16s_ease-out] overflow-x-hidden rounded-xl border border-hairline bg-surface p-5 shadow-2xl sm:p-6 ${wide ? "max-w-2xl" : "max-w-lg"}`}
       >
         <div className="flex items-center justify-between">
           <h2 className="text-lg font-semibold text-ink">{title}</h2>
@@ -41,7 +41,7 @@ export function Modal({
             <X size={16} />
           </button>
         </div>
-        <div className="mt-4 max-h-[70vh] overflow-y-auto">{children}</div>
+        <div className="mt-5 max-h-[80vh] overflow-y-auto overflow-x-hidden pr-0.5">{children}</div>
       </div>
       <style jsx global>{`
         @keyframes modalIn {
