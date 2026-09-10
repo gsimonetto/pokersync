@@ -306,6 +306,12 @@ export interface CandidateSnapshot {
   vpipPct: number | null;
   pfrPct: number | null;
   threeBetPct: number | null;
+  aggressionFactor: number | null;
+  cbetFlopPct: number | null;
+  /** Preenchidos em Minha Conta -- ver TempoExperiencia/HorarioTreino/DiaSemana em profile-service.ts. */
+  tempoExperiencia: string | null;
+  horarioTreino: string | null;
+  diasTreinoSemana: string[] | null;
   status: ApplicationStatus;
   message: string | null;
   appliedAt: string;
@@ -344,6 +350,11 @@ export async function fetchCandidateSnapshot(applicationId: string): Promise<Can
     vpipPct: r.vpip_pct,
     pfrPct: r.pfr_pct,
     threeBetPct: r.three_bet_pct,
+    aggressionFactor: r.aggression_factor,
+    cbetFlopPct: r.cbet_flop_pct,
+    tempoExperiencia: r.tempo_experiencia,
+    horarioTreino: r.horario_treino,
+    diasTreinoSemana: r.dias_treino_semana,
     status: r.status,
     message: r.message,
     appliedAt: r.applied_at,

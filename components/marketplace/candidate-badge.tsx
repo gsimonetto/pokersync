@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Check, X, Loader2, MessageCircle } from "lucide-react";
+import { Check, X, Loader2, MessageCircle, Clock, CalendarDays } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { SpeedGauge } from "@/components/dashboard/kit";
 import { Chip } from "@/components/chip";
@@ -12,6 +12,14 @@ import {
   APPLICATION_STATUS_LABEL,
   type CandidateSnapshot,
 } from "@/lib/services/marketplace-service";
+import {
+  TEMPO_EXPERIENCIA_LABEL,
+  HORARIO_TREINO_LABEL,
+  DIA_SEMANA_LABEL,
+  type TempoExperiencia,
+  type HorarioTreino,
+  type DiaSemana,
+} from "@/lib/services/profile-service";
 
 function fmtPct(v: number | null): string {
   return v === null ? "—" : `${v >= 0 ? "" : ""}${v}%`;
@@ -93,7 +101,35 @@ export function CandidateBadge({
 
         {snap.message && <p className="mt-2 text-sm italic text-muted">&ldquo;{snap.message}&rdquo;</p>}
 
-        <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-4 sm:grid-cols-3">
+        {/* Disponibilidade -- vem do que o jogador preencheu em Minha
+            Conta. Pro time, isso pesa tanto quanto os números: dado
+            que bate com a vaga mas incompatível de horário não serve. */}
+        {(snap.tempoExperiencia || snap.horarioTreino || (snap.diasTreinoSemana && snap.diasTreinoSemana.length > 0)) && (
+          <div className="mt-3 flex flex-wrap gap-x-4 gap-y-1.5 text-[12px] text-muted">
+            {snap.tempoExperiencia && (
+              <span className="flex items-center gap-1.5">
+                <Clock size={12} className="shrink-0 text-muted/70" />
+                {TEMPO_EXPERIENCIA_LABEL[snap.tempoExperiencia as TempoExperiencia] ?? snap.tempoExperiencia} de poker
+              </span>
+            )}
+            {snap.horarioTreino && (
+              <span className="flex items-center gap-1.5">
+                <Clock size={12} className="shrink-0 text-muted/70" />
+                Joga de {HORARIO_TREINO_LABEL[snap.horarioTreino as HorarioTreino] ?? snap.horarioTreino}
+              </span>
+            )}
+            {snap.diasTreinoSemana && snap.diasTreinoSemana.length > 0 && (
+              <span className="flex items-center gap-1.5">
+                <CalendarDays size={12} className="shrink-0 text-muted/70" />
+                {snap.diasTreinoSemana.length === 7
+                  ? "Todos os dias"
+                  : snap.diasTreinoSemana.map((d) => DIA_SEMANA_LABEL[d as DiaSemana] ?? d).join(", ")}
+              </span>
+            )}
+          </div>
+        )}
+
+        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 sm:grid-cols-4">
           <div className="flex flex-col gap-2.5">
             <Metric label="ROI acumulado" value={snap.roiPct !== null ? `${snap.roiPct >= 0 ? "+" : ""}${fmtPct(snap.roiPct)}` : "—"} tone={snap.roiPct === null ? undefined : snap.roiPct >= 0 ? "bom" : "ruim"} />
             <Metric label="Buy-in médio" value={snap.abiTorneio !== null ? `R$ ${snap.abiTorneio.toFixed(0)}` : "—"} />
@@ -108,6 +144,10 @@ export function CandidateBadge({
             <Metric label="VPIP" value={fmtPct(snap.vpipPct)} />
             <Metric label="PFR" value={fmtPct(snap.pfrPct)} />
             <Metric label="3-Bet" value={fmtPct(snap.threeBetPct)} />
+          </div>
+          <div className="flex flex-col gap-2.5">
+            <Metric label="Aggression Factor" value={snap.aggressionFactor !== null ? snap.aggressionFactor.toFixed(2) : "—"} />
+            <Metric label="C-Bet Flop" value={fmtPct(snap.cbetFlopPct)} />
           </div>
         </div>
 

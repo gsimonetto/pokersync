@@ -282,11 +282,18 @@ export function SpeedGauge({
         {zones.map((z, i) => {
           const p1 = pointOn(z.from, r);
           const p2 = pointOn(z.to, r);
-          const largeArc = z.to - z.from > 50 ? 1 : 0;
+          // O gauge inteiro nunca passa de 180° (é sempre um semicírculo),
+          // entao nenhum trecho dele pode ser o "arco grande" (>180°) de
+          // um círculo completo -- o large-arc-flag do SVG é sempre 0
+          // aqui. Antes usava "> 50 pontos" como proxy, uma condição
+          // completamente diferente (50 pontos = 90° do semicírculo) que
+          // fazia o SVG desenhar o arco pelo lado errado do círculo -- os
+          // pedaços coloridos apareciam desconexos, relatado como
+          // "gráfico quebrado".
           return (
             <path
               key={i}
-              d={`M ${p1.x} ${p1.y} A ${r} ${r} 0 ${largeArc} 1 ${p2.x} ${p2.y}`}
+              d={`M ${p1.x} ${p1.y} A ${r} ${r} 0 0 1 ${p2.x} ${p2.y}`}
               fill="none"
               stroke={z.color}
               strokeOpacity={0.35}
