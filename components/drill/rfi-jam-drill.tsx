@@ -8,7 +8,7 @@ import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-sty
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
-import { fetchTrainingAccuracy } from "@/lib/services/drill-service";
+import { fetchTrainingAccuracy, fetchSessionState, type RfiJamFilterState } from "@/lib/services/drill-service";
 import { Chip } from "@/components/chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
@@ -557,6 +557,16 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   const [stats, setStats] = useState({ hits: 0, total: 0 });
   const [detailsOpen, setDetailsOpen] = useState(false);
 
+  // Sessao diaria retomavel: filtros salvos pela ultima mao respondida
+  // hoje (ver training_session_state, lido por fetchSessionState) e
+  // quantas maos/acertos ja entraram nesse bloco antes de reabrir a
+  // tela. `resumeFilters` fica pendente ate' existir pelo menos 1 spot
+  // carregado (senao nao ha o que aplicar) e nenhuma sugestao explicita
+  // (Revisor/Banca) ter vindo de fora -- essa sempre tem prioridade
+  // sobre retomar o bloco de hoje.
+  const [resumeFilters, setResumeFilters] = useState<RfiJamFilterState | null>(null);
+  const [blockProgress, setBlockProgress] = useState<{ hands: number; hits: number } | null>(null);
+
   useEffect(() => {
     let alive = true;
     fetchTrainingAccuracy()
@@ -570,6 +580,41 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       alive = false;
     };
   }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetchSessionState()
+      .then((state) => {
+        if (!alive || !state) return;
+        setBlockProgress({ hands: state.handsPlayed, hits: state.hits });
+        setResumeFilters(state.filters);
+      })
+      .catch(() => {
+        // sem sessao de hoje pra retomar (ou erro de rede) -- treino
+        // comeca normal, do jeito que sempre comecou
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // So' aplica quando ja' existe spot carregado (senao nao ha' o que
+  // sortear com os filtros restaurados) e quando ninguem de fora pediu
+  // um matchup/stack especifico -- ver comentario acima de resumeFilters.
+  useEffect(() => {
+    if (!resumeFilters || spots.length === 0) return;
+    if (initialMatchup != null || initialStackBb != null) return;
+    setHeroPos(resumeFilters.heroPos);
+    setVillainPos(resumeFilters.villainPos);
+    setStackBb(resumeFilters.stackBb);
+    setPhaseKey(resumeFilters.phaseKey as (typeof PHASES)[number]["key"]);
+    setHeroAny(resumeFilters.heroAny);
+    setVillainAny(resumeFilters.villainAny);
+    setStackAny(resumeFilters.stackAny);
+    setPhaseAny(resumeFilters.phaseAny);
+    setResumeFilters(null);
+    bump();
+  }, [resumeFilters, spots, initialMatchup, initialStackBb, bump]);
 
   useEffect(() => {
     listRfiJamSpots()
@@ -796,7 +841,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
   useEffect(() => {
     if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
-    setStats((prev) => ({ hits: prev.hits + (verdict === "OTIMA" ? 1 : 0), total: prev.total + 1 }));
+    const isHit = verdict === "OTIMA";
+    setStats((prev) => ({ hits: prev.hits + (isHit ? 1 : 0), total: prev.total + 1 }));
+    setBlockProgress((prev) => ({ hands: (prev?.hands ?? 0) + 1, hits: (prev?.hits ?? 0) + (isHit ? 1 : 0) }));
     const isGood = verdict === "OTIMA" || verdict === "ACEITAVEL";
     onRoundComplete?.();
     registerTraining({
@@ -804,6 +851,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       verdict: VERDICT_TO_RPC[verdict],
       evLoss: isGood ? 0 : Math.max(0, round.gap),
       userAction: chosen === "fold" ? "FOLD" : chosen === "distractor" ? "OUTRA" : currentPhase?.action ?? null,
+      filters: { heroPos, villainPos, stackBb, phaseKey, heroAny, villainAny, stackAny, phaseAny },
     }).catch(() => {
       // XP e' um bonus, nao pode travar o treino se a rede falhar
     });
@@ -1089,7 +1137,12 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
               <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
                 {heroPos} vs {villainPos} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>· {stackBb}bb</span>
               </span>
-              <div style={{ marginLeft: "auto" }}>
+              <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
+                {blockProgress && (
+                  <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
+                    Hoje: {blockProgress.hands} mãos
+                  </span>
+                )}
                 <Chip color={accuracyChipColor(stats.total, sessionPct)} size="sm">
                   {stats.hits}/{stats.total}
                   {stats.total > 0 ? ` · ${sessionPct}%` : ""}
@@ -1199,6 +1252,11 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
         </span>
 
         <div className="ps-tr-session" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
+          {blockProgress && (
+            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
+              Hoje: {blockProgress.hands} mãos · {blockProgress.hits} ótimas
+            </span>
+          )}
           <Chip color={accuracyChipColor(stats.total, sessionPct)}>
             {stats.hits}/{stats.total} ótimas{stats.total > 0 ? ` · ${sessionPct}%` : ""}
           </Chip>
