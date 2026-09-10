@@ -301,6 +301,8 @@ export interface CandidateSnapshot {
   abiTorneio: number | null;
   numTorneios: number | null;
   numCash: number | null;
+  numSessoes: number | null;
+  lucroAcumulado: number | null;
   frequenciaSemanalSessoes: number | null;
   scoreGeral: number | null;
   vpipPct: number | null;
@@ -345,6 +347,8 @@ export async function fetchCandidateSnapshot(applicationId: string): Promise<Can
     abiTorneio: r.abi_torneio,
     numTorneios: r.num_torneios,
     numCash: r.num_cash,
+    numSessoes: r.num_sessoes,
+    lucroAcumulado: r.lucro_acumulado,
     frequenciaSemanalSessoes: r.frequencia_semanal_sessoes,
     scoreGeral: r.score_geral,
     vpipPct: r.vpip_pct,
