@@ -187,21 +187,24 @@ export function TabJogadores({
               // candidato, pra consistência entre as duas listas de
               // pessoas do produto.
               <li key={j.userId} className="rounded-lg border border-hairline bg-elevated p-3 transition-colors hover:border-white/15">
-                {/* Grid com colunas fixas compartilhadas por todas as linhas —
-                    resolve o desalinhamento do layout anterior (flex por
-                    linha fazia cada linha calcular suas proprias larguras).
-                    So' "Resultado" fica visivel de cara; o resto (treinos,
-                    GTO, revisadas, jogos) entra no detalhe expansivel. */}
-                <div className="grid grid-cols-[16px_auto_1fr_84px_36px_36px_36px] items-center gap-2.5 sm:grid-cols-[20px_auto_1fr_96px_36px_36px_36px] sm:gap-3">
-                  <span className={`text-center text-[13px] font-bold tnum ${
+                {/* Flex com quebra, nao grid de colunas fixas -- o grid
+                    antigo (16/84/36/36/36px fixos + 1fr pro nome) nao
+                    sobrava espaço nenhum pro nome+badges no celular
+                    (badges empilhavam por cima do avatar/resultado em vez
+                    de so' quebrar linha), reportado como lista quebrada.
+                    Com flex-wrap, resultado+ações formam um bloco que
+                    desce pra segunda linha inteiro quando não cabe, em
+                    vez de cada coluna colidir com a vizinha. */}
+                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
+                  <span className={`w-4 shrink-0 text-center text-[13px] font-bold tnum ${
                     ordem !== "nome" ? (idx === 0 ? "text-evolution" : "text-muted") : "invisible"
                   }`}>
                     {ordem !== "nome" ? idx + 1 : "·"}
                   </span>
 
-                  <Avatar id={j.avatarId} url={j.avatarUrl} size={38} />
+                  <Avatar id={j.avatarId} url={j.avatarUrl} size={38} className="shrink-0" />
 
-                  <div className="min-w-0">
+                  <div className="min-w-0 flex-1 basis-40">
                     <div className="flex flex-wrap items-center gap-2">
                       <button onClick={() => setFichaAberta(j.userId)} className="truncate text-sm font-medium hover:underline">
                         {j.nome}
@@ -227,58 +230,60 @@ export function TabJogadores({
                     </p>
                   </div>
 
-                  <div className="text-right">
-                    {ordem === "xp" ? (
-                      <>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">XP no período</p>
-                        <p className="text-[13px] font-medium tnum text-evolution">{j.xpPeriodo} XP</p>
-                      </>
-                    ) : (
-                      <>
-                        <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">Resultado</p>
-                        <p className={`text-[13px] font-medium tnum ${
-                          j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-ink/90"
-                        }`}>
-                          {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
-                        </p>
-                      </>
+                  <div className="ml-auto flex shrink-0 items-center gap-2.5">
+                    <div className="text-right">
+                      {ordem === "xp" ? (
+                        <>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">XP no período</p>
+                          <p className="text-[13px] font-medium tnum text-evolution">{j.xpPeriodo} XP</p>
+                        </>
+                      ) : (
+                        <>
+                          <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">Resultado</p>
+                          <p className={`text-[13px] font-medium tnum ${
+                            j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-ink/90"
+                          }`}>
+                            {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
+                          </p>
+                        </>
+                      )}
+                    </div>
+
+                    {podeConversar && (
+                      <button
+                        onClick={() => abrirConversa(j.userId)}
+                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+                        aria-label={`Conversar com ${j.nome}`}
+                      >
+                        <MessageCircle size={15} />
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => alternarExpandido(j.userId)}
+                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+                      aria-label={aberto ? `Recolher informações de ${j.nome}` : `Ver informações de ${j.nome}`}
+                    >
+                      <ChevronDown size={15} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
+                    </button>
+
+                    {isAdmin && (
+                      <button
+                        onClick={() => setAcaoAberta(j)}
+                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
+                        aria-label={`Ações para ${j.nome}`}
+                      >
+                        <MoreVertical size={15} />
+                      </button>
                     )}
                   </div>
-
-                  {podeConversar ? (
-                    <button
-                      onClick={() => abrirConversa(j.userId)}
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-                      aria-label={`Conversar com ${j.nome}`}
-                    >
-                      <MessageCircle size={15} />
-                    </button>
-                  ) : <span />}
-
-                  <button
-                    onClick={() => alternarExpandido(j.userId)}
-                    className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-                    aria-label={aberto ? `Recolher informações de ${j.nome}` : `Ver informações de ${j.nome}`}
-                  >
-                    <ChevronDown size={15} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
-                  </button>
-
-                  {isAdmin ? (
-                    <button
-                      onClick={() => setAcaoAberta(j)}
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-                      aria-label={`Ações para ${j.nome}`}
-                    >
-                      <MoreVertical size={15} />
-                    </button>
-                  ) : <span />}
                 </div>
 
                 {aberto && (
                   // Sem fundo/borda proprios: o card ja e' bg-elevated
                   // agora, uma segunda caixa da mesma cor so' empilhava
                   // contorno sem contraste -- um divisor simples basta.
-                  <div className="mt-2.5 ml-[26px] border-t border-hairline pt-3 sm:ml-[64px]">
+                  <div className="mt-2.5 ml-[74px] border-t border-hairline pt-3">
                     <div className="grid grid-cols-4 gap-3 sm:max-w-xs">
                       <Metrica label="Treinos" valor={String(j.treinos)} />
                       <Metrica label="GTO" valor={pct === null ? "—" : `${pct}%`} />
