@@ -17,13 +17,10 @@ import {
   fetchPlayerAlerts,
   fetchPlayerDetail,
   fetchPlayerEvolutionStats,
-  fetchPlayerFinancialSeries,
   fetchPlayerLeaks,
   fetchPlayerScoreHistory,
   fetchPlayerSharedHands,
-  fetchPlayerStakingSessions,
   traduzErroTime,
-  type FinancialDay,
   type PlayerActivityDay,
   type PlayerEvolutionStats,
   type PlayerScoreHistoryPoint,
@@ -31,7 +28,6 @@ import {
   type PlayerDetail,
   type PlayerSharedHand,
   type PlayerLeak,
-  type PlayerStakingSession,
 } from "@/lib/services/team-service";
 
 // Ficha individual do jogador. Quem pode abrir: admin do time, o coach
@@ -55,8 +51,6 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
   const [leaks, setLeaks] = useState<PlayerLeak[]>([]);
   const [maos, setMaos] = useState<PlayerSharedHand[]>([]);
   const [alertas, setAlertas] = useState<TeamAlert[]>([]);
-  const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
-  const [staking, setStaking] = useState<PlayerStakingSession[]>([]);
   const [historicoScore, setHistoricoScore] = useState<PlayerScoreHistoryPoint[]>([]);
   const [evolutionStats, setEvolutionStats] = useState<PlayerEvolutionStats | null>(null);
 
@@ -64,14 +58,12 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, fin, stk, hist, evo] = await Promise.all([
+      const [d, a, l, m, al, hist, evo] = await Promise.all([
         fetchPlayerDetail(id, dias),
         fetchPlayerActivity(id, dias),
         fetchPlayerLeaks(id, dias),
         fetchPlayerSharedHands(id),
         fetchPlayerAlerts(id).catch(() => []),
-        fetchPlayerFinancialSeries(id, dias).catch(() => []),
-        fetchPlayerStakingSessions(id).catch(() => []),
         fetchPlayerScoreHistory(id, dias).catch(() => []),
         fetchPlayerEvolutionStats(id, dias).catch(() => null),
       ]);
@@ -80,8 +72,6 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
       setLeaks(l);
       setMaos(m);
       setAlertas(al);
-      setFinanceiro(fin);
-      setStaking(stk);
       setHistoricoScore(hist);
       setEvolutionStats(evo);
     } catch (e) {
@@ -151,8 +141,6 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
           leaks={leaks}
           maos={maos}
           alertas={alertas}
-          financeiro={financeiro}
-          staking={staking}
           historicoScore={historicoScore}
           evolutionStats={evolutionStats}
           // Metas so' se criam/editam pelo card do jogador no Funil (controle

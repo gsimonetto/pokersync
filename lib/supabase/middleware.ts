@@ -30,6 +30,13 @@ const PUBLIC_ROUTES = [
   // não conseguia interpretar a resposta como JSON — reportado como
   // "erro ao testar conexão e ao sincronizar".
   "/api/agent",
+  // Webhook do Stripe: POST server-to-server, sem cookie de sessão
+  // nenhum (o Stripe não tem como logar). Sem isso aqui, TODO evento
+  // (pagamento confirmado, assinatura cancelada) recebia um redirect
+  // 307 pro /login antes de chegar no handler que valida a assinatura
+  // (app/api/billing/webhook/route.ts) — liberação de plano pago e
+  // downgrade automático simplesmente nunca aconteciam.
+  "/api/billing/webhook",
 ];
 
 function isPublicRoute(pathname: string) {

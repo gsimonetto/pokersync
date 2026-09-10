@@ -3,6 +3,7 @@
 // mãos via lib/services/agent-sync-service.ts.
 import { authenticateAgentRequest, AgentAuthError } from "@/lib/supabase/agent";
 import { processAgentSync, type AgentSyncInput } from "@/lib/services/agent-sync-service";
+import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
 const MAX_FILES_PER_REQUEST = 200;
 const MAX_FILE_SIZE = 5 * 1024 * 1024; // 5MB de texto por arquivo é generoso p/ hand history
@@ -32,6 +33,9 @@ function isValidInput(body: unknown): body is AgentSyncInput {
 }
 
 export async function POST(request: Request) {
+  const ipLimit = rateLimit(`agent-sync:${clientIp(request)}`, 20, 60_000);
+  if (!ipLimit.allowed) return rateLimitResponse(ipLimit.retryAfterSeconds);
+
   let user;
   let supabase;
   try {
@@ -43,6 +47,9 @@ export async function POST(request: Request) {
     console.error("[agent/sync] auth", e);
     return Response.json({ ok: false, error: "Erro interno." }, { status: 500 });
   }
+
+  const userLimit = rateLimit(`agent-sync:user:${user.id}`, 20, 60_000);
+  if (!userLimit.allowed) return rateLimitResponse(userLimit.retryAfterSeconds);
 
   let body: unknown;
   try {

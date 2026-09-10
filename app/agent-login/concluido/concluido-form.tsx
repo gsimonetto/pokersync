@@ -9,20 +9,18 @@ const SHOW_FALLBACK_AFTER_MS = 1800;
 
 export default function AgentLoginConcluido() {
   const searchParams = useSearchParams();
-  const accessToken = searchParams.get("access_token");
-  const refreshToken = searchParams.get("refresh_token");
+  // Código opaco de uso único (não é mais o access_token/refresh_token
+  // em si) — o agente desktop troca isso pelos tokens reais chamando
+  // /api/agent/exchange-code. Ver app/auth/confirm/route.ts.
+  const code = searchParams.get("code");
   const state = searchParams.get("state");
 
   const [showFallback, setShowFallback] = useState(false);
   const [copied, setCopied] = useState(false);
 
-  const valid = Boolean(accessToken && refreshToken && state);
+  const valid = Boolean(code && state);
   const deepLink = valid
-    ? `radar-pokersync://auth?${new URLSearchParams({
-        access_token: accessToken!,
-        refresh_token: refreshToken!,
-        state: state!,
-      }).toString()}`
+    ? `radar-pokersync://auth?${new URLSearchParams({ code: code!, state: state! }).toString()}`
     : null;
 
   useEffect(() => {

@@ -7,25 +7,18 @@ import {
   MessageSquare,
   Eye,
   ChevronRight,
-  Handshake,
-  CalendarDays,
   LayoutDashboard,
-  Wallet,
   BookOpen,
   Target,
 } from "lucide-react";
 import { Chip } from "@/components/chip";
 import { TabNav } from "@/components/ui/tab-nav";
-import { EvolutionChart } from "@/components/time/evolution-chart";
 import { ScoreHistoryChart } from "@/components/time/score-history-chart";
-import { TeamHeatmap } from "@/components/time/team-heatmap";
-import { PainelCard } from "@/components/time/painel-card";
 import { MetasCard } from "@/components/time/metas-card";
 import { HeroMetric } from "@/components/time/hero-metric";
 import { BRL, variacao } from "@/lib/format";
 import {
   ALERTA_LABEL,
-  type FinancialDay,
   type PlayerActivityDay,
   type PlayerEvolutionStats,
   type PlayerScoreHistoryPoint,
@@ -33,27 +26,31 @@ import {
   type PlayerDetail,
   type PlayerSharedHand,
   type PlayerLeak,
-  type PlayerStakingSession,
 } from "@/lib/services/team-service";
 
-type Aba = "geral" | "financeiro" | "estudo" | "performance";
+type Aba = "geral" | "estudo" | "performance";
 
 const TABS: { value: Aba; label: string; icon: typeof LayoutDashboard }[] = [
   { value: "geral", label: "Visão Geral", icon: LayoutDashboard },
-  { value: "financeiro", label: "Financeiro", icon: Wallet },
   { value: "estudo", label: "Estudo", icon: BookOpen },
   { value: "performance", label: "Performance", icon: Target },
 ];
 
 // Corpo da ficha do jogador — mesmo padrão de abas do Player Evolution
-// (TabNav, um container só) em vez de empilhar hero + score + gráfico
-// financeiro + heatmap + estudo + staking + metas + mãos + alertas +
-// leaks tudo junto numa rolagem só. O herói (identidade/resumo) fica
-// fora das abas -- é o "quem é esse jogador" que faz sentido ver
-// sempre, o resto é organizado por assunto. Extraído pra ser reusado
-// tanto na página cheia (/time/jogador/[id]) quanto no modal aberto de
-// dentro da lista de Jogadores, sem duplicar a mesma marcação em dois
-// lugares.
+// (TabNav, um container só) em vez de empilhar hero + score + estudo +
+// metas + mãos + alertas + leaks tudo junto numa rolagem só. O herói
+// (identidade/resumo) fica fora das abas -- é o "quem é esse jogador"
+// que faz sentido ver sempre, o resto é organizado por assunto.
+// Extraído pra ser reusado tanto na página cheia (/time/jogador/[id])
+// quanto no modal aberto de dentro da lista de Jogadores, sem duplicar
+// a mesma marcação em dois lugares.
+//
+// LGPD/privacidade: o coach vê só o resultado agregado do jogador no
+// time (ganhos - buy-ins, no hero acima), nunca o detalhamento diário
+// nem sessões de staking (backer, markup, valores líquido/bruto por
+// sessão) -- isso é gestão de banca pessoal do jogador, não dado que o
+// papel de coach precisa pra orientar o jogo. Antes disso morava numa
+// aba "Financeiro" aqui; foi removida de propósito.
 export function PlayerDetailBody({
   id,
   p,
@@ -61,8 +58,6 @@ export function PlayerDetailBody({
   leaks,
   maos,
   alertas,
-  financeiro,
-  staking,
   historicoScore,
   evolutionStats,
   podeGerenciarMetas,
@@ -74,8 +69,6 @@ export function PlayerDetailBody({
   leaks: PlayerLeak[];
   maos: PlayerSharedHand[];
   alertas: TeamAlert[];
-  financeiro: FinancialDay[];
-  staking: PlayerStakingSession[];
   historicoScore: PlayerScoreHistoryPoint[];
   evolutionStats: PlayerEvolutionStats | null;
   podeGerenciarMetas: boolean;
@@ -111,7 +104,7 @@ export function PlayerDetailBody({
             label="Resultado no time"
             value={p.jogosNoTime > 0 ? BRL.format(p.lucroNoTime) : "—"}
             tone={p.lucroNoTime > 0 ? "bom" : p.lucroNoTime < 0 ? "ruim" : "neutro"}
-            hint={`${p.jogosNoTime} jogo${p.jogosNoTime === 1 ? "" : "s"}${staking.length > 0 ? " · líquido, já descontado o staking" : " desde que entrou"}`}
+            hint={`${p.jogosNoTime} jogo${p.jogosNoTime === 1 ? "" : "s"} desde que entrou · resultado líquido total (ganhos menos buy-ins)`}
             destaque
           />
           <HeroMetric
@@ -150,7 +143,6 @@ export function PlayerDetailBody({
           {aba === "geral" && (
             <AbaGeral leaks={leaks} alertas={alertas} historicoScore={historicoScore} />
           )}
-          {aba === "financeiro" && <AbaFinanceiro financeiro={financeiro} staking={staking} />}
           {aba === "estudo" && (
             <AbaEstudo id={id} atividade={atividade} maos={maos} podeGerenciarMetas={podeGerenciarMetas} hrefMaoCompartilhada={hrefMaoCompartilhada} />
           )}
@@ -164,7 +156,7 @@ export function PlayerDetailBody({
 // ------------------------------------------------------------
 // Visão Geral: o que o coach checa primeiro ao abrir a ficha -- a
 // tendência do Score e o que já está gerando alerta ou leak, antes de
-// entrar em financeiro/estudo/performance.
+// entrar em estudo/performance.
 // ------------------------------------------------------------
 function AbaGeral({
   leaks,
@@ -233,56 +225,6 @@ function AbaGeral({
           </ul>
         )}
       </div>
-    </div>
-  );
-}
-
-// ------------------------------------------------------------
-// Financeiro: resultado, consistência e staking -- tudo que envolve
-// dinheiro do jogador, junto.
-// ------------------------------------------------------------
-function AbaFinanceiro({ financeiro, staking }: { financeiro: FinancialDay[]; staking: PlayerStakingSession[] }) {
-  return (
-    <div className="space-y-5">
-      <section className="grid gap-4 lg:grid-cols-2 print:grid-cols-2">
-        <EvolutionChart dados={financeiro} titulo="Resultado no período" />
-        <PainelCard titulo="Consistência" icone={<CalendarDays size={13} className="text-evolution" />} className="flex flex-col">
-          <div className="flex flex-1 items-center">
-            <TeamHeatmap dados={financeiro} />
-          </div>
-        </PainelCard>
-      </section>
-
-      {staking.length > 0 && (
-        <section className="border-t border-hairline pt-5">
-          <h2 className="flex items-center gap-1.5 text-base font-semibold">
-            <Handshake size={15} className="text-training" />
-            Staking recente
-          </h2>
-          <p className="mt-1 text-sm text-muted">
-            Sessões em que o jogador vendeu parte da ação — resultado líquido é o que fica com ele, bruto é o
-            tamanho real do swing da sessão.
-          </p>
-          <ul className="mt-4 divide-y divide-hairline">
-            {staking.map((s) => (
-              <li key={s.id} className="flex flex-wrap items-center gap-x-3 gap-y-1 py-2.5 text-[13px]">
-                <span className="text-muted">{new Date(s.dia).toLocaleDateString("pt-BR")}</span>
-                <span className="font-medium">{s.formato}</span>
-                <span className="rounded-full border border-training/40 bg-training/10 px-2 py-0.5 text-[10.5px] font-semibold text-training">
-                  {s.ownPct}% dele · markup {s.markup.toFixed(2)}
-                </span>
-                {s.backerName && <span className="text-muted">backer: {s.backerName}</span>}
-                <span className="ml-auto flex items-center gap-3 tnum">
-                  <span className={s.resultadoLiquido >= 0 ? "text-positive" : "text-negative"}>
-                    líquido {BRL.format(s.resultadoLiquido)}
-                  </span>
-                  <span className="text-xs text-muted">bruto {BRL.format(s.resultadoBruto)}</span>
-                </span>
-              </li>
-            ))}
-          </ul>
-        </section>
-      )}
     </div>
   );
 }
