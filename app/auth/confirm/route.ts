@@ -84,6 +84,22 @@ export async function GET(request: Request) {
         redirect(`/agent-login/concluido?${params.toString()}`);
       }
 
+      // Prova de consentimento (LGPD art. 8): o login com Google pode
+      // ser o próprio primeiro cadastro (Supabase cria a conta na hora)
+      // e nunca passa pela caixinha de aceite de app/login/login-form.tsx
+      // -- por isso fica registrado aqui, no primeiro sucesso de sessão
+      // por esse caminho. Erro (ex.: já aceito nessa versão) é esperado
+      // e ignorado de propósito.
+      if (data.session?.user) {
+        await supabase
+          .from("user_consents")
+          .insert({ user_id: data.session.user.id, terms_version: "2026-09" })
+          .then(
+            () => {},
+            () => {}
+          );
+      }
+
       // Login com Google já cria sessão de verdade — aqui SIM deixamos
       // o usuário entrar direto, sem precisar digitar senha de novo.
       redirect("/modulos");

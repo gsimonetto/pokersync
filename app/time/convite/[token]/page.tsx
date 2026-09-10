@@ -134,8 +134,9 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
             )}
 
             <p className="mt-4 text-xs text-muted">
-              Ao entrar, o time passa a ver sua frequência de estudo e sua evolução. Suas mãos só ficam visíveis quando
-              você compartilhar.
+              Ao entrar, o time passa a ver sua frequência de estudo, evolução, leaks e o resultado financeiro total
+              (ganhos menos buy-ins) do período — nunca o detalhamento diário da sua gestão de banca pessoal, nem
+              sessões de staking. Suas mãos só ficam visíveis quando você compartilhar.
             </p>
           </div>
         )}
