@@ -34,7 +34,11 @@ async function fetchAllChatUnread(): Promise<number> {
 
 const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
 // Nenhum modulo/accent existente usa laranja (ver ACCENT em lib/modules-data.tsx).
-const CHAT_ACCENT = "#F2994A";
+// Mesmo azul ja usado no icone do chat dentro do ChatCenter (--color-training)
+// -- antes o botao flutuante tinha fundo solido amarelo/laranja, sem nada a
+// ver com o resto da identidade do chat; agora fica translucido com borda,
+// no mesmo tom.
+const CHAT_ACCENT = "#3b82f6";
 
 // Casca compartilhada (sidebar + topbar) entre os módulos que já migraram
 // pro layout novo -- hoje /modulos e /banca. Cada módulo continua dono do
@@ -478,10 +482,10 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           onClick={() => toggleMenu("chats")}
           aria-label={unreadChats > 0 ? `Abrir chat, ${unreadChats} mensagem${unreadChats === 1 ? "" : "s"} não lida${unreadChats === 1 ? "" : "s"}` : "Abrir chat"}
           title="Chat"
-          className="fixed bottom-5 right-5 z-40 grid size-14 place-items-center rounded-full shadow-lg shadow-black/50 transition-transform hover:scale-105 print:hidden"
-          style={{ background: CHAT_ACCENT, boxShadow: `0 6px 20px -4px ${CHAT_ACCENT}80` }}
+          className="fixed bottom-5 right-5 z-40 grid size-14 place-items-center rounded-full border shadow-lg shadow-black/40 backdrop-blur-md transition-transform hover:scale-105 print:hidden"
+          style={{ background: `${CHAT_ACCENT}1A`, borderColor: `${CHAT_ACCENT}55`, color: CHAT_ACCENT }}
         >
-          <MessageCircle size={24} strokeWidth={2} className="text-void" />
+          <MessageCircle size={24} strokeWidth={2} />
           {unreadChats > 0 && (
             <span className="absolute -right-1 -top-1 grid min-w-[22px] place-items-center rounded-full border-2 border-void bg-evolution px-1 text-[11px] font-bold leading-[19px] text-void">
               {unreadChats > 9 ? "9+" : unreadChats}
