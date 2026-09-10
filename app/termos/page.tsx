@@ -4,8 +4,7 @@ import { Logo } from "@/components/logo";
 
 export const metadata = { title: "Termos de Uso — PokerSync" };
 
-// Mesmo padrão visual de app/privacidade/page.tsx. O e-mail de contato
-// na seção 10 ainda é placeholder.
+// Mesmo padrão visual de app/privacidade/page.tsx.
 export default function TermosDeUsoPage() {
   return (
     <main className="min-h-screen bg-void px-4 py-10 text-ink">
@@ -97,7 +96,11 @@ export default function TermosDeUsoPage() {
 
           <Secao titulo="10. Contato">
             <p>
-              Dúvidas sobre estes Termos: <strong className="text-ink">[e-mail de contato a configurar]</strong>.
+              Dúvidas sobre estes Termos:{" "}
+              <a href="mailto:suporte@pokersync.com.br" className="text-training hover:underline">
+                suporte@pokersync.com.br
+              </a>
+              .
             </p>
           </Secao>
         </div>

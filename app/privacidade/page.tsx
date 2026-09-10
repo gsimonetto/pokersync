@@ -9,8 +9,7 @@ export const metadata = { title: "Política de Privacidade — PokerSync" };
 // linguagem simples de propósito -- é o documento que qualquer usuário
 // pode abrir, não só quem entende termos jurídicos.
 //
-// Identificação legal preenchida em 2026-09. Os e-mails de contato
-// ainda são placeholder -- ver seções 2 e 6.
+// Identificação legal e e-mails de contato preenchidos em 2026-09.
 export default function PoliticaDePrivacidadePage() {
   return (
     <main className="min-h-screen bg-void px-4 py-10 text-ink">
@@ -48,7 +47,9 @@ export default function PoliticaDePrivacidadePage() {
             <p className="mt-2">
               Para qualquer outra dúvida sobre privacidade que não dê pra resolver por lá — inclusive se você não é
               usuário do PokerSync e aparece nos dados de alguém que é (ver seção 6) — escreva pra{" "}
-              <strong className="text-ink">[e-mail de privacidade a configurar]</strong>.
+              <a href="mailto:suporte@pokersync.com.br" className="text-training hover:underline">
+                suporte@pokersync.com.br
+              </a>.
             </p>
           </Secao>
 
@@ -112,7 +113,9 @@ export default function PoliticaDePrivacidadePage() {
               coletamos nome completo, documento, e-mail nem qualquer dado de identificação real desses jogadores —
               só o nick usado na mesa e o comportamento observado no próprio jogo. Se você é um desses jogadores e
               quer que os dados vinculados ao seu nick sejam removidos, escreva pra{" "}
-              <strong className="text-ink">[e-mail de privacidade a configurar]</strong> informando o(s) nick(s)
+              <a href="mailto:suporte@pokersync.com.br" className="text-training hover:underline">
+                suporte@pokersync.com.br
+              </a> informando o(s) nick(s)
               usados.
             </p>
           </Secao>
