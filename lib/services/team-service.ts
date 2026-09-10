@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { isModuleUnlocked, toPlanId } from "@/lib/plans/plans-data";
 import { fetchMyPlanId } from "@/lib/services/plan-service";
+import type { ProfileCard } from "@/lib/services/profile-card-type";
 
 // ============================================================
 // Modo Team — base (time, papeis, convites por token)
@@ -229,10 +230,11 @@ export async function fetchMyTeam(): Promise<MyTeam | null> {
   if (!teamRow) return null;
 
   const ids = (memberRows ?? []).map((m) => m.user_id);
-  const { data: profileRows } = await supabase
-    .from("profiles")
-    .select("id, nome, apelido, avatar_id, avatar_url")
-    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  // public_profile_cards (RPC) em vez de .from("profiles") direto -- ver
+  // lib/services/range-service.ts pro motivo (auditoria de seguranca).
+  const { data: profileRows } = (await supabase.rpc("public_profile_cards", {
+    p_ids: ids.length ? ids : ["00000000-0000-0000-0000-000000000000"],
+  })) as { data: ProfileCard[] | null };
 
   const ordem: Record<TeamRole, number> = { admin: 0, coach: 1, player: 2 };
   const members: TeamMember[] = (memberRows ?? [])

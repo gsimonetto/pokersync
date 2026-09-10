@@ -112,7 +112,17 @@ export default function LoginForm() {
   // limpa logo abaixo (?expirado=1 etc. some da barra de enderecos
   // depois de lida), entao ler searchParams.get direto mais adiante
   // devolveria null e perderia o destino/mensagem.
-  const [redirectTo] = useState(() => searchParams.get("redirectTo") || "/modulos");
+  //
+  // redirectTo so' pode ser um caminho interno (comeca com "/" mas nao
+  // "//" nem "/\", que navegadores tratam como protocol-relative pra
+  // outro host) -- sem essa checagem, um link tipo
+  // "/login?redirectTo=https://site-falso.com" mandava quem loga de
+  // verdade direto pra um site de phishing depois da autenticacao (open
+  // redirect, achado em auditoria de seguranca).
+  const [redirectTo] = useState(() => {
+    const raw = searchParams.get("redirectTo");
+    return raw && /^\/(?!\/|\\)/.test(raw) ? raw : "/modulos";
+  });
   const [expirado] = useState(() => searchParams.get("expirado") === "1");
   const [senhaRedefinida] = useState(() => searchParams.get("senha_redefinida") === "1");
   const [emailConfirmado] = useState(() => searchParams.get("email_confirmado") === "1");

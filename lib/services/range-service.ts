@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { RangeHands, RaiseType } from "@/components/ranges/range-grid";
+import type { ProfileCard } from "@/lib/services/profile-card-type";
 
 // RangeHands agora vive em range-grid.tsx (fold/call/raise por mao, somando
 // 100) — reexportado aqui pra quem so importa do service nao precisar
@@ -273,10 +274,13 @@ export async function listTeamSharedRanges(teamId: string): Promise<TeamSharedRa
   if (error) throw error;
 
   const ownerIds = Array.from(new Set((data ?? []).map((r) => r.user_id)));
-  const { data: profiles } = await supabase
-    .from("profiles")
-    .select("id, nome, apelido")
-    .in("id", ownerIds.length ? ownerIds : ["00000000-0000-0000-0000-000000000000"]);
+  // public_profile_cards (RPC) em vez de .from("profiles") direto: a
+  // tabela so' deixa cada um ler a propria linha (RLS -- ver auditoria de
+  // seguranca), essa funcao devolve so' nome/apelido/avatar de qualquer
+  // usuario, sem colunas sensiveis.
+  const { data: profiles } = (await supabase.rpc("public_profile_cards", {
+    p_ids: ownerIds.length ? ownerIds : ["00000000-0000-0000-0000-000000000000"],
+  })) as { data: ProfileCard[] | null };
 
   return (data ?? []).map((r) => {
     const profile = (profiles ?? []).find((p) => p.id === r.user_id);

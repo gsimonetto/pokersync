@@ -52,23 +52,29 @@ interface PerfilBasico {
   last_seen_at: string | null;
 }
 
+// friend_code e last_seen_at sao dado sensivel -- friends_profile_info
+// (RPC) so' devolve a linha de quem JA e' seu amigo aceito (ou voce
+// mesmo), nunca de qualquer usuario (ver auditoria de seguranca:
+// profiles nao tem mais leitura publica nenhuma).
 async function fetchProfilesByIds(ids: string[]): Promise<PerfilBasico[]> {
   if (ids.length === 0) return [];
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, nome, apelido, friend_code, avatar_id, avatar_url, last_seen_at")
-    .in("id", ids);
+  const { data, error } = await supabase.rpc("friends_profile_info", { p_ids: ids });
   if (error) throw error;
   return data ?? [];
 }
 
 // Le so' last_seen_at pra uma lista de ids (ex: os membros do time na
 // Central de Conversas, que ja vem de outro lugar sem essa coluna).
+// presence_last_seen (RPC) libera self/amigo/colega de time -- nunca
+// qualquer usuario.
 export async function fetchLastSeenMap(ids: string[]): Promise<Map<string, string | null>> {
   if (ids.length === 0) return new Map();
   const supabase = createClient();
-  const { data, error } = await supabase.from("profiles").select("id, last_seen_at").in("id", ids);
+  const { data, error } = (await supabase.rpc("presence_last_seen", { p_ids: ids })) as {
+    data: { id: string; last_seen_at: string | null }[] | null;
+    error: { message: string } | null;
+  };
   if (error) throw error;
   return new Map((data ?? []).map((r) => [r.id, r.last_seen_at]));
 }
@@ -166,15 +172,17 @@ export async function sendFriendRequest(apelido: string, codigo: string): Promis
   const codigoLimpo = codigo.trim().replace(/^#/, "");
   if (!apelidoLimpo || !codigoLimpo) throw new Error("PARAMETRO_INVALIDO");
 
-  const { data: alvo, error: eAlvo } = await supabase
-    .from("profiles")
-    .select("id")
-    .ilike("apelido", apelidoLimpo)
-    .eq("friend_code", codigoLimpo)
-    .maybeSingle();
+  // find_profile_by_friend_code (RPC) em vez de ler friend_code direto
+  // da tabela -- devolve so' o id de UM match exato, nunca permite
+  // varrer/listar o codigo de ninguem (ver auditoria de seguranca).
+  const { data: alvoId, error: eAlvo } = await supabase.rpc("find_profile_by_friend_code", {
+    p_apelido: apelidoLimpo,
+    p_friend_code: codigoLimpo,
+  });
   if (eAlvo) throw eAlvo;
-  if (!alvo) throw new Error("JOGADOR_NAO_ENCONTRADO");
-  if (alvo.id === me) throw new Error("NAO_PODE_ADICIONAR_VOCE_MESMO");
+  if (!alvoId) throw new Error("JOGADOR_NAO_ENCONTRADO");
+  if (alvoId === me) throw new Error("NAO_PODE_ADICIONAR_VOCE_MESMO");
+  const alvo = { id: alvoId };
 
   const { data: existente, error: eExistente } = await supabase
     .from("friendships")

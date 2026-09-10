@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import type { ProfileCard } from "@/lib/services/profile-card-type";
 
 // ============================================================
 // Modo Team — Kanban de evolução (funil de fases)
@@ -404,10 +405,11 @@ export async function fetchCardComments(cardId: string): Promise<CardComment[]> 
   if (error) throw error;
   const rows = data ?? [];
   const ids = [...new Set(rows.map((r) => r.author_id))];
-  const { data: profileRows } = await supabase
-    .from("profiles")
-    .select("id, nome, apelido")
-    .in("id", ids.length ? ids : ["00000000-0000-0000-0000-000000000000"]);
+  // public_profile_cards (RPC) em vez de .from("profiles") direto -- ver
+  // lib/services/range-service.ts pro motivo (auditoria de seguranca).
+  const { data: profileRows } = (await supabase.rpc("public_profile_cards", {
+    p_ids: ids.length ? ids : ["00000000-0000-0000-0000-000000000000"],
+  })) as { data: ProfileCard[] | null };
   return rows.map((r) => {
     const p = (profileRows ?? []).find((row) => row.id === r.author_id);
     return {

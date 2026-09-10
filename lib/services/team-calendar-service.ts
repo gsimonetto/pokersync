@@ -1,5 +1,14 @@
 import { createClient } from "@/lib/supabase/client";
 
+interface TeammateBirthdayRow {
+  id: string;
+  nome: string | null;
+  apelido: string | null;
+  avatar_id: number | null;
+  avatar_url: string | null;
+  data_nascimento: string;
+}
+
 // ============================================================
 // Modo Team — Calendário (aulas/reuniões)
 // Lista simples de próximos eventos (sem grade de mês/semana).
@@ -17,17 +26,17 @@ export interface TeamBirthday {
   dataNascimento: string;
 }
 
-// Perfil e' de leitura publica pra todo usuario logado (mesma policy que
-// ja libera nome/avatar) — so' filtra pelos ids do time aqui, sem precisar
-// de RPC nova. So' devolve quem de fato preencheu a data.
+// data_nascimento e' dado sensivel -- a RPC teammates_birthdays so'
+// devolve quem esta no MEU time ativo (checado no banco via
+// my_team_id()), nunca gente de fora (ver auditoria de seguranca:
+// profiles nao tem mais leitura publica nenhuma).
 export async function fetchTeamBirthdays(memberIds: string[]): Promise<TeamBirthday[]> {
   if (memberIds.length === 0) return [];
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("profiles")
-    .select("id, nome, apelido, avatar_id, avatar_url, data_nascimento")
-    .in("id", memberIds)
-    .not("data_nascimento", "is", null);
+  const { data, error } = (await supabase.rpc("teammates_birthdays", { p_ids: memberIds })) as {
+    data: TeammateBirthdayRow[] | null;
+    error: { message: string } | null;
+  };
   if (error) throw error;
   return (data ?? []).map((r) => ({
     userId: r.id,
