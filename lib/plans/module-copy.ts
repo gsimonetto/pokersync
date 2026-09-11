@@ -3,7 +3,7 @@ import type { ModuleKey } from "./plans-data";
 // Texto de venda de cada modulo bloqueado -- usado na modal que abre
 // quando o jogador clica num item travado do menu (components/app-shell.tsx)
 // e na pagina /planos. `benefits` e' a lista COMPLETA do que o modulo
-// realmente tem (ver POKERSYNC.md, secao 6, pra descricao real de cada
+// realmente tem (ver docs/cockpit/ROADMAP.md pra descricao real de cada
 // modulo) -- pedido explicito: nada de bloco de "diferencial" separado,
 // so' os checks, direto.
 export interface ModuleCopy {

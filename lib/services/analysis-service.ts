@@ -172,7 +172,7 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
     heroPosition: (r.hero_position as HeroPosition) ?? null,
     matchup: r.matchup ?? null,
     stackDepthBucket: (r.stack_depth_bucket as StackDepthBucket) ?? null,
-    tournamentStage: null, // motor ainda não popula tournament_phase (ver POKERSYNC.md §8)
+    tournamentStage: null, // motor ainda não popula tournament_phase (ver docs/cockpit/ROADMAP.md, item MAIN-008)
     vpip: r.vpip,
     pfr: r.pfr,
     threeBet: r.three_bet,
@@ -380,7 +380,7 @@ export function computePostflopMetrics(rows: AnalysisHandRow[]): PostflopMetrics
 // ============================================================
 // Torneios — só o que dá pra provar com o que está gravado hoje
 // (bankroll_sessions: buy-in/reentries/cashout reais). cEV/ICM ficam
-// null: motor não grava chip-equity por mão (ver POKERSYNC.md §8).
+// null: motor não grava chip-equity por mão (ver docs/cockpit/ROADMAP.md, item SOLVER-013).
 // ============================================================
 function isTournamentSession(s: BankrollSession): boolean {
   const f = s.format?.trim().toLowerCase();
@@ -522,7 +522,7 @@ export async function fetchTournamentSessions(): Promise<HandSession[]> {
 // EvolutionChart (components/time/evolution-chart.tsx) já consome, pra
 // reusar o componente pronto em vez de desenhar outro SVG do zero.
 // All-in EV fica de fora: motor não roda simulação de equity all-in
-// ainda (ver POKERSYNC.md §8) — sem essa linha, não sem dado fake.
+// ainda (ver docs/cockpit/ROADMAP.md, item SOLVER-013) — sem essa linha, não sem dado fake.
 // ============================================================
 export async function fetchFinancialDaySeries(): Promise<FinancialDay[]> {
   const sessions = await fetchSessions();
