@@ -12,6 +12,7 @@ import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
 import { Modal } from "@/components/ui/modal";
+import { FounderCard } from "@/components/achievements/founder-card";
 import { MinhasMetasModalBody } from "@/components/goals/minhas-metas-modal";
 import { RecadosCoachModalBody } from "@/components/goals/recados-coach-modal";
 import { fetchGoals } from "@/lib/services/bankroll-service";
@@ -54,6 +55,7 @@ export default function ModulosPage() {
 
   const [metasModalOpen, setMetasModalOpen] = useState(false);
   const [coachModalOpen, setCoachModalOpen] = useState(false);
+  const [openAchievement, setOpenAchievement] = useState<Achievement | null>(null);
   const [metasDot, setMetasDot] = useState(false);
   const [coachDot, setCoachDot] = useState(false);
 
@@ -299,13 +301,15 @@ export default function ModulosPage() {
                 {achievements.map((a) => {
                   const Icon = ACHIEVEMENT_ICON[a.code] ?? Trophy;
                   return (
-                    <div
+                    <button
                       key={a.code}
+                      type="button"
                       title={a.description}
-                      className="grid size-9 place-items-center rounded-lg border border-evolution/40 bg-evolution/10 text-evolution shadow-[0_0_10px_rgba(245,158,11,.3)]"
+                      onClick={() => setOpenAchievement(a)}
+                      className="grid size-9 place-items-center rounded-lg border border-evolution/40 bg-evolution/10 text-evolution shadow-[0_0_10px_rgba(245,158,11,.3)] transition-transform hover:scale-105"
                     >
                       <Icon size={16} strokeWidth={1.75} />
-                    </div>
+                    </button>
                   );
                 })}
               </div>
@@ -369,6 +373,18 @@ export default function ModulosPage() {
       <Modal open={coachModalOpen} onClose={() => setCoachModalOpen(false)} title="Recados do Coach" wide>
         <RecadosCoachModalBody />
       </Modal>
+
+      {/* So' a conquista "founder" tem card de detalhe proprio hoje (unica
+          no catalogo, ver ACHIEVEMENT_ICON) -- futuras conquistas com
+          catalogo/design proprios entram aqui do mesmo jeito. */}
+      {openAchievement?.code === "founder" && (
+        <FounderCard
+          open
+          onClose={() => setOpenAchievement(null)}
+          description={openAchievement.description}
+          unlockedAt={openAchievement.unlockedAt}
+        />
+      )}
     </AppShell>
   );
 }

@@ -137,6 +137,37 @@ select option {
   .fade-in-up { animation: none; }
 }
 
+/* Card de detalhe da conquista Founder: leve flutuacao + giro em Y no
+   trofeu (efeito "3D" pedido no design), ciclo longo pra nao cansar quem
+   deixa o card aberto. */
+@keyframes trophy-float-3d {
+  0%, 100% { transform: translateY(0) rotateY(-16deg); }
+  50% { transform: translateY(-8px) rotateY(16deg); }
+}
+.trophy-float-3d {
+  animation: trophy-float-3d 4.5s ease-in-out infinite;
+}
+@media (prefers-reduced-motion: reduce) {
+  .trophy-float-3d { animation: none; }
+}
+
+/* Aneis dourados girando devagar atras do trofeu -- mesmo espirito do
+   glow-breathe, so' que rotacionando em vez de pulsando (um em cada
+   sentido, pra nao parecer uma unica peca solida girando). */
+@keyframes orbit-spin-slow {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+.orbit-spin-slow {
+  animation: orbit-spin-slow 14s linear infinite;
+}
+.orbit-spin-slow-reverse {
+  animation: orbit-spin-slow 18s linear infinite reverse;
+}
+@media (prefers-reduced-motion: reduce) {
+  .orbit-spin-slow, .orbit-spin-slow-reverse { animation: none; }
+}
+
 /* Utilitarios de acento: a cor vem da custom property --acc definida
    inline no elemento. Espelha exatamente o design de referencia (v0). */
 .acc-card {
