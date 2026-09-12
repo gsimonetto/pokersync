@@ -601,11 +601,13 @@ export function RevisorHandTable({
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.08)",
                 padding: 10,
-                // overflow:hidden — bug corrigido: sem isso, conteudo de seat
-                // (chip de nome, fichas paradas) que se acumula conforme a acao
-                // avanca podia vazar visualmente pra fora da caixa. Agora fica
-                // sempre travada no tamanho definido, clipando qualquer excesso.
-                overflow: "hidden",
+                // overflow:visible (era "hidden") -- pedido explicito: "tem
+                // algumas informacoes cortadas... pode deixar as cartas
+                // passar da mesa e nome tambem, nao precisa cortar". Sem
+                // mudar nenhuma posicao de assento, so' para de clipar o
+                // que sobra pra fora da caixa (placa de nome/stack perto da
+                // borda, por exemplo).
+                overflow: "visible",
                 // flex:1 + minHeight:0 (pedido explicito: "aumentar a mesa no
                 // mesmo tamanho da lista de maos... nao devera conter espaco
                 // em branco em baixo") — antes a mesa tinha altura FIXA por

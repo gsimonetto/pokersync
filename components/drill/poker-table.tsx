@@ -922,7 +922,14 @@ export function PokerTable({
           maxHeight: "100%",
           aspectRatio,
           margin: "auto",
-          overflow: "hidden",
+          // overflow:visible (era "hidden") -- pedido explicito: "tem
+          // algumas informacoes cortadas... pode deixar as cartas passar
+          // da mesa e nome tambem, nao precisa cortar" -- assentos perto
+          // da borda (x/y proximos de 0%/100%) tem metade do proprio
+          // bloco fora da caixa da mesa; sem mudar NENHUMA posicao (pedido
+          // explicito: "nao mexa nas posicoes por enquanto"), so' parar de
+          // clipar o que passa da borda.
+          overflow: "visible",
           borderRadius: cornerRadius,
         }}
         ref={tableBoxRef}
