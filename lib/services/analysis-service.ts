@@ -214,6 +214,16 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
   };
 }
 
+// Fontes de hand_reviews que contam como "mão importada" pro Player
+// Evolution — pedido explícito: as estatísticas só podem vir de mão/
+// torneio importado, nunca de lançamento manual. "agent" é o Radar
+// PokerSync sincronizando sozinho; "import" é a importação em lote (ex:
+// os arquivos de hand history anexados numa sessão anterior). "manual"
+// (colar hand history à mão em Revisor de Mãos → Nova Mão) e "print"
+// (upload de print) continuam funcionando normalmente ali — servem pra
+// revisar UMA mão pontual — mas não entram nas métricas agregadas daqui.
+const IMPORTED_HAND_SOURCES = ["agent", "import"] as const;
+
 export async function fetchAnalysisHandRows(): Promise<AnalysisHandRow[]> {
   const supabase = createClient();
   // Sem paginação: hoje a base tem ~200 mãos por usuário. Quando o volume
@@ -231,11 +241,20 @@ export async function fetchAnalysisHandRows(): Promise<AnalysisHandRow[]> {
         "hero_open_raise, steal_opportunity, steal_attempt, steal_success, hero_faced_3bet, " +
         "hero_fold_to_3bet, hero_call_3bet, hero_made_4bet, hero_faced_4bet, hero_fold_to_4bet, " +
         "blind_defense_opportunity, blind_defended, re_steal, squeeze, " +
-        "hand_reviews!inner(created_at, parsed_data)"
+        "hand_reviews!inner(created_at, parsed_data, source)"
     )
+    .in("hand_reviews.source", IMPORTED_HAND_SOURCES as unknown as string[])
     .order("computed_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(rowToAnalysisHand);
+  // Filtro do lado do cliente como rede de segurança — o filtro acima em
+  // "hand_reviews.source" depende do PostgREST aplicar corretamente num
+  // embed com !inner; sem essa segunda checagem, uma mão "manual"/"print"
+  // vazaria pras estatísticas se esse filtro não pegar por algum motivo.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filtered = (data ?? []).filter((r: any) =>
+    (IMPORTED_HAND_SOURCES as readonly string[]).includes(r.hand_reviews?.source)
+  );
+  return filtered.map(rowToAnalysisHand);
 }
 
 // ============================================================
