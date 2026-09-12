@@ -1,12 +1,11 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import {
   Trophy,
   Layers,
   Award,
   Loader2,
-  Sparkles,
   Hash,
   TrendingUp,
   CheckCircle2,
@@ -178,29 +177,45 @@ export function StatisticsTab({
   );
   const payoutPendingCount = totalTorneiosCount - payoutRegisteredCount;
 
-  async function handleCompute() {
-    if (computing) return;
-    setComputing(true);
-    setComputeError("");
-    setSummary(null);
-    try {
-      const ids = await fetchEligibleHandReviewIds();
-      if (ids.length === 0) {
-        setSummary({ computed: 0, skipped: 0 });
-        return;
+  // cEV calcula sozinho ao entrar na aba, sem botão -- mesmo padrão de
+  // trackers como Hold'em Manager/PokerTracker (stats saem automáticas do
+  // import, sem clique). Roda em segundo plano, sem travar a navegação:
+  // o jogador pode usar o resto da tela normalmente enquanto calcula por
+  // trás. Só uma vez por visita à aba (StatisticsTab desmonta ao trocar
+  // de aba — ver AnimatePresence key={tab} em app/performance/page.tsx —
+  // então reentrar já dispara de novo se houver mão nova elegível).
+  useEffect(() => {
+    let cancelled = false;
+    async function run() {
+      setComputing(true);
+      setComputeError("");
+      setSummary(null);
+      try {
+        const ids = await fetchEligibleHandReviewIds();
+        if (ids.length === 0) return;
+        setProgress({ done: 0, total: ids.length });
+        const outcomes = await computeHandEvBatch(ids, (done, total) => {
+          if (!cancelled) setProgress({ done, total });
+        });
+        if (cancelled) return;
+        const computed = outcomes.filter((o) => o.computed).length;
+        setSummary({ computed, skipped: outcomes.length - computed });
+        onCevComputed();
+      } catch (e) {
+        if (!cancelled) setComputeError(e instanceof Error ? e.message : "Erro ao calcular cEV.");
+      } finally {
+        if (!cancelled) {
+          setComputing(false);
+          setProgress(null);
+        }
       }
-      setProgress({ done: 0, total: ids.length });
-      const outcomes = await computeHandEvBatch(ids, (done, total) => setProgress({ done, total }));
-      const computed = outcomes.filter((o) => o.computed).length;
-      setSummary({ computed, skipped: outcomes.length - computed });
-      onCevComputed();
-    } catch (e) {
-      setComputeError(e instanceof Error ? e.message : "Erro ao calcular cEV.");
-    } finally {
-      setComputing(false);
-      setProgress(null);
     }
-  }
+    run();
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
   return (
     <div className="space-y-4">
@@ -368,14 +383,12 @@ export function StatisticsTab({
         titulo="cEV & ICM"
         icone={<Layers size={14} className="icon-glow text-review" />}
         action={
-          <button
-            onClick={handleCompute}
-            disabled={computing}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink disabled:opacity-50"
-          >
-            {computing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="icon-glow" />}
-            {computing && progress ? `Calculando ${progress.done}/${progress.total}` : "Calcular cEV"}
-          </button>
+          computing ? (
+            <span className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-muted">
+              <Loader2 size={13} className="animate-spin" />
+              {progress ? `Calculando ${progress.done}/${progress.total}` : "Calculando…"}
+            </span>
+          ) : undefined
         }
       >
         <p className="mb-3 text-xs leading-relaxed text-muted">
@@ -423,11 +436,9 @@ export function StatisticsTab({
           ) : (
             <Bloqueado
               titulo="Chip EV Total, cEV/game, Net Expected Profit, EV ROI %"
-              texto={'Clique em "Calcular cEV" acima — sem mão elegível calculada ainda (ou o motor GTO não está publicado neste ambiente).'}
+              texto="Sem mão elegível calculada ainda (all-in preflop com premiação cadastrada) — calcula sozinho assim que houver uma, ou o motor GTO não está publicado neste ambiente."
             />
           )}
-          <Bloqueado titulo="Desempenho por faixa de blind" texto="Existe a estrutura (hand_sessions), mas sem stack/blind por mão associado ao resultado." />
-          <Bloqueado titulo="Situações de ICM (bolha, mesa final)" texto="tournament_phase e icm_pressure existem no schema, mas o parser ainda não os preenche." />
         </div>
       </Painel>
     </div>
