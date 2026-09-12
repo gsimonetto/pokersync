@@ -58,6 +58,22 @@ function parseHeroFinishPlace(text: string): number | null {
   return pt ? toNumber(pt[1]) : null;
 }
 
+// FIX (2026-09, amostra real capturada): em torneios de campo grande a
+// PokerStars às vezes fecha só com "You finished the tournament
+// (eliminated at hand #...)." — SEM o ordinal ("in Nth place") — mesmo
+// quando a colocação exata já é conhecida. A colocação continua presente
+// na lista numerada de eliminados mais acima no arquivo ("  1268: <nome>
+// (<país>),"), só não é repetida na frase de fechamento. Esse fallback
+// acha a linha do próprio herói nessa lista (dado o nome dele, resolvido
+// à parte — ver lookupHeroNameForTournament em
+// agent-tournament-sync-service.ts) e lê a colocação de lá.
+export function parseHeroFinishPlaceFromList(text: string, heroName: string): number | null {
+  const escaped = heroName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^\\s*(\\d+):\\s*${escaped}\\s*(?:\\[\\d+\\])?\\s*\\(`, "m");
+  const m = text.match(re);
+  return m ? toNumber(m[1]) : null;
+}
+
 // "A $150.00 USD award has been credited..." / "...recebeu $150.00" —
 // várias formulações conhecidas do texto de premiação; pega o primeiro
 // valor em dólar plausível perto de um verbo de recebimento.

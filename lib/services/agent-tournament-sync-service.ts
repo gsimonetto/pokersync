@@ -16,8 +16,43 @@
 // hand_sync_devices.last_sync_at, reaproveitando upsertDevice).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
-import { parseTournamentSummary } from "@/lib/poker/tournament-summary-parser";
+import { parseTournamentSummary, parseHeroFinishPlaceFromList } from "@/lib/poker/tournament-summary-parser";
 import { upsertDevice, type AgentDeviceInfo } from "@/lib/services/agent-sync-service";
+
+// FIX (2026-09, bug reportado: "o radar achou torneios no pc mas nao
+// subiu no meu usuario") -- amostras reais mostraram que em torneios de
+// campo grande a PokerStars as vezes fecha o resumo so' com "You finished
+// the tournament (eliminated at hand #...)." SEM a colocacao (o "in Nth
+// place" que parseHeroFinishPlace espera), mesmo com a colocacao exata ja
+// disponivel na lista numerada de eliminados mais acima no arquivo. Sem
+// colocacao NEM premio extraidos, o torneio inteiro era descartado
+// silenciosamente (so contava como "erro" numa estatistica que ninguem
+// ve). Esse fallback acha o nome do heroi (via alguma mao ja sincronizada
+// do MESMO torneio, se existir) e usa esse nome pra ler a colocacao dele
+// direto da lista numerada.
+async function lookupHeroNameForTournament(
+  supabase: SupabaseClient,
+  userId: string,
+  tournamentIdPs: string
+): Promise<string | null> {
+  const { data: session } = await supabase
+    .from("hand_sessions")
+    .select("id")
+    .eq("user_id", userId)
+    .eq("tournament_id_ps", tournamentIdPs)
+    .maybeSingle();
+  if (!session) return null;
+
+  const { data: review } = await supabase
+    .from("hand_reviews")
+    .select("parsed_data")
+    .eq("hand_session_id", session.id)
+    .not("parsed_data", "is", null)
+    .limit(1)
+    .maybeSingle();
+  const parsedData = review?.parsed_data as { heroName?: string | null } | null;
+  return parsedData?.heroName ?? null;
+}
 
 export interface AgentTournamentSyncFile {
   rawText: string;
@@ -65,11 +100,20 @@ export async function processAgentTournamentSync(
     seenThisBatch.add(parsed.tournamentIdPs);
 
     if (parsed.heroFinishPlace == null && parsed.heroPayoutAmount == null) {
-      // Achou o torneio mas não a colocação nem o valor ganho — sem os
-      // dois não há nada de novo pra registrar (evita sobrescrever um
-      // registro manual já preenchido com tudo em branco).
-      errors += 1;
-      continue;
+      // Fallback (ver lookupHeroNameForTournament acima) antes de
+      // desistir -- so' funciona se alguma mao desse MESMO torneio ja foi
+      // sincronizada antes (e' de la' que vem o nome do heroi).
+      const heroName = await lookupHeroNameForTournament(supabase, userId, parsed.tournamentIdPs);
+      const fallbackPlace = heroName ? parseHeroFinishPlaceFromList(file.rawText, heroName) : null;
+      if (fallbackPlace != null) {
+        parsed.heroFinishPlace = fallbackPlace;
+      } else {
+        // Achou o torneio mas não a colocação nem o valor ganho — sem os
+        // dois não há nada de novo pra registrar (evita sobrescrever um
+        // registro manual já preenchido com tudo em branco).
+        errors += 1;
+        continue;
+      }
     }
 
     // `places` (estrutura completa de premiação, usada pelo cEV/ICM) não
