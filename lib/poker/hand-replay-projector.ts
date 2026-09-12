@@ -392,17 +392,14 @@ export function projectHandAtStep(
   const chipsOutByPlayer = new Map<string, number>(initial.chipsOutByPlayer);
   const chipsWonByPlayer = new Map<string, number>();
 
-  // Chip persistente no assento (pedido explicito: "check/fold/allin
-  // como chips" + "no river não tem essa animação, precisamos colocar").
-  // Dois grupos por causa da diferenca de "vida util" de cada tipo:
-  // - roundBadgeByPlayer: check/bet/call/raise so valem NESSA rua —
-  //   reseta a cada "deal" (nova rua começa com decisões novas).
-  // - lockedBadgeByPlayer: fold/all-in NUNCA resetam — o jogador nao
-  //   decide mais nada pro resto da mao, entao o chip precisa continuar
-  //   visivel em toda rua seguinte (inclusive no river, quando a mao
-  //   corre sem mais nenhuma acao depois de um all-in mais cedo).
+  // Chip do assento (fold/check/allin) — pedido explicito (2026-09):
+  // "não quero que fique fixo quando alguém dá all in... quero apenas que
+  // apareça (como era antes)... não precisa ficar fixo". Reverte o
+  // comportamento anterior (fold/all-in ficavam LOCKED, nunca resetando
+  // pelo resto da mao) -- agora TODO tipo de badge (inclusive fold/allin)
+  // usa o mesmo criterio transitorio: so vale NESSA rua, resetando a
+  // cada "deal" (nova rua comeca com decisões novas).
   let roundBadgeByPlayer = new Map<string, { type: string; size?: number }>();
-  const lockedBadgeByPlayer = new Map<string, { type: string; size?: number }>();
 
   // Committed-na-rua-atual por posLabel (nao por nome — a UI so conhece
   // posLabel). Reseta toda vez que cruza um "deal" (nova rua comeca).
@@ -432,12 +429,7 @@ export function projectHandAtStep(
           streetCommitted.set(e.posLabel, (streetCommitted.get(e.posLabel) ?? 0) + e.chipsAdded);
           chipsOutByPlayer.set(e.player, (chipsOutByPlayer.get(e.player) ?? 0) + e.chipsAdded);
         }
-        const badge = { type: e.badgeType, size: e.badgeSizeBB };
-        if (e.badgeType === "fold" || e.badgeType === "allin") {
-          lockedBadgeByPlayer.set(e.player, badge);
-        } else {
-          roundBadgeByPlayer.set(e.player, badge);
-        }
+        roundBadgeByPlayer.set(e.player, { type: e.badgeType, size: e.badgeSizeBB });
         break;
       }
       case "deal":
@@ -499,15 +491,15 @@ export function projectHandAtStep(
     // mostrava startingChips cru, o stack nunca se mexia na tela.
     const chipsOut = chipsOutByPlayer.get(slot.playerName) ?? 0;
     const chipsWon = chipsWonByPlayer.get(slot.playerName) ?? 0;
-    // Chip de acao no assento (fold/check/call/bet/raise/allin) — locked
-    // (fold/allin) tem prioridade e nunca some; round (check/bet/call/
-    // raise) so' vale enquanto a rua atual nao vira.
-    const badge = lockedBadgeByPlayer.get(slot.playerName) ?? roundBadgeByPlayer.get(slot.playerName);
+    // Chip de acao no assento (fold/check/call/bet/raise/allin) -- so'
+    // vale enquanto a rua atual nao vira (ver comentario acima).
+    const badge = roundBadgeByPlayer.get(slot.playerName);
     seats[slot.posLabel] = {
       status: isFolded ? "folded" : isActing ? "acting" : "live",
       stack: toBB(seatData.startingChips - chipsOut + chipsWon),
       cards: slot.isHero ? hand.heroCards ?? undefined : revealedForVillain,
       action: badge ? { type: badge.type, size: badge.size } : null,
+      bountyValue: seatData.bountyValue,
     };
   }
 

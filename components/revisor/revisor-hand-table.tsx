@@ -611,7 +611,12 @@ export function RevisorHandTable({
                 background: "#050505",
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.08)",
-                padding: 10,
+                // padding 10 -> 32 (pedido explicito: "diminua um pouco mais
+                // a mesa, esta grande demais") -- a mesa preenche o espaco
+                // que sobra dentro desse card (ver width:min(...) em
+                // PokerTable), entao um respiro maior aqui encolhe a mesa
+                // sem mexer em mais nada.
+                padding: 32,
                 // overflow:visible (era "hidden") -- pedido explicito: "tem
                 // algumas informacoes cortadas... pode deixar as cartas
                 // passar da mesa e nome tambem, nao precisa cortar". Sem
@@ -748,6 +753,9 @@ export function RevisorHandTable({
                 </span>
               </div>
 
+              {/* iconOnly (pedido explicito: "quero apenas os icones de
+                  salvar e analisar mao") -- title continua com o texto
+                  completo, so' o rotulo visivel ao lado do icone sai. */}
               {canSave && (
                 <ChipButton
                   icon={<Bookmark size={13} fill={saved ? "currentColor" : "none"} />}
@@ -755,10 +763,11 @@ export function RevisorHandTable({
                   title={saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
                   onClick={toggleSaved}
                   disabled={savingSpot}
+                  iconOnly
                 />
               )}
               {canAnalyze && (
-                <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" />
+                <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" iconOnly />
               )}
             </div>
           </div>
