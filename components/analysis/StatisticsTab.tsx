@@ -125,12 +125,35 @@ export function StatisticsTab({
   }, [focusPendingPayout]);
   const payoutByTournament = useMemo(() => new Map(payouts.map((p) => [p.tournamentIdPs, p])), [payouts]);
 
+  // Torneios importados só via Tournament Summary (tournament_payouts),
+  // sem NENHUMA mão sincronizada pra esse torneio ainda -- pedido
+  // explícito: "total de torneios devem vir dos torneios importados e nao
+  // do hand history". Antes o total só contava hand_sessions, então um
+  // torneio cujo agente só mandou o resumo (sem hand history) nunca
+  // aparecia em lugar nenhum. Só entra no total SEM filtro de buy-in
+  // ativo -- tournament_payouts não guarda buy-in (isso só vem do hand
+  // history, ver extractTournamentInfo em hand-session-service.ts), então
+  // não dá pra classificar esses torneios numa faixa quando o filtro está
+  // ativo.
+  const tournamentIdsFromSessions = useMemo(
+    () => new Set(filteredSessions.map((s) => s.tournament_id_ps).filter((id): id is string => id != null)),
+    [filteredSessions]
+  );
+  const payoutOnlyList = useMemo(
+    () => (buyinFilter.length > 0 ? [] : payouts.filter((p) => !tournamentIdsFromSessions.has(p.tournamentIdPs))),
+    [payouts, tournamentIdsFromSessions, buyinFilter]
+  );
+  const totalTorneiosCount = filteredSessions.length + payoutOnlyList.length;
+
   // Buy-ins investidos / Ganhos (premiação) / Torneios: pedido explícito
   // pra vir SÓ das mãos importadas (hand_sessions + tournament_payouts),
   // nunca de bankroll_sessions (Gestão de Banca) — são fontes de verdade
   // separadas de propósito, e excluir uma sessão na Banca não pode apagar
   // (nem mudar) esses números aqui. Por isso soma bruta (nunca subtrai
   // buy-in do ganho, ao contrário do lucro líquido que a Banca calcula).
+  // Buy-in em si não soma nada dos torneios só-de-payout (não tem esse
+  // dado, ver comentário acima) — só Ganhos e as contagens de premiação
+  // ganham os torneios extras.
   const totalBuyinImportado = useMemo(
     () => filteredSessions.reduce((acc, s) => acc + (s.buyin ?? 0), 0),
     [filteredSessions]
@@ -140,8 +163,8 @@ export function StatisticsTab({
       filteredSessions.reduce((acc, s) => {
         const p = s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps) : undefined;
         return acc + (p?.heroPayoutAmount ?? 0);
-      }, 0),
-    [filteredSessions, payoutByTournament]
+      }, 0) + payoutOnlyList.reduce((acc, p) => acc + (p.heroPayoutAmount ?? 0), 0),
+    [filteredSessions, payoutByTournament, payoutOnlyList]
   );
 
   const payoutRegisteredCount = useMemo(
@@ -149,10 +172,13 @@ export function StatisticsTab({
       filteredSessions.filter((s) => {
         const p = s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps) : undefined;
         return p != null && (p.heroPayoutAmount != null || p.places.length > 0);
-      }).length,
-    [filteredSessions, payoutByTournament]
+      }).length +
+      // Torneio só-de-payout é, por definição, já registrado (é o único
+      // dado que ele tem).
+      payoutOnlyList.length,
+    [filteredSessions, payoutByTournament, payoutOnlyList]
   );
-  const payoutPendingCount = filteredSessions.length - payoutRegisteredCount;
+  const payoutPendingCount = totalTorneiosCount - payoutRegisteredCount;
 
   async function handleCompute() {
     if (computing) return;
@@ -188,10 +214,10 @@ export function StatisticsTab({
               value: filteredSessions.length > 0 ? fmtMoneyPlain(totalBuyinImportado) : null,
               icon: ArrowDownToLine,
             },
-            { label: "Torneios", value: filteredSessions.length > 0 ? String(filteredSessions.length) : null, icon: Hash },
+            { label: "Torneios", value: totalTorneiosCount > 0 ? String(totalTorneiosCount) : null, icon: Hash },
             {
               label: "Ganhos (premiação)",
-              value: filteredSessions.length > 0 ? fmtMoneyPlain(totalGanhosImportado) : null,
+              value: totalTorneiosCount > 0 ? fmtMoneyPlain(totalGanhosImportado) : null,
               icon: Trophy,
               tone: totalGanhosImportado > 0 ? "bom" : undefined,
             },
