@@ -506,39 +506,41 @@ function Seat({
     ) : null;
 
   // Bounty ("cabeça") em torneios PKO/Mystery Bounty -- pedido explicito:
-  // "coloque um alvo e o valor da cabeça... seguindo nosso layout". Mesma
-  // cor/estilo do chip de bounty ja usado na listagem de torneios
-  // (revisor-fila.tsx: borda/fundo/texto em #FBBF24), so' que por
-  // jogador (cada assento carrega o proprio bounty, hero incluido).
+  // "o pko pode colocar ao lado direito superior do nick do jogador, bem
+  // na quina" + "coloque a cor branca". Badge pequeno, absolute, encostado
+  // no canto superior-direito da placa de nome (mesmo padrao dos selos de
+  // campeao/medalha em revisor-fila.tsx), em vez de um chip solto na
+  // coluna -- ver onde e' renderizado (canto da placa de nome), abaixo.
   const bountyChip = !empty && bountyValue != null && (
     <div
       title={`Bounty de $${bountyValue}`}
       style={{
+        position: "absolute",
+        top: -8,
+        right: -8,
+        zIndex: 4,
         display: "flex",
         alignItems: "center",
-        gap: 3,
-        padding: "2px 8px",
+        gap: 2,
+        padding: "2px 7px",
         borderRadius: 999,
         fontFamily: F,
-        fontSize: 10.5,
+        fontSize: 10,
         fontWeight: 700,
-        color: "#FBBF24",
-        background: "rgba(251,191,36,0.10)",
-        border: "1px solid rgba(251,191,36,0.4)",
+        color: "#FFFFFF",
+        background: "rgba(10,10,12,0.9)",
+        border: "1px solid rgba(255,255,255,0.35)",
+        boxShadow: "0 2px 6px rgba(0,0,0,.5)",
         whiteSpace: "nowrap",
         ...num,
       }}
     >
-      <Target size={10} />${bountyValue}
+      <Target size={9} />${bountyValue}
     </div>
   );
 
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-      {/* Bounty bem ACIMA do nome da posicao (pedido explicito: "o alvo do
-          pko deve ficar bem em cima do nome da posição") -- primeiro
-          elemento da coluna, antes do proprio chip de posicao. */}
-      {bountyChip}
       <div style={{ position: "relative" }}>
         {isDealer && (
           <div
@@ -591,44 +593,50 @@ function Seat({
       {opponentHudChip}
 
       {!empty && (
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            gap: 1,
-            fontFamily: F,
-            color: acting ? "#FFFFFF" : "rgba(255,255,255,.72)",
-            background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
-            border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
-            borderRadius: 10,
-            padding: "4px 10px",
-            maxWidth: 118,
-            lineHeight: 1.25,
-            boxShadow: acting ? `0 0 10px ${col.glow}` : "none",
-            textShadow: acting ? `0 0 6px ${col.glow}` : "none",
-            transition: "all 200ms ease",
-          }}
-        >
-          {seat.playerName && (
-            <>
-              <span
-                style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}
-                title={seat.playerName}
-              >
-                {truncateName(seat.playerName)}
-              </span>
-              <div
-                style={{
-                  width: "100%",
-                  height: 1,
-                  background: acting ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.14)",
-                  margin: "2px 0",
-                }}
-              />
-            </>
-          )}
-          <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} bb</span>
+        <div style={{ position: "relative" }}>
+          {/* Bounty no canto superior-direito da placa de nome (pedido
+              explicito: "o pko pode colocar ao lado direito superior do
+              nick do jogador, bem na quina"). */}
+          {bountyChip}
+          <div
+            style={{
+              display: "flex",
+              flexDirection: "column",
+              alignItems: "center",
+              gap: 1,
+              fontFamily: F,
+              color: acting ? "#FFFFFF" : "rgba(255,255,255,.72)",
+              background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
+              border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
+              borderRadius: 10,
+              padding: "4px 10px",
+              maxWidth: 118,
+              lineHeight: 1.25,
+              boxShadow: acting ? `0 0 10px ${col.glow}` : "none",
+              textShadow: acting ? `0 0 6px ${col.glow}` : "none",
+              transition: "all 200ms ease",
+            }}
+          >
+            {seat.playerName && (
+              <>
+                <span
+                  style={{ fontSize: 11, fontWeight: 600, overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap", maxWidth: 110 }}
+                  title={seat.playerName}
+                >
+                  {truncateName(seat.playerName)}
+                </span>
+                <div
+                  style={{
+                    width: "100%",
+                    height: 1,
+                    background: acting ? "rgba(255,255,255,.28)" : "rgba(255,255,255,.14)",
+                    margin: "2px 0",
+                  }}
+                />
+              </>
+            )}
+            <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} bb</span>
+          </div>
         </div>
       )}
 

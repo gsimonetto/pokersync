@@ -52,16 +52,16 @@ import { F, T } from "@/lib/poker/drill-theme";
 // conforme header global, breadcrumb etc.) e usa o espaco que sobra ate'
 // o fim da viewport, com o mesmo respiro inferior de 40px do Treino.
 const GRID_FALLBACK_HEIGHT = "calc(100vh - 240px)"; // usado so' ate a 1a medicao real
-// GRID_MIN_HEIGHT (480 -> 560) e BOTTOM_PADDING_PX (40 -> 20) -- pedido
-// explicito: "o hero nao pode sair do container, pode aumentar o
-// container do revisor". O hero agora usa a carta tamanho "hero" (maior)
-// e a mesa parou de clipar overflow -- sem mais respiro vertical na
-// coluna, ele passava por cima do rodape da pagina. Aumentar a area
-// disponivel pra mesa+lista da margem suficiente pro hero (que se
-// projeta um pouco pra baixo da propria mesa) ficar contido dentro do
-// container do Revisor.
-const GRID_MIN_HEIGHT = 560;
-const BOTTOM_PADDING_PX = 20;
+// GRID_MIN_HEIGHT (480 -> 560 -> 640) e BOTTOM_PADDING_PX (40 -> 20 -> 8)
+// -- pedido explicito, repetido: "o hero ainda esta passando do
+// container, aumente mais o container da mesa". O hero usa a carta
+// tamanho "hero" (maior) e a mesa parou de clipar overflow -- sem
+// respiro vertical suficiente na coluna, ele continuava passando por
+// cima do rodape da pagina mesmo depois do primeiro aumento. Reclama
+// ainda mais espaco da viewport (BOTTOM_PADDING_PX bem menor) e sobe o
+// piso minimo (GRID_MIN_HEIGHT) pra telas mais baixas.
+const GRID_MIN_HEIGHT = 640;
+const BOTTOM_PADDING_PX = 8;
 
 interface HandInListing {
   id: string;
