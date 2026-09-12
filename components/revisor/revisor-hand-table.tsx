@@ -653,6 +653,25 @@ export function RevisorHandTable({
                   Seletor de velocidade continua removido — autoplay roda
                   em ritmo fixo. */}
               <div style={{ display: "flex", alignItems: "center", gap: 3, padding: 3, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
+                {/* Mão anterior/seguinte (pedido explicito: "quero o botao
+                    de player do desktop igual do celular, e' mais
+                    completo") -- mesmos onPrevHand/onNextHand ja usados no
+                    dock do celular, so' que dentro do pill de navegacao do
+                    header desktop em vez de um dock separado. */}
+                <button
+                  onClick={onPrevHand}
+                  disabled={!onPrevHand}
+                  aria-label="Mão anterior"
+                  title="Mão anterior"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
+                    color: !onPrevHand ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
+                    borderRadius: 999, width: 26, height: 26, cursor: !onPrevHand ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronsLeft size={13} />
+                </button>
+
                 <button
                   onClick={prevStep}
                   disabled={replayState.stepIndex === 0}
@@ -697,6 +716,20 @@ export function RevisorHandTable({
                   <ChevronRight size={13} />
                 </button>
 
+                <button
+                  onClick={onNextHand}
+                  disabled={!onNextHand}
+                  aria-label="Próxima mão"
+                  title="Próxima mão"
+                  style={{
+                    display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
+                    color: !onNextHand ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
+                    borderRadius: 999, width: 26, height: 26, cursor: !onNextHand ? "not-allowed" : "pointer",
+                  }}
+                >
+                  <ChevronsRight size={13} />
+                </button>
+
                 <span style={{ marginLeft: 3, marginRight: 5, fontSize: 10.5, color: "rgba(255,255,255,0.4)", ...num }}>
                   {replayState.stepIndex + 1}/{replayState.stepCount}
                 </span>
@@ -732,16 +765,23 @@ export function RevisorHandTable({
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
             {...(isMobile
-              ? { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.6, heroScale: 1.4 }
+              ? // Celular MANTIDO sem nenhuma mudanca (pedido explicito) --
+                // so' o desktop ganha o formato mais oval abaixo.
+                { aspectRatio: "3 / 5", cornerRadius: "10% / 6%", minSeatScale: 0.6, heroScale: 1.4 }
               : // Coluna estreita no desktop (ex: "Analisar mão") -- mesma
                 // ideia do celular (retangulo mais alto, piso de escala
                 // mais folgado), mas sem mover o hero pro canto (isso e'
                 // so' do modo tela-cheia do celular, ver mobileSeatLayout
                 // acima) -- os assentos continuam na borda calculada
                 // normal, so' o formato da mesa em volta deles muda.
+                // cornerRadius aumentado (pedido explicito: "no desktop a
+                // mesa esta muito quadrada... deixe ela mais oval") --
+                // mesmo par h/v = h*aspectRatio calibrado pra nao formar
+                // "bico" (ver comentario original em poker-table.tsx),
+                // so' com raio bem maior que o padrao.
                 compact
-                ? { aspectRatio: "4 / 5", cornerRadius: "10% / 8%", minSeatScale: 0.5 }
-                : {})}
+                ? { aspectRatio: "4 / 5", cornerRadius: "28% / 22%", minSeatScale: 0.5 }
+                : { cornerRadius: "34% / 54%" })}
           />
 
           {isMobile && (
