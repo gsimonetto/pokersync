@@ -3,10 +3,7 @@
 import { useMemo, useState } from "react";
 import {
   Trophy,
-  Layers,
   Award,
-  Loader2,
-  Sparkles,
   Hash,
   TrendingUp,
   CheckCircle2,
@@ -19,27 +16,20 @@ import {
   Flame,
   Snowflake,
   ChevronDown,
-  Monitor,
 } from "lucide-react";
-import { Painel, StatList, Bloqueado } from "@/components/dashboard/kit";
+import { Painel, StatList } from "@/components/dashboard/kit";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { TournamentPayoutsPanel } from "@/components/analysis/TournamentPayoutsPanel";
 import { buyinBucketOf } from "@/lib/services/analysis-service";
-import { fetchEligibleHandReviewIds, computeHandEvBatch } from "@/lib/services/hand-ev-service";
 import { BUYIN_BUCKET_LABEL, type BuyinBucket, type TournamentMetrics } from "@/types/analysis";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import type { TournamentPayout } from "@/lib/services/tournament-payout-service";
-import type { FinancialDay } from "@/lib/services/team-service";
 import type { DisplayCurrency } from "@/lib/hooks/use-currency-preference";
 
 const BUYIN_BUCKET_ORDER: BuyinBucket[] = ["0-10", "10-50", "50-200", "200+"];
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
-}
-
-function fmtChips(v: number | null): string | null {
-  return v === null ? null : `${v >= 0 ? "+" : ""}${Math.round(v).toLocaleString("pt-BR")}`;
 }
 
 function fmtSince(iso: string | null): string | null {
@@ -55,7 +45,6 @@ export function StatisticsTab({
   metrics,
   tournamentSessions,
   payouts,
-  onCevComputed,
   buyinFilter,
   onBuyinFilterChange,
   availableBuyinBuckets,
@@ -64,10 +53,8 @@ export function StatisticsTab({
   formatUsd,
 }: {
   metrics: TournamentMetrics;
-  financialSeries: FinancialDay[];
   tournamentSessions: HandSession[];
   payouts: TournamentPayout[];
-  onCevComputed: () => void;
   buyinFilter: BuyinBucket[];
   onBuyinFilterChange: (next: BuyinBucket[]) => void;
   availableBuyinBuckets: Set<BuyinBucket>;
@@ -75,13 +62,6 @@ export function StatisticsTab({
   onCurrencyChange: (next: DisplayCurrency) => void;
   formatUsd: (amountUsd: number | null) => string | null;
 }) {
-  const [computing, setComputing] = useState(false);
-  const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
-  const [computeError, setComputeError] = useState("");
-  const [summary, setSummary] = useState<{ computed: number; skipped: number } | null>(null);
-
-  const hasCev = metrics.chip_ev_total !== null;
-
   // Todo valor de dinheiro aqui vem em USD (buy-in/premiação importados
   // só reconhecem "$X ... USD" — ver hand-session-service.ts); formatUsd
   // já resolve a moeda escolhida pelo jogador (ver use-currency-preference.ts).
@@ -177,30 +157,6 @@ export function StatisticsTab({
     [filteredSessions, payoutByTournament, payoutOnlyList]
   );
   const payoutPendingCount = totalTorneiosCount - payoutRegisteredCount;
-
-  async function handleCompute() {
-    if (computing) return;
-    setComputing(true);
-    setComputeError("");
-    setSummary(null);
-    try {
-      const ids = await fetchEligibleHandReviewIds();
-      if (ids.length === 0) {
-        setSummary({ computed: 0, skipped: 0 });
-        return;
-      }
-      setProgress({ done: 0, total: ids.length });
-      const outcomes = await computeHandEvBatch(ids, (done, total) => setProgress({ done, total }));
-      const computed = outcomes.filter((o) => o.computed).length;
-      setSummary({ computed, skipped: outcomes.length - computed });
-      onCevComputed();
-    } catch (e) {
-      setComputeError(e instanceof Error ? e.message : "Erro ao calcular cEV.");
-    } finally {
-      setComputing(false);
-      setProgress(null);
-    }
-  }
 
   return (
     <div className="space-y-4">
@@ -331,9 +287,8 @@ export function StatisticsTab({
 
       <Painel titulo="Estrutura de premiação" icone={<Award size={14} className="icon-glow text-training" />}>
         <p className="mb-3 text-xs leading-relaxed text-muted">
-          Pré-requisito pro cálculo de cEV/ICM abaixo — sem saber quanto cada colocação pagou, não dá pra calcular quanto sua
-          decisão &quot;deveria&quot; valer em $. Vem automaticamente do agente desktop (Radar PokerSync) sincronizando o resumo de
-          cada torneio.
+          Quanto cada torneio pagou — vem automaticamente do agente desktop (Radar PokerSync) sincronizando o resumo de cada
+          torneio.
         </p>
 
         <div className="flex flex-wrap items-center gap-5">
@@ -362,73 +317,6 @@ export function StatisticsTab({
             <TournamentPayoutsPanel sessions={filteredSessions} payouts={payouts} formatUsd={formatUsd} />
           </div>
         )}
-      </Painel>
-
-      <Painel
-        titulo="cEV & ICM"
-        icone={<Layers size={14} className="icon-glow text-review" />}
-        action={
-          <button
-            onClick={handleCompute}
-            disabled={computing}
-            className="inline-flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink disabled:opacity-50"
-          >
-            {computing ? <Loader2 size={13} className="animate-spin" /> : <Sparkles size={13} className="icon-glow" />}
-            {computing && progress ? `Calculando ${progress.done}/${progress.total}` : "Calcular cEV"}
-          </button>
-        }
-      >
-        <p className="mb-3 text-xs leading-relaxed text-muted">
-          Cobre all-in no preflop com TODAS as mãos envolvidas mostradas no showdown (heads-up ou multiway), em torneios com
-          premiação cadastrada acima — é o único caso que o motor GTO valida hoje (ver{" "}
-          <code className="text-ink/70">pokersync-solver/engine/hand_cev.py</code>). Não é uma estimativa do torneio inteiro,
-          é a soma exata dessas mãos específicas.
-        </p>
-
-        <div className="mb-3 flex items-start gap-2 rounded-lg border border-hairline bg-elevated/60 p-2.5 text-[11.5px] leading-relaxed text-muted">
-          <Monitor size={14} className="mt-0.5 shrink-0 text-muted/70" />
-          <span>
-            Todas as mãos e torneios do Player Evolution vêm do{" "}
-            <span className="text-ink/80 font-semibold">agente desktop (Radar PokerSync)</span> sincronizando sozinho — não
-            existe mais importação manual nessa tela.
-          </span>
-        </div>
-
-        {computeError && <p className="mb-3 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{computeError}</p>}
-        {summary && !computeError && (
-          <p className="mb-3 text-xs text-muted">
-            {summary.computed} mão{summary.computed === 1 ? "" : "s"} calculada{summary.computed === 1 ? "" : "s"}
-            {summary.skipped > 0 && `, ${summary.skipped} não deu (sem premiação do torneio ou motor indisponível)`}.
-          </p>
-        )}
-
-        <div className="grid grid-cols-1 gap-2.5 sm:grid-cols-2">
-          {hasCev ? (
-            <>
-              <div className="rounded-lg border border-hairline bg-elevated p-3.5">
-                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">Chip EV Total / cEV por game</p>
-                <p className="mt-1 text-xl font-bold tabular-nums text-ink">
-                  {fmtChips(metrics.chip_ev_total)} <span className="text-sm font-normal text-muted">chips</span>
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted">{fmtChips(metrics.cev_per_game)} chips/game</p>
-              </div>
-              <div className="rounded-lg border border-hairline bg-elevated p-3.5">
-                <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">Net Expected Profit / EV ROI</p>
-                <p className={`mt-1 text-xl font-bold tabular-nums ${(metrics.net_ev_profit ?? 0) >= 0 ? "text-positive" : "text-negative"}`}>
-                  {fmtMoney(metrics.net_ev_profit)}
-                </p>
-                <p className="mt-0.5 text-[11px] text-muted">{fmtPct(metrics.ev_roi_pct) ?? "—"} EV ROI</p>
-              </div>
-            </>
-          ) : (
-            <Bloqueado
-              titulo="Chip EV Total, cEV/game, Net Expected Profit, EV ROI %"
-              texto={'Clique em "Calcular cEV" acima — sem mão elegível calculada ainda (ou o motor GTO não está publicado neste ambiente).'}
-            />
-          )}
-          <Bloqueado titulo="Desempenho por faixa de blind" texto="Existe a estrutura (hand_sessions), mas sem stack/blind por mão associado ao resultado." />
-          <Bloqueado titulo="Situações de ICM (bolha, mesa final)" texto="tournament_phase e icm_pressure existem no schema, mas o parser ainda não os preenche." />
-        </div>
       </Painel>
     </div>
   );

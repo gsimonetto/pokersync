@@ -1,6 +1,4 @@
 import { createClient } from "@/lib/supabase/client";
-import { fetchSessions } from "@/lib/services/bankroll-service";
-import type { FinancialDay } from "@/lib/services/team-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchHandEvResults } from "@/lib/services/hand-ev-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
@@ -214,6 +212,16 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
   };
 }
 
+// Fontes de hand_reviews que contam como "mão importada" pro Player
+// Evolution — pedido explícito: as estatísticas só podem vir de mão/
+// torneio importado, nunca de lançamento manual. "agent" é o Radar
+// PokerSync sincronizando sozinho; "import" é a importação em lote (ex:
+// os arquivos de hand history anexados numa sessão anterior). "manual"
+// (colar hand history à mão em Revisor de Mãos → Nova Mão) e "print"
+// (upload de print) continuam funcionando normalmente ali — servem pra
+// revisar UMA mão pontual — mas não entram nas métricas agregadas daqui.
+const IMPORTED_HAND_SOURCES = ["agent", "import"] as const;
+
 export async function fetchAnalysisHandRows(): Promise<AnalysisHandRow[]> {
   const supabase = createClient();
   // Sem paginação: hoje a base tem ~200 mãos por usuário. Quando o volume
@@ -231,11 +239,20 @@ export async function fetchAnalysisHandRows(): Promise<AnalysisHandRow[]> {
         "hero_open_raise, steal_opportunity, steal_attempt, steal_success, hero_faced_3bet, " +
         "hero_fold_to_3bet, hero_call_3bet, hero_made_4bet, hero_faced_4bet, hero_fold_to_4bet, " +
         "blind_defense_opportunity, blind_defended, re_steal, squeeze, " +
-        "hand_reviews!inner(created_at, parsed_data)"
+        "hand_reviews!inner(created_at, parsed_data, source)"
     )
+    .in("hand_reviews.source", IMPORTED_HAND_SOURCES as unknown as string[])
     .order("computed_at", { ascending: true });
   if (error) throw error;
-  return (data ?? []).map(rowToAnalysisHand);
+  // Filtro do lado do cliente como rede de segurança — o filtro acima em
+  // "hand_reviews.source" depende do PostgREST aplicar corretamente num
+  // embed com !inner; sem essa segunda checagem, uma mão "manual"/"print"
+  // vazaria pras estatísticas se esse filtro não pegar por algum motivo.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const filtered = (data ?? []).filter((r: any) =>
+    (IMPORTED_HAND_SOURCES as readonly string[]).includes(r.hand_reviews?.source)
+  );
+  return filtered.map(rowToAnalysisHand);
 }
 
 // ============================================================
@@ -539,39 +556,25 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
 // Sessões de torneio (hand_sessions, mesmo agrupador do Revisor) — é onde
 // a estrutura de premiação se ancora (por tournament_id_ps), pra aparecer
 // junto do torneio que o jogador já reconhece, não como tela separada.
+//
+// Mesma regra de fetchAnalysisHandRows: uma sessão só entra aqui se tiver
+// pelo menos uma mão vinculada com source importado (agent/import) --
+// colar hand history à mão em Revisor de Mãos → Nova Mão cria/anexa a
+// uma hand_sessions do mesmo jeito que uma mão do agente, então sem esse
+// filtro um torneio inteiro entraria no Player Evolution (Torneios,
+// buy-ins investidos, Estrutura de premiação) só por causa de UMA mão
+// colada manualmente. Duas consultas em vez de embed+!inner porque
+// PostgREST devolveria uma linha de hand_sessions por hand_review
+// batendo no filtro (duplicando sessão com mais de uma mão elegível).
 export async function fetchTournamentSessions(): Promise<HandSession[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("hand_sessions")
-    .select("*")
-    .eq("kind", "tournament")
-    .not("tournament_id_ps", "is", null)
-    .order("updated_at", { ascending: false });
+  const [{ data, error }, { data: importedReviews, error: eReviews }] = await Promise.all([
+    supabase.from("hand_sessions").select("*").eq("kind", "tournament").not("tournament_id_ps", "is", null).order("updated_at", { ascending: false }),
+    supabase.from("hand_reviews").select("hand_session_id").not("hand_session_id", "is", null).in("source", IMPORTED_HAND_SOURCES as unknown as string[]),
+  ]);
   if (error) throw error;
-  return (data ?? []) as HandSession[];
+  if (eReviews) throw eReviews;
+  const importedSessionIds = new Set((importedReviews ?? []).map((r) => r.hand_session_id as string));
+  return ((data ?? []) as HandSession[]).filter((s) => importedSessionIds.has(s.id));
 }
 
-// ============================================================
-// Gráfico principal — Net Won acumulado por dia, no mesmo formato que
-// EvolutionChart (components/time/evolution-chart.tsx) já consome, pra
-// reusar o componente pronto em vez de desenhar outro SVG do zero.
-// All-in EV fica de fora: motor não roda simulação de equity all-in
-// ainda (ver docs/cockpit/ROADMAP.md, item SOLVER-013) — sem essa linha, não sem dado fake.
-// ============================================================
-export async function fetchFinancialDaySeries(): Promise<FinancialDay[]> {
-  const sessions = await fetchSessions();
-  const byDay = new Map<string, { resultado: number; sessoes: number }>();
-  for (const s of sessions) {
-    const net = s.cashout - s.buyIn * (1 + (s.reentries || 0));
-    const agg = byDay.get(s.date) ?? { resultado: 0, sessoes: 0 };
-    agg.resultado += net;
-    agg.sessoes += 1;
-    byDay.set(s.date, agg);
-  }
-  const days = [...byDay.entries()].sort(([a], [b]) => (a < b ? -1 : 1));
-  let cumulative = 0;
-  return days.map(([dia, agg]) => {
-    cumulative += agg.resultado;
-    return { dia, resultado: Math.round(agg.resultado * 100) / 100, acumulado: Math.round(cumulative * 100) / 100, sessoes: agg.sessoes };
-  });
-}

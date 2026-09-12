@@ -25,10 +25,8 @@ import {
   buyinBucketOf,
   fetchTournamentMetrics,
   fetchTournamentSessions,
-  fetchFinancialDaySeries,
 } from "@/lib/services/analysis-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
-import type { FinancialDay } from "@/lib/services/team-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import {
   EMPTY_ANALYSIS_FILTERS,
@@ -55,7 +53,6 @@ export default function PerformancePage() {
   const [tournament, setTournament] = useState<TournamentMetrics | null>(null);
   const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
   const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
-  const [financialSeries, setFinancialSeries] = useState<FinancialDay[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("preflop");
@@ -88,18 +85,16 @@ export default function PerformancePage() {
   async function loadAll() {
     setErro("");
     try {
-      const [r, tourn, sessions, po, fs] = await Promise.all([
+      const [r, tourn, sessions, po] = await Promise.all([
         fetchAnalysisHandRows(),
         fetchTournamentMetrics(tournamentBuyinFilter),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
-        fetchFinancialDaySeries(),
       ]);
       setRows(r);
       setTournament(tourn);
       setTournamentSessions(sessions);
       setPayouts(po);
-      setFinancialSeries(fs);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar a análise.");
     } finally {
@@ -206,10 +201,8 @@ export default function PerformancePage() {
                     {tab === "estatisticas" && tournament && (
                       <StatisticsTab
                         metrics={tournament}
-                        financialSeries={financialSeries}
                         tournamentSessions={tournamentSessions}
                         payouts={payouts}
-                        onCevComputed={() => reloadTournamentMetrics()}
                         buyinFilter={tournamentBuyinFilter}
                         onBuyinFilterChange={handleBuyinFilterChange}
                         availableBuyinBuckets={availableBuyinBuckets}
