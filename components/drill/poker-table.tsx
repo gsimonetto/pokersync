@@ -315,10 +315,14 @@ function CommittedChip({ seat, amount, scale, heroScale = 1 }: { seat: SeatLayou
 // gira sentido anti-horario = topo da carta pende pra esquerda), mas o
 // angulo total (6deg pra 2 cartas = 3deg pra cada lado) era sutil demais
 // pra ficar perceptivel — subiu pra 10deg (5deg por carta em duplas).
+// Subiu de novo pra 16deg (pedido explicito: "deitar um pouquinho mais
+// as cartas, pois o 10 neste exemplo ficou muito escondido") -- com mais
+// giro o canto superior-esquerdo da carta de tras (onde fica o rank)
+// desloca mais pra fora da carta da frente, ficando mais visivel.
 const CARD_OVERLAP_PX: Record<Size, number> = { board: 30, hero: 44, mini: 20, villain: 25 } as const;
 type Size = "board" | "hero" | "mini" | "villain";
 
-function CardFan({ cards, size, fanDeg = 10 }: { cards: (string | null)[]; size: Size; fanDeg?: number }) {
+function CardFan({ cards, size, fanDeg = 16 }: { cards: (string | null)[]; size: Size; fanDeg?: number }) {
   const overlap = CARD_OVERLAP_PX[size];
   return (
     <div style={{ display: "flex" }}>
