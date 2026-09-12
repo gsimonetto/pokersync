@@ -1,5 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
-import { parseSession, type ParsedHand } from "@/lib/poker/hand-parser";
+import { parseSession, handDateToISO, type ParsedHand } from "@/lib/poker/hand-parser";
 import type { ProfileCard } from "@/lib/services/profile-card-type";
 
 const BUCKET = "hand-reviews";
@@ -518,6 +518,10 @@ export async function importSelectedHands(
     const hand = batch.parsed_hands[idx];
     if (!hand) continue;
     const title = [hand.format, hand.stakes, hand.heroPosition].filter(Boolean).join(" · ") || "Mão importada";
+    // created_at explicito com a data da propria hand history (dia em que a
+    // mao foi jogada) -- sem isso o default do banco (now()) marcava a mao
+    // com o dia da IMPORTACAO, nao o dia do torneio (pedido explicito).
+    const playedAt = handDateToISO(hand.date);
     const { data, error } = await supabase
       .from("hand_reviews")
       .insert({
@@ -527,6 +531,7 @@ export async function importSelectedHands(
         parsed_data: { kind: "parsed", ...hand },
         source: "import",
         status: "pendente",
+        ...(playedAt ? { created_at: playedAt } : {}),
       })
       .select()
       .single();

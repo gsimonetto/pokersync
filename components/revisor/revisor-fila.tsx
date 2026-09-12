@@ -75,11 +75,9 @@ export function RevisorFila({
   // ---- Sessões ----
   const [sessionsList, setSessionsList] = useState<HandSessionWithCount[]>([]);
   const [sessionsLoading, setSessionsLoading] = useState(true);
-  // Filtros da lista de torneios/sessoes (pedido explicito): chips
-  // nao-exclusivos ("campeão" + "PKO" ativos ao mesmo tempo mostra
-  // torneios que casam com QUALQUER um dos dois) + busca por texto no
-  // nome do torneio/sessao.
-  const [sessionChipFilters, setSessionChipFilters] = useState<Set<"campeao" | "pko" | "mystery">>(new Set());
+  // Busca por texto no nome do torneio/sessao (chips de Campeão/PKO/Mystery
+  // removidos, pedido explicito: "esse filtro pode tirar, manter apenas a
+  // lupa").
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [sessionsError, setSessionsError] = useState("");
@@ -255,29 +253,13 @@ export function RevisorFila({
     router.push(`/treino?suggestionId=${leak.drill_id}`);
   }
 
-  function toggleSessionChip(chip: "campeao" | "pko" | "mystery") {
-    setSessionChipFilters((prev) => {
-      const next = new Set(prev);
-      if (next.has(chip)) next.delete(chip);
-      else next.add(chip);
-      return next;
-    });
-  }
-
   const filteredSessions = useMemo(() => {
     const q = sessionSearchQuery.trim().toLowerCase();
     return sessionsList.filter((s) => {
-      if (sessionChipFilters.size > 0) {
-        const matches =
-          (sessionChipFilters.has("campeao") && s.champion) ||
-          (sessionChipFilters.has("pko") && s.format_type === "pko") ||
-          (sessionChipFilters.has("mystery") && s.format_type === "mystery");
-        if (!matches) return false;
-      }
       if (q && !s.label.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [sessionsList, sessionChipFilters, sessionSearchQuery]);
+  }, [sessionsList, sessionSearchQuery]);
 
   const counts = useMemo(() => {
     const acc: Record<string, number> = { pendente: 0, em_revisao: 0, concluida: 0 };
@@ -342,19 +324,6 @@ export function RevisorFila({
           <SummaryStat icon={HelpCircle} label="Dúvida" value={String(summary.totalDoubts)} accent="#f59e0b" />
         </div>
       )}
-      {summary && (summary.worstStreet || summary.worstCategory) && (
-        <p className="mb-4 text-xs text-muted">
-          Pior rua nos últimos 30 dias:{" "}
-          <span className="font-semibold text-ink">{summary.worstStreet ? summary.worstStreet.toUpperCase() : "—"}</span>
-          {summary.worstCategory && (
-            <>
-              {" "}
-              · categoria de erro mais comum: <span className="font-semibold text-ink">{summary.worstCategory}</span>
-            </>
-          )}
-        </p>
-      )}
-
       {/* Toolbar unica: abas + chips + busca + acao principal na mesma
           linha -- mesmo padrao do Funil (Time > Painel), em vez de cada
           grupo de filtro numa linha separada. */}
@@ -370,18 +339,6 @@ export function RevisorFila({
 
         {tab === "sessoes" && (
           <>
-            <FilterChip
-              label="Campeão"
-              icon={<Trophy size={12} />}
-              active={sessionChipFilters.has("campeao")}
-              onClick={() => toggleSessionChip("campeao")}
-            />
-            <FilterChip label="PKO" active={sessionChipFilters.has("pko")} onClick={() => toggleSessionChip("pko")} />
-            <FilterChip
-              label="Mystery"
-              active={sessionChipFilters.has("mystery")}
-              onClick={() => toggleSessionChip("mystery")}
-            />
             <button
               onClick={() => {
                 setSessionSearchOpen((v) => !v);

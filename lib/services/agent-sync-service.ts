@@ -6,7 +6,7 @@
 // sync (device, batch, dedupe, contagem).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
-import { splitHands, parseHand, type ParsedHand } from "@/lib/poker/hand-parser";
+import { splitHands, parseHand, handDateToISO, type ParsedHand } from "@/lib/poker/hand-parser";
 import { extractTournamentInfo } from "@/lib/services/hand-session-service";
 
 export interface AgentDeviceInfo {
@@ -268,6 +268,11 @@ export async function processAgentSync(
         }
       }
 
+      // created_at explicito com a data da propria hand history (dia em que
+      // a mao foi jogada) -- sem isso o default do banco (now()) marcava a
+      // mao com o dia em que o agente sincronizou, nao o dia do torneio
+      // (pedido explicito, mesma correcao do fluxo de import manual).
+      const playedAt = c.parsed ? handDateToISO(c.parsed.date) : null;
       rowsToInsert.push({
         user_id: userId,
         title: buildTitle(c.parsed, input.pokerRoom),
@@ -283,6 +288,7 @@ export async function processAgentSync(
         device_id: input.device.deviceId,
         sync_batch_id: batchId,
         hand_session_id: handSessionId,
+        ...(playedAt ? { created_at: playedAt } : {}),
       });
     }
 

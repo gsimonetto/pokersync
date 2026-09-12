@@ -430,6 +430,20 @@ function extractDate(text: string): string | null {
   return m ? m[1].trim() : null;
 }
 
+// Converte o "date" cru da hand history ("2024/09/12 21:15:30 ET") pra ISO,
+// usado pra marcar hand_reviews.created_at com o dia em que a mão foi JOGADA
+// em vez do dia em que foi importada (pedido explicito) -- sem isso, uma
+// hand history importada semanas depois aparecia com a data de hoje na
+// listagem do revisor, e nao a data real do torneio.
+export function handDateToISO(date: string | null): string | null {
+  if (!date) return null;
+  const m = date.match(/(\d{4})\/(\d{2})\/(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  const parsed = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
+}
+
 function extractHeroPosition(text: string, heroName: string | null): string | null {
   if (!heroName) return null;
   const escaped = heroName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
