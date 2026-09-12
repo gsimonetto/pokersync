@@ -24,7 +24,6 @@ import { buyinBucketOf } from "@/lib/services/analysis-service";
 import { BUYIN_BUCKET_LABEL, type BuyinBucket, type TournamentMetrics } from "@/types/analysis";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import type { TournamentPayout } from "@/lib/services/tournament-payout-service";
-import type { FinancialDay } from "@/lib/services/team-service";
 import type { DisplayCurrency } from "@/lib/hooks/use-currency-preference";
 
 const BUYIN_BUCKET_ORDER: BuyinBucket[] = ["0-10", "10-50", "50-200", "200+"];
@@ -54,7 +53,6 @@ export function StatisticsTab({
   formatUsd,
 }: {
   metrics: TournamentMetrics;
-  financialSeries: FinancialDay[];
   tournamentSessions: HandSession[];
   payouts: TournamentPayout[];
   buyinFilter: BuyinBucket[];
