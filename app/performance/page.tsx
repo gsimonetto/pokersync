@@ -14,6 +14,7 @@ import { RadarPanel } from "@/components/analysis/RadarPanel";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
 import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
 import { isAddonUnlockedFor } from "@/lib/plans/plans-data";
+import { useCurrencyPreference } from "@/lib/hooks/use-currency-preference";
 import {
   fetchAnalysisHandRows,
   applyAnalysisFilters,
@@ -60,10 +61,16 @@ export default function PerformancePage() {
   const [tab, setTab] = useState<TabKey>("preflop");
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
   // Filtro de buy-in — só afeta a aba Estatísticas (Total Games/ROI/ITM/
-  // Lucro total, que vêm de bankroll_sessions; cEV/ICM não têm buy-in
-  // associado, ver comentário em fetchTournamentMetrics), por isso vive
-  // separado do `filters` de cima (que filtra mãos preflop/postflop).
+  // Lucro total, que vêm de hand_sessions + tournament_payouts; cEV/ICM
+  // não têm buy-in associado, ver comentário em fetchTournamentMetrics),
+  // por isso vive separado do `filters` de cima (que filtra mãos
+  // preflop/postflop).
   const [tournamentBuyinFilter, setTournamentBuyinFilter] = useState<BuyinBucket[]>([]);
+  // Buy-in/premiação importados sempre vêm em USD (ver
+  // use-currency-preference.ts) — o jogador escolhe se quer ver em dólar
+  // cru ou convertido pra real, um só lugar controlando os dois painéis
+  // que mostram dinheiro na aba Estatísticas.
+  const { currency, setCurrency, formatUsd } = useCurrencyPreference();
   // Radar PokerSync e' addon, nao vem liberado por padrao em nenhum plano
   // -- a aba existe pra todo mundo (pedido: "radar pokersync deve ficar
   // dentro do player evolution"), mas o conteudo so' aparece pra quem tem
@@ -206,6 +213,9 @@ export default function PerformancePage() {
                         buyinFilter={tournamentBuyinFilter}
                         onBuyinFilterChange={handleBuyinFilterChange}
                         availableBuyinBuckets={availableBuyinBuckets}
+                        currency={currency}
+                        onCurrencyChange={setCurrency}
+                        formatUsd={formatUsd}
                       />
                     )}
                     {tab === "radar" &&

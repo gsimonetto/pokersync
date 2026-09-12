@@ -833,11 +833,19 @@ export function parseHand(rawText: string): ParsedHand {
   const postflopTags = computePostflopTags(streets, heroName);
   const preflopTags = computePreflopTags(preflopActionsForMatchup, seats, heroName);
 
+  // Pedido explicito: "mesas com 3 jogadores sao de sit and go" -- mesa
+  // declarada 3-max desde a primeira mao (maxSeats, ja extraido acima) e'
+  // o sinal de Sit & Go/Spin & Go, nao de MTT normal (MTT so chega a
+  // 3-handed na mesa final, nunca comeca declarada 3-max). extractFormat
+  // sozinho so distingue "Tournament"/"Torneio" de cash, nunca SNG.
+  const rawFormat = extractFormat(rawText);
+  const format = rawFormat === "MTT" && maxSeats !== null && maxSeats <= 3 ? "SNG" : rawFormat;
+
   return {
     site,
     handId: extractHandId(rawText),
     date: extractDate(rawText),
-    format: extractFormat(rawText),
+    format,
     stakes: extractStakes(rawText),
     heroName,
     heroCards: extractHeroCards(rawText, heroName),

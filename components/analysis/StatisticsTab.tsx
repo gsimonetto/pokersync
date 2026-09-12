@@ -30,20 +30,12 @@ import { BUYIN_BUCKET_LABEL, type BuyinBucket, type TournamentMetrics } from "@/
 import type { HandSession } from "@/lib/services/hand-session-service";
 import type { TournamentPayout } from "@/lib/services/tournament-payout-service";
 import type { FinancialDay } from "@/lib/services/team-service";
+import type { DisplayCurrency } from "@/lib/hooks/use-currency-preference";
 
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
 const BUYIN_BUCKET_ORDER: BuyinBucket[] = ["0-10", "10-50", "50-200", "200+"];
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
-}
-
-function fmtMoney(v: number | null): string | null {
-  return v === null ? null : `${v >= 0 ? "+" : ""}${BRL.format(v)}`;
-}
-
-function fmtMoneyPlain(v: number | null): string | null {
-  return v === null ? null : BRL.format(v);
 }
 
 function fmtChips(v: number | null): string | null {
@@ -67,6 +59,9 @@ export function StatisticsTab({
   buyinFilter,
   onBuyinFilterChange,
   availableBuyinBuckets,
+  currency,
+  onCurrencyChange,
+  formatUsd,
 }: {
   metrics: TournamentMetrics;
   financialSeries: FinancialDay[];
@@ -76,6 +71,9 @@ export function StatisticsTab({
   buyinFilter: BuyinBucket[];
   onBuyinFilterChange: (next: BuyinBucket[]) => void;
   availableBuyinBuckets: Set<BuyinBucket>;
+  currency: DisplayCurrency;
+  onCurrencyChange: (next: DisplayCurrency) => void;
+  formatUsd: (amountUsd: number | null) => string | null;
 }) {
   const [computing, setComputing] = useState(false);
   const [progress, setProgress] = useState<{ done: number; total: number } | null>(null);
@@ -84,10 +82,21 @@ export function StatisticsTab({
 
   const hasCev = metrics.chip_ev_total !== null;
 
+  // Todo valor de dinheiro aqui vem em USD (buy-in/premiação importados
+  // só reconhecem "$X ... USD" — ver hand-session-service.ts); formatUsd
+  // já resolve a moeda escolhida pelo jogador (ver use-currency-preference.ts).
+  function fmtMoney(v: number | null): string | null {
+    if (v === null) return null;
+    const formatted = formatUsd(v);
+    return formatted === null ? null : `${v >= 0 ? "+" : ""}${formatted}`;
+  }
+  const fmtMoneyPlain = formatUsd;
+
   // Painel de premiação/torneios (hand_sessions) filtrado pelo mesmo
-  // corte de buy-in — fonte diferente das bankroll_sessions que alimentam
-  // `metrics` (ver comentário em fetchTournamentMetrics), então a lista
-  // abaixo é filtrada aqui no cliente em vez de recarregar do servidor.
+  // corte de buy-in que `metrics` já aplica no servidor (ver
+  // fetchTournamentMetrics) — filtrado aqui de novo no cliente pra não
+  // precisar recarregar tournamentSessions/payouts do servidor a cada
+  // troca de filtro.
   const filteredSessions =
     buyinFilter.length === 0 ? tournamentSessions : tournamentSessions.filter((s) => s.buyin != null && buyinFilter.includes(buyinBucketOf(s.buyin)));
 
@@ -195,7 +204,32 @@ export function StatisticsTab({
 
   return (
     <div className="space-y-4">
-      <Painel titulo="Resumo financeiro" icone={<Wallet size={14} className="icon-glow text-evolution" />}>
+      <Painel
+        titulo="Resumo financeiro"
+        icone={<Wallet size={14} className="icon-glow text-evolution" />}
+        action={
+          <div className="flex items-center gap-1 rounded-lg border border-hairline p-0.5 text-[11px] font-semibold">
+            <button
+              type="button"
+              onClick={() => onCurrencyChange("usd")}
+              className={`rounded-md px-2 py-1 transition-colors ${currency === "usd" ? "bg-ink text-void" : "text-muted hover:text-ink"}`}
+            >
+              US$
+            </button>
+            <button
+              type="button"
+              onClick={() => onCurrencyChange("brl")}
+              className={`rounded-md px-2 py-1 transition-colors ${currency === "brl" ? "bg-ink text-void" : "text-muted hover:text-ink"}`}
+            >
+              R$
+            </button>
+          </div>
+        }
+      >
+        <p className="mb-3 -mt-1 text-[11px] leading-relaxed text-muted/70">
+          Buy-in e premiação são sempre importados em dólar (hand history/resumo de torneio) — escolha acima se quer ver os
+          valores em dólar ou convertidos pra real na cotação do dia.
+        </p>
         <StatList
           items={[
             {
@@ -325,7 +359,7 @@ export function StatisticsTab({
 
         {premiacaoOpen && (
           <div className="mt-3 border-t border-hairline pt-3">
-            <TournamentPayoutsPanel sessions={filteredSessions} payouts={payouts} />
+            <TournamentPayoutsPanel sessions={filteredSessions} payouts={payouts} formatUsd={formatUsd} />
           </div>
         )}
       </Painel>
