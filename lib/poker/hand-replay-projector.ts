@@ -392,15 +392,6 @@ export function projectHandAtStep(
   const chipsOutByPlayer = new Map<string, number>(initial.chipsOutByPlayer);
   const chipsWonByPlayer = new Map<string, number>();
 
-  // Chip do assento (fold/check/allin) — pedido explicito (2026-09):
-  // "não quero que fique fixo quando alguém dá all in... quero apenas que
-  // apareça (como era antes)... não precisa ficar fixo". Reverte o
-  // comportamento anterior (fold/all-in ficavam LOCKED, nunca resetando
-  // pelo resto da mao) -- agora TODO tipo de badge (inclusive fold/allin)
-  // usa o mesmo criterio transitorio: so vale NESSA rua, resetando a
-  // cada "deal" (nova rua comeca com decisões novas).
-  let roundBadgeByPlayer = new Map<string, { type: string; size?: number }>();
-
   // Committed-na-rua-atual por posLabel (nao por nome — a UI so conhece
   // posLabel). Reseta toda vez que cruza um "deal" (nova rua comeca).
   // Blinds do preflop contam desde o step 0 (SB/BB ja "tem ficha na
@@ -429,7 +420,6 @@ export function projectHandAtStep(
           streetCommitted.set(e.posLabel, (streetCommitted.get(e.posLabel) ?? 0) + e.chipsAdded);
           chipsOutByPlayer.set(e.player, (chipsOutByPlayer.get(e.player) ?? 0) + e.chipsAdded);
         }
-        roundBadgeByPlayer.set(e.player, { type: e.badgeType, size: e.badgeSizeBB });
         break;
       }
       case "deal":
@@ -437,7 +427,6 @@ export function projectHandAtStep(
         // Rua nova comeca — pilhas de fichas da rua anterior "vao pro
         // pote" (ja estao contadas em `pot`) e o chao fica limpo de novo.
         streetCommitted = new Map();
-        roundBadgeByPlayer = new Map();
         break;
       case "showdown":
         revealed.set(e.player, e.cards);
@@ -491,9 +480,18 @@ export function projectHandAtStep(
     // mostrava startingChips cru, o stack nunca se mexia na tela.
     const chipsOut = chipsOutByPlayer.get(slot.playerName) ?? 0;
     const chipsWon = chipsWonByPlayer.get(slot.playerName) ?? 0;
-    // Chip de acao no assento (fold/check/call/bet/raise/allin) -- so'
-    // vale enquanto a rua atual nao vira (ver comentario acima).
-    const badge = roundBadgeByPlayer.get(slot.playerName);
+    // Chip de acao no assento (fold/check/allin, ver showBadge em
+    // poker-table.tsx) -- pedido explicito (2026-09): "não quero que
+    // fique a ação fixa em baixo do jogador... quero apenas que apareça
+    // (como era antes)". Em vez de acumular num mapa que persiste por
+    // toda a rua (ou pior, a mao inteira), so' mostra o badge no EXATO
+    // step em que essa acao acabou de acontecer (currentEvent) -- assim
+    // que o usuario avanca pro proximo step, o badge desse jogador some,
+    // mesmo dentro da mesma rua.
+    const badge =
+      currentEvent && currentEvent.kind === "action" && currentEvent.player === slot.playerName
+        ? { type: currentEvent.badgeType, size: currentEvent.badgeSizeBB }
+        : null;
     seats[slot.posLabel] = {
       status: isFolded ? "folded" : isActing ? "acting" : "live",
       stack: toBB(seatData.startingChips - chipsOut + chipsWon),
