@@ -531,6 +531,10 @@ function Seat({
 
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+      {/* Bounty bem ACIMA do nome da posicao (pedido explicito: "o alvo do
+          pko deve ficar bem em cima do nome da posição") -- primeiro
+          elemento da coluna, antes do proprio chip de posicao. */}
+      {bountyChip}
       <div style={{ position: "relative" }}>
         {isDealer && (
           <div
@@ -581,7 +585,6 @@ function Seat({
       </div>
 
       {opponentHudChip}
-      {bountyChip}
 
       {!empty && (
         <div
@@ -1056,13 +1059,18 @@ export function PokerTable({
             bloco de cartas+nome colidindo com o badge de SPR, que ficava
             colado logo abaixo desse ponto. Descer o bloco central da mesa
             um pouco abre esse respiro sem precisar encolher as cartas. */}
-        <div style={{ position: "absolute", left: "50%", top: "53%", transform: `translate(-50%,-50%) scale(${seatScale})`, display: "flex", flexDirection: "column", alignItems: "center", gap: 10, zIndex: 3 }}>
+        <div style={{ position: "absolute", left: "50%", top: "53%", transform: `translate(-50%,-50%) scale(${seatScale})`, zIndex: 3 }}>
           {active && hand ? (
-            <>
-              {hand.spr != null && <SprBadge spr={hand.spr} />}
-              {/* Pote ACIMA do board (pedido explicito) -- era board depois
-                  pote, invertido. */}
-              <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+            // O board fica no FLUXO normal desse wrapper (unico conteudo
+            // que conta pra altura dele) -- e' por isso que o translate
+            // (-50%,-50%) do pai centraliza exatamente o BOARD no meio da
+            // mesa (pedido explicito: "quero que as cartas fiquem
+            // centralizadas no meio da mesa e nao o pote"). SPR + pote
+            // ficam absolute, ancorados no proprio topo desse wrapper --
+            // flutuam ACIMA do board sem empurrar o centro dele pra baixo.
+            <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
+              <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+                {hand.spr != null && <SprBadge spr={hand.spr} />}
                 <div
                   style={{
                     display: "flex",
@@ -1074,6 +1082,7 @@ export function PokerTable({
                     background: "linear-gradient(180deg,#000000,#0A0A0A)",
                     border: "1px solid rgba(255,255,255,.20)",
                     boxShadow: "0 8px 22px rgba(0,0,0,.7), 0 0 20px rgba(52,211,153,.20)",
+                    whiteSpace: "nowrap",
                   }}
                 >
                   <PotChipStack />
@@ -1088,7 +1097,7 @@ export function PokerTable({
                   </div>
                 ))}
               </div>
-            </>
+            </div>
           ) : (
             <div style={{ textAlign: "center", maxWidth: 290, fontFamily: F }}>
               <div style={{ display: "flex", gap: 7, justifyContent: "center", marginBottom: 14 }}>
