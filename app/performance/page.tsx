@@ -209,7 +209,6 @@ export default function PerformancePage() {
                         financialSeries={financialSeries}
                         tournamentSessions={tournamentSessions}
                         payouts={payouts}
-                        onCevComputed={() => reloadTournamentMetrics()}
                         buyinFilter={tournamentBuyinFilter}
                         onBuyinFilterChange={handleBuyinFilterChange}
                         availableBuyinBuckets={availableBuyinBuckets}
