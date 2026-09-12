@@ -62,11 +62,15 @@ export const TOURNAMENT_STAGE_LABEL: Record<TournamentStage, string> = {
 // torneio). Ver buyinBucketOf em analysis-service.ts.
 export type BuyinBucket = "0-10" | "10-50" | "50-200" | "200+";
 
+// Corte fixo em USD (ver buyinBucketOf em analysis-service.ts) -- buy-in
+// importado de hand history so' e' reconhecido em "$X ... USD" (nunca
+// R$), entao a faixa e' sempre em dolar, independente da moeda que o
+// jogador escolheu pra EXIBIR os valores (ver use-currency-preference.ts).
 export const BUYIN_BUCKET_LABEL: Record<BuyinBucket, string> = {
-  "0-10": "Até R$10",
-  "10-50": "R$10–50",
-  "50-200": "R$50–200",
-  "200+": "R$200+",
+  "0-10": "Até US$10",
+  "10-50": "US$10–50",
+  "50-200": "US$50–200",
+  "200+": "US$200+",
 };
 
 // 8 posições reais gravadas em hand_tags.hero_position (mesma granularidade

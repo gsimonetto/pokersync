@@ -6,8 +6,6 @@ import type { TournamentPayout } from "@/lib/services/tournament-payout-service"
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { EmptyState } from "@/components/dashboard/kit";
 
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
-
 // Mesmos slugs que o agente desktop manda em `pokerRoom` (ver PokerRoom em
 // pokersync-agent/crates/scanner/src/room.rs) — só rótulo de exibição.
 const ROOM_LABEL: Record<string, string> = {
@@ -38,7 +36,17 @@ interface TournamentRowData {
 // desktop (Radar PokerSync) sincronizando o resumo de torneio — não há
 // mais formulário manual aqui (pedido explícito: retirar os dois botões
 // de importação manual do Player Evolution).
-export function TournamentPayoutsPanel({ sessions, payouts }: { sessions: HandSession[]; payouts: TournamentPayout[] }) {
+export function TournamentPayoutsPanel({
+  sessions,
+  payouts,
+  formatUsd,
+}: {
+  sessions: HandSession[];
+  payouts: TournamentPayout[];
+  // Buy-in/premiação sempre vêm em USD (ver use-currency-preference.ts) —
+  // formatUsd já resolve a moeda que o jogador escolheu ver.
+  formatUsd: (amountUsd: number | null) => string | null;
+}) {
   const byTournament = new Map(payouts.map((p) => [p.tournamentIdPs, p]));
 
   const sessionTournamentIds = new Set(sessions.map((s) => s.tournament_id_ps).filter((id): id is string => !!id));
@@ -71,13 +79,13 @@ export function TournamentPayoutsPanel({ sessions, payouts }: { sessions: HandSe
   return (
     <div className="grid grid-cols-1 gap-2 sm:grid-cols-2 lg:grid-cols-3">
       {rows.map((row) => (
-        <TournamentRow key={row.key} row={row} />
+        <TournamentRow key={row.key} row={row} formatUsd={formatUsd} />
       ))}
     </div>
   );
 }
 
-function TournamentRow({ row }: { row: TournamentRowData }) {
+function TournamentRow({ row, formatUsd }: { row: TournamentRowData; formatUsd: (amountUsd: number | null) => string | null }) {
   const payout = row.payout;
   const [open, setOpen] = useState(false);
 
@@ -99,9 +107,9 @@ function TournamentRow({ row }: { row: TournamentRowData }) {
         <div className="min-w-0">
           <p className="truncate text-sm font-medium text-ink">{row.label}</p>
           <p className="mt-0.5 text-[11px] leading-relaxed text-muted">
-            {row.buyin != null ? BRL.format(row.buyin) : "buy-in não identificado"}
+            {row.buyin != null ? formatUsd(row.buyin) : "buy-in não identificado"}
             {payout?.heroFinishPlace != null && <> · {payout.heroFinishPlace}º lugar</>}
-            {payout?.heroPayoutAmount != null && <> · {BRL.format(payout.heroPayoutAmount)}</>}
+            {payout?.heroPayoutAmount != null && <> · {formatUsd(payout.heroPayoutAmount)}</>}
           </p>
           {hasPayout ? (
             <span className="mt-1.5 inline-flex items-center gap-1 rounded-full border border-positive/35 bg-positive/10 px-2 py-0.5 text-[10px] font-semibold text-positive">
@@ -126,7 +134,7 @@ function TournamentRow({ row }: { row: TournamentRowData }) {
               .sort((a, b) => a.place - b.place)
               .map((p) => (
                 <p key={p.place}>
-                  {p.place}º — {BRL.format(p.amount)}
+                  {p.place}º — {formatUsd(p.amount)}
                 </p>
               ))}
           </div>

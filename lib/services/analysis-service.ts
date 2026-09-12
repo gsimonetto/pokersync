@@ -382,26 +382,31 @@ export function computePostflopMetrics(rows: AnalysisHandRow[]): PostflopMetrics
 // torneios importados e nao do hand history" (leia-se: de tudo que foi
 // importado — mãos E resumos de torneio — nunca de bankroll_sessions,
 // que é lançamento manual da Gestão de Banca, uma fonte de verdade
-// separada). Buy-in vem de hand_sessions (extraído do hand history,
-// ver extractTournamentInfo em hand-session-service.ts); premiação vem
-// de tournament_payouts (agente desktop sincronizando o Tournament
-// Summary). Um torneio sem hand_sessions (só resumo sincronizado, sem
-// mão anexada ainda) ainda entra na conta — "torneio órfão" no mesmo
-// espírito do TournamentPayoutsPanel.
+// separada). Buy-in vem de hand_sessions (extraído do hand history, em
+// USD — ver extractTournamentInfo em hand-session-service.ts); premiação
+// vem de tournament_payouts (agente desktop sincronizando o Tournament
+// Summary, também em USD).
+//
+// ROI/ITM/Lucro médio/Torneios por dia/sequências só entram torneios com
+// buy-in CONHECIDO (hand_sessions) — um torneio "órfão" (só resumo
+// sincronizado, sem mão anexada, sem buy-in) não tem o que comparar a
+// premiação, então ficaria como ruído nessas contas. "Torneios"/"Ganhos"
+// (que somam TUDO, órfão incluído — pedido explícito de contar todo
+// torneio importado) são calculados à parte em StatisticsTab, não aqui.
 //
 // Limitação assumida: sem linha em tournament_payouts pro torneio, não
 // dá pra distinguir "ainda não sincronizou a premiação" de "não fez
-// dinheiro" — tratamos como R$0 (mesmo critério já usado em
-// StatisticsTab pra "Ganhos"), então ROI/ITM/Lucro tendem a ficar um
-// pouco pessimistas até o agente sincronizar todos os resumos. Não há
-// contagem de re-entry (hand_sessions não modela isso — um torneio com
-// múltiplos buy-ins ainda é uma linha só, com um buy-in só).
+// dinheiro" — tratamos como $0 (mesmo critério já usado em StatisticsTab
+// pra "Ganhos"), então ROI/ITM/Lucro tendem a ficar um pouco pessimistas
+// até o agente sincronizar todos os resumos. Não há contagem de
+// re-entry (hand_sessions não modela isso — um torneio com múltiplos
+// buy-ins ainda é uma linha só, com um buy-in só).
 // cEV/ICM ficam null quando não há hand_ev_results: motor não grava
 // chip-equity por mão pra todo torneio (ver docs/cockpit/ROADMAP.md,
 // item SOLVER-013).
 // ============================================================
 
-// Corte fixo em R$ (ver BuyinBucket em types/analysis.ts) — mesmo
+// Corte fixo em USD (ver BuyinBucket em types/analysis.ts) — mesmo
 // espírito do StackDepthBucket: faixa redonda, não um valor por torneio.
 export function buyinBucketOf(buyin: number): BuyinBucket {
   if (buyin <= 10) return "0-10";
@@ -410,12 +415,14 @@ export function buyinBucketOf(buyin: number): BuyinBucket {
   return "200+";
 }
 
-// Uma linha unificada de torneio importado — de hand_sessions (buy-in
-// conhecido) ou só de tournament_payouts (torneio órfão, sem mão
-// anexada, buy-in desconhecido). `date`/`payout` já resolvidos aqui pra
-// fetchTournamentMetrics não precisar saber de onde cada torneio veio.
+// Uma linha de torneio com buy-in conhecido (hand_sessions) — torneio
+// "órfão" (só resumo sincronizado, sem mão anexada, sem hand_sessions)
+// fica de fora daqui de propósito: sem buy-in não dá pra calcular ROI/
+// lucro/ITM daquele torneio (não tem o que comparar a premiação), então
+// entraria como ruído nessas métricas. "Torneios"/"Ganhos" (que somam
+// TUDO, órfão incluído) são calculados à parte em StatisticsTab.
 interface ImportedTournament {
-  buyin: number | null;
+  buyin: number;
   payout: number | null;
   date: string;
 }
@@ -423,29 +430,17 @@ interface ImportedTournament {
 export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): Promise<TournamentMetrics> {
   const [sessionsAll, payouts, evResults] = await Promise.all([fetchTournamentSessions(), fetchTournamentPayouts(), fetchHandEvResults()]);
   const payoutByTournament = new Map(payouts.map((p) => [p.tournamentIdPs, p]));
-  const sessionTournamentIds = new Set(sessionsAll.map((s) => s.tournament_id_ps).filter((id): id is string => id != null));
 
-  // Torneios só-de-payout (sem hand_sessions) não têm buy-in — não dá pra
-  // classificar numa faixa, então só entram quando nenhum filtro de
-  // buy-in está ativo (mesmo critério de StatisticsTab).
-  const orphanPayouts = buyinBuckets.length === 0 ? payouts.filter((p) => !sessionTournamentIds.has(p.tournamentIdPs)) : [];
+  const tournaments: ImportedTournament[] = sessionsAll
+    .filter((s): s is typeof s & { buyin: number } => s.buyin != null)
+    .filter((s) => buyinBuckets.length === 0 || buyinBuckets.includes(buyinBucketOf(s.buyin)))
+    .map((s) => ({
+      buyin: s.buyin,
+      payout: (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null) ?? null,
+      date: s.updated_at.slice(0, 10),
+    }));
 
-  const tournaments: ImportedTournament[] = [
-    ...sessionsAll
-      .filter((s) => buyinBuckets.length === 0 || (s.buyin != null && buyinBuckets.includes(buyinBucketOf(s.buyin))))
-      .map((s) => ({
-        buyin: s.buyin,
-        payout: (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null) ?? null,
-        date: s.updated_at.slice(0, 10),
-      })),
-    ...orphanPayouts.map((p) => ({
-      buyin: null,
-      payout: p.heroPayoutAmount ?? null,
-      date: p.updatedAt.slice(0, 10),
-    })),
-  ];
-
-  const invested = tournaments.reduce((acc, t) => acc + (t.buyin ?? 0), 0);
+  const invested = tournaments.reduce((acc, t) => acc + t.buyin, 0);
   const returned = tournaments.reduce((acc, t) => acc + (t.payout ?? 0), 0);
   const itmCount = tournaments.filter((t) => (t.payout ?? 0) > 0).length;
   // "Jogando desde" / "último torneio" — datas extremas da amostra
@@ -454,15 +449,12 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
   const since = tournaments.reduce<string | null>((min, t) => (min === null || t.date < min ? t.date : min), null);
   const until = tournaments.reduce<string | null>((max, t) => (max === null || t.date > max ? t.date : max), null);
 
-  // Buy-in médio por torneio — só sobre quem tem buy-in conhecido (não
-  // dá pra tirar média incluindo torneio órfão, buy-in desconhecido).
   // ROI médio é a média do ROI de cada torneio individual, diferente do
   // roi_pct acima (que é o ROI agregado do total investido/total
   // devolvido) — os dois contam histórias diferentes: um pondera pelo
   // tamanho do buy-in, o outro não.
-  const withBuyin = tournaments.filter((t): t is ImportedTournament & { buyin: number } => t.buyin != null);
-  const avgBuyin = withBuyin.length > 0 ? withBuyin.reduce((acc, t) => acc + t.buyin, 0) / withBuyin.length : null;
-  const perGameRois = withBuyin
+  const avgBuyin = tournaments.length > 0 ? tournaments.reduce((acc, t) => acc + t.buyin, 0) / tournaments.length : null;
+  const perGameRois = tournaments
     .map((t) => (t.buyin > 0 ? (((t.payout ?? 0) - t.buyin) / t.buyin) * 100 : null))
     .filter((r): r is number => r !== null);
   const avgRoiPct = perGameRois.length > 0 ? perGameRois.reduce((a, b) => a + b, 0) / perGameRois.length : null;
@@ -473,7 +465,7 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
   const netByDay = new Map<string, number>();
   for (const t of tournaments) {
     gamesByDay.set(t.date, (gamesByDay.get(t.date) ?? 0) + 1);
-    const net = (t.payout ?? 0) - (t.buyin ?? 0);
+    const net = (t.payout ?? 0) - t.buyin;
     netByDay.set(t.date, (netByDay.get(t.date) ?? 0) + net);
   }
   const activeDays = gamesByDay.size;
