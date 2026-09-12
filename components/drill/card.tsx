@@ -38,7 +38,11 @@ const SIZES = {
   // Hero maior — pedido explicito de aumentar mais uma vez. De 58x82
   // pra 72x100: quase 40% maior que a carta comunitaria, destaque de
   // "essas sao as suas cartas" sem precisar de rotacao ou selo extra.
-  hero: { w: 72, h: 100, rank: 22, cornerSuit: 16, bigCenter: 48, cornerOffset: 5, cornerGap: 2 },
+  // Reduzido um pouco depois (72x100 -> 64x90, pedido explicito: "diminua
+  // bem pouco as cartas do hero pra nao sobrepor as fichas") -- carta
+  // grande demais colidia com a ficha de aposta (CommittedChip) flutuando
+  // logo acima do assento do heroi.
+  hero: { w: 64, h: 90, rank: 20, cornerSuit: 14, bigCenter: 43, cornerOffset: 5, cornerGap: 2 },
   // Fix (2026-08 v8): cantos usavam o mesmo offset/gap/fonte da carta
   // "board" (50x71), so' escalado pro tamanho errado -- os dois blocos
   // de canto (rank+naipe empilhados) sozinhos ja tomavam quase toda a
