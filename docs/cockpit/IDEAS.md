@@ -65,6 +65,30 @@ validação cruzada.
 **Status:** ❌ DESCARTADA (superada pelo motor próprio; reabrir só se
 houver necessidade concreta de validação cruzada)
 
+### IDEA-008 — Leitura de print via IA de visão no Modo Treino
+**Descrição:** decisão registrada em 08/08/2026 (changelog antigo do
+produto), nunca implementada: jogador anexa print da mesa, uma IA de
+visão (Edge Function no Supabase + API externa) tenta extrair os dados
+da mão automaticamente, e uma tela de confirmação/correção aparece
+antes de salvar — nunca aceita a leitura da IA sem revisão do jogador.
+Diferente do "Upload de print" que já existe no Revisor (esse só
+guarda a imagem, não lê o conteúdo). Resgatada de um arquivo antigo
+que o dono enviou em 12/09/2026 — não tinha rastro em nenhum lugar do
+Cockpit até então.
+**Frente:** Main (Modo Treino)
+**Prioridade:** 🟡 P2
+**Status:** 💡 NOVA
+
+### IDEA-009 — Mais automações de performance
+**Descrição:** item genérico do backlog original de 30/07/2026
+("Ideias futuras"), nunca detalhado — não ficou claro o que significa
+na prática. Resgatado por completude, mas precisa de refinamento antes
+de virar algo acionável: o que, especificamente, deveria ser
+automatizado em Player Evolution/Performance que hoje não é?
+**Frente:** Main (Player Evolution)
+**Prioridade:** ⚪ P3
+**Status:** 🔎 AVALIAR (vaga demais pra ir direto pro roadmap)
+
 ---
 
 ## Como usar

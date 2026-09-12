@@ -120,3 +120,28 @@ documentação vire ficção conforme o código evolui.
 `ROADMAP.md` contra o código antes de confiar neles, e atualizá-los ao
 final.
 **Data:** 11/09/2026
+
+---
+
+## Regras de evolução do produto
+
+> Resgatadas dos documentos originais de 30/07/2026 (`Product Vision &
+> Roadmap` e `AI Context`) — existiam antes do Cockpit, mas nunca tinham
+> migrado pra cá. Valem tanto pra decisão humana quanto pra qualquer IA
+> trabalhando no projeto.
+
+**Regra do roadmap** — toda funcionalidade nova deve:
+1. fortalecer um módulo existente; **ou**
+2. criar uma integração útil entre módulos; **ou**
+3. contribuir claramente para a evolução do jogador ou do time.
+
+O PokerSync não deve virar um conjunto de ferramentas isoladas.
+
+**Antes de implementar qualquer coisa, perguntar:**
+1. A funcionalidade fortalece a visão do produto?
+2. Existe módulo relacionado — e o item já não está feito? (conferir
+   `ROADMAP.md` antes de abrir tarefa — muita coisa que parecia
+   pendente já está no ar)
+3. Há integração com outro módulo que deveria vir junto?
+4. Está duplicando algo sem benefício claro?
+5. A UX é simples o bastante para um jogador em sessão?
