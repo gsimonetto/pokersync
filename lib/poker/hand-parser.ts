@@ -234,8 +234,18 @@ const ACTION_WORD_MAP: Record<string, string> = {
   "all-in": "allin",
 };
 
+// FIX (2026-09, amostra real GGPoker capturada): hand history com
+// oponentes anonimizados (GGPoker sempre, PokerStars em algumas salas)
+// lista uma linha "Dealt to X" pra CADA jogador da mao, nao so pro heroi
+// -- so a linha do heroi de fato tem as cartas visiveis entre colchetes
+// ("Dealt to Hero [Jd Ac]"); as dos oponentes ficam sem colchete nenhum
+// ("Dealt to 3325fcef "). Sem exigir o colchete aqui, o regex antigo
+// (so' "Dealt to (\S+)", sem global) pegava sempre a PRIMEIRA linha
+// "Dealt to" do texto -- ou seja, o jogador do assento 1, nao o heroi de
+// verdade -- e todo o resto (cartas, posicao, resultado) saia errado a
+// partir dai.
 function extractHeroName(text: string): string | null {
-  const en = text.match(/Dealt to (\S+)/i);
+  const en = text.match(/Dealt to (\S+) \[/i);
   if (en) return en[1];
   // PT-BR: nome e cartas vem na MESMA linha ("simoNetto11 recebe [4c 2h]"),
   // nao ha linha "Dealt to" separada. Ancorado no inicio de linha pra nao
@@ -383,12 +393,22 @@ function extractHeroFinishPlace(text: string, heroName: string | null): number |
 }
 
 function extractStakes(text: string): string | null {
-  const m = text.match(/\(\$?([\d.,]+\/\$?[\d.,]+)\)/);
+  // (?:\([\d.,]+\))? no fim -- torneios com ante no cabecalho de nivel
+  // ("Level7(200/400(60))", visto em amostra real GGPoker) tem um
+  // PARENTESE ANINHADO com o valor do ante logo antes do fechamento; sem
+  // aceitar esse grupo opcional o "(" extra quebrava o casamento e
+  // stakes/blinds saiam null em qualquer mao de torneio com ante.
+  const m = text.match(/\(\$?([\d.,]+\/\$?[\d.,]+)(?:\([\d.,]+\))?\)/);
   return m ? m[1] : null;
 }
 
+// FIX (2026-09, amostra real GGPoker capturada): "Level7(200/400(60))" --
+// o ante fica num parentese ANINHADO logo apos o big blind. Sem aceitar
+// esse grupo opcional (mesmo ajuste de extractStakes acima), o "(" extra
+// impedia o regex de casar e smallBlind/bigBlind saiam null em qualquer
+// mao de torneio com ante (a maioria).
 function extractBlinds(text: string): { smallBlind: number | null; bigBlind: number | null } {
-  const m = text.match(/\(\$?([\d.,]+)\/\$?([\d.,]+)\)/);
+  const m = text.match(/\(\$?([\d.,]+)\/\$?([\d.,]+)(?:\([\d.,]+\))?\)/);
   if (!m) return { smallBlind: null, bigBlind: null };
   return { smallBlind: Number(m[1].replace(",", "")), bigBlind: Number(m[2].replace(",", "")) };
 }
