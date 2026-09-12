@@ -242,14 +242,120 @@ function ellipseSeatCoords(n: number, config: RingConfig = {}): { x: number; y: 
   return coords;
 }
 
+// Configuracao pra alinhar o anel de assentos EXATAMENTE na borda real da
+// mesa (o mesmo retangulo de cantos elipticos que PokerTable desenha via
+// `cornerRadius`/`aspectRatio`) -- pedido explicito: "alinhe na borda,
+// nao quero que traga as posicoes mais pro meio... inclusive o hero".
+// Diferente de ellipseSeatCoords (superelipse aproximada, calibrada a
+// mao pro retangulo pouco arredondado de antes), essa anda o PERIMETRO DE
+// VERDADE do retangulo arredondado (lados retos + arcos elipticos nos 4
+// cantos, replicando o clamp que o proprio navegador aplica quando os
+// raios adjacentes de um lado somam mais que a dimensao daquele lado) e
+// distribui os assentos por COMPRIMENTO DE ARCO igual -- todo mundo
+// (inclusive o slot 0, onde o hero sempre cai) fica exatamente sobre essa
+// borda, com espaçamento consistente entre eles.
+export type BorderRingConfig = {
+  // Mesmo valor passado como `aspectRatio` pra PokerTable (ex: 8/5 = 1.6).
+  aspectRatio: number;
+  // Os dois numeros do `cornerRadius` ("H% / V%") passado pra PokerTable.
+  cornerXPercent: number;
+  cornerYPercent: number;
+};
+
+// Aproximacao de Ramanujan pro perimetro de uma elipse -- usada so' pra
+// dividir o perimetro TOTAL da mesa em fatias proporcionais (arco vs
+// reta), nunca pra desenhar nada diretamente.
+function ellipsePerimeter(a: number, b: number): number {
+  return Math.PI * (3 * (a + b) - Math.sqrt((3 * a + b) * (a + 3 * b)));
+}
+
+type BorderSegment =
+  | { type: "line"; len: number; from: [number, number]; to: [number, number] }
+  | { type: "arc"; len: number; center: [number, number]; rx: number; ry: number; fromDeg: number; toDeg: number };
+
+function borderRingCoords(n: number, config: BorderRingConfig): { x: number; y: number; cardSide: CardSide }[] {
+  // Espaco "pixel-equivalente" com a MESMA proporcao W:H da mesa (W=100*
+  // aspectRatio, H=100) -- necessario pra comparar raio horizontal e
+  // vertical na mesma escala, do jeito que o navegador faz ao desenhar
+  // border-radius com "%" diferente em cada eixo.
+  const W = 100 * config.aspectRatio;
+  const H = 100;
+  let rx = (config.cornerXPercent / 100) * W;
+  let ry = (config.cornerYPercent / 100) * H;
+  // Clamp identico ao CSS: se os dois raios verticais de um lado (ex:
+  // esquerdo) somam mais que a altura, o navegador encolhe TODOS os raios
+  // pelo mesmo fator ate' caber -- e' esse clamp que faz um cornerRadius
+  // "grande" virar, na pratica, formato pista de atletismo (retas em
+  // cima/embaixo + pontas totalmente arredondadas).
+  const scale = Math.min(1, W / (2 * rx), H / (2 * ry));
+  rx *= scale;
+  ry *= scale;
+
+  const flatX = Math.max(0, W - 2 * rx);
+  const flatY = Math.max(0, H - 2 * ry);
+  const cornerArc = ellipsePerimeter(rx, ry) / 4;
+
+  // Anda o perimetro comecando no meio da base (onde o slot 0 = hero
+  // sempre cai) em direcao ao lado ESQUERDO primeiro -- mesma direcao de
+  // rotacao do anel antigo (ellipseSeatCoords), pra nao inverter o
+  // rotulo de nenhuma posicao.
+  const segments: BorderSegment[] = [
+    { type: "line", len: flatX / 2, from: [W / 2, H], to: [rx, H] },
+    { type: "arc", len: cornerArc, center: [rx, H - ry], rx, ry, fromDeg: 90, toDeg: 180 },
+    { type: "line", len: flatY, from: [0, H - ry], to: [0, ry] },
+    { type: "arc", len: cornerArc, center: [rx, ry], rx, ry, fromDeg: 180, toDeg: 270 },
+    { type: "line", len: flatX, from: [rx, 0], to: [W - rx, 0] },
+    { type: "arc", len: cornerArc, center: [W - rx, ry], rx, ry, fromDeg: 270, toDeg: 360 },
+    { type: "line", len: flatY, from: [W, ry], to: [W, H - ry] },
+    { type: "arc", len: cornerArc, center: [W - rx, H - ry], rx, ry, fromDeg: 0, toDeg: 90 },
+    { type: "line", len: flatX / 2, from: [W - rx, H], to: [W / 2, H] },
+  ];
+  const total = segments.reduce((sum, seg) => sum + seg.len, 0);
+
+  function pointAt(dist: number): [number, number] {
+    let d = dist;
+    for (const seg of segments) {
+      if (d <= seg.len) {
+        const frac = seg.len > 0 ? d / seg.len : 0;
+        if (seg.type === "line") {
+          return [seg.from[0] + (seg.to[0] - seg.from[0]) * frac, seg.from[1] + (seg.to[1] - seg.from[1]) * frac];
+        }
+        const deg = seg.fromDeg + (seg.toDeg - seg.fromDeg) * frac;
+        const rad = (deg * Math.PI) / 180;
+        return [seg.center[0] + seg.rx * Math.cos(rad), seg.center[1] + seg.ry * Math.sin(rad)];
+      }
+      d -= seg.len;
+    }
+    return [W / 2, H];
+  }
+
+  const coords: { x: number; y: number; cardSide: CardSide }[] = [];
+  for (let i = 0; i < n; i++) {
+    const [xPx, yPx] = pointAt((i / n) * total);
+    const x = (xPx / W) * 100;
+    const y = yPx; // H=100, ja em %
+    let cardSide: CardSide;
+    if (Math.abs(x - 50) < 18) cardSide = y < H / 2 ? "above" : "below";
+    else cardSide = x < 50 ? "left" : "right";
+    coords.push({ x: Math.round(x * 10) / 10, y: Math.round(y * 10) / 10, cardSide });
+  }
+  return coords;
+}
+
 // Modo Replay: usa a mesa real (assentos ocupados + botao) do hand
 // history parseado. Mesma logica de rotacao do computeStylizedSeatLayout
 // (hero sempre embaixo, rotulo real) — so que com contagem de assentos
 // variavel (2 a 9) em vez do anel fixo de 8 do Treino.
+// `borderRing` (opcional): quando informado, os assentos vem de
+// borderRingCoords (anel colado na borda real da mesa) em vez do anel
+// antigo -- omitido, mantem o comportamento de sempre (usado no celular,
+// que ja tem seu proprio ajuste de posicao em revisor-hand-table.tsx e
+// nao deve mudar).
 export function computeRealSeatLayout(
   seats: ParsedSeat[],
   buttonSeatNumber: number,
-  maxSeats: number
+  maxSeats: number,
+  borderRing?: BorderRingConfig
 ): SeatLayoutSlot[] {
   const n = seats.length;
   const labels = POSITION_LABELS_BY_COUNT[n];
@@ -269,7 +375,7 @@ export function computeRealSeatLayout(
     throw new Error("Não foi possível localizar o hero entre os assentos ocupados.");
   }
 
-  const coords = ellipseSeatCoords(n);
+  const coords = borderRing ? borderRingCoords(n, borderRing) : ellipseSeatCoords(n);
 
   // coords[0] e' sempre o slot de baixo. Rotaciona os assentos pra que
   // o hero caia ali, mantendo a ordem horaria pros demais.
