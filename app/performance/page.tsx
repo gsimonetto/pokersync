@@ -59,7 +59,6 @@ export default function PerformancePage() {
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("preflop");
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
-  const [focusPendingPayout, setFocusPendingPayout] = useState(false);
   // Filtro de buy-in — só afeta a aba Estatísticas (Total Games/ROI/ITM/
   // Lucro total, que vêm de bankroll_sessions; cEV/ICM não têm buy-in
   // associado, ver comentário em fetchTournamentMetrics), por isso vive
@@ -98,14 +97,6 @@ export default function PerformancePage() {
       setErro(e instanceof Error ? e.message : "Falha ao carregar a análise.");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function reloadPayouts() {
-    try {
-      setPayouts(await fetchTournamentPayouts());
-    } catch (e) {
-      setErro(e instanceof Error ? e.message : "Falha ao recarregar premiação.");
     }
   }
 
@@ -183,11 +174,6 @@ export default function PerformancePage() {
                   onChange={setFilters}
                   availableStackDepths={availableStackDepths}
                   availablePositions={availablePositions}
-                  onImported={loadAll}
-                  onSelectTournamentImport={() => {
-                    setTab("estatisticas");
-                    setFocusPendingPayout(true);
-                  }}
                 />
               }
             />
@@ -195,7 +181,7 @@ export default function PerformancePage() {
             <div className="mt-4">
               {rows.length === 0 && tab !== "radar" ? (
                 <p className="rounded-xl border border-dashed border-hairline p-6 text-center text-sm text-muted">
-                  Sem mãos com hand history estruturada ainda. Importe acima ou aguarde a sincronização do agente desktop —
+                  Sem mãos com hand history estruturada ainda. Aguarde a sincronização do agente desktop (Radar PokerSync) —
                   as métricas aparecem aqui automaticamente assim que houver dado.
                 </p>
               ) : (
@@ -216,10 +202,7 @@ export default function PerformancePage() {
                         financialSeries={financialSeries}
                         tournamentSessions={tournamentSessions}
                         payouts={payouts}
-                        onPayoutsChanged={reloadPayouts}
                         onCevComputed={() => reloadTournamentMetrics()}
-                        focusPendingPayout={focusPendingPayout}
-                        onFocusPendingPayoutConsumed={() => setFocusPendingPayout(false)}
                         buyinFilter={tournamentBuyinFilter}
                         onBuyinFilterChange={handleBuyinFilterChange}
                         availableBuyinBuckets={availableBuyinBuckets}

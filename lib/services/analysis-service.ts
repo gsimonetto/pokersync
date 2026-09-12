@@ -1,9 +1,9 @@
 import { createClient } from "@/lib/supabase/client";
 import { fetchSessions } from "@/lib/services/bankroll-service";
-import type { Session as BankrollSession } from "@/lib/bankroll/types";
 import type { FinancialDay } from "@/lib/services/team-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchHandEvResults } from "@/lib/services/hand-ev-service";
+import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import {
   type AnalysisFilters,
   type AnalysisHandRow,
@@ -378,14 +378,28 @@ export function computePostflopMetrics(rows: AnalysisHandRow[]): PostflopMetrics
 }
 
 // ============================================================
-// Torneios — só o que dá pra provar com o que está gravado hoje
-// (bankroll_sessions: buy-in/reentries/cashout reais). cEV/ICM ficam
-// null: motor não grava chip-equity por mão (ver docs/cockpit/ROADMAP.md, item SOLVER-013).
+// Torneios — pedido explícito: "total de torneios devem vir dos
+// torneios importados e nao do hand history" (leia-se: de tudo que foi
+// importado — mãos E resumos de torneio — nunca de bankroll_sessions,
+// que é lançamento manual da Gestão de Banca, uma fonte de verdade
+// separada). Buy-in vem de hand_sessions (extraído do hand history,
+// ver extractTournamentInfo em hand-session-service.ts); premiação vem
+// de tournament_payouts (agente desktop sincronizando o Tournament
+// Summary). Um torneio sem hand_sessions (só resumo sincronizado, sem
+// mão anexada ainda) ainda entra na conta — "torneio órfão" no mesmo
+// espírito do TournamentPayoutsPanel.
+//
+// Limitação assumida: sem linha em tournament_payouts pro torneio, não
+// dá pra distinguir "ainda não sincronizou a premiação" de "não fez
+// dinheiro" — tratamos como R$0 (mesmo critério já usado em
+// StatisticsTab pra "Ganhos"), então ROI/ITM/Lucro tendem a ficar um
+// pouco pessimistas até o agente sincronizar todos os resumos. Não há
+// contagem de re-entry (hand_sessions não modela isso — um torneio com
+// múltiplos buy-ins ainda é uma linha só, com um buy-in só).
+// cEV/ICM ficam null quando não há hand_ev_results: motor não grava
+// chip-equity por mão pra todo torneio (ver docs/cockpit/ROADMAP.md,
+// item SOLVER-013).
 // ============================================================
-function isTournamentSession(s: BankrollSession): boolean {
-  const f = s.format?.trim().toLowerCase();
-  return f === "mtt" || f === "torneio" || f === "sng" || f === "spin";
-}
 
 // Corte fixo em R$ (ver BuyinBucket em types/analysis.ts) — mesmo
 // espírito do StackDepthBucket: faixa redonda, não um valor por torneio.
@@ -396,49 +410,77 @@ export function buyinBucketOf(buyin: number): BuyinBucket {
   return "200+";
 }
 
+// Uma linha unificada de torneio importado — de hand_sessions (buy-in
+// conhecido) ou só de tournament_payouts (torneio órfão, sem mão
+// anexada, buy-in desconhecido). `date`/`payout` já resolvidos aqui pra
+// fetchTournamentMetrics não precisar saber de onde cada torneio veio.
+interface ImportedTournament {
+  buyin: number | null;
+  payout: number | null;
+  date: string;
+}
+
 export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): Promise<TournamentMetrics> {
-  const [sessionsAll, evResults] = await Promise.all([fetchSessions(), fetchHandEvResults()]);
-  const sessions = sessionsAll
-    .filter(isTournamentSession)
-    .filter((s) => buyinBuckets.length === 0 || buyinBuckets.includes(buyinBucketOf(s.buyIn)));
-  const invested = sessions.reduce((acc, s) => acc + s.buyIn * (1 + (s.reentries || 0)), 0);
-  const returned = sessions.reduce((acc, s) => acc + s.cashout, 0);
-  const itmCount = sessions.filter((s) => s.cashout > 0).length;
+  const [sessionsAll, payouts, evResults] = await Promise.all([fetchTournamentSessions(), fetchTournamentPayouts(), fetchHandEvResults()]);
+  const payoutByTournament = new Map(payouts.map((p) => [p.tournamentIdPs, p]));
+  const sessionTournamentIds = new Set(sessionsAll.map((s) => s.tournament_id_ps).filter((id): id is string => id != null));
+
+  // Torneios só-de-payout (sem hand_sessions) não têm buy-in — não dá pra
+  // classificar numa faixa, então só entram quando nenhum filtro de
+  // buy-in está ativo (mesmo critério de StatisticsTab).
+  const orphanPayouts = buyinBuckets.length === 0 ? payouts.filter((p) => !sessionTournamentIds.has(p.tournamentIdPs)) : [];
+
+  const tournaments: ImportedTournament[] = [
+    ...sessionsAll
+      .filter((s) => buyinBuckets.length === 0 || (s.buyin != null && buyinBuckets.includes(buyinBucketOf(s.buyin))))
+      .map((s) => ({
+        buyin: s.buyin,
+        payout: (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null) ?? null,
+        date: s.updated_at.slice(0, 10),
+      })),
+    ...orphanPayouts.map((p) => ({
+      buyin: null,
+      payout: p.heroPayoutAmount ?? null,
+      date: p.updatedAt.slice(0, 10),
+    })),
+  ];
+
+  const invested = tournaments.reduce((acc, t) => acc + (t.buyin ?? 0), 0);
+  const returned = tournaments.reduce((acc, t) => acc + (t.payout ?? 0), 0);
+  const itmCount = tournaments.filter((t) => (t.payout ?? 0) > 0).length;
   // "Jogando desde" / "último torneio" — datas extremas da amostra
   // filtrada, pro resumo financeiro estilo SharkScope (não é a data de
-  // cadastro da conta, é desde quando há torneio registrado na Gestão de
-  // Banca).
-  const since = sessions.reduce<string | null>((min, s) => (min === null || s.date < min ? s.date : min), null);
-  const until = sessions.reduce<string | null>((max, s) => (max === null || s.date > max ? s.date : max), null);
+  // cadastro da conta, é desde quando há torneio importado).
+  const since = tournaments.reduce<string | null>((min, t) => (min === null || t.date < min ? t.date : min), null);
+  const until = tournaments.reduce<string | null>((max, t) => (max === null || t.date > max ? t.date : max), null);
 
-  // Buy-in médio por torneio — sem contar re-entries (senão um jogador que
-  // faz muitas re-entries num buy-in baixo puxaria a média pra baixo do
-  // que ele de fato costuma jogar). ROI médio é a média do ROI de cada
-  // torneio individual, diferente do roi_pct acima (que é o ROI agregado
-  // do total investido/total devolvido) — os dois contam histórias
-  // diferentes: um pondera pelo tamanho do buy-in, o outro não.
-  const avgBuyin = sessions.length > 0 ? sessions.reduce((acc, s) => acc + s.buyIn, 0) / sessions.length : null;
-  const perGameRois = sessions
-    .map((s) => s.buyIn * (1 + (s.reentries || 0)))
-    .map((gameInvested, i) => (gameInvested > 0 ? ((sessions[i].cashout - gameInvested) / gameInvested) * 100 : null))
+  // Buy-in médio por torneio — só sobre quem tem buy-in conhecido (não
+  // dá pra tirar média incluindo torneio órfão, buy-in desconhecido).
+  // ROI médio é a média do ROI de cada torneio individual, diferente do
+  // roi_pct acima (que é o ROI agregado do total investido/total
+  // devolvido) — os dois contam histórias diferentes: um pondera pelo
+  // tamanho do buy-in, o outro não.
+  const withBuyin = tournaments.filter((t): t is ImportedTournament & { buyin: number } => t.buyin != null);
+  const avgBuyin = withBuyin.length > 0 ? withBuyin.reduce((acc, t) => acc + t.buyin, 0) / withBuyin.length : null;
+  const perGameRois = withBuyin
+    .map((t) => (t.buyin > 0 ? (((t.payout ?? 0) - t.buyin) / t.buyin) * 100 : null))
     .filter((r): r is number => r !== null);
   const avgRoiPct = perGameRois.length > 0 ? perGameRois.reduce((a, b) => a + b, 0) / perGameRois.length : null;
 
   // Dias ativos / jogos por dia / dia com mais torneios — agrupado pela
-  // mesma `date` da sessão (YYYY-MM-DD), sem depender de horário.
+  // data resolvida acima (YYYY-MM-DD), sem depender de horário.
   const gamesByDay = new Map<string, number>();
   const netByDay = new Map<string, number>();
-  for (const s of sessions) {
-    gamesByDay.set(s.date, (gamesByDay.get(s.date) ?? 0) + 1);
-    const net = s.cashout - s.buyIn * (1 + (s.reentries || 0));
-    netByDay.set(s.date, (netByDay.get(s.date) ?? 0) + net);
+  for (const t of tournaments) {
+    gamesByDay.set(t.date, (gamesByDay.get(t.date) ?? 0) + 1);
+    const net = (t.payout ?? 0) - (t.buyin ?? 0);
+    netByDay.set(t.date, (netByDay.get(t.date) ?? 0) + net);
   }
   const activeDays = gamesByDay.size;
   const busiestDayCount = gamesByDay.size > 0 ? Math.max(...gamesByDay.values()) : 0;
 
   // Sequências de dias ganhando/perdendo — mesmo espírito do "streak" do
-  // SharkScope, dia a dia (não torneio a torneio) e só sobre torneios
-  // (não mistura com dias de cash), em ordem cronológica.
+  // SharkScope, dia a dia (não torneio a torneio), em ordem cronológica.
   const dayResults = [...netByDay.entries()].sort(([a], [b]) => (a < b ? -1 : 1)).map(([, net]) => net);
   let daysWon = 0,
     daysLost = 0,
@@ -471,24 +513,24 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
   // dá pra provar com o motor validado hoje, não uma estimativa pro
   // torneio inteiro. Não tem buy-in associado direto (hand_ev_results
   // não guarda isso), então `buyinBuckets` não filtra esses dois números
-  // — só Total Games/ROI/ITM/Lucro total, que vêm de `sessions`.
+  // — só Total Games/ROI/ITM/Lucro total, que vêm de `tournaments`.
   const chipEvTotal = evResults.reduce((acc, r) => acc + (r.heroExpectedChipDelta ?? 0), 0);
   const netEvProfit = evResults.reduce((acc, r) => acc + (r.heroExpectedIcmDeltaDollars ?? 0), 0);
 
   return {
-    total_games: sessions.length,
+    total_games: tournaments.length,
     roi_pct: invested > 0 ? Math.round(((returned - invested) / invested) * 1000) / 10 : null,
-    itm_pct: sessions.length > 0 ? pct(itmCount, sessions.length) : null,
-    total_profit: sessions.length > 0 ? Math.round((returned - invested) * 100) / 100 : null,
-    total_invested: sessions.length > 0 ? Math.round(invested * 100) / 100 : null,
-    total_cashout: sessions.length > 0 ? Math.round(returned * 100) / 100 : null,
+    itm_pct: tournaments.length > 0 ? pct(itmCount, tournaments.length) : null,
+    total_profit: tournaments.length > 0 ? Math.round((returned - invested) * 100) / 100 : null,
+    total_invested: tournaments.length > 0 ? Math.round(invested * 100) / 100 : null,
+    total_cashout: tournaments.length > 0 ? Math.round(returned * 100) / 100 : null,
     since,
     until,
-    avg_profit_per_game: sessions.length > 0 ? Math.round(((returned - invested) / sessions.length) * 100) / 100 : null,
+    avg_profit_per_game: tournaments.length > 0 ? Math.round(((returned - invested) / tournaments.length) * 100) / 100 : null,
     avg_buyin: avgBuyin !== null ? Math.round(avgBuyin * 100) / 100 : null,
     avg_roi_pct: avgRoiPct !== null ? Math.round(avgRoiPct * 10) / 10 : null,
     active_days: activeDays,
-    games_per_day: activeDays > 0 ? Math.round((sessions.length / activeDays) * 10) / 10 : null,
+    games_per_day: activeDays > 0 ? Math.round((tournaments.length / activeDays) * 10) / 10 : null,
     busiest_day_count: busiestDayCount,
     days_won: daysWon,
     days_lost: daysLost,
@@ -497,7 +539,7 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
     max_lose_streak: maxLoseStreak,
     net_ev_profit: evResults.length > 0 ? Math.round(netEvProfit * 100) / 100 : null,
     chip_ev_total: evResults.length > 0 ? Math.round(chipEvTotal * 100) / 100 : null,
-    cev_per_game: evResults.length > 0 && sessions.length > 0 ? Math.round((chipEvTotal / sessions.length) * 100) / 100 : null,
+    cev_per_game: evResults.length > 0 && tournaments.length > 0 ? Math.round((chipEvTotal / tournaments.length) * 100) / 100 : null,
     ev_roi_pct: evResults.length > 0 && invested > 0 ? Math.round((netEvProfit / invested) * 1000) / 10 : null,
   };
 }

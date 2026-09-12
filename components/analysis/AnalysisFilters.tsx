@@ -1,11 +1,10 @@
 "use client";
 
 import { useState } from "react";
-import { Upload, ChevronDown, SlidersHorizontal, X } from "lucide-react";
+import { SlidersHorizontal, X } from "lucide-react";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
-import { ManualImportPanel } from "@/components/analysis/ManualImportPanel";
 import {
   STACK_DEPTH_LABEL,
   TOURNAMENT_STAGE_LABEL,
@@ -48,18 +47,12 @@ export function AnalysisFilters({
   onChange,
   availableStackDepths,
   availablePositions,
-  onImported,
-  onSelectTournamentImport,
 }: {
   filters: Filters;
   onChange: (next: Filters) => void;
   availableStackDepths: Set<StackDepthBucket>;
   availablePositions: Set<HeroPosition>;
-  onImported: () => void;
-  onSelectTournamentImport: () => void;
 }) {
-  const [importOpen, setImportOpen] = useState(false);
-  const [importMenuOpen, setImportMenuOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
 
   const modality: ModalityValue = filters.formats.length === 1 ? (filters.formats[0] as ModalityValue) : "all";
@@ -165,56 +158,6 @@ export function AnalysisFilters({
         </MoreFiltersModal>
       )}
 
-      <div className="relative">
-        <button
-          type="button"
-          onClick={() => setImportMenuOpen((v) => !v)}
-          className={`inline-flex items-center gap-1.5 rounded-lg border px-3 py-1.5 text-[11.5px] font-semibold transition-colors ${
-            importMenuOpen ? "border-ink bg-ink text-void" : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
-          }`}
-        >
-          <Upload size={13} />
-          Importar
-          <ChevronDown size={13} className={`transition-transform ${importMenuOpen ? "rotate-180" : ""}`} />
-        </button>
-
-        {importMenuOpen && (
-          <div className="absolute right-0 top-full z-20 mt-1.5 w-52 overflow-hidden rounded-lg border border-hairline bg-elevated shadow-lg">
-            <button
-              type="button"
-              onClick={() => {
-                setImportOpen(true);
-                setImportMenuOpen(false);
-              }}
-              className="block w-full px-3.5 py-2.5 text-left text-[13px] font-medium text-ink hover:bg-void/40"
-            >
-              Hand history
-              <span className="mt-0.5 block text-[11px] font-normal text-muted">Cole o texto exportado do site</span>
-            </button>
-            <button
-              type="button"
-              onClick={() => {
-                setImportMenuOpen(false);
-                onSelectTournamentImport();
-              }}
-              className="block w-full border-t border-hairline px-3.5 py-2.5 text-left text-[13px] font-medium text-ink hover:bg-void/40"
-            >
-              Torneio
-              <span className="mt-0.5 block text-[11px] font-normal text-muted">Premiação / colocação na aba Torneios</span>
-            </button>
-          </div>
-        )}
-      </div>
-
-      {importOpen && (
-        <ImportHandHistoryModal
-          onClose={() => setImportOpen(false)}
-          onImported={() => {
-            setImportOpen(false);
-            onImported();
-          }}
-        />
-      )}
     </div>
   );
 }
@@ -232,25 +175,6 @@ function MoreFiltersModal({ onClose, children }: { onClose: () => void; children
             </button>
           </div>
           {children}
-        </div>
-      </div>
-    </ModalPortal>
-  );
-}
-
-function ImportHandHistoryModal({ onClose, onImported }: { onClose: () => void; onImported: () => void }) {
-  useEscapeToClose(onClose);
-  return (
-    <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 p-4 pt-10" onClick={onClose}>
-        <div className="w-full max-w-xl rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
-          <div className="mb-3 flex items-center justify-between gap-2">
-            <h3 className="text-[15px] font-semibold">Importar hand history</h3>
-            <button onClick={onClose} className="text-muted hover:text-ink" aria-label="Fechar">
-              <X size={16} />
-            </button>
-          </div>
-          <ManualImportPanel onImported={onImported} />
         </div>
       </div>
     </ModalPortal>

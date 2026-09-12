@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import {
   Trophy,
   Layers,
@@ -63,10 +63,7 @@ export function StatisticsTab({
   metrics,
   tournamentSessions,
   payouts,
-  onPayoutsChanged,
   onCevComputed,
-  focusPendingPayout,
-  onFocusPendingPayoutConsumed,
   buyinFilter,
   onBuyinFilterChange,
   availableBuyinBuckets,
@@ -75,10 +72,7 @@ export function StatisticsTab({
   financialSeries: FinancialDay[];
   tournamentSessions: HandSession[];
   payouts: TournamentPayout[];
-  onPayoutsChanged: () => void;
   onCevComputed: () => void;
-  focusPendingPayout?: boolean;
-  onFocusPendingPayoutConsumed?: () => void;
   buyinFilter: BuyinBucket[];
   onBuyinFilterChange: (next: BuyinBucket[]) => void;
   availableBuyinBuckets: Set<BuyinBucket>;
@@ -116,13 +110,8 @@ export function StatisticsTab({
   // (registradas/pendentes) em vez do grid com 1 card por torneio — o
   // grid pesa muito nessa aba pra quem já tem dezenas de torneios
   // importados. Clicar num dos números expande e revela a lista de
-  // verdade (mesmo componente TournamentPayoutsPanel, intacto). Expande
-  // sozinho quando vem do fluxo "Importar → Torneio" (focusPendingPayout),
-  // senão o alvo do scroll automático do painel nunca chega a existir no DOM.
-  const [premiacaoOpen, setPremiacaoOpen] = useState(!!focusPendingPayout);
-  useEffect(() => {
-    if (focusPendingPayout) setPremiacaoOpen(true);
-  }, [focusPendingPayout]);
+  // verdade (mesmo componente TournamentPayoutsPanel).
+  const [premiacaoOpen, setPremiacaoOpen] = useState(false);
   const payoutByTournament = useMemo(() => new Map(payouts.map((p) => [p.tournamentIdPs, p])), [payouts]);
 
   // Torneios importados só via Tournament Summary (tournament_payouts),
@@ -309,8 +298,8 @@ export function StatisticsTab({
       <Painel titulo="Estrutura de premiação" icone={<Award size={14} className="icon-glow text-training" />}>
         <p className="mb-3 text-xs leading-relaxed text-muted">
           Pré-requisito pro cálculo de cEV/ICM abaixo — sem saber quanto cada colocação pagou, não dá pra calcular quanto sua
-          decisão &quot;deveria&quot; valer em $. Hoje é só manual; quando o agente desktop buscar isso sozinho, aparece aqui do mesmo jeito
-          (mesmo torneio, sem tela nova).
+          decisão &quot;deveria&quot; valer em $. Vem automaticamente do agente desktop (Radar PokerSync) sincronizando o resumo de
+          cada torneio.
         </p>
 
         <div className="flex flex-wrap items-center gap-5">
@@ -336,13 +325,7 @@ export function StatisticsTab({
 
         {premiacaoOpen && (
           <div className="mt-3 border-t border-hairline pt-3">
-            <TournamentPayoutsPanel
-              sessions={filteredSessions}
-              payouts={payouts}
-              onChanged={onPayoutsChanged}
-              focusPending={focusPendingPayout}
-              onFocusConsumed={onFocusPendingPayoutConsumed}
-            />
+            <TournamentPayoutsPanel sessions={filteredSessions} payouts={payouts} />
           </div>
         )}
       </Painel>
@@ -368,18 +351,12 @@ export function StatisticsTab({
           é a soma exata dessas mãos específicas.
         </p>
 
-        {/* Aviso não-bloqueante (pedido explícito): entrada manual continua
-            funcionando normalmente (mão importada aqui já vincula ao
-            torneio sozinha) -- isso só avisa que a experiência completa do
-            Player Evolution (sincronização automática, sem precisar colar
-            hand history) depende do agente desktop, sem tirar a opção
-            manual de ninguém. */}
         <div className="mb-3 flex items-start gap-2 rounded-lg border border-hairline bg-elevated/60 p-2.5 text-[11.5px] leading-relaxed text-muted">
           <Monitor size={14} className="mt-0.5 shrink-0 text-muted/70" />
           <span>
-            Colar hand history manualmente já é suficiente pra calcular cEV. Pra ter a experiência completa do Player
-            Evolution — sincronização automática, sem precisar importar nada na mão — instale o{" "}
-            <span className="text-ink/80 font-semibold">agente desktop</span>.
+            Todas as mãos e torneios do Player Evolution vêm do{" "}
+            <span className="text-ink/80 font-semibold">agente desktop (Radar PokerSync)</span> sincronizando sozinho — não
+            existe mais importação manual nessa tela.
           </span>
         </div>
 
