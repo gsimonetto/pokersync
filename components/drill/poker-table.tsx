@@ -464,8 +464,14 @@ function Seat({
   // principal de "tem mais informacao". Sem cor por faixa de proposito
   // (pedido explicito): so' o numero cru, sem juizo de valor embutido --
   // quem decide o que "38/22/8" significa e' o jogador, nao o produto.
+  // HUD (VPIP/PFR/3-Bet no assento) removido por enquanto (pedido
+  // explicito: "retirar o hud por enquanto, vamos colocar em outro
+  // momento") -- fetch/props/modal continuam intactos, so' a renderizacao
+  // do chip no assento fica desligada; reativar e' so' voltar a condicao
+  // original abaixo.
+  const HUD_ENABLED = false;
   const opponentHudChip =
-    !hero && opponentStats ? (
+    HUD_ENABLED && !hero && opponentStats ? (
       <div
         onClick={onOpponentClick ? () => onOpponentClick(seat.playerName!) : undefined}
         title={`VPIP / PFR / 3-Bet — clique pro perfil completo de ${seat.playerName}`}
