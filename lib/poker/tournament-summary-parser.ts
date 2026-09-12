@@ -24,9 +24,16 @@ export interface ParsedTournamentSummary {
   heroName: string | null;
 }
 
+// FIX (2026-09, amostra real GGPoker capturada): valores em USD nesses
+// arquivos (PokerStars e GGPoker) sempre usam notacao americana --
+// virgula separando milhar, ponto separando decimal ("$31,255.51") --
+// NUNCA a europeia/BR ("$31.255,51") que essa funcao assumia antes. Com
+// a logica antiga, "$32040.00" virava 3204000 e "$1.50" virava 150 --
+// qualquer valor com ponto decimal saia 100x maior. Agora so' remove a
+// virgula de milhar e mantem o ponto como decimal.
 function toNumber(raw: string | undefined | null): number | null {
   if (!raw) return null;
-  const n = Number(raw.replace(/\./g, "").replace(",", "."));
+  const n = Number(raw.replace(/,/g, ""));
   return Number.isFinite(n) ? n : null;
 }
 
@@ -77,9 +84,13 @@ export function parseHeroFinishPlaceFromList(text: string, heroName: string): nu
 // "A $150.00 USD award has been credited..." / "...recebeu $150.00" —
 // várias formulações conhecidas do texto de premiação; pega o primeiro
 // valor em dólar plausível perto de um verbo de recebimento.
+// "You received a total of $150." (GGPoker, amostra real capturada) --
+// mesmo verbo "received" do padrão de PokerStars logo abaixo, mas com
+// "a total of" no meio, que o padrão antigo não pulava.
 function parseHeroPayoutAmount(text: string): number | null {
   const patterns = [
     /\$\s?([\d.,]+)\s*(?:USD)?\s+award\s+has\s+been\s+credited/i,
+    /received\s+a\s+total\s+of\s+\$\s?([\d.,]+)/i,
     /received\s+\$\s?([\d.,]+)/i,
     /recebeu\s+\$\s?([\d.,]+)/i,
     /premiado\s+(?:em|com)\s+\$\s?([\d.,]+)/i,
