@@ -99,9 +99,13 @@ export const PLANS: Record<PlanId, PlanDef> = {
     name: "Individual",
     priceCents: 14900,
     modules: INDIVIDUAL_MODULES,
-    // Radar nao vem incluso -- compra avulsa por ADDON_PRICES.radar
-    // (ver isAddonUnlocked, que soma esta flag com user_plans.radar_addon).
-    addons: { radar: false },
+    // Radar agora vem incluso no plano Individual (pedido explicito:
+    // "o radar pokersync vai ir junto com o pacote do plano individual")
+    // -- deixou de ser addon avulso pra quem esta nesse plano. Continua
+    // existindo `user_plans.radar_addon` pra quem comprou avulso ANTES
+    // dessa mudanca enquanto estava num plano sem radar incluso (Free),
+    // ver isAddonUnlocked (soma as duas fontes).
+    addons: { radar: true },
   },
   // Nomenclatura pedida: os dois planos de time se chamam "Team Pro" e
   // "Team Elite" (os ids internos continuam "team"/"team_pro" -- so' o

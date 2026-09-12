@@ -35,9 +35,6 @@ import {
 
 const MAX_IMAGES = 3;
 
-// Mesma chave do painel de Análise (components/analysis/ManualImportPanel.tsx)
-// -- pedido explícito: a última escolha do jogador vale nos dois lugares,
-// não é uma preferência por tela.
 const ALSO_LOG_BANKROLL_KEY = "pokersync:import:alsoLogToBankroll";
 
 interface ImageDraft {
