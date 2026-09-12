@@ -615,8 +615,15 @@ export function RevisorHandTable({
                 // a mesa, esta grande demais") -- a mesa preenche o espaco
                 // que sobra dentro desse card (ver width:min(...) em
                 // PokerTable), entao um respiro maior aqui encolhe a mesa
-                // sem mexer em mais nada.
-                padding: 32,
+                // sem mexer em mais nada. Embaixo ganha ainda mais respiro
+                // (32 -> 64, pedido explicito: "o hero nao pode sair do
+                // container") -- o hero (carta tamanho "hero", maior, mais
+                // o proprio corte do assento no anel) se projeta pra baixo
+                // da borda da mesa agora que o overflow e' visible; esse
+                // respiro extra da espaco pra ele terminar de aparecer
+                // DENTRO desse card, em vez de vazar pro que vem depois na
+                // pagina.
+                padding: "32px 32px 64px",
                 // overflow:visible (era "hidden") -- pedido explicito: "tem
                 // algumas informacoes cortadas... pode deixar as cartas
                 // passar da mesa e nome tambem, nao precisa cortar". Sem
