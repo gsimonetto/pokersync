@@ -506,26 +506,27 @@ function Seat({
     ) : null;
 
   // Bounty ("cabeça") em torneios PKO/Mystery Bounty -- pedido explicito:
-  // "o pko pode colocar ao lado direito superior do nick do jogador, bem
-  // na quina" + "coloque a cor branca". Badge pequeno, absolute, encostado
-  // no canto superior-direito da placa de nome (mesmo padrao dos selos de
-  // campeao/medalha em revisor-fila.tsx), em vez de um chip solto na
-  // coluna -- ver onde e' renderizado (canto da placa de nome), abaixo.
+  // "ajuste o bounty, nao pode sobrepor o nome, tem que ficar bem na
+  // quina do chipname sem sobrepor". O offset de -8 (com so' 4px de gap
+  // pro chip de posicao logo acima) deixava o badge encostar/sobrepor
+  // esse chip -- reduzido pra -3 (so' o suficiente pra "morder" a quina
+  // da placa de nome, igual um badge de notificacao) e o gap acima subiu
+  // (ver seatInfo) pra garantir folga de verdade entre os dois.
   const bountyChip = !empty && bountyValue != null && (
     <div
       title={`Bounty de $${bountyValue}`}
       style={{
         position: "absolute",
-        top: -8,
-        right: -8,
+        top: -3,
+        right: -3,
         zIndex: 4,
         display: "flex",
         alignItems: "center",
         gap: 2,
-        padding: "2px 7px",
+        padding: "1px 6px",
         borderRadius: 999,
         fontFamily: F,
-        fontSize: 10,
+        fontSize: 9.5,
         fontWeight: 700,
         color: "#FFFFFF",
         background: "rgba(10,10,12,0.9)",
@@ -535,12 +536,14 @@ function Seat({
         ...num,
       }}
     >
-      <Target size={9} />${bountyValue}
+      <Target size={8} />${bountyValue}
     </div>
   );
 
   const seatInfo = (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
+    // gap 4 -> 6 (pedido explicito: o badge de bounty no canto da placa de
+    // nome nao pode encostar no chip de posicao logo acima).
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
       <div style={{ position: "relative" }}>
         {isDealer && (
           <div
