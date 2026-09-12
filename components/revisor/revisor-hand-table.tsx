@@ -10,6 +10,7 @@ import { OpponentStatsModal } from "./opponent-stats-modal";
 import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
 import { fetchOpponentsStatsForHand, type OpponentStats } from "@/lib/services/opponent-stats-service";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
+import type { BorderRingConfig } from "@/lib/poker/seat-layout";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
 import { F, T, num } from "@/lib/poker/drill-theme";
@@ -388,13 +389,23 @@ export function RevisorHandTable({
         replayError: "Essa mão foi importada antes do suporte à mesa completa e não tem dados de assentos suficientes pra montar o replay. Mãos importadas a partir de agora já vêm com esses dados.",
       };
     }
+    // Anel de assentos colado na borda real da mesa (pedido explicito:
+    // "alinhe na borda... inclusive o hero") -- precisa bater EXATAMENTE
+    // com o aspectRatio/cornerRadius passados pra PokerTable mais abaixo
+    // em cada um dos 3 casos. Celular fica de fora (undefined = mantem o
+    // anel antigo, que o mobileSeatLayout ja ajusta do jeito de sempre).
+    const borderRing: BorderRingConfig | undefined = isMobile
+      ? undefined
+      : compact
+      ? { aspectRatio: 4 / 5, cornerXPercent: 28, cornerYPercent: 22 }
+      : { aspectRatio: 8 / 5, cornerXPercent: 34, cornerYPercent: 54 };
     try {
-      return { replayState: projectHandAtStep(parsedHand, stepIndex, previousStepRef.current), replayError: null };
+      return { replayState: projectHandAtStep(parsedHand, stepIndex, previousStepRef.current, borderRing), replayError: null };
     } catch (e) {
       if (e instanceof HandReplayError) return { replayState: null, replayError: e.message };
       return { replayState: null, replayError: e instanceof Error ? e.message : "Erro ao montar a mesa dessa mão." };
     }
-  }, [parsedHand, stepIndex]);
+  }, [parsedHand, stepIndex, isMobile, compact]);
 
   // Dispara o callback pro consumidor (RevisorSessao) trocar de mao
   // assim que um erro aparece — nao renderiza a caixa de erro nesse caso,

@@ -1,5 +1,5 @@
 import type { ParsedHand, ParsedStreet, ParsedAction } from "./hand-parser";
-import { computeRealSeatLayout, type SeatLayoutSlot } from "./seat-layout";
+import { computeRealSeatLayout, type SeatLayoutSlot, type BorderRingConfig } from "./seat-layout";
 import type { TableHand, SeatState, HistoryStep } from "@/components/drill/poker-table";
 
 type StreetName = ParsedStreet["name"];
@@ -351,8 +351,16 @@ function computeCurrentStreet(events: StepEvent[], throughStep: number): StreetN
   return street;
 }
 
-export function projectHandAtStep(hand: ParsedHand, stepIndex: number, previousStepIndex?: number): ReplayState {
-  const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat ?? 0, hand.maxSeats ?? hand.seats.length);
+// `borderRing` (opcional): repassado direto pra computeRealSeatLayout --
+// omitido, mantem o anel de sempre (usado no celular). Ver comentario em
+// seat-layout.ts sobre por que o desktop agora passa isso.
+export function projectHandAtStep(
+  hand: ParsedHand,
+  stepIndex: number,
+  previousStepIndex?: number,
+  borderRing?: BorderRingConfig
+): ReplayState {
+  const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat ?? 0, hand.maxSeats ?? hand.seats.length, borderRing);
   // bbUnit calculado ANTES de montar a lista de eventos — precisa estar
   // disponivel pra actionLabel converter os valores da history bar pra BB
   // no momento em que cada evento e' criado.
