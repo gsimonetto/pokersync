@@ -191,7 +191,11 @@ function formatPotPct(size: number, pot: number): string | null {
 function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: number }) {
   if (!action) return null;
   const a = ACT[action.type.toLowerCase()] || ACT.check;
-  const potPct = action.size ? formatPotPct(action.size, pot) : null;
+  // All-in nao mostra "% do pote" (pedido explicito) -- o valor em bb ja
+  // diz tudo que importa; a fracao do pote so faz sentido pra sizing de
+  // aposta/raise normal, nao pra um all-in (que e' o stack inteiro, nao
+  // uma decisao de sizing).
+  const potPct = action.size && action.type !== "allin" ? formatPotPct(action.size, pot) : null;
   return (
     <div
       style={{
