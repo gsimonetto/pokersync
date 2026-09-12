@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { Info } from "lucide-react";
-import { Card } from "./card";
+import { Info, Target } from "lucide-react";
+import { Card, sortCardsDesc } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
 import type { OpponentStats } from "@/lib/services/opponent-stats-service";
@@ -62,6 +62,9 @@ export interface SeatState {
   stack?: number;
   action?: { type: string; size?: number } | null;
   cards?: (string | null)[];
+  // Bounty ("cabeça") desse jogador em torneios PKO/Mystery Bounty --
+  // ausente fora desse formato (ver ParsedSeat.bountyValue).
+  bountyValue?: number;
 }
 
 const NAME_MAX_CHARS = 12;
@@ -416,7 +419,7 @@ function Seat({
   onOpponentClick?: (playerName: string) => void;
 }) {
   const posCol = POS[seat.posLabel];
-  const { status = "empty", stack, action, cards } = state;
+  const { status = "empty", stack, action, cards, bountyValue } = state;
   const hero = seat.isHero;
   const effectiveScale = hero ? scale * heroScale : scale;
   const acting = status === "acting";
@@ -498,6 +501,34 @@ function Seat({
       </div>
     ) : null;
 
+  // Bounty ("cabeça") em torneios PKO/Mystery Bounty -- pedido explicito:
+  // "coloque um alvo e o valor da cabeça... seguindo nosso layout". Mesma
+  // cor/estilo do chip de bounty ja usado na listagem de torneios
+  // (revisor-fila.tsx: borda/fundo/texto em #FBBF24), so' que por
+  // jogador (cada assento carrega o proprio bounty, hero incluido).
+  const bountyChip = !empty && bountyValue != null && (
+    <div
+      title={`Bounty de $${bountyValue}`}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        gap: 3,
+        padding: "2px 8px",
+        borderRadius: 999,
+        fontFamily: F,
+        fontSize: 10.5,
+        fontWeight: 700,
+        color: "#FBBF24",
+        background: "rgba(251,191,36,0.10)",
+        border: "1px solid rgba(251,191,36,0.4)",
+        whiteSpace: "nowrap",
+        ...num,
+      }}
+    >
+      <Target size={10} />${bountyValue}
+    </div>
+  );
+
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
       <div style={{ position: "relative" }}>
@@ -550,6 +581,7 @@ function Seat({
       </div>
 
       {opponentHudChip}
+      {bountyChip}
 
       {!empty && (
         <div
@@ -621,7 +653,10 @@ function Seat({
           <>
             {cards && cards.length > 0 && (
               <div style={{ position: "relative", zIndex: 1, transform: CARD_BEHIND_NAME_TRANSFORM.above }}>
-                <CardFan cards={cards} size="board" />
+                {/* size "hero" (72x100, era "board" 56x80) -- pedido
+                    explicito: "as cartas do hero deverão ser maiores que
+                    as do vilão" (villain usa 46x66, ja bem menor). */}
+                <CardFan cards={sortCardsDesc(cards)} size="hero" />
               </div>
             )}
             <div style={{ position: "relative", zIndex: 2 }}>{seatInfo}</div>
@@ -635,7 +670,7 @@ function Seat({
             const showGhostCards = !revealedVillainCards && !empty && status !== "folded";
             const cardsBlock = revealedVillainCards ? (
               <div style={{ position: "relative", zIndex: 1, transform: CARD_BEHIND_NAME_TRANSFORM.above }}>
-                <CardFan cards={cards!} size="villain" />
+                <CardFan cards={sortCardsDesc(cards!)} size="villain" />
               </div>
             ) : showGhostCards ? (
               // FIX (pedido explicito): sem opacity aqui -- opacity no
@@ -1025,13 +1060,8 @@ export function PokerTable({
           {active && hand ? (
             <>
               {hand.spr != null && <SprBadge spr={hand.spr} />}
-              <div style={{ display: "flex", gap: 7 }}>
-                {hand.board.map((c, i) => (
-                  <div key={i} style={{ animation: "cardDeal 300ms ease-out both", animationDelay: `${i * 70}ms` }}>
-                    <Card card={c} />
-                  </div>
-                ))}
-              </div>
+              {/* Pote ACIMA do board (pedido explicito) -- era board depois
+                  pote, invertido. */}
               <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
                 <div
                   style={{
@@ -1050,6 +1080,13 @@ export function PokerTable({
                   <span style={{ color: TEXT.critical, fontWeight: 500, fontSize: 15, ...num }}>{hand.pot}</span>
                   <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>bb</span>
                 </div>
+              </div>
+              <div style={{ display: "flex", gap: 7 }}>
+                {hand.board.map((c, i) => (
+                  <div key={i} style={{ animation: "cardDeal 300ms ease-out both", animationDelay: `${i * 70}ms` }}>
+                    <Card card={c} />
+                  </div>
+                ))}
               </div>
             </>
           ) : (

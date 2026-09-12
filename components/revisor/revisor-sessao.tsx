@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AlertTriangle, Loader2, ChevronRight, Search, X, List, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
-import { HalfCard } from "@/components/drill/card";
+import { HalfCard, sortCardsDesc } from "@/components/drill/card";
 import { RevisorResponsiveStyles } from "./revisor-responsive-styles";
 import { ModalPortal } from "@/components/modal-portal";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
@@ -87,9 +87,11 @@ interface HandInListing {
 // ver HalfCard em components/drill/card.tsx), so' no tamanho compacto
 // de antes.
 function HeroCardsPreview({ cards }: { cards: string[] }) {
+  // Ordem sempre maior->menor (pedido explicito) -- mesma regra da mesa.
+  const ordered = sortCardsDesc(cards);
   return (
     <div style={{ display: "flex", gap: 3, flexShrink: 0 }}>
-      {cards.map((c, i) => (
+      {ordered.map((c, i) => (
         <HalfCard key={i} card={c} size="mini" />
       ))}
     </div>

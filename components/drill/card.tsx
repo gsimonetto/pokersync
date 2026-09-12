@@ -1,5 +1,18 @@
 import { T, F, SUITS, num } from "@/lib/poker/drill-theme";
 
+const RANK_ORDER = "23456789TJQKA";
+
+// Ordena um par de cartas (hole cards) da MAIOR pra MENOR -- pedido
+// explicito: "as cartas sempre devem ser na ordem: maior para o menor".
+// So' usar em cartas de JOGADOR (hero/vilao) -- NUNCA no board, cuja
+// ordem (flop/turn/river) e' temporal e nao pode ser mexida.
+export function sortCardsDesc<T extends string | null>(cards: T[]): T[] {
+  return [...cards].sort((a, b) => {
+    if (!a || !b) return a ? -1 : b ? 1 : 0;
+    return RANK_ORDER.indexOf(b[0]) - RANK_ORDER.indexOf(a[0]);
+  });
+}
+
 /* <Card card="Ah" />            carta aberta
    <Card card={null} />          slot vazio (board nao distribuido)
    <Card card="7s" size="hero"/> carta do heroi (maior)
@@ -34,9 +47,11 @@ const SIZES = {
   // Fonte/gap/offset proprios e menores pra essa carta caber sem
   // sobrepor, sem esconder nenhum elemento.
   // bigCenter aumentado (15 -> 20, pedido explicito: "naipe central da
-  // listagem das maos... muito pequeno") -- so o naipe central, resto do
-  // tamanho "mini" (usado no HalfCard da lista de maos do Revisor) mantido.
-  mini: { w: 34, h: 48, rank: 9, cornerSuit: 7, bigCenter: 20, cornerOffset: 3, cornerGap: 1 },
+  // listagem das maos... muito pequeno"). rank aumentado (9 -> 11,
+  // pedido explicito: "aumente um pouco o numero, agora ficou pequeno
+  // demais perto do naipe") -- o naipe central cresceu antes e deixou o
+  // numero do canto desproporcional perto dele.
+  mini: { w: 34, h: 48, rank: 11, cornerSuit: 7, bigCenter: 20, cornerOffset: 3, cornerGap: 1 },
   // Cartas dos vilões na mesa (reveladas no showdown ou viradas/silhueta)
   // -- pedido explicito: "diminua as cartas dos vilões... de forma
   // sutil não diminua tanto". ~18% menor que "board" (mesma proporção),
