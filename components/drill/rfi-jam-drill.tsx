@@ -1427,7 +1427,20 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
         {filtersOpen && (
           <div
             className="ps-tr-filters-backdrop"
-            onClick={() => setFiltersOpen(false)}
+            // FIX (bug reportado: "nao pode vir esse layout, precisa vir
+            // o responsivo do celular"): esse backdrop so' existe/e'
+            // clicavel no celular (ver .ps-tr-filters-backdrop em
+            // treino-responsive-styles.tsx -- display:none no desktop).
+            // A gaveta de filtros no celular so' entra nesse estado
+            // depois que o botao de filtros do modo mesa-cheia desliga
+            // fullscreenMode pra abrir ela (ver acima, no header do
+            // portal). Fechar batendo no fundo escuro (em vez do botao
+            // "Aplicar") so' desligava filtersOpen, sem religar
+            // fullscreenMode -- o jogador ficava preso no layout
+            // "normal" (o mesmo do desktop) pro resto da sessao. Usar
+            // applyFilters aqui garante o mesmo comportamento do botao
+            // Aplicar: fecha a gaveta E volta pra mesa-cheia no celular.
+            onClick={applyFilters}
             style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,0.6)", zIndex: 59 }}
           />
         )}
