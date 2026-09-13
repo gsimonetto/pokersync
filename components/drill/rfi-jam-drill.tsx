@@ -1497,8 +1497,35 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   />
                 )}
 
-                <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
-                  <PokerTable hand={tableHand} seats={seatLayout} variant="treino" streetCommitments={streetCommitments} chipAnimation={chipAnimation} />
+                <div
+                  style={
+                    isMobile
+                      ? { position: "relative", flex: 1, minHeight: 0 }
+                      : // Desktop passa a usar o mesmo card decorativo da
+                        // mesa do Revisor (revisor-hand-table.tsx) -- pedido
+                        // explicito: "use a mesa do revisor no modo treino
+                        // no desktop, nao mexa no celular". Mobile (acima)
+                        // fica intocado.
+                        {
+                          position: "relative",
+                          flex: 1,
+                          minHeight: 0,
+                          background: "#050505",
+                          borderRadius: 14,
+                          border: "1px solid rgba(255,255,255,0.08)",
+                          padding: "32px 32px 110px",
+                          overflow: "visible",
+                        }
+                  }
+                >
+                  <PokerTable
+                    hand={tableHand}
+                    seats={seatLayout}
+                    variant="treino"
+                    streetCommitments={streetCommitments}
+                    chipAnimation={chipAnimation}
+                    {...(isMobile ? {} : { cornerRadius: "34% / 54%" })}
+                  />
                   {chosen && verdict && displayLabel && displayColor && (
                     <VerdictFlash label={displayLabel} color={displayColor} isGood={isGoodVerdict} freqPct={chosenFreqPct} />
                   )}

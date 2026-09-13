@@ -4,6 +4,30 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 13/09/2026 (parte 6) — Remoção de dado ilustrativo/de teste do estoque pós-flop
+
+- A pedido do dono ("retire tudo que foi colocado como teste, quero só
+  arquivos reais a partir de agora"), removido o único spot pós-flop
+  que existia em `drills` (`postflop_river_cbet_river_dry_board`) — era
+  um dado ilustrativo com ranges inventadas à mão só pra provar o
+  pipeline ponta a ponta durante o desenvolvimento do motor, nunca foi
+  uma situação real de mesa. Removido também o `solver_jobs` associado.
+- `DEFAULT_CBET_RIVER_SPOT` removida de `jobs/solve_postflop_batch.py`
+  (pokersync-solver) — o job de river continua funcionando normalmente,
+  só não tem mais um exemplo fake embutido no arquivo.
+- Corrigido um erro de contagem introduzido na parte 3 (abaixo): "33
+  spots pré-flop" estava errado — eram 32 (12 push/fold + 20 RFI/Jam);
+  o "33" incluía sem querer essa linha de teste, que nem era pré-flop.
+- Investigação nesse processo (registrada em `roadmap.json`, MAIN-021):
+  hoje NÃO existe estoque pós-flop real nenhum, e a tela de Modo Treino
+  só sabe renderizar o formato de spot do RFI/Jam — um componente de UI
+  mais antigo (`components/drill/range-drill.tsx`) sabe ler um formato
+  genérico de GTO, mas não está conectado a nenhuma tela do produto.
+  Construir o pipeline pós-flop de verdade (MAIN-021) exige ranges reais
+  por spot (trabalho de conteúdo, não só código), um componente de UI
+  novo pra árvore de decisão do river/turn/flop, e integração com o
+  sistema de sugestão leak→treino — maior que uma sessão só.
+
 ## 13/09/2026 (parte 5) — MAIN-007 concluído: env vars já estavam configuradas
 
 - Ao pedir pro dono checar o painel do Vercel, descobrimos que
@@ -99,8 +123,11 @@
   - 12 novos spots de **RFI/Jam**: stacks 10/20/30/50/75/100bb em
     `sb_vs_bb` e `btn_vs_bb`, somados aos 4 já existentes por matchup
     (15/25/40/60bb), totalizando 10 stacks por matchup (10 a 100bb).
-  - Estoque pré-flop total: 33 spots (12 push/fold + 20 RFI/Jam ativo em
+  - Estoque pré-flop total: 32 spots (12 push/fold + 20 RFI/Jam ativo em
     Modo Treino), acima dos 8 spots que existiam antes desta sessão.
+    (Correção 13/09: o número "33" citado originalmente aqui incluía por
+    engano 1 spot pós-flop ilustrativo/de teste, removido depois — ver
+    entrada mais recente abaixo.)
   - `MAIN-022` e `SOLVER-006` marcados como concluídos no roadmap.
 - README do `pokersync-solver` ganhou seções documentando
   `compute_cev_multiway` (cEV/ICM multiway) e `compute_action_evs`

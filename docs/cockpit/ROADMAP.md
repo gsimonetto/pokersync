@@ -10,7 +10,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC MAIN — 59%
+## POKERSYNC MAIN — 70%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
@@ -44,9 +44,11 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 **Objetivo:** treinar o jogador com spots reais gerados pelo motor.
 **O que existe:** filtros por posição/stack/tipo, sessão diária
 retomável (persiste progresso do dia).
-**O que falta:** estoque pós-flop — pré-flop agora tem 33 spots (12
+**O que falta:** estoque pós-flop — pré-flop agora tem 32 spots (12
 push/fold ICM + 20 RFI/Jam, sb_vs_bb e btn_vs_bb, stacks de 8 a 100bb),
-mas os leaks reais dos usuários são majoritariamente pós-flop.
+mas os leaks reais dos usuários são majoritariamente pós-flop. Nenhum
+spot pós-flop real no estoque hoje — a única linha que existia era um
+dado ilustrativo/de teste, removida em 13/09/2026 a pedido do dono.
 **Próximo passo:** ver MAIN-021 (pipeline pós-flop ponta a ponta).
 **Dependências:** MAIN-021.
 
@@ -80,7 +82,7 @@ foram avaliados a partir do que o repositório `pokersync` sabe sobre ele
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC SOLVER — 79%
+## POKERSYNC SOLVER — 86%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
