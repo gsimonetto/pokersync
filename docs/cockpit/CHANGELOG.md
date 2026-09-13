@@ -4,6 +4,22 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 13/09/2026 (parte 4) — BLOQUEIO-001 resolvido: deploy do Solver confirmado ativo
+
+- O dono confirmou que `https://pokersync-solver-production.up.railway.app`
+  está no ar e responde `/health` — a ambiguidade registrada em
+  `BLOCKERS.md` desde 21/08/2026 está resolvida.
+- `SOLVER-018` (deploy Railway) marcado como concluído.
+- `SOLVER-013` e `MAIN-007` (cEV/ICM por mão) sobem de "bloqueado" pra
+  "atenção" — só falta um passo manual: configurar `SOLVER_API_URL` e
+  `SOLVER_API_KEY` nas env vars do projeto `pokersync` no Vercel. Não há
+  ferramenta MCP nesta sessão pra ler/escrever env vars do Vercel, e a
+  chave é um segredo que só o dono tem — por isso não foi possível
+  concluir esse último passo nesta sessão.
+- Progresso recalculado a partir de `roadmap.json` (a fórmula descrita em
+  `STATE.md` — média de progresso por frente): Main 59%→69%, Solver
+  79%→86%, geral 67%→75%. Radar ficou em 63% (sem itens alterados).
+
 ## 13/09/2026 (parte 3) — Limpeza do arquivo de backup órfão (MAIN-025)
 
 - Removido `app/modulos/_backup-page.tsx` (backup deliberado da tela de
