@@ -16,7 +16,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 |---|---|---|---|---|
 | MAIN-001 | Gestor de Banca | 🟢 | ⚪ P3 | — |
 | MAIN-002 | Review de Mãos (Revisor) | 🟢 | 🟠 P1 | sugestão de drill depende de MAIN-021 |
-| MAIN-003 | Modo Treino | 🟠 | 🔴 P0 | gerar estoque pós-flop e push/fold multi-stack |
+| MAIN-003 | Modo Treino | 🟠 | 🔴 P0 | gerar estoque pós-flop (depende de MAIN-021) |
 | MAIN-004 | Construtor de Ranges e Árvores | 🟢 | 🟡 P2 | — |
 | MAIN-005 | Player Evolution (core) | 🟢 | 🟡 P2 | — |
 | MAIN-006 | Módulo de Análise | 🟢 | 🟠 P1 | — |
@@ -35,8 +35,8 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-019 | Correções de segurança | 🟢 | 🔴 P0 | — |
 | MAIN-020 | Catálogo de formatos (Banca) | 🔵 | ⚪ P3 | decidir catálogo vs. migrar dados |
 | MAIN-021 | Pipeline pós-flop ponta a ponta | 🔵 | 🔴 P0 | maior alavanca do backlog |
-| MAIN-022 | Estoque push/fold ICM multi-stack | 🔵 | 🟠 P1 | só falta disparar o job |
-| MAIN-023 | `engine_version` em `hand_ev_results` | 🔵 | ⚪ P3 | — |
+| MAIN-022 | Estoque push/fold ICM multi-stack | 🟢 | 🟠 P1 | — |
+| MAIN-023 | `engine_version` em `hand_ev_results` | 🟢 | ⚪ P3 | — |
 | MAIN-024 | Sincronizar board externo do roadmap | 🔵 | ⚪ P3 | avaliar aposentar em favor do Cockpit |
 | MAIN-025 | Limpeza: arquivo de backup órfão | ⚠️ | ⚪ P3 | confirmar com o dono |
 
@@ -44,10 +44,11 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 **Objetivo:** treinar o jogador com spots reais gerados pelo motor.
 **O que existe:** filtros por posição/stack/tipo, sessão diária
 retomável (persiste progresso do dia).
-**O que falta:** estoque — só 8 spots (RFI/Jam pré-flop) no banco; os
-leaks reais dos usuários são todos pós-flop.
-**Próximo passo:** ver MAIN-021 e MAIN-022.
-**Dependências:** SOLVER-006, MAIN-021, MAIN-022.
+**O que falta:** estoque pós-flop — pré-flop agora tem 33 spots (12
+push/fold ICM + 20 RFI/Jam, sb_vs_bb e btn_vs_bb, stacks de 8 a 100bb),
+mas os leaks reais dos usuários são majoritariamente pós-flop.
+**Próximo passo:** ver MAIN-021 (pipeline pós-flop ponta a ponta).
+**Dependências:** MAIN-021.
 
 ### Destaque — MAIN-007 cEV/ICM por mão
 **Objetivo:** mostrar o EV real (ajustado por sorte) de mãos all-in já
@@ -86,20 +87,20 @@ foram avaliados a partir do que o repositório `pokersync` sabe sobre ele
 | SOLVER-003 | ICM (Malmuth-Harville) | 🟢 | 🟠 P1 | — |
 | SOLVER-004 | Push/Fold heads-up | 🟢 | 🟠 P1 | — |
 | SOLVER-005 | RFI/Jam heads-up ICM (produção) | 🟢 | 🔴 P0 | — |
-| SOLVER-006 | RFI/Jam multi-tamanho | 🟠 | 🟡 P2 | decidir tamanhos e subir spots |
+| SOLVER-006 | RFI/Jam multi-stack (sb_vs_bb e btn_vs_bb) | 🟢 | 🟡 P2 | — |
 | SOLVER-007 | Motor multiway (N jogadores) | 🟠 | 🟠 P1 | validar squeeze real |
 | SOLVER-008 | chipEV puro (toggle sem ICM) | 🟢 | 🟡 P2 | — |
 | SOLVER-009 | Pós-flop river | 🟢 | 🟠 P1 | — |
 | SOLVER-010 | Pós-flop turn | 🟢 | 🟠 P1 | — |
 | SOLVER-011 | Pós-flop flop | 🟠 | 🟡 P2 | rodar mais iterações |
-| SOLVER-012 | EV por ação pós-flop | 🟢 | 🟡 P2 | documentar no README |
+| SOLVER-012 | EV por ação pós-flop | 🟢 | 🟡 P2 | — |
 | SOLVER-013 | cEV/ICM heads-up por mão | 🔴 | 🔴 P0 | resolver BLOQUEIO-001 |
-| SOLVER-014 | cEV/ICM multiway | 🟠 | 🟡 P2 | documentar + avaliar consumo |
+| SOLVER-014 | cEV/ICM multiway | 🟠 | 🟡 P2 | avaliar consumo no produto |
 | SOLVER-015 | 3-bet real pré-flop | 🔵 | 🟡 P2 | não iniciado |
 | SOLVER-016 | Squeeze multiway validado | 🔵 | 🟡 P2 | rodar spot real offline |
 | SOLVER-017 | CI (GitHub Actions) | 🟢 | ⚪ P3 | — |
 | SOLVER-018 | Deploy no Railway | ⚠️ | 🔴 P0 | ver BLOQUEIO-001 |
-| SOLVER-019 | README desatualizado | ⚠️ | 🟡 P2 | atualizar 3 seções |
+| SOLVER-019 | README desatualizado | 🟢 | 🟡 P2 | — |
 
 ### Destaque — SOLVER-007 Motor multiway
 **Objetivo:** resolver spots com 3+ jogadores (squeeze, CO vs BTN, UTG

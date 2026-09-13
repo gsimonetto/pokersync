@@ -21,6 +21,7 @@ interface SolverCevResponse {
   hero_icm_baseline_dollars: number;
   hero_expected_icm_dollars: number;
   hero_expected_icm_delta_dollars: number;
+  engine_version: string;
 }
 
 export async function POST(request: Request) {
@@ -155,6 +156,7 @@ export async function POST(request: Request) {
         hero_icm_baseline_dollars: solverResult.hero_icm_baseline_dollars,
         hero_expected_icm_dollars: solverResult.hero_expected_icm_dollars,
         hero_expected_icm_delta_dollars: solverResult.hero_expected_icm_delta_dollars,
+        engine_version: solverResult.engine_version,
         computed_at: new Date().toISOString(),
       },
       { onConflict: "hand_review_id" }

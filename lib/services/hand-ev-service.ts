@@ -10,6 +10,7 @@ export interface HandEvResult {
   heroIcmBaselineDollars: number | null;
   heroExpectedIcmDollars: number | null;
   heroExpectedIcmDeltaDollars: number | null;
+  engineVersion: string | null;
   computedAt: string;
 }
 
@@ -23,6 +24,7 @@ function rowToResult(r: any): HandEvResult {
     heroIcmBaselineDollars: r.hero_icm_baseline_dollars,
     heroExpectedIcmDollars: r.hero_expected_icm_dollars,
     heroExpectedIcmDeltaDollars: r.hero_expected_icm_delta_dollars,
+    engineVersion: r.engine_version,
     computedAt: r.computed_at,
   };
 }
