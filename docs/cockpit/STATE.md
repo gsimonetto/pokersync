@@ -76,7 +76,6 @@ ser auditada numa sessão com acesso a esse repositório.
 
 🔴 P0 — Reconciliar e resolver o deploy do `pokersync-solver` (destrava cEV/ICM)
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
-🟠 P1 — Gerar estoque pré-flop push/fold ICM (10/20/30/50bb) — só falta disparar
 🟠 P1 — Validar agente desktop (Radar) contra instalações reais
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -100,3 +99,10 @@ listados no roadmap estão parados, não em desenvolvimento no momento.
 
 11/09/2026 — auditoria completa dos dois repositórios (código, não só
 commits), criação do Cockpit.
+
+13/09/2026 — estoque pré-flop de Modo Treino ampliado: 12 spots de
+push/fold ICM (8 a 100bb, sb_vs_bb) e 20 spots de RFI/Jam (10 a 100bb,
+sb_vs_bb e btn_vs_bb) gerados pelo motor e gravados na tabela `drills`
+via SQL direto (sem credencial de service role disponível na sessão).
+MAIN-022 e SOLVER-006 marcados como concluídos. Ver `CHANGELOG.md` para
+detalhes completos da sessão.

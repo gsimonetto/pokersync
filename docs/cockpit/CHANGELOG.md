@@ -4,6 +4,60 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 13/09/2026 — Correções de dados/UI e ampliação do estoque pré-flop do Modo Treino
+
+**Correções (Player Evolution / Gestão de Banca / Revisor)**
+- ROI/ITM/buy-in médio/streaks estavam diluídos por torneios importados
+  sem buy-in conhecido — `fetchTournamentMetrics` agora só considera
+  torneios com `hand_sessions.buyin` preenchido.
+- Removidas 58 linhas de teste/fake em `tournament_payouts` (todas com
+  `source="agent"`, sem `hero_payout_amount`, geradas no mesmo minuto).
+- Isolamento de dados garantido nos dois sentidos: mãos importadas
+  manualmente no Revisor (`source` fora de `agent`/`import`) não entram
+  mais em Player Evolution nem em Gestão de Banca, e confirmado que
+  Gestão de Banca nunca afeta os demais (FKs são `ON DELETE SET NULL`,
+  não `CASCADE`).
+- Corrigido bug que impedia excluir uma sessão "Importada" em Gestão de
+  Banca: a sincronização automática recriava a sessão apagada. Nova
+  coluna `hand_sessions.bankroll_excluded` marca a exclusão manual sem
+  afetar Player Evolution/Revisor.
+- Removida a seção inteira de cEV/ICM de `StatisticsTab` (painel, cálculo
+  automático, estado associado) a pedido do dono — feature adiada.
+
+**Correções (Revisor de Mãos)**
+- Badge de bounty reposicionado pra não sobrepor mais o nome do jogador
+  (`bottom: 100%` em vez de posição absoluta sobre a placa).
+- No celular, o seat do topo (posições ímpares de jogadores) estava muito
+  próximo do centro da mesa — corrigido o cálculo de layout.
+- Removido o replayer da tela "Analisar mão" (desktop e mobile) — no
+  celular ele quebrava visualmente e a mesa completa já não aparecia
+  mais nessa tela de qualquer forma.
+- Pendente: pedido de remover o "ante" da UI do Revisor não foi
+  localizado no código (não há nenhum texto/label visível de ante) —
+  aguardando o dono apontar exatamente onde aparece (print ajudaria).
+
+**Estoque pré-flop do Modo Treino (MAIN-022, SOLVER-006)**
+- Gerados e gravados na tabela `drills` do Supabase (projeto
+  `olgziujndtlvxegcnaoq`), via chamadas diretas ao motor Python
+  (sem `SUPABASE_SERVICE_ROLE_KEY` disponível na sessão — inserção feita
+  via SQL direto):
+  - 8 novos spots de **push/fold ICM** (`sb_vs_bb`): 40, 60, 75, 100bb
+    (somados aos 25bb já existente e aos 8/12/15bb re-upados com
+    arredondamento), totalizando 12 stacks: 8/10/12/15/20/25/30/40/50/
+    60/75/100bb.
+  - 12 novos spots de **RFI/Jam**: stacks 10/20/30/50/75/100bb em
+    `sb_vs_bb` e `btn_vs_bb`, somados aos 4 já existentes por matchup
+    (15/25/40/60bb), totalizando 10 stacks por matchup (10 a 100bb).
+  - Estoque pré-flop total: 33 spots (12 push/fold + 20 RFI/Jam ativo em
+    Modo Treino), acima dos 8 spots que existiam antes desta sessão.
+  - `MAIN-022` e `SOLVER-006` marcados como concluídos no roadmap.
+- README do `pokersync-solver` ganhou seções documentando
+  `compute_cev_multiway` (cEV/ICM multiway) e `compute_action_evs`
+  (EV por ação pós-flop), além de nota sobre o status ambíguo do deploy
+  no Railway (ver `BLOCKERS.md`).
+- Estoque pós-flop (o maior leak real dos usuários) continua pendente —
+  depende do pipeline ponta a ponta de MAIN-021, não gerado nesta sessão.
+
 ## 11/09/2026 (parte 2) — POKERSYNC.md removido, painel com identidade visual real
 
 - `POKERSYNC.md` excluído a pedido do dono — o Cockpit (`docs/cockpit/`)

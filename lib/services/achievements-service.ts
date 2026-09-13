@@ -2,11 +2,11 @@ import { createClient } from "@/lib/supabase/client";
 
 // Estrutura minima de conquistas (2026-09): catalogo em `achievements` +
 // desbloqueios em `user_achievements`. Hoje so' existe 1 conquista no
-// catalogo ("founder" -- primeiro mes assinando o PokerSync), mas
-// nenhum criterio automatico concede ela ainda: depende de um sistema
-// de assinatura/pagamento que o produto ainda nao tem. Enquanto isso,
-// fetchMyAchievements() sempre volta vazio pra todo mundo -- de
-// proposito, nunca mostra um selo bloqueado/placeholder no lugar.
+// catalogo ("founder" -- concedida automaticamente a todo jogador que
+// fecha um plano pago, ver grantFounderAchievement() no webhook de
+// billing em app/api/billing/webhook/route.ts). fetchMyAchievements()
+// so' devolve o que o jogador ja' desbloqueou de verdade -- nunca mostra
+// selo bloqueado/placeholder no lugar de uma conquista nao conquistada.
 
 export interface Achievement {
   code: string;
