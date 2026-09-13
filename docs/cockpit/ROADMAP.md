@@ -20,7 +20,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-004 | Construtor de Ranges e Árvores | 🟢 | 🟡 P2 | — |
 | MAIN-005 | Player Evolution (core) | 🟢 | 🟡 P2 | — |
 | MAIN-006 | Módulo de Análise | 🟢 | 🟠 P1 | — |
-| MAIN-007 | cEV/ICM por mão (consumo) | 🔴 | 🔴 P0 | resolver BLOQUEIO-001 |
+| MAIN-007 | cEV/ICM por mão (consumo) | 🟢 | 🔴 P0 | — |
 | MAIN-008 | Estatísticas de oponente | 🔵 | 🟡 P2 | desenhar schema por jogador |
 | MAIN-009 | HUD em tempo real | 🔵 | ⚪ P3 | não priorizado |
 | MAIN-010 | Plataforma para Times (core) | 🟢 | 🟡 P2 | — |
@@ -38,7 +38,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-022 | Estoque push/fold ICM multi-stack | 🟢 | 🟠 P1 | — |
 | MAIN-023 | `engine_version` em `hand_ev_results` | 🟢 | ⚪ P3 | — |
 | MAIN-024 | Sincronizar board externo do roadmap | 🔵 | ⚪ P3 | avaliar aposentar em favor do Cockpit |
-| MAIN-025 | Limpeza: arquivo de backup órfão | ⚠️ | ⚪ P3 | confirmar com o dono |
+| MAIN-025 | Limpeza: arquivo de backup órfão | 🟢 | ⚪ P3 | — |
 
 ### Destaque — MAIN-003 Modo Treino
 **Objetivo:** treinar o jogador com spots reais gerados pelo motor.
@@ -50,15 +50,17 @@ mas os leaks reais dos usuários são majoritariamente pós-flop.
 **Próximo passo:** ver MAIN-021 (pipeline pós-flop ponta a ponta).
 **Dependências:** MAIN-021.
 
-### Destaque — MAIN-007 cEV/ICM por mão
+### Destaque — MAIN-007 cEV/ICM por mão ✅ concluído em 13/09/2026
 **Objetivo:** mostrar o EV real (ajustado por sorte) de mãos all-in já
 jogadas.
 **O que existe:** endpoint no produto pronto e mergeado
-(`app/api/hand-ev/compute`), chama o motor via HTTP.
-**O que falta:** o motor nunca foi confirmadamente publicado — ver
-`BLOCKERS.md`.
-**Próximo passo:** resolver BLOQUEIO-001.
-**Dependências:** SOLVER-013, SOLVER-018.
+(`app/api/hand-ev/compute`), chama o motor via HTTP. Deploy do motor
+confirmado ativo (BLOQUEIO-001 resolvido) e `SOLVER_API_URL`/
+`SOLVER_API_KEY` já configuradas no Vercel (Production) desde
+03/09/2026 — a suposição de que faltava configurar isso estava
+desatualizada.
+**Próximo passo:** validar com uma mão all-in elegível real no Revisor.
+**Dependências:** SOLVER-013, SOLVER-018 (ambos concluídos).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -94,12 +96,12 @@ foram avaliados a partir do que o repositório `pokersync` sabe sobre ele
 | SOLVER-010 | Pós-flop turn | 🟢 | 🟠 P1 | — |
 | SOLVER-011 | Pós-flop flop | 🟠 | 🟡 P2 | rodar mais iterações |
 | SOLVER-012 | EV por ação pós-flop | 🟢 | 🟡 P2 | — |
-| SOLVER-013 | cEV/ICM heads-up por mão | 🔴 | 🔴 P0 | resolver BLOQUEIO-001 |
+| SOLVER-013 | cEV/ICM heads-up por mão | 🟢 | 🔴 P0 | — |
 | SOLVER-014 | cEV/ICM multiway | 🟠 | 🟡 P2 | avaliar consumo no produto |
 | SOLVER-015 | 3-bet real pré-flop | 🔵 | 🟡 P2 | não iniciado |
 | SOLVER-016 | Squeeze multiway validado | 🔵 | 🟡 P2 | rodar spot real offline |
 | SOLVER-017 | CI (GitHub Actions) | 🟢 | ⚪ P3 | — |
-| SOLVER-018 | Deploy no Railway | ⚠️ | 🔴 P0 | ver BLOQUEIO-001 |
+| SOLVER-018 | Deploy no Railway | 🟢 | 🔴 P0 | — |
 | SOLVER-019 | README desatualizado | 🟢 | 🟡 P2 | — |
 
 ### Destaque — SOLVER-007 Motor multiway
@@ -127,11 +129,11 @@ Main: MAIN-021 Pipeline pós-flop ponta a ponta (planejado)
    ↓
 Main: MAIN-003 Modo Treino (estoque pós-flop)
 
-Solver: SOLVER-013 cEV/ICM por mão (pronto no motor)
+Solver: SOLVER-013 cEV/ICM por mão (🟢 pronto no motor)
    ↓
-Solver: SOLVER-018 Deploy Railway (⚠️ ambíguo — BLOQUEIO-001)
+Solver: SOLVER-018 Deploy Railway (🟢 confirmado ativo)
    ↓
-Main: MAIN-007 cEV/ICM (consumo no produto)
+Main: MAIN-007 cEV/ICM (🟢 concluído — consumo no produto)
 
 Radar: RADAR-002 Agente desktop (parcial, repo separado)
    ↓

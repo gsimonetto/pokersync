@@ -25,33 +25,33 @@ sobre `roadmap.json`, que qualquer um pode reproduzir.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC — Progresso Geral: 67%
+## POKERSYNC — Progresso Geral: 76%
 
-🟢 Main    ████████████░░░░░░░░ 59%  (24 itens rastreados)
+🟢 Main    ██████████████░░░░░░ 70%  (25 itens rastreados)
 🔵 Radar   █████████████░░░░░░░ 63%  (4 itens rastreados)
-🟣 Solver  ████████████████░░░░ 79%  (18 itens rastreados)
+🟣 Solver  █████████████████░░░ 86%  (19 itens rastreados)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## ONDE ESTAMOS?
 
-### PokerSync Main — 59% completo
+### PokerSync Main — 70% completo
 **Trabalho atual:** nenhuma frente "em progresso" ativa no momento da
 auditoria — o repositório está numa sequência de módulos concluídos
 (Marketplace, Conquistas, LGPD, segurança) sem nada pela metade.
 **Próximo:** 🔴 P0 — Pipeline pós-flop ponta a ponta (job → contrato →
 UI), porque os 5 leaks reais da base de usuários são todos pós-flop e
 sem isso o loop "leak vira treino" não fecha de verdade.
-**Bloqueio:** cEV/ICM por mão jogada está pronto no código dos dois lados
-e travado só pelo status do deploy do Solver (ver Blocos abaixo).
+**Bloqueio:** nenhum — cEV/ICM por mão (MAIN-007) concluído em
+13/09/2026: deploy do Solver confirmado ativo e as env vars já estavam
+configuradas no Vercel desde 03/09/2026 (a suposição de que faltava
+configurar era desatualizada).
 
-### PokerSync Solver — 79% completo
+### PokerSync Solver — 86% completo
 **Trabalho atual:** motor multiway (squeeze) — arquitetura pronta e
 bugs graves corrigidos nesta janela, falta validar num spot real.
-**Próximo:** 🔴 P0 — resolver a ambiguidade do deploy no Railway (ver
-Bloqueios) — é o item que, sozinho, destrava mais valor no produto.
-**Bloqueio:** nenhum bloqueio técnico interno; o bloqueio é de decisão/
-confirmação com o dono do projeto sobre o deploy.
+**Próximo:** 🟠 P1 — validar squeeze multiway num spot real (SOLVER-016).
+**Bloqueio:** nenhum.
 
 ### Radar PokerSync (addon + agente desktop) — 63% completo
 **Trabalho atual:** validar o agente desktop (Tauri/Rust, repositório
@@ -74,9 +74,9 @@ ser auditada numa sessão com acesso a esse repositório.
 
 ## PRÓXIMOS PASSOS (ordem de prioridade)
 
-🔴 P0 — Reconciliar e resolver o deploy do `pokersync-solver` (destrava cEV/ICM)
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
 🟠 P1 — Validar agente desktop (Radar) contra instalações reais
+🟠 P1 — Validar squeeze multiway num spot real (SOLVER-016)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -90,8 +90,7 @@ listados no roadmap estão parados, não em desenvolvimento no momento.
 
 ## BLOQUEIOS
 
-🔴 **Solver** — status de deploy no Railway é ambíguo (ver `BLOCKERS.md`)
-🔴 **Main** — cEV/ICM por mão depende do bloqueio acima
+Nenhum bloqueio ativo (ver `BLOCKERS.md`).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
