@@ -4,6 +4,19 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 13/09/2026 (parte 5) — MAIN-007 concluído: env vars já estavam configuradas
+
+- Ao pedir pro dono checar o painel do Vercel, descobrimos que
+  `SOLVER_API_URL` e `SOLVER_API_KEY` **já estavam configuradas em
+  Production desde 03/09/2026** — a suposição (registrada na parte 4,
+  abaixo) de que faltava esse passo manual estava desatualizada.
+- `MAIN-007` e `SOLVER-013` marcados como concluídos.
+- Progresso recalculado: Main 69%→70%, geral 75%→76% (Solver e Radar
+  sem mudança).
+- Próximo passo real do item: só falta validar com uma mão all-in
+  elegível de verdade no Revisor pra confirmar que o cálculo aparece na
+  UI ponta a ponta.
+
 ## 13/09/2026 (parte 4) — BLOQUEIO-001 resolvido: deploy do Solver confirmado ativo
 
 - O dono confirmou que `https://pokersync-solver-production.up.railway.app`
@@ -11,11 +24,9 @@
   `BLOCKERS.md` desde 21/08/2026 está resolvida.
 - `SOLVER-018` (deploy Railway) marcado como concluído.
 - `SOLVER-013` e `MAIN-007` (cEV/ICM por mão) sobem de "bloqueado" pra
-  "atenção" — só falta um passo manual: configurar `SOLVER_API_URL` e
-  `SOLVER_API_KEY` nas env vars do projeto `pokersync` no Vercel. Não há
-  ferramenta MCP nesta sessão pra ler/escrever env vars do Vercel, e a
-  chave é um segredo que só o dono tem — por isso não foi possível
-  concluir esse último passo nesta sessão.
+  "atenção" — achávamos nesse momento que ainda faltava configurar
+  `SOLVER_API_URL`/`SOLVER_API_KEY` no Vercel (ver correção acima, na
+  parte 5, feita minutos depois).
 - Progresso recalculado a partir de `roadmap.json` (a fórmula descrita em
   `STATE.md` — média de progresso por frente): Main 59%→69%, Solver
   79%→86%, geral 67%→75%. Radar ficou em 63% (sem itens alterados).

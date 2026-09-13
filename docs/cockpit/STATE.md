@@ -25,9 +25,9 @@ sobre `roadmap.json`, que qualquer um pode reproduzir.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC — Progresso Geral: 75%
+## POKERSYNC — Progresso Geral: 76%
 
-🟢 Main    ██████████████░░░░░░ 69%  (25 itens rastreados)
+🟢 Main    ██████████████░░░░░░ 70%  (25 itens rastreados)
 🔵 Radar   █████████████░░░░░░░ 63%  (4 itens rastreados)
 🟣 Solver  █████████████████░░░ 86%  (19 itens rastreados)
 
@@ -35,16 +35,17 @@ sobre `roadmap.json`, que qualquer um pode reproduzir.
 
 ## ONDE ESTAMOS?
 
-### PokerSync Main — 69% completo
+### PokerSync Main — 70% completo
 **Trabalho atual:** nenhuma frente "em progresso" ativa no momento da
 auditoria — o repositório está numa sequência de módulos concluídos
 (Marketplace, Conquistas, LGPD, segurança) sem nada pela metade.
 **Próximo:** 🔴 P0 — Pipeline pós-flop ponta a ponta (job → contrato →
 UI), porque os 5 leaks reais da base de usuários são todos pós-flop e
 sem isso o loop "leak vira treino" não fecha de verdade.
-**Bloqueio:** nenhum mais — deploy do Solver confirmado ativo em
-13/09/2026. Só falta o dono configurar `SOLVER_API_URL`/`SOLVER_API_KEY`
-no Vercel (ver MAIN-007).
+**Bloqueio:** nenhum — cEV/ICM por mão (MAIN-007) concluído em
+13/09/2026: deploy do Solver confirmado ativo e as env vars já estavam
+configuradas no Vercel desde 03/09/2026 (a suposição de que faltava
+configurar era desatualizada).
 
 ### PokerSync Solver — 86% completo
 **Trabalho atual:** motor multiway (squeeze) — arquitetura pronta e
@@ -73,9 +74,9 @@ ser auditada numa sessão com acesso a esse repositório.
 
 ## PRÓXIMOS PASSOS (ordem de prioridade)
 
-🔴 P0 — Configurar SOLVER_API_URL/SOLVER_API_KEY no Vercel (destrava cEV/ICM, MAIN-007)
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
 🟠 P1 — Validar agente desktop (Radar) contra instalações reais
+🟠 P1 — Validar squeeze multiway num spot real (SOLVER-016)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 

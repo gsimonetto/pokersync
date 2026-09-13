@@ -20,7 +20,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-004 | Construtor de Ranges e Árvores | 🟢 | 🟡 P2 | — |
 | MAIN-005 | Player Evolution (core) | 🟢 | 🟡 P2 | — |
 | MAIN-006 | Módulo de Análise | 🟢 | 🟠 P1 | — |
-| MAIN-007 | cEV/ICM por mão (consumo) | ⚠️ | 🔴 P0 | configurar env vars no Vercel |
+| MAIN-007 | cEV/ICM por mão (consumo) | 🟢 | 🔴 P0 | — |
 | MAIN-008 | Estatísticas de oponente | 🔵 | 🟡 P2 | desenhar schema por jogador |
 | MAIN-009 | HUD em tempo real | 🔵 | ⚪ P3 | não priorizado |
 | MAIN-010 | Plataforma para Times (core) | 🟢 | 🟡 P2 | — |
@@ -50,19 +50,17 @@ mas os leaks reais dos usuários são majoritariamente pós-flop.
 **Próximo passo:** ver MAIN-021 (pipeline pós-flop ponta a ponta).
 **Dependências:** MAIN-021.
 
-### Destaque — MAIN-007 cEV/ICM por mão
+### Destaque — MAIN-007 cEV/ICM por mão ✅ concluído em 13/09/2026
 **Objetivo:** mostrar o EV real (ajustado por sorte) de mãos all-in já
 jogadas.
 **O que existe:** endpoint no produto pronto e mergeado
 (`app/api/hand-ev/compute`), chama o motor via HTTP. Deploy do motor
-confirmado ativo em 13/09/2026 (BLOQUEIO-001 resolvido).
-**O que falta:** só um passo manual — configurar `SOLVER_API_URL` e
-`SOLVER_API_KEY` nas env vars do projeto `pokersync` no Vercel
-(Settings → Environment Variables). Nenhuma ferramenta desta sessão
-lê/escreve env vars do Vercel nem tem a chave secreta, então é o dono
-quem precisa fazer isso.
-**Próximo passo:** dono configura as duas env vars no Vercel.
-**Dependências:** SOLVER-013, SOLVER-018 (ambos prontos).
+confirmado ativo (BLOQUEIO-001 resolvido) e `SOLVER_API_URL`/
+`SOLVER_API_KEY` já configuradas no Vercel (Production) desde
+03/09/2026 — a suposição de que faltava configurar isso estava
+desatualizada.
+**Próximo passo:** validar com uma mão all-in elegível real no Revisor.
+**Dependências:** SOLVER-013, SOLVER-018 (ambos concluídos).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -98,7 +96,7 @@ foram avaliados a partir do que o repositório `pokersync` sabe sobre ele
 | SOLVER-010 | Pós-flop turn | 🟢 | 🟠 P1 | — |
 | SOLVER-011 | Pós-flop flop | 🟠 | 🟡 P2 | rodar mais iterações |
 | SOLVER-012 | EV por ação pós-flop | 🟢 | 🟡 P2 | — |
-| SOLVER-013 | cEV/ICM heads-up por mão | 🟠 | 🔴 P0 | ver MAIN-007 (env vars) |
+| SOLVER-013 | cEV/ICM heads-up por mão | 🟢 | 🔴 P0 | — |
 | SOLVER-014 | cEV/ICM multiway | 🟠 | 🟡 P2 | avaliar consumo no produto |
 | SOLVER-015 | 3-bet real pré-flop | 🔵 | 🟡 P2 | não iniciado |
 | SOLVER-016 | Squeeze multiway validado | 🔵 | 🟡 P2 | rodar spot real offline |
@@ -131,11 +129,11 @@ Main: MAIN-021 Pipeline pós-flop ponta a ponta (planejado)
    ↓
 Main: MAIN-003 Modo Treino (estoque pós-flop)
 
-Solver: SOLVER-013 cEV/ICM por mão (pronto no motor)
+Solver: SOLVER-013 cEV/ICM por mão (🟢 pronto no motor)
    ↓
 Solver: SOLVER-018 Deploy Railway (🟢 confirmado ativo)
    ↓
-Main: MAIN-007 cEV/ICM (consumo — falta env vars no Vercel)
+Main: MAIN-007 cEV/ICM (🟢 concluído — consumo no produto)
 
 Radar: RADAR-002 Agente desktop (parcial, repo separado)
    ↓
