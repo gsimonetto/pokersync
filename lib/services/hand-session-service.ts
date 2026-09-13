@@ -37,6 +37,12 @@ export interface HandSession {
   // (heuristica: heroFinishPlace <= maxSeats da mao de eliminacao) mas
   // NAO ficou entre os 3 primeiros. Selo "FT" na lista de torneios.
   reached_ft: boolean;
+  // true quando o jogador excluiu manualmente a sessao de banca que tinha
+  // sido importada a partir deste torneio (ver excludeSessionFromBankroll)
+  // -- so' controla se a sincronizacao automatica agente->banca (Gestao de
+  // Banca) pode recriar essa sessao; nunca filtra Player Evolution/Revisor,
+  // que continuam vendo o torneio normalmente.
+  bankroll_excluded: boolean;
   created_at: string;
   updated_at: string;
 }
@@ -366,4 +372,20 @@ export async function linkOrCreateBankrollSessionForTournament(params: {
   await linkHandSessionReviews(handSession.id, saved.id);
 
   return { created: true, bankrollSessionId: saved.id };
+}
+
+// Marca o torneio pra nunca mais ser recriado automaticamente na Gestão
+// de Banca -- chamado quando o jogador exclui, na tela da Banca, uma
+// sessão que tinha sido importada de um torneio (bankroll_sessions.
+// imported_hand_session_id). Sem essa marcação, a sincronização
+// automática agente->banca (ver app/banca/page.tsx, pendingAgentTournaments)
+// via de volta e recriava a sessão no próximo carregamento, porque
+// excluir da Banca nunca apaga o torneio/mãos no Revisor (pedido
+// explícito, fontes de verdade separadas) -- então o torneio continuava
+// aparecendo como "pendente de importar". Só afeta esse sync; Player
+// Evolution e Revisor de Mãos continuam vendo o torneio normalmente.
+export async function excludeSessionFromBankroll(handSessionId: string) {
+  const supabase = createClient();
+  const { error } = await supabase.from("hand_sessions").update({ bankroll_excluded: true }).eq("id", handSessionId);
+  if (error) throw error;
 }

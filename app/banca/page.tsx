@@ -10,7 +10,7 @@ import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, CURRENCIES, todayISO, se
 import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
 import { fetchReviewCountsBySessionIds, linkHandSessionReviews } from "@/lib/services/hand-review-service";
-import type { HandSession } from "@/lib/services/hand-session-service";
+import { excludeSessionFromBankroll, type HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
@@ -265,7 +265,7 @@ export default function BankrollPage() {
   // R$ 1 na banca, o bug que gerou esse pedido. Cacheado 12h no navegador
   // pra não bater na API a cada carregamento de página.
   const pendingAgentTournaments = useMemo(
-    () => agentTournaments.filter((h) => !sessions.some((s) => s.importedHandSessionId === h.id)),
+    () => agentTournaments.filter((h) => !h.bankroll_excluded && !sessions.some((s) => s.importedHandSessionId === h.id)),
     [agentTournaments, sessions]
   );
   const [usdRateError, setUsdRateError] = useState(false);
@@ -637,14 +637,36 @@ export default function BankrollPage() {
   // linha de bankroll_sessions; hand_sessions (e suas maos) fica intacta,
   // so perde o vinculo (FK SET NULL) -- reaparece como orfa se algum dia
   // for reimportada.
+  //
+  // Sessao "Importada" (importedHandSessionId setado) precisa tambem
+  // marcar o torneio como excluido da banca (bankroll_excluded) -- sem
+  // isso, o proximo carregamento via a mesma hand_sessions sem sessao de
+  // banca correspondente e importava ela de volta sozinha (pendingAgentTournaments/
+  // importAgentTournaments), tornando impossivel excluir de verdade.
   async function handleRemove(id: string) {
     const backup = sessions;
+    const removed = sessions.find((x) => x.id === id);
     setSessions((prev) => prev.filter((x) => x.id !== id));
+    if (removed?.importedHandSessionId) {
+      setAgentTournaments((prev) => prev.map((h) => (h.id === removed.importedHandSessionId ? { ...h, bankroll_excluded: true } : h)));
+    }
     try {
       await apiDeleteSession(id);
     } catch {
       setErr("Nao foi possivel excluir. Restaurando.");
       setSessions(backup);
+      if (removed?.importedHandSessionId) {
+        setAgentTournaments((prev) => prev.map((h) => (h.id === removed.importedHandSessionId ? { ...h, bankroll_excluded: false } : h)));
+      }
+      return;
+    }
+    // Marca DEPOIS de confirmar que a sessao foi excluida de verdade -- se
+    // isso falhar, a sessao ja foi excluida (nao ha o que reverter), so'
+    // corre o risco (raro) de reaparecer no proximo carregamento.
+    if (removed?.importedHandSessionId) {
+      excludeSessionFromBankroll(removed.importedHandSessionId).catch(() => {
+        console.error("Falha ao marcar torneio como excluido da banca:", removed.importedHandSessionId);
+      });
     }
   }
 
