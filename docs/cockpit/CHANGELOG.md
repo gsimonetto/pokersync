@@ -4,6 +4,21 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 13/09/2026 (parte 2) — engine_version em hand_ev_results (MAIN-023)
+
+- Coluna `engine_version` adicionada à tabela `hand_ev_results` via
+  migration.
+- `compute_hand_cev()` e `compute_hand_cev_multiway()` (pokersync-solver)
+  agora retornam `engine_version` (`pokersync-solver-v1.0.0-hand-cev` e
+  `-hand-cev-multiway`), seguindo a mesma convenção dos jobs em lote.
+- A rota `app/api/hand-ev/compute/route.ts` grava esse valor junto com o
+  resto do resultado; `HandEvResult`/`hand-ev-service.ts` expõe
+  `engineVersion` pro resto do produto.
+- `exploitability` não se aplica a esses dois endpoints (cálculo
+  analítico de uma mão específica, não solve iterativo) — decisão
+  registrada em `DECISIONS.md` (ADR-011).
+- `MAIN-023` marcado como concluído.
+
 ## 13/09/2026 — Correções de dados/UI e ampliação do estoque pré-flop do Modo Treino
 
 **Correções (Player Evolution / Gestão de Banca / Revisor)**

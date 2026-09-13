@@ -79,7 +79,11 @@ demanda tornaria a tela refém do motor.
 `exploitability`.
 **Motivo:** a ausência desse log tornou o diagnóstico do pipeline antigo
 (TexasSolver) muito lento.
-**Impacto:** MAIN-023 (pendência: falta em `hand_ev_results`).
+**Impacto:** MAIN-023 — aplicada em `hand_ev_results` em 13/09/2026.
+Nota: `exploitability` não se aplica aos endpoints `compute_cev`/
+`compute_cev_multiway` (são cálculo analítico/EV direto de uma mão já
+jogada, não um solve iterativo de estratégia) — só `engine_version` é
+gravado ali.
 **Data:** 21/08/2026 (registrada — já valia na prática antes)
 
 ### ADR-012 — Estrutura mínima aceita: ICM primeiro
@@ -96,7 +100,7 @@ EV analítico de UMA mão específica já jogada, all-in heads-up com as
 duas mãos mostradas no showdown. Não é solve de spot.
 **Motivo:** cEV/ICM por mão exige o resultado de UM confronto específico,
 não dá pra pré-computar em lote sem saber quais mãos serão jogadas.
-**Impacto:** ADR-011 ainda não aplicada em `hand_ev_results` (MAIN-023).
+**Impacto:** ADR-011 aplicada em `hand_ev_results` em 13/09/2026 (MAIN-023).
 **Data:** 27/08/2026
 
 ### ADR-014 — "Radar" é uma frente, não dois módulos

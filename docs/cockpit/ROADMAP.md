@@ -36,7 +36,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-020 | Catálogo de formatos (Banca) | 🔵 | ⚪ P3 | decidir catálogo vs. migrar dados |
 | MAIN-021 | Pipeline pós-flop ponta a ponta | 🔵 | 🔴 P0 | maior alavanca do backlog |
 | MAIN-022 | Estoque push/fold ICM multi-stack | 🟢 | 🟠 P1 | — |
-| MAIN-023 | `engine_version` em `hand_ev_results` | 🔵 | ⚪ P3 | — |
+| MAIN-023 | `engine_version` em `hand_ev_results` | 🟢 | ⚪ P3 | — |
 | MAIN-024 | Sincronizar board externo do roadmap | 🔵 | ⚪ P3 | avaliar aposentar em favor do Cockpit |
 | MAIN-025 | Limpeza: arquivo de backup órfão | ⚠️ | ⚪ P3 | confirmar com o dono |
 

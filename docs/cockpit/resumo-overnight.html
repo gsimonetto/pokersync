@@ -1,0 +1,109 @@
+<!doctype html>
+<title>Resumo da Sessão</title>
+<style>
+:root{
+  --bg:#f7f7f5; --fg:#1a1a1a; --muted:#6b6b6b; --card:#ffffff; --border:#e4e4e0;
+  --green:#1f9d55; --amber:#c98a12; --blue:#3a6ea5; --gold:#b8860b;
+}
+@media (prefers-color-scheme: dark){
+  :root:not([data-theme="light"]){
+    --bg:#111113; --fg:#eaeaea; --muted:#9a9a9a; --card:#191a1d; --border:#2a2b2f;
+    --green:#39c56d; --amber:#e0a834; --blue:#6fa3d8; --gold:#e0b84b;
+  }
+}
+:root[data-theme="dark"]{
+  --bg:#111113; --fg:#eaeaea; --muted:#9a9a9a; --card:#191a1d; --border:#2a2b2f;
+  --green:#39c56d; --amber:#e0a834; --blue:#6fa3d8; --gold:#e0b84b;
+}
+body{background:var(--bg);color:var(--fg);font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif;padding-block:32px;line-height:1.55;}
+.wrap{max-width:760px;margin:0 auto;padding-inline:20px;}
+h1{font-size:1.5rem;margin-bottom:4px;}
+.sub{color:var(--muted);font-size:0.9rem;margin-bottom:28px;}
+h2{font-size:1.1rem;margin-top:32px;margin-bottom:10px;display:flex;align-items:center;gap:8px;}
+.card{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:16px 18px;margin-bottom:12px;}
+.card p{margin:4px 0;}
+.tag{display:inline-block;font-size:0.72rem;font-weight:600;padding:2px 8px;border-radius:99px;margin-right:6px;}
+.tag.done{background:color-mix(in srgb, var(--green) 18%, transparent);color:var(--green);}
+.tag.pending{background:color-mix(in srgb, var(--amber) 18%, transparent);color:var(--amber);}
+.tag.blocked{background:color-mix(in srgb, #c0392b 18%, transparent);color:#c0392b;}
+ul{margin:8px 0 0 0;padding-left:20px;}
+li{margin-bottom:4px;}
+code{background:color-mix(in srgb, var(--fg) 8%, transparent);padding:1px 5px;border-radius:4px;font-size:0.85em;}
+.stat-row{display:flex;gap:12px;flex-wrap:wrap;margin:12px 0;}
+.stat{background:var(--card);border:1px solid var(--border);border-radius:10px;padding:10px 16px;flex:1;min-width:120px;text-align:center;}
+.stat .n{font-size:1.4rem;font-weight:700;}
+.stat .l{font-size:0.75rem;color:var(--muted);}
+.footer{margin-top:36px;color:var(--muted);font-size:0.85rem;border-top:1px solid var(--border);padding-top:16px;}
+</style>
+
+<div class="wrap">
+  <h1>Bom dia! Aqui está o resumo do que foi feito</h1>
+  <div class="sub">Sessão de 13/09/2026 — commits feitos localmente, nada foi enviado (push/PR) sem sua confirmação.</div>
+
+  <h2>📊 Números da noite</h2>
+  <div class="stat-row">
+    <div class="stat"><div class="n">33</div><div class="l">spots pré-flop no Modo Treino (eram 8)</div></div>
+    <div class="stat"><div class="n">12</div><div class="l">stacks push/fold ICM (8–100bb)</div></div>
+    <div class="stat"><div class="n">20</div><div class="l">spots RFI/Jam (10–100bb, 2 posições)</div></div>
+  </div>
+
+  <h2>✅ Concluído esta noite (autônomo, "veja o cockpit")</h2>
+  <div class="card">
+    <p><span class="tag done">MAIN-022</span><span class="tag done">SOLVER-006</span></p>
+    <p><strong>Estoque pré-flop do Modo Treino ampliado</strong></p>
+    <ul>
+      <li>Push/fold ICM: gerados os stacks 40, 60, 75 e 100bb (somados aos que já existiam), totalizando <strong>12 stacks</strong> de 8 a 100bb.</li>
+      <li>RFI/Jam: gerados 6 stacks novos (10/20/30/50/75/100bb) para <code>sb_vs_bb</code> e <code>btn_vs_bb</code>, totalizando <strong>10 stacks por posição</strong>.</li>
+      <li>Tudo gerado pelo motor Python e gravado direto na tabela <code>drills</code> do Supabase (sem a chave de service role disponível nesta sessão — inserção feita via SQL).</li>
+      <li>Roadmap atualizado: os dois itens agora marcados como <strong>concluídos</strong>.</li>
+    </ul>
+  </div>
+  <div class="card">
+    <p><strong>Documentação do README do Solver</strong></p>
+    <ul>
+      <li>Nova seção documentando <code>compute_cev_multiway</code> (cEV/ICM para 3+ jogadores).</li>
+      <li>Nova seção documentando <code>compute_action_evs</code> (EV por ação pós-flop, já usado em produção no job de river).</li>
+      <li>Nota sobre a ambiguidade do deploy no Railway (mesma informação do <code>BLOCKERS.md</code>).</li>
+    </ul>
+  </div>
+  <div class="card">
+    <p><strong>Limpeza</strong></p>
+    <ul>
+      <li>Corrigido um comentário desatualizado em <code>achievements-service.ts</code> que ainda descrevia a conquista "founder" como não concedida automaticamente (ela já é, desde a integração de billing).</li>
+    </ul>
+  </div>
+
+  <h2>✅ Concluído mais cedo na sessão (já mergeado)</h2>
+  <div class="card">
+    <ul>
+      <li>ROI/ITM/buy-in médio corrigidos: só contam torneios com buy-in conhecido (antes eram diluídos por torneios importados sem valor).</li>
+      <li>Removidas 58 linhas de teste/fake em <code>tournament_payouts</code>.</li>
+      <li>Isolamento de dados garantido nos dois sentidos: mãos manuais do Revisor não vazam mais para Player Evolution/Gestão de Banca, e Gestão de Banca confirmada como incapaz de afetar os demais.</li>
+      <li>Corrigida a impossibilidade de excluir uma sessão "Importada" na Gestão de Banca (nova flag <code>bankroll_excluded</code>).</li>
+      <li>Removida a seção de cEV/ICM da tela de Estatísticas (a seu pedido, adiada para o futuro).</li>
+      <li>No Revisor: badge de bounty não sobrepõe mais o nome; seat do topo no celular mais próximo da borda da mesa; replayer quebrado removido de "Analisar mão" (desktop e mobile).</li>
+    </ul>
+  </div>
+
+  <h2>⏳ Ainda pendente</h2>
+  <div class="card">
+    <p><span class="tag pending">Aguardando você</span></p>
+    <p><strong>"Ante" no Revisor</strong> — não encontrei nenhum texto/label visível mostrando o ante na UI do Revisor, apesar de ter procurado em todos os componentes relevantes. Preciso que você aponte exatamente onde está vendo isso (um print ajudaria bastante).</p>
+  </div>
+  <div class="card">
+    <p><span class="tag blocked">Bloqueado</span></p>
+    <p><strong>Estoque pós-flop do Modo Treino</strong> — não gerado nesta sessão. É o maior leak real dos usuários, mas depende do pipeline pós-flop ponta a ponta (MAIN-021), que é um item maior e não cabia no escopo "sem depender de mais nada".</p>
+  </div>
+
+  <h2>📌 O que fazer quando acordar</h2>
+  <div class="card">
+    <ul>
+      <li>Nada foi enviado pro GitHub — está tudo commitado localmente nas branches <code>claude/amazing-maxwell-fcb21n</code> dos dois repositórios, esperando seu "pode mergear".</li>
+      <li>Se quiser, me dê um print de onde está vendo o "ante" no Revisor pra eu finalmente resolver esse item.</li>
+    </ul>
+  </div>
+
+  <div class="footer">
+    Gerado automaticamente ao final da sessão autônoma — nenhum push ou PR foi feito sem confirmação, conforme combinado.
+  </div>
+</div>
