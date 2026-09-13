@@ -457,14 +457,25 @@ export function RevisorHandTable({
   // pra dentro, so' no eixo horizontal (EDGE_MARGIN) -- os demais ficam
   // exatamente onde o anel real os posiciona.
   const EDGE_MARGIN = 12;
+  // O assento mais no topo do anel (menor y) cola direitinho na borda
+  // (y perto de 0) pra mesa com numero PAR de jogadores -- mas em
+  // contagens IMPARES (3, 5, 7: nenhum assento cai exatamente no meio do
+  // topo) o anel real deixa o de cima bem mais pra baixo (ex: y=23 numa
+  // mesa de 3, comum em Spin&Go/SNG 3-max) -- pedido explicito: "suba o
+  // seat que fica no topo mais pra borda da mesa, ele esta muito proximo
+  // do meio". Empurra esse assento especifico ate' TOP_TARGET, igual o
+  // EDGE_MARGIN ja faz no eixo horizontal.
+  const TOP_TARGET = 4;
   const mobileSeatLayout = useMemo(() => {
     if (!replayState) return null;
+    const minY = Math.min(...replayState.seatLayout.filter((s) => !s.isHero).map((s) => s.y));
     return replayState.seatLayout.map((s, i) => {
       if (s.isHero) return { ...s, x: 28, y: 88 };
       let x = s.x;
       if (x < EDGE_MARGIN) x = EDGE_MARGIN;
       else if (x > 100 - EDGE_MARGIN) x = 100 - EDGE_MARGIN;
       let y = s.y;
+      if (y === minY && y > TOP_TARGET) y = TOP_TARGET;
       // Unico ajuste que sobra além da borda: o vizinho imediato à
       // esquerda do hero (index 1 no anel) fica colado nas cartas do
       // próprio hero -- não é corte na borda da mesa, é sobreposição

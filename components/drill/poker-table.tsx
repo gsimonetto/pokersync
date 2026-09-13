@@ -509,20 +509,21 @@ function Seat({
       </div>
     ) : null;
 
-  // Bounty ("cabeça") em torneios PKO/Mystery Bounty -- pedido explicito:
-  // "ajuste o bounty, nao pode sobrepor o nome, tem que ficar bem na
-  // quina do chipname sem sobrepor". O offset de -8 (com so' 4px de gap
-  // pro chip de posicao logo acima) deixava o badge encostar/sobrepor
-  // esse chip -- reduzido pra -3 (so' o suficiente pra "morder" a quina
-  // da placa de nome, igual um badge de notificacao) e o gap acima subiu
-  // (ver seatInfo) pra garantir folga de verdade entre os dois.
+  // Bounty ("cabeça") em torneios PKO/Mystery Bounty -- pedido explicito
+  // (revisado 2026-09): "ainda esta sobrepondo o nome, quero que mantenha
+  // bem na quina do nome mas sem sobrepor". `top`/`right` negativos (-3,
+  // depois -8) sempre deixavam uma fatia do badge por cima da placa de
+  // nome, ainda que pequena. Trocado por `bottom: 100%` (o badge fica
+  // INTEIRO acima da placa, encostado na borda de cima) + `right: 0`
+  // (alinhado com a quina direita) -- toca a quina sem nunca sobrepor.
   const bountyChip = !empty && bountyValue != null && (
     <div
       title={`Bounty de $${bountyValue}`}
       style={{
         position: "absolute",
-        top: -3,
-        right: -3,
+        bottom: "100%",
+        right: 0,
+        marginBottom: 3,
         zIndex: 4,
         display: "flex",
         alignItems: "center",
@@ -545,9 +546,7 @@ function Seat({
   );
 
   const seatInfo = (
-    // gap 4 -> 6 (pedido explicito: o badge de bounty no canto da placa de
-    // nome nao pode encostar no chip de posicao logo acima).
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 6 }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
       <div style={{ position: "relative" }}>
         {isDealer && (
           <div
@@ -600,10 +599,14 @@ function Seat({
       {opponentHudChip}
 
       {!empty && (
-        <div style={{ position: "relative" }}>
+        // marginTop reserva espaço pro badge de bounty (que fica INTEIRO
+        // acima da placa, ver bountyChip) não encostar no chip de posição
+        // acima -- só quando há bounty pra não abrir vão à toa nas outras
+        // mãos/formatos.
+        <div style={{ position: "relative", marginTop: bountyValue != null ? 13 : 0 }}>
           {/* Bounty no canto superior-direito da placa de nome (pedido
               explicito: "o pko pode colocar ao lado direito superior do
-              nick do jogador, bem na quina"). */}
+              nick do jogador, bem na quina, sem sobrepor"). */}
           {bountyChip}
           <div
             style={{

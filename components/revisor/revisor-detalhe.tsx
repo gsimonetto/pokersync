@@ -35,7 +35,6 @@ import {
   type BankrollSessionOption,
 } from "@/lib/services/hand-review-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
-import { RevisorHandTable } from "./revisor-hand-table";
 import { CoachThread } from "./coach-thread";
 import { ShareHandModal } from "./share-hand-modal";
 
@@ -848,39 +847,23 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           envolvendo quem esta olhando (o proprio componente decide). */}
       <CoachThread reviewId={reviewId} reviewTitle={review.title || "Mão sem título"} />
 
-      {/* Coluna da mesa aumentada (pedido explicito: "aumente a tela
-          aqui") — era 1fr/1.3fr, agora 0.8fr/1.5fr. Perguntas ficaram
-          mais compactas (ver secondaryContent) pra compensar o espaco
-          menor. */}
-      {parsedHandForTable ? (
-        <div className="grid grid-cols-1 gap-4 lg:grid-cols-[0.8fr_1.5fr]">
-          <div>{secondaryContent}</div>
-          <div>
-            {/* Sem reviewId/onOpenHand aqui de proposito -- essa tela JA
-                É "Analisar mão" (destino do botão "Analisar mão" da
-                mesa em outros contextos), então os botões "Salvar" e
-                "Compartilhar" nativos da mesa ficam ocultos (o header
-                acima já tem os seus próprios). Evita duplicar a mesma
-                ação duas vezes na mesma tela. */}
-            <RevisorHandTable parsedHand={parsedHandForTable} />
-          </div>
-        </div>
-      ) : (
-        <>
-          {(review.free_text || review.hand_history) && (
-            <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
-              <h3 className="m-0 text-sm font-semibold text-ink">Contexto</h3>
-              {review.free_text && <p className="mt-2 text-[13px] leading-relaxed text-ink/85">{review.free_text}</p>}
-              {review.hand_history && (
-                <pre className="mt-2.5 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-void p-2.5 font-mono text-[11px] text-muted">
-                  {review.hand_history}
-                </pre>
-              )}
-            </section>
+      {/* A mesa visual (RevisorHandTable) saiu daqui de vez -- pedido
+          explicito: "no replayer no celular está todo quebrado, acho que
+          não precisamos mostrar ali, pode retirar tanto do desktop quanto
+          celular". "Analisar mão" agora sempre mostra o hand history cru
+          + as perguntas guiadas, sem tentar montar a mesa. */}
+      {(review.free_text || review.hand_history) && (
+        <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+          <h3 className="m-0 text-sm font-semibold text-ink">Contexto</h3>
+          {review.free_text && <p className="mt-2 text-[13px] leading-relaxed text-ink/85">{review.free_text}</p>}
+          {review.hand_history && (
+            <pre className="mt-2.5 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-void p-2.5 font-mono text-[11px] text-muted">
+              {review.hand_history}
+            </pre>
           )}
-          {secondaryContent}
-        </>
+        </section>
       )}
+      {secondaryContent}
 
       {xpFeedback && (
         <div className="fixed bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 flex-col items-center gap-1 rounded-xl bg-positive px-5 py-3 font-semibold text-void shadow-[0_8px_24px_rgba(34,197,94,0.4)]">
