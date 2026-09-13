@@ -4,6 +4,15 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 13/09/2026 (parte 3) — Limpeza do arquivo de backup órfão (MAIN-025)
+
+- Removido `app/modulos/_backup-page.tsx` (backup deliberado da tela de
+  Módulos anterior ao redesenho com sidebar, agosto/2026) — confirmado
+  com o dono que o redesenho já está estabilizado e divergiu demais do
+  backup (404 linhas vs 62, já tem Metas/Recados do Coach) pra continuar
+  valendo como rede de segurança; o histórico do git cobre isso.
+- `MAIN-025` marcado como concluído.
+
 ## 13/09/2026 (parte 2) — engine_version em hand_ev_results (MAIN-023)
 
 - Coluna `engine_version` adicionada à tabela `hand_ev_results` via
