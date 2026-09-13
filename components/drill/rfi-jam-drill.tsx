@@ -941,7 +941,13 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       // Ninguem decidiu nada ainda alem dos blinds forcados.
       return { [heroPos]: seatBlind(heroPos), [villainPos]: seatBlind(villainPos) };
     }
-    const decidingBlind = seatBlind(activeHeroSeat);
+    // FIX (bug reportado: "nos spots onde o vilao da all-in, os blinds
+    // nao estao indo ate a mesa"): em sbCallJam, quem decide (SB) ja
+    // tinha ABERTO por OPEN_RAISE_APPROX_BB antes do vilao (BB) dar o
+    // jam -- o valor investido dela na mesa nesse ponto e' o tamanho da
+    // abertura, nao mais o blind cru (0.5bb) que so vale antes de agir.
+    // Usar so seatBlind() aqui subestimava a ficha do SB na mesa.
+    const decidingBlind = phaseKey === "sbCallJam" ? OPEN_RAISE_APPROX_BB : seatBlind(activeHeroSeat);
     const villainCommitted = phaseKey === "sbCallJam" ? spot.effectiveStack : OPEN_RAISE_APPROX_BB;
     return { [activeHeroSeat]: decidingBlind, [activeVillainSeat]: villainCommitted };
   }, [spot, phaseKey, heroPos, villainPos, activeHeroSeat, activeVillainSeat, seatBlind]);
@@ -1438,7 +1444,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                 {error || layoutError?.message || emptyMessage}
               </p>
             ) : round && currentPhase && tableHand && seatLayout ? (
-              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1360, maxHeight: 850, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
+              <div className="ps-tr-table-wrap" style={{ width: "100%", height: "100%", maxWidth: 1520, maxHeight: 1040, margin: "0 auto", display: "flex", flexDirection: "column", gap: 8 }}>
                 {/* "vs Jam" testa a decisão do DEFENSOR, não do abridor
                     selecionado em "Posição herói" -- sem isso o jogador
                     pode ficar sem entender por que as cartas viradas
@@ -1505,7 +1511,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                         // mesa do Revisor (revisor-hand-table.tsx) -- pedido
                         // explicito: "use a mesa do revisor no modo treino
                         // no desktop, nao mexa no celular". Mobile (acima)
-                        // fica intocado.
+                        // fica intocado. Padding menor que o do Revisor
+                        // (32/32/110) -- pedido explicito: "preencha mais
+                        // os espacos com a mesa, ficou muito pequena". O
+                        // Revisor tem uma coluna mais estreita ao lado
+                        // (lista de maos) que sobra menos espaco de largura
+                        // pra compensar; aqui a mesa e' o unico conteudo
+                        // central, entao um respiro menor ja basta pro
+                        // hero nao cortar na borda (overflow:visible).
                         {
                           position: "relative",
                           flex: 1,
@@ -1513,7 +1526,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                           background: "#050505",
                           borderRadius: 14,
                           border: "1px solid rgba(255,255,255,0.08)",
-                          padding: "32px 32px 110px",
+                          padding: "16px 16px 48px",
                           overflow: "visible",
                         }
                   }
