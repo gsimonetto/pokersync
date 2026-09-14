@@ -76,14 +76,14 @@ motor).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## RADAR POKERSYNC (addon + agente desktop) — 74%
+## RADAR POKERSYNC (addon + agente desktop) — 80%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
 | RADAR-001 | Painel in-app (RadarPanel + gating) | 🟢 | 🟡 P2 | — |
 | RADAR-002 | Agente desktop (repo `pokersync-agent`/`pokersync-radar`) | 🟠 | 🟠 P1 | validado com 1 instalação Windows real; confirmar mais usuários/salas |
 | RADAR-003 | Sync automático (`/api/agent/sync`) | 🟢 | 🟠 P1 | — |
-| RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | parser dedicado PartyPoker/888poker |
+| RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | validar parser contra hand history real de cada sala |
 
 *Nota: o código do agente desktop em si (Rust/Tauri) vive no repositório
 `pokersync-agent` (renomeado pra `pokersync-radar`), que não está anexado

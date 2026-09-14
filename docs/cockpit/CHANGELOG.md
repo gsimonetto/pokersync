@@ -4,6 +4,44 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 14/09/2026 — RADAR-004: parser dedicado de PartyPoker e 888poker
+
+A pedido do dono, implementado suporte a mais duas salas em
+`lib/poker/hand-parser.ts` a partir de uma amostra de cada (exemplo/
+gerada, não capturada de mão real jogada) — mesma cautela já aplicada
+ao GGPoker antes de ter amostra real.
+
+- **PartyPoker**: formato muito próximo do PokerStars já suportado
+  (mesmas linhas de ação com "PlayerName: verb amount"). Só precisou de
+  detecção de site/início de mão, listagem de assentos sem o sufixo
+  "in chips", e extração do ID da mão (formato "Game hand #X" sem
+  ":").
+- **888poker**: formato bem mais diferente — linhas de ação SEM ":"
+  depois do nome e valores entre colchetes ("Player6 raises [50]") em
+  vez de "PlayerName: raises 50". Regras de blind/board/pote também
+  próprias dessa sala. Turn/river/showdown foram extrapolados por
+  simetria com o padrão "Dealing X" observado no flop — não
+  confirmados contra exemplo real.
+- Durante o teste manual contra as duas amostras, um bug foi
+  encontrado e corrigido no processo: deixar o sufixo "in chips"
+  opcional (pra aceitar PartyPoker/888poker) fazia o parser também
+  confundir linhas do resumo final da mão ("Seat X: Nome (button)
+  folded...") com listagem de assentos, inflando a contagem de
+  jogadores em QUALQUER sala, PokerStars/GGPoker incluídos. Corrigido
+  restringindo a busca de assentos ao trecho antes de "HOLE CARDS"/
+  "Dealing down cards" — testado de novo com uma mão PokerStars
+  sintética pra confirmar que voltou a dar 6 assentos, não 12.
+- A amostra de 888poker fornecida tinha uma inconsistência interna
+  (botão no assento 5, blinds postados pelos assentos 8/9 em vez de
+  6/7) — o parser seguiu a regra padrão de poker (posição por rotação
+  a partir do botão), então pode sair diferente do 888poker real se
+  essa amostra não refletir o formato de verdade da sala.
+- `RADAR-004` sobe de 30% pra 55% (parser implementado, não validado
+  contra hand history real) — mesmo status intermediário que o
+  GGPoker teve antes de ganhar amostras reais em 13/09/2026.
+- Combinado com a entrada de MAIN-012/RADAR-003 abaixo: Radar
+  63%→80%, Progresso Geral 73%→80%.
+
 ## 14/09/2026 — MAIN-012 e RADAR-003 concluídos: tráfego real do agente desktop confirmado
 
 O dono do produto instalou o agente desktop (Radar PokerSync) no

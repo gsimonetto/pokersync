@@ -32,10 +32,10 @@ qualquer um pode reproduzir.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC — Progresso Geral: 77%
+## POKERSYNC — Progresso Geral: 80%
 
 🟢 Main    ██████████████░░░░░░ 72%  (25 itens rastreados)
-🔵 Radar   ███████████████░░░░░ 74%  (4 itens rastreados)
+🔵 Radar   ████████████████░░░░ 80%  (4 itens rastreados)
 🟣 Solver  █████████████████░░░ 87%  (20 itens rastreados)
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -63,13 +63,15 @@ bugs graves corrigidos nesta janela, falta validar num spot real.
 **Próximo:** 🟠 P1 — validar squeeze multiway num spot real (SOLVER-016).
 **Bloqueio:** nenhum.
 
-### Radar PokerSync (addon + agente desktop) — 74% completo
+### Radar PokerSync (addon + agente desktop) — 80% completo
 **Trabalho atual:** primeira instalação real confirmada em 14/09/2026 —
 device Windows real (dono do produto, PokerStars) sincronizou com
 sucesso ponta a ponta, verificado direto no banco (RADAR-003/MAIN-012
-concluídos). Falta confirmar com mais usuários e mais salas.
-**Próximo:** 🟡 P2 — suporte a PartyPoker/888poker (hoje só chegam como
-dado bruto) e confirmar a instalação com outros usuários/plataformas.
+concluídos). No mesmo dia, parser dedicado de PartyPoker e 888poker
+implementado (RADAR-004), ainda não validado contra hand history real
+dessas duas salas.
+**Próximo:** 🟡 P2 — validar os parsers novos contra hand history real
+e confirmar a instalação do agente com outros usuários/plataformas.
 **Bloqueio:** nenhum — depende de tempo de uso real, não de código.
 
 **Nota de nomenclatura:** "Radar" não é um terceiro produto/repositório
@@ -88,7 +90,7 @@ ser auditada numa sessão com acesso a esse repositório.
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
 🔴 P0 — Reconstruir a UI de cEV/ICM no produto (MAIN-007 — motor pronto, falta a tela)
 🟠 P1 — Validar squeeze multiway num spot real (SOLVER-016)
-🟡 P2 — Confirmar agente desktop (Radar) com mais usuários/salas (PartyPoker/888poker)
+🟡 P2 — Validar parser de PartyPoker/888poker contra hand history real (RADAR-004)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -109,6 +111,23 @@ Nenhum bloqueio ativo (ver `BLOCKERS.md`). Há 1 item em "atenção"
 
 ## ÚLTIMA ATUALIZAÇÃO
 
+14/09/2026 — RADAR-004: parser dedicado de PartyPoker e 888poker
+implementado em `lib/poker/hand-parser.ts`, a partir de uma amostra de
+cada (exemplo/gerada pelo dono, não capturada de mão real) — mesma
+cautela já aplicada ao GGPoker antes de amostras reais. PartyPoker
+ficou muito próximo do formato PokerStars já suportado; 888poker
+exigiu regras próprias (linhas de ação sem ":", valores entre
+colchetes). No processo, corrigido um bug introduzido nesta mesma
+sessão (tornar "in chips" opcional pra aceitar os formatos novos
+também fazia o parser confundir linhas do resumo final da mão com
+listagem de assentos, em qualquer sala) — testado de novo contra uma
+mão PokerStars sintética pra confirmar a correção. A amostra de
+888poker tinha uma inconsistência interna (botão no assento 5, blinds
+postados pelos assentos 8/9 em vez de 6/7); o parser seguiu a regra
+padrão de poker, não a amostra, então pode sair diferente do formato
+real da sala. RADAR-004 sobe de 30% pra 55% (implementado, não
+validado contra hand history real).
+
 14/09/2026 — MAIN-012 e RADAR-003 (sincronização com o agente desktop)
 marcados como concluídos, com tráfego real confirmado. Verificado
 direto no banco (Supabase): device Windows real de
@@ -118,8 +137,10 @@ novas, 172 duplicatas, 0 erros) e as 24 mãos de fato gravadas em
 `hand_reviews` com `source='agent'`. RADAR-002 subiu de 50% pra 65%
 (scaffold validado em instalação real, mas o código Rust em si — repo
 `pokersync-agent`/`pokersync-radar` — continua não auditado
-diretamente nesta sessão). Progresso de Main pra 72%, Radar pra 74%,
-Geral pra 77%.
+diretamente nesta sessão).
+
+Progresso combinado das duas entradas acima: Main 72%, Radar 63%→80%
+(RADAR-002 65%, RADAR-003 100%, RADAR-004 55%), Geral 73%→80%.
 
 14/09/2026 — MAIN-011 (Score de evolução consolidado) marcado como
 concluído. A fórmula (5 componentes ponderados) já existia pronta na
