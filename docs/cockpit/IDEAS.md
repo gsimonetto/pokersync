@@ -89,6 +89,27 @@ automatizado em Player Evolution/Performance que hoje não é?
 **Prioridade:** ⚪ P3
 **Status:** 🔎 AVALIAR (vaga demais pra ir direto pro roadmap)
 
+### IDEA-010 — Paridade competitiva do Modo Treino (vs. GTO Wizard / Upswing Lab)
+**Descrição:** comparação de 14/09/2026 com os líderes de mercado focados
+só em treino (GTO Wizard, Upswing Poker Lab) identificou 3 gaps que
+ainda não têm rastro em nenhum item do roadmap (o gap de conteúdo
+pós-flop em si já está coberto por MAIN-021, não duplicar):
+1. **Feedback instantâneo por decisão** — os concorrentes dão nota/score
+   na hora de cada escolha dentro do drill, não só no resultado final da
+   sessão. Verificar se o Modo Treino atual já faz isso e, se não,
+   avaliar incluir junto da UI nova de pós-flop (MAIN-021).
+2. **Organização de drills salvos (tags/filtros/reuso)** — GTO Wizard
+   deixa o usuário salvar configurações de drill com um clique e
+   organizar por tag/dificuldade. Hoje nosso Modo Treino não tem esse
+   conceito de "drill salvo reutilizável" pelo jogador.
+3. **Modo RNG para estratégias mistas** — GTO Wizard treina o jogador a
+   executar frequências mistas (ex: 30% call / 70% fold) sorteando a
+   ação certa aleatoriamente respeitando a frequência, em vez de só
+   cobrar a ação "pura". Não existe equivalente no nosso motor de treino.
+**Frente:** Main (Modo Treino)
+**Prioridade:** 🟡 P2 (avaliar depois de MAIN-021 fechar o pós-flop)
+**Status:** 🔎 AVALIAR
+
 ---
 
 ## Como usar
