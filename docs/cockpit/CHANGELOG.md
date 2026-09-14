@@ -39,6 +39,31 @@ ao GGPoker antes de ter amostra real.
 - `RADAR-004` sobe de 30% pra 55% (parser implementado, não validado
   contra hand history real) — mesmo status intermediário que o
   GGPoker teve antes de ganhar amostras reais em 13/09/2026.
+- Combinado com a entrada de MAIN-012/RADAR-003 abaixo: Radar
+  63%→80%, Progresso Geral 73%→80%.
+
+## 14/09/2026 — MAIN-012 e RADAR-003 concluídos: tráfego real do agente desktop confirmado
+
+O dono do produto instalou o agente desktop (Radar PokerSync) no
+próprio Windows e sincronizou mãos reais do PokerStars com a conta
+gsimonetto1@gmail.com. Confirmado direto no banco (Supabase, sem
+depender do repositório `pokersync-agent`, que não está anexado a esta
+sessão):
+
+- `hand_sync_devices`: 1 device Windows real, `agent_version` 0.1.0.
+- `hand_sync_batches`: 1 batch `completed`, PokerStars, 196 mãos lidas
+  pelo agente, 24 novas importadas, 172 corretamente detectadas como
+  duplicatas, 0 erros.
+- `hand_reviews`: as 24 mãos realmente gravadas com `source='agent'`.
+
+Fluxo ponta a ponta confirmado, não só o schema — por isso `MAIN-012`
+e `RADAR-003` foram pra "concluído"/100%. `RADAR-002` (o agente em si)
+subiu de 50% pra 65%: o scaffold funciona de verdade numa instalação
+real, mas ainda é só 1 usuário/1 sala confirmados, e o código Rust
+continua sem auditoria direta nesta sessão (repo renomeado de
+`pokersync-agent` pra `pokersync-radar`).
+
+Progresso recalculado: Main 70%→72%, Radar 63%→74%, Geral 73%→77%.
 
 ## 14/09/2026 — MAIN-011 (Score de evolução consolidado) concluído
 

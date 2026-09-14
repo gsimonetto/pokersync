@@ -10,7 +10,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC MAIN — 70%
+## POKERSYNC MAIN — 72%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
@@ -25,7 +25,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-009 | HUD em tempo real | 🔵 | ⚪ P3 | não priorizado |
 | MAIN-010 | Plataforma para Times (core) | 🟢 | 🟡 P2 | — |
 | MAIN-011 | Score de evolução consolidado | 🟢 | 🟡 P2 | — |
-| MAIN-012 | Sync com agente desktop (schema) | 🟠 | 🟠 P1 | validar com instalações reais |
+| MAIN-012 | Sync com agente desktop (schema) | 🟢 | 🟠 P1 | — |
 | MAIN-013 | Hub de Evolução | 🟢 | ⚪ P3 | — |
 | MAIN-014 | Marketplace de Vagas | 🟢 | 🟡 P2 | — |
 | MAIN-015 | Conquistas (Achievements) | 🟢 | ⚪ P3 | corrigir comentário desatualizado no código |
@@ -76,19 +76,19 @@ motor).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## RADAR POKERSYNC (addon + agente desktop) — 63%
+## RADAR POKERSYNC (addon + agente desktop) — 80%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
 | RADAR-001 | Painel in-app (RadarPanel + gating) | 🟢 | 🟡 P2 | — |
-| RADAR-002 | Agente desktop (repo `pokersync-agent`) | 🟠 | 🟠 P1 | validar contra instalações reais |
-| RADAR-003 | Sync automático (`/api/agent/sync`) | 🟠 | 🟠 P1 | confirmar tráfego real |
+| RADAR-002 | Agente desktop (repo `pokersync-agent`/`pokersync-radar`) | 🟠 | 🟠 P1 | validado com 1 instalação Windows real; confirmar mais usuários/salas |
+| RADAR-003 | Sync automático (`/api/agent/sync`) | 🟢 | 🟠 P1 | — |
 | RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | validar parser contra hand history real de cada sala |
 
 *Nota: o código do agente desktop em si (Rust/Tauri) vive no repositório
-`pokersync-agent`, que não está anexado a esta sessão — os itens acima
-foram avaliados a partir do que o repositório `pokersync` sabe sobre ele
-(endpoints, schema, documentação), não por leitura direta do código Rust.*
+`pokersync-agent` (renomeado pra `pokersync-radar`), que não está anexado
+a esta sessão — RADAR-002/003 acima foram confirmados por evidência real
+no banco de dados (Supabase), não por leitura direta do código Rust.*
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -148,9 +148,9 @@ Solver: SOLVER-018 Deploy Railway (🟢 confirmado ativo)
    ↓
 Main: MAIN-007 cEV/ICM (⚠️ motor pronto, UI removida em 12/09 — falta reconstruir)
 
-Radar: RADAR-002 Agente desktop (parcial, repo separado)
+Radar: RADAR-002 Agente desktop (parcial, validado com 1 instalação Windows real)
    ↓
-Main: MAIN-012 Sync com agente (schema pronto, falta tráfego real)
+Main: MAIN-012 Sync com agente (🟢 tráfego real confirmado 14/09/2026)
    ↓
 Main: MAIN-009 HUD em tempo real (planejado, não priorizado)
 ```
