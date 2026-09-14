@@ -59,7 +59,7 @@ export async function POST(request: Request) {
   const importScope = await fetchRadarImportScopeFor(supabase, user.id);
   if (!importScope) {
     return Response.json(
-      { ok: false, error: "IMPORT_SCOPE_NAO_DEFINIDO", message: "Escolha, na tela do Radar dentro do Player Evolution, o que importar antes de continuar." },
+      { ok: false, error: "IMPORT_SCOPE_NAO_DEFINIDO", message: "Escolha, na tela do Radar dentro do Performance, o que importar antes de continuar." },
       { status: 409 }
     );
   }

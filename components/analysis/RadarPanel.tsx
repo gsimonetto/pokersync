@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Check, Download, History, Loader2, Radar as RadarIcon, Sparkles } from "lucide-react";
+import { Check, Download, History, Loader2, RotateCcw, Radar as RadarIcon, Sparkles } from "lucide-react";
 import { RADAR_COPY } from "@/lib/plans/module-copy";
 import { fetchRadarImportScope, setRadarImportScope, type RadarImportScope } from "@/lib/services/agent-status-service";
+import { resetPerformanceStats } from "@/lib/services/analysis-service";
+import { useConfirm } from "@/components/confirm-dialog";
 
 // Conteudo do addon Radar PokerSync, agora reaproveitado dentro de Player
 // Evolution (aba "Radar", pedido explicito: "radar pokersync deve ficar
@@ -31,11 +33,13 @@ const SCOPE_OPTIONS: { value: RadarImportScope; icon: typeof Sparkles; title: st
   },
 ];
 
-export function RadarPanel() {
+export function RadarPanel({ onReset }: { onReset?: () => void }) {
   // undefined = ainda carregando, null = ainda não respondeu.
   const [scope, setScope] = useState<RadarImportScope | null | undefined>(undefined);
   const [saving, setSaving] = useState<RadarImportScope | null>(null);
+  const [resetting, setResetting] = useState(false);
   const [error, setError] = useState("");
+  const confirm = useConfirm();
 
   useEffect(() => {
     fetchRadarImportScope()
@@ -53,6 +57,32 @@ export function RadarPanel() {
       setError("Não foi possível salvar sua escolha. Tente de novo.");
     } finally {
       setSaving(null);
+    }
+  }
+
+  // "Começar do zero" (pedido explícito) -- zera só as estatísticas do
+  // Performance (hand_tags), sem apagar as mãos do Revisor nem os
+  // torneios da Gestão de Banca. Também limpa a escolha de escopo acima,
+  // pra voltar a perguntar (útil se o jogador quer mudar de ideia sobre
+  // importar histórico completo).
+  async function handleReset() {
+    const ok = await confirm({
+      title: "Resetar Performance",
+      message:
+        "Isso zera todas as estatísticas do Performance (VPIP, PFR, C-Bet, ROI de mãos etc.) e volta a perguntar o escopo de importação. As mãos continuam salvas no Revisor de Mãos e os torneios na Gestão de Banca — só os números daqui somem, até você reimportar ou reabrir as mãos.",
+      confirmLabel: "Resetar",
+    });
+    if (!ok) return;
+    setResetting(true);
+    setError("");
+    try {
+      await resetPerformanceStats();
+      setScope(null);
+      onReset?.();
+    } catch {
+      setError("Não foi possível resetar agora. Tente de novo.");
+    } finally {
+      setResetting(false);
     }
   }
 
@@ -86,7 +116,7 @@ export function RadarPanel() {
           <p className="text-sm font-semibold text-ink">O que o Radar deve importar?</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
             Antes de ativar, escolha uma opção — isso afeta o que aparece na Gestão de Banca, no Revisor de Mãos e no
-            Player Evolution. Dá pra trocar depois, mas o que já foi importado com a escolha anterior não é desfeito.
+            Performance. Dá pra trocar depois, mas o que já foi importado com a escolha anterior não é desfeito.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-2">
             {SCOPE_OPTIONS.map((opt) => (
@@ -113,10 +143,23 @@ export function RadarPanel() {
             <p className="text-xs text-muted">
               Importando: <span className="font-semibold text-ink">{SCOPE_OPTIONS.find((o) => o.value === scope)?.title}</span>
             </p>
-            <button type="button" onClick={() => setScope(null)} className="text-[11.5px] font-semibold text-muted hover:text-ink">
-              Trocar
-            </button>
+            <div className="flex items-center gap-3">
+              <button type="button" onClick={() => setScope(null)} className="text-[11.5px] font-semibold text-muted hover:text-ink">
+                Trocar
+              </button>
+              <button
+                type="button"
+                onClick={handleReset}
+                disabled={resetting}
+                title="Zera as estatísticas do Performance pra começar do zero"
+                className="inline-flex items-center gap-1.5 text-[11.5px] font-semibold text-negative/80 hover:text-negative disabled:opacity-50"
+              >
+                {resetting ? <Loader2 size={12} className="animate-spin" /> : <RotateCcw size={12} />}
+                Resetar Performance
+              </button>
+            </div>
           </div>
+          {error && <p className="text-xs text-negative">{error}</p>}
 
           <div className="rounded-xl border border-hairline bg-surface p-5">
             <p className="text-xs font-bold uppercase tracking-wider text-muted/60">O que ele faz</p>
@@ -135,8 +178,8 @@ export function RadarPanel() {
             <p className="mt-2 text-sm leading-relaxed text-muted">
               Depois de instalado, o Radar roda em segundo plano (fica na bandeja do sistema) e varre as pastas de hand
               history do seu computador — PokerStars, GGPoker, PartyPoker, 888poker e ACR. Só o que mudou desde a
-              última varredura é reenviado, e cada mão importada alimenta automaticamente o Revisor e o Player
-              Evolution, sem precisar colar hand history na mão.
+              última varredura é reenviado, e cada mão importada alimenta automaticamente o Revisor e o Performance,
+              sem precisar colar hand history na mão.
             </p>
           </div>
 

@@ -1406,7 +1406,7 @@ export default function BankrollPage() {
                 Instale o Radar PokerSync no seu computador pra importar mãos e torneios automaticamente — hoje o
                 único jeito de trazer dados pra cá sem ele é colar hand history na mão em{" "}
                 <Link href="/performance" className="text-training hover:underline">
-                  Player Evolution → Importar
+                  Performance → Importar
                 </Link>
                 .
               </p>

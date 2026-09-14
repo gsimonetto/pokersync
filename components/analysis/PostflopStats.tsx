@@ -153,13 +153,19 @@ export function PostflopTab({
             icon: Target,
             tone: toneFromRange(metrics.cbet_turn_pct, ref.cbetTurn.min, ref.cbetTurn.max),
             bar: statBar(metrics.cbet_turn_pct, ref.cbetTurn.min, ref.cbetTurn.max, 100),
-            hint: "Frequência de apostar no turn quando você já tinha feito c-bet no flop.",
+            // Correcao (auditoria): o texto antigo dizia "quando voce ja
+            // tinha feito c-bet no flop", mas cbet_turn no banco NAO exige
+            // isso -- so' exige ter sido o ultimo a subir no preflop E ser
+            // o primeiro a apostar no turn (pode ter chegado ali com o
+            // flop checado por todo mundo). Texto ajustado pra bater com o
+            // que o numero mede de verdade.
+            hint: "Frequência que você aposta primeiro no turn quando foi o último a subir no preflop, independente do que aconteceu no flop.",
             coaching: rangeCoaching(
               metrics.cbet_turn_pct,
               ref.cbetTurn.min,
               ref.cbetTurn.max,
-              "Depois de apostar no flop, você quase não continua apostando no turn. Está desistindo de manter a pressão numa mão que já vinha construindo vantagem.",
-              "Você continua apostando no turn com frequência alta demais depois do flop. Fica fácil de perceber, e o adversário passa a te desafiar de volta."
+              "Quando você foi o último a subir no preflop e a mão chega ao turn, você quase não aposta primeiro. Está desistindo de manter a pressão numa mão em que ainda tem a iniciativa.",
+              "Você aposta primeiro no turn com frequência alta demais quando foi o último a subir no preflop. Fica fácil de perceber, e o adversário passa a te desafiar de volta."
             ),
             category: "agressao",
           },
@@ -169,13 +175,16 @@ export function PostflopTab({
             icon: Target,
             tone: toneFromRange(metrics.cbet_river_pct, ref.cbetRiver.min, ref.cbetRiver.max),
             bar: statBar(metrics.cbet_river_pct, ref.cbetRiver.min, ref.cbetRiver.max, 100),
-            hint: "Frequência de apostar no river quando você já vinha apostando flop e turn.",
+            // Mesma correção do Turn C-Bet acima -- não exige ter apostado
+            // flop/turn antes, só ser o último a subir no preflop e o
+            // primeiro a apostar no river.
+            hint: "Frequência que você aposta primeiro no river quando foi o último a subir no preflop, independente do que aconteceu no flop/turn.",
             coaching: rangeCoaching(
               metrics.cbet_river_pct,
               ref.cbetRiver.min,
               ref.cbetRiver.max,
-              "Depois de apostar flop e turn, você quase não fecha a aposta no river. Está deixando de cobrar valor ou de completar o blefe numa mão que já vinha pressionando.",
-              "Você aposta o river com frequência alta demais depois de já ter apostado flop e turn. Um adversário atento vai passar a te desafiar de volta com mais frequência."
+              "Quando você foi o último a subir no preflop e a mão chega ao river, você quase não fecha a aposta. Está deixando de cobrar valor ou de completar o blefe numa mão em que ainda tem a iniciativa.",
+              "Você aposta o river com frequência alta demais quando foi o último a subir no preflop. Um adversário atento vai passar a te desafiar de volta com mais frequência."
             ),
             category: "agressao",
           },

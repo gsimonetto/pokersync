@@ -83,7 +83,7 @@ export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
     ],
   },
   performance: {
-    title: "Player Evolution",
+    title: "Performance",
     blurb: "Raio-x da sua evolução: ROI, volume, tendências e leaks que viram ação.",
     benefits: [
       "ROI, ABI, volume e lucro",
@@ -116,7 +116,7 @@ export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
       "Vagas abertas de MTT, Cash, SNG e Spin com requisitos claros",
       "Match score comparando seu ROI, volume e evolução com a vaga",
       "Candidatura com mensagem, acompanhamento de status num só lugar",
-      "Time vê o crachá completo do candidato (Player Evolution) antes de decidir",
+      "Time vê o crachá completo do candidato (Performance) antes de decidir",
     ],
   },
 };
@@ -131,7 +131,7 @@ export const RADAR_COPY: ModuleCopy = {
   benefits: [
     "Detecta PokerStars, GGPoker, PartyPoker, 888poker e ACR automaticamente",
     "Só reenvia o que mudou desde a última varredura",
-    "Sincroniza direto com Revisor e Player Evolution",
+    "Sincroniza direto com Revisor e Performance",
     "Roda em segundo plano, sem precisar abrir o app",
   ],
 };

@@ -65,7 +65,7 @@ export const modules: ModuleDef[] = [
   {
     key: "performance",
     icon: LineChart,
-    title: "Player Evolution",
+    title: "Performance",
     subtitle: "Preflop, postflop, torneios e leaks",
     // Amber liberado pro Hub (que ja usa essa cor como identidade
     // propria em app/hub/page.tsx) -- Performance passa pro cyan.
