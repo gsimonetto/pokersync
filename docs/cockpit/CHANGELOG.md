@@ -4,6 +4,39 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 14/09/2026 — Sincronização: painel visual e repositório estavam divergentes
+
+A auditoria automática de hoje (rotina `PokerSync Cockpit — auditoria
+diária`) fez um trabalho correto e rigoroso — achou que `MAIN-007`
+(cEV/ICM por mão) tinha sido marcado "concluído" ontem só pela
+mensagem de um commit, sem checar que a UI de consumo foi removida do
+produto horas antes. Corrigiu isso e achou `SOLVER-020` (hardening de
+segurança da API), mas **só publicou a correção no painel visual — nunca
+commitou de volta pro `roadmap.json`**. Os dois ficaram divergentes por
+algumas horas até esta sessão notar e sincronizar.
+
+- `MAIN-007` rebaixado de "concluído"/100% pra "atenção"/40% no
+  `roadmap.json` (já estava assim no painel).
+- `SOLVER-020` adicionado ao `roadmap.json` (hardening de segurança da
+  API do Solver: limite de iterations, comparação de API key resistente
+  a timing attack, Dockerfile sem root).
+- **"Progresso Geral" corrigido de 76% pra 72%** — a sessão de ontem
+  tinha trocado silenciosamente o método de cálculo pra média direta de
+  todos os itens (o que super-representa Main/Solver, que têm mais
+  itens rastreados que Radar) em vez da média das 3 frentes, que é o
+  método documentado desde a criação do Cockpit. Voltou ao método
+  original; `STATE.md` agora deixa a fórmula explícita pra evitar essa
+  ambiguidade de novo.
+- `meta.last_full_audit` em `roadmap.json` atualizado pra 14/09/2026
+  (estava preso em 11/09/2026 apesar do trabalho real de 13 e 14/09).
+- Nota: um arquivo `docs/cockpit/resumo-overnight.html` (resumo estático
+  de uma sessão overnight) também apareceu no repositório em 14/09/2026
+  — mantido como está, não é parte do fluxo padrão do Cockpit
+  (STATE/ROADMAP/roadmap.json/painel), é um artefato pontual daquela
+  sessão.
+
+Progresso final: Main 67%, Radar 63%, Solver 87%, geral 72%.
+
 ## 13/09/2026 (parte 6) — Remoção de dado ilustrativo/de teste do estoque pós-flop
 
 - A pedido do dono ("retire tudo que foi colocado como teste, quero só

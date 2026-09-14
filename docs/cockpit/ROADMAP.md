@@ -10,7 +10,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC MAIN — 70%
+## POKERSYNC MAIN — 67%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
@@ -20,7 +20,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-004 | Construtor de Ranges e Árvores | 🟢 | 🟡 P2 | — |
 | MAIN-005 | Player Evolution (core) | 🟢 | 🟡 P2 | — |
 | MAIN-006 | Módulo de Análise | 🟢 | 🟠 P1 | — |
-| MAIN-007 | cEV/ICM por mão (consumo) | 🟢 | 🔴 P0 | — |
+| MAIN-007 | cEV/ICM por mão (consumo) | ⚠️ | 🔴 P0 | reconstruir a UI removida em 12/09 |
 | MAIN-008 | Estatísticas de oponente | 🔵 | 🟡 P2 | desenhar schema por jogador |
 | MAIN-009 | HUD em tempo real | 🔵 | ⚪ P3 | não priorizado |
 | MAIN-010 | Plataforma para Times (core) | 🟢 | 🟡 P2 | — |
@@ -52,17 +52,27 @@ dado ilustrativo/de teste, removida em 13/09/2026 a pedido do dono.
 **Próximo passo:** ver MAIN-021 (pipeline pós-flop ponta a ponta).
 **Dependências:** MAIN-021.
 
-### Destaque — MAIN-007 cEV/ICM por mão ✅ concluído em 13/09/2026
+### Destaque — MAIN-007 cEV/ICM por mão ⚠️ precisa atenção
 **Objetivo:** mostrar o EV real (ajustado por sorte) de mãos all-in já
 jogadas.
 **O que existe:** endpoint no produto pronto e mergeado
 (`app/api/hand-ev/compute`), chama o motor via HTTP. Deploy do motor
 confirmado ativo (BLOQUEIO-001 resolvido) e `SOLVER_API_URL`/
 `SOLVER_API_KEY` já configuradas no Vercel (Production) desde
-03/09/2026 — a suposição de que faltava configurar isso estava
-desatualizada.
-**Próximo passo:** validar com uma mão all-in elegível real no Revisor.
-**Dependências:** SOLVER-013, SOLVER-018 (ambos concluídos).
+03/09/2026 — isso tudo é real e continua valendo.
+**O que falta:** a auditoria de 13/09/2026 marcou este item como
+concluído por causa da mensagem de um commit ("confirma que está
+pronto ponta a ponta"), sem checar que a UI de consumo (painel "cEV &
+ICM" em `StatisticsTab.tsx`) tinha sido removida do produto horas
+antes, em 12/09/2026, a pedido do dono (pra reavaliar depois). Hoje
+não existe nenhuma tela que chame o cálculo — corrigido nesta
+auditoria (14/09/2026), consistente com a ADR-015 (código é sempre a
+fonte de verdade, nunca a mensagem de commit).
+**Próximo passo:** decidir onde reexibir cEV/ICM no produto (Revisor
+por mão? Performance de volta?) e reconstruir a UI — motor e deploy já
+estão prontos, falta só a camada de produto.
+**Dependências:** SOLVER-013, SOLVER-018 (ambos concluídos do lado do
+motor).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -82,7 +92,7 @@ foram avaliados a partir do que o repositório `pokersync` sabe sobre ele
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC SOLVER — 86%
+## POKERSYNC SOLVER — 87%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
@@ -105,6 +115,7 @@ foram avaliados a partir do que o repositório `pokersync` sabe sobre ele
 | SOLVER-017 | CI (GitHub Actions) | 🟢 | ⚪ P3 | — |
 | SOLVER-018 | Deploy no Railway | 🟢 | 🔴 P0 | — |
 | SOLVER-019 | README desatualizado | 🟢 | 🟡 P2 | — |
+| SOLVER-020 | Hardening de segurança da API | 🟢 | 🟡 P2 | — |
 
 ### Destaque — SOLVER-007 Motor multiway
 **Objetivo:** resolver spots com 3+ jogadores (squeeze, CO vs BTN, UTG
@@ -135,7 +146,7 @@ Solver: SOLVER-013 cEV/ICM por mão (🟢 pronto no motor)
    ↓
 Solver: SOLVER-018 Deploy Railway (🟢 confirmado ativo)
    ↓
-Main: MAIN-007 cEV/ICM (🟢 concluído — consumo no produto)
+Main: MAIN-007 cEV/ICM (⚠️ motor pronto, UI removida em 12/09 — falta reconstruir)
 
 Radar: RADAR-002 Agente desktop (parcial, repo separado)
    ↓

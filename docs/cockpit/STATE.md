@@ -13,41 +13,50 @@ sem editar arquivo).
 **`POKERSYNC.md` foi removido** em 11/09/2026 — o Cockpit é agora a
 única fonte de verdade sobre estado de desenvolvimento. Não recriar.
 
-**Última auditoria completa:** 11/09/2026 — código dos repositórios
-`pokersync` (commit `2e68893`) e `pokersync-solver` (commit `a272ae5`)
-lido linha a linha, não só mensagens de commit.
+**Última auditoria completa:** 14/09/2026 — código dos repositórios
+`pokersync` e `pokersync-solver` lido linha a linha, não só mensagens
+de commit. Este Cockpit vem sendo mantido colaborativamente desde
+11/09/2026: tanto pela rotina automática diária (`trig_01NTMk54bjqESZjueiY5Znbe`)
+quanto por sessões de desenvolvimento normais que tocam nestes arquivos
+como parte do trabalho — ver `CHANGELOG.md` pra o histórico completo.
 
 **Como o progresso é calculado:** cada item do `roadmap.json` recebe um
 número (concluído=100, planejado=0, parcial/bloqueado/em progresso = uma
-estimativa a partir do que existe de fato no código). O progresso de cada
-frente é a média simples dos itens dela. Não é uma opinião — é o cálculo
-sobre `roadmap.json`, que qualquer um pode reproduzir.
+estimativa a partir do que existe de fato no código). O progresso de
+cada frente é a média simples dos itens dela. **O "Progresso Geral" é a
+média das 3 médias por frente** (não a média direta de todos os itens
+juntos — isso pesaria demais as frentes com mais itens rastreados, hoje
+Main e Solver, em vez de tratar as 3 frentes como igualmente
+importantes). Não é uma opinião — é o cálculo sobre `roadmap.json`, que
+qualquer um pode reproduzir.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC — Progresso Geral: 76%
+## POKERSYNC — Progresso Geral: 72%
 
-🟢 Main    ██████████████░░░░░░ 70%  (25 itens rastreados)
+🟢 Main    █████████████░░░░░░░ 67%  (25 itens rastreados)
 🔵 Radar   █████████████░░░░░░░ 63%  (4 itens rastreados)
-🟣 Solver  █████████████████░░░ 86%  (19 itens rastreados)
+🟣 Solver  █████████████████░░░ 87%  (20 itens rastreados)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## ONDE ESTAMOS?
 
-### PokerSync Main — 70% completo
-**Trabalho atual:** nenhuma frente "em progresso" ativa no momento da
-auditoria — o repositório está numa sequência de módulos concluídos
-(Marketplace, Conquistas, LGPD, segurança) sem nada pela metade.
+### PokerSync Main — 67% completo
+**Trabalho atual:** nenhuma frente "em progresso" ativa — o repositório
+está numa sequência de módulos concluídos (Marketplace, Conquistas,
+LGPD, segurança) sem nada pela metade.
 **Próximo:** 🔴 P0 — Pipeline pós-flop ponta a ponta (job → contrato →
 UI), porque os 5 leaks reais da base de usuários são todos pós-flop e
 sem isso o loop "leak vira treino" não fecha de verdade.
-**Bloqueio:** nenhum — cEV/ICM por mão (MAIN-007) concluído em
-13/09/2026: deploy do Solver confirmado ativo e as env vars já estavam
-configuradas no Vercel desde 03/09/2026 (a suposição de que faltava
-configurar era desatualizada).
+**Atenção:** ⚠️ cEV/ICM por mão (MAIN-007) foi marcado "concluído" em
+13/09/2026 com base só na mensagem de um commit — auditoria de
+14/09/2026 achou que a UI de consumo (painel "cEV & ICM") tinha sido
+removida do produto em 12/09/2026 e nunca foi reconectada. Motor e
+deploy do Solver (SOLVER-013/SOLVER-018) continuam prontos; falta só a
+camada de produto. Rebaixado pra "atenção", 40%.
 
-### PokerSync Solver — 86% completo
+### PokerSync Solver — 87% completo
 **Trabalho atual:** motor multiway (squeeze) — arquitetura pronta e
 bugs graves corrigidos nesta janela, falta validar num spot real.
 **Próximo:** 🟠 P1 — validar squeeze multiway num spot real (SOLVER-016).
@@ -75,6 +84,7 @@ ser auditada numa sessão com acesso a esse repositório.
 ## PRÓXIMOS PASSOS (ordem de prioridade)
 
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
+🔴 P0 — Reconstruir a UI de cEV/ICM no produto (MAIN-007 — motor pronto, falta a tela)
 🟠 P1 — Validar agente desktop (Radar) contra instalações reais
 🟠 P1 — Validar squeeze multiway num spot real (SOLVER-016)
 
@@ -82,26 +92,37 @@ ser auditada numa sessão com acesso a esse repositório.
 
 ## EM PROGRESSO
 
-Nenhum item com trabalho ativo identificado nesta auditoria (o último
-ciclo de commits fechou tudo que estava aberto). Os itens "parciais"
-listados no roadmap estão parados, não em desenvolvimento no momento.
+Nenhum item com trabalho ativo identificado nesta auditoria. Os itens
+"parciais"/"atenção" listados no roadmap estão parados, não em
+desenvolvimento no momento.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## BLOQUEIOS
 
-Nenhum bloqueio ativo (ver `BLOCKERS.md`).
+Nenhum bloqueio ativo (ver `BLOCKERS.md`). Há 1 item em "atenção"
+(MAIN-007) — não é bloqueio, é trabalho de produto pendente.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## ÚLTIMA ATUALIZAÇÃO
 
-11/09/2026 — auditoria completa dos dois repositórios (código, não só
-commits), criação do Cockpit.
+14/09/2026 — sincronizado `roadmap.json` com correções que só tinham
+sido aplicadas no painel visual (não no repositório): MAIN-007
+rebaixado de "concluído" pra "atenção" (UI removida em 12/09, nunca
+reconectada — achado verificando o código, não a mensagem de commit),
+SOLVER-020 (hardening de segurança da API) adicionado. "Progresso
+Geral" corrigido pra usar a média das 3 frentes (72%), não a média
+direta de todos os itens (que dava 76% e superrepresentava Main/Solver
+por terem mais itens rastreados que Radar).
 
 13/09/2026 — estoque pré-flop de Modo Treino ampliado: 12 spots de
 push/fold ICM (8 a 100bb, sb_vs_bb) e 20 spots de RFI/Jam (10 a 100bb,
-sb_vs_bb e btn_vs_bb) gerados pelo motor e gravados na tabela `drills`
-via SQL direto (sem credencial de service role disponível na sessão).
-MAIN-022 e SOLVER-006 marcados como concluídos. Ver `CHANGELOG.md` para
-detalhes completos da sessão.
+sb_vs_bb e btn_vs_bb) gerados pelo motor e gravados na tabela `drills`.
+MAIN-022 e SOLVER-006 marcados como concluídos. Deploy do Solver
+confirmado ativo (SOLVER-018), arquivo de backup órfão removido
+(MAIN-025), engine_version rastreado (MAIN-023). Ver `CHANGELOG.md`
+para detalhes completos.
+
+11/09/2026 — auditoria completa dos dois repositórios (código, não só
+commits), criação do Cockpit.
