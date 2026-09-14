@@ -23,6 +23,7 @@ import {
   reopenListing,
   FORMAT_LABEL,
   APPLICATION_STATUS_LABEL,
+  APPLICATION_STATUS_COLOR,
   type Listing,
   type MyApplication,
   type ApplicationSummary,
@@ -114,7 +115,7 @@ export default function ListingDetailPage() {
           <section className="rounded-xl border border-hairline bg-surface p-5">
             <div className="flex flex-wrap items-start justify-between gap-3">
               <div className="flex items-center gap-3">
-                <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-orange-500/30 bg-orange-500/10 text-orange-500">
+                <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-hairline bg-elevated text-muted">
                   <Briefcase size={22} />
                 </div>
                 <div>
@@ -306,11 +307,7 @@ function ApplySection({
       <div className="flex-1">
         {minhaCandidatura && minhaCandidatura.status !== "retirada" ? (
           <div className="flex flex-col items-start gap-2">
-            <Chip
-              color={
-                minhaCandidatura.status === "aceita" ? "#2FB89A" : minhaCandidatura.status === "recusada" ? "#e0555a" : "#E0B24C"
-              }
-            >
+            <Chip color={APPLICATION_STATUS_COLOR[minhaCandidatura.status]}>
               {APPLICATION_STATUS_LABEL[minhaCandidatura.status]}
             </Chip>
             {minhaCandidatura.status === "pendente" && (

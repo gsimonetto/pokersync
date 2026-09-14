@@ -7,14 +7,13 @@ import { AppShell } from "@/components/app-shell";
 import { Chip } from "@/components/chip";
 import { MarketplaceTabs } from "@/components/marketplace/marketplace-tabs";
 import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
-import { fetchMyApplications, FORMAT_LABEL, APPLICATION_STATUS_LABEL, type MyApplication } from "@/lib/services/marketplace-service";
-
-const STATUS_COLOR: Record<MyApplication["status"], string> = {
-  pendente: "#E0B24C",
-  aceita: "#2FB89A",
-  recusada: "#e0555a",
-  retirada: "#8A94A3",
-};
+import {
+  fetchMyApplications,
+  FORMAT_LABEL,
+  APPLICATION_STATUS_LABEL,
+  APPLICATION_STATUS_COLOR,
+  type MyApplication,
+} from "@/lib/services/marketplace-service";
 
 export default function MinhasCandidaturasPage() {
   const [apps, setApps] = useState<MyApplication[] | null>(null);
@@ -82,7 +81,7 @@ export default function MinhasCandidaturasPage() {
                       <p className="text-[9px] uppercase tracking-wider text-muted/60">match</p>
                     </div>
                   )}
-                  <Chip color={STATUS_COLOR[a.status]}>{APPLICATION_STATUS_LABEL[a.status]}</Chip>
+                  <Chip color={APPLICATION_STATUS_COLOR[a.status]}>{APPLICATION_STATUS_LABEL[a.status]}</Chip>
                   <ChevronRight size={16} className="shrink-0 text-muted" />
                 </Link>
               ))}

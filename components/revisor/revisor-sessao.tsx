@@ -10,6 +10,7 @@ import { ModalPortal } from "@/components/modal-portal";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
+import { markReviewViewedInReplayer } from "@/lib/services/hand-review-service";
 import { F, T } from "@/lib/poker/drill-theme";
 
 // Tela nova (2026-08): abre uma sessao/torneio e mostra o master-detail —
@@ -85,6 +86,12 @@ interface HandInListing {
   } | null;
   created_at: string;
   status: string;
+  // Marcado quando a mao ja foi aberta aqui na mesa do replayer -- o check
+  // da listagem usa ISSO (pedido explicito: "o check da listagem das
+  // cartas devem aparecer quando forem revisadas e nao analisadas"), nao
+  // mais `status === "concluida"` (que so reflete o fluxo separado de
+  // "Analisar mao" em RevisorDetalhe).
+  viewed_in_replayer_at: string | null;
   // Marcadores da mao (pedido explicito: filtrar maos marcadas na lista).
   hand_review_tag_links?: { tag_id: string; hand_review_tags: { id: string; label: string }[] | null }[];
 }
@@ -187,7 +194,7 @@ export function RevisorSessao({
           supabase.from("hand_sessions").select("*").eq("id", sessionId).single(),
           supabase
             .from("hand_reviews")
-            .select("id, title, hand_history, parsed_data, created_at, status, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )")
+            .select("id, title, hand_history, parsed_data, created_at, status, viewed_in_replayer_at, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )")
             .eq("hand_session_id", sessionId)
             .order("created_at", { ascending: true }),
         ]);
@@ -234,6 +241,23 @@ export function RevisorSessao({
     }
     setParsedCache((prev) => ({ ...prev, [selectedId]: parsed }));
   }, [selectedHand, selectedId, parsedCache]);
+
+  // Marca "revisada" na primeira vez que a mao e' de fato aberta na mesa
+  // do replayer (parseou com sucesso) -- independente de mais tarde
+  // completar ou nao o fluxo de "Analisar mao". markReviewViewedInReplayer
+  // ja' so' grava na 1a vez (WHERE viewed_in_replayer_at IS NULL); o guard
+  // local (selectedHand?.viewed_in_replayer_at) so evita a chamada de rede
+  // repetida ao reabrir a mesma mao na sessao.
+  useEffect(() => {
+    if (!selectedId || !parsedForSelected || selectedHand?.viewed_in_replayer_at) return;
+    markReviewViewedInReplayer(selectedId)
+      .then(() => {
+        setHands((prev) =>
+          prev.map((h) => (h.id === selectedId ? { ...h, viewed_in_replayer_at: new Date().toISOString() } : h))
+        );
+      })
+      .catch(() => {});
+  }, [selectedId, parsedForSelected, selectedHand]);
 
   // Busca (lupa): filtra por posicao do hero, stack inicial do hero, ou
   // numero da mao ("Mão 5" casa com "5"). Um unico campo de texto livre
@@ -523,7 +547,7 @@ export function RevisorSessao({
                     Mão {i + 1}
                   </div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
-                    {h.status === "concluida" && <span style={{ color: T.ok }}>✓</span>}
+                    {h.viewed_in_replayer_at && <span style={{ color: T.ok }}>✓</span>}
                     {heroPosition && <span>{heroPosition}</span>}
                     {heroEntered !== null && (
                       <span
@@ -558,6 +582,7 @@ export function RevisorSessao({
       reviewId={selectedId}
       onOpenHand={() => selectedId && onOpenHand(selectedId)}
       onFatalError={goToNextHand}
+      canAdvanceOnError={hasNextHand}
       actionsSlot={isMobile ? actionsSlotEl : undefined}
       onPrevHand={hasPrevHand ? goToPrevHandManual : undefined}
       onNextHand={hasNextHand ? goToNextHandManual : undefined}

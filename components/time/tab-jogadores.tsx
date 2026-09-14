@@ -3,18 +3,16 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Flame, ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
+import { ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
 import { RankChip } from "@/components/ui/rank-chip";
-import { ScoreRing } from "@/components/ui/score-ring";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { PlayerDetailModal } from "@/components/time/player-detail-modal";
 import {
   assignCoach,
   assignTeamDrill,
   calcularScore,
-  diasSemAtividade,
   fetchTeamLeakPlayers,
   removeMember,
   setMemberLabel,
@@ -35,8 +33,6 @@ import { BRL } from "@/lib/format";
 // - filtro por etiqueta em cima, porque time grande se organiza por
 //   buy-in e o coach quase sempre olha um recorte, nao a lista toda;
 // - linha inteira clicavel para a ficha — menos fricção que um botao.
-
-const INATIVO_DIAS = 7;
 
 type Ordem = "nome" | "risco" | "xp" | "treinos" | "acerto" | "revisadas" | "resultado";
 
@@ -176,10 +172,7 @@ export function TabJogadores({
       ) : (
         <ul className="mt-4 flex flex-col gap-2.5">
           {lista.map((j, idx) => {
-            const d = diasSemAtividade(j.lastActivityAt);
-            const inativo = d === null || d >= INATIVO_DIAS;
             const pct = j.treinos > 0 ? Math.round((j.acertosGto / j.treinos) * 100) : null;
-            const score = calcularScore(j);
             const aberto = expandidos.has(j.userId);
             return (
               // Crachá do jogador -- mesmo tratamento visual (card com
@@ -205,29 +198,23 @@ export function TabJogadores({
                   <Avatar id={j.avatarId} url={j.avatarUrl} size={38} className="shrink-0" />
 
                   <div className="min-w-0 flex-1 basis-40">
+                    {/* Lista fica so' com identidade + etiqueta (pedido
+                        explicito: "manter essa tela clean... as
+                        informacoes necessarias precisam estar dentro do
+                        perfil quando o coach clicar") -- score, streak,
+                        data de entrada e inatividade saem daqui; todas ja
+                        aparecem na ficha completa (PlayerDetailModal),
+                        que abre ao clicar no nome ou em "Ver ficha
+                        completa" abaixo. */}
                     <div className="flex flex-wrap items-center gap-2">
                       <button onClick={() => setFichaAberta(j.userId)} className="truncate text-sm font-medium hover:underline">
                         {j.nome}
                       </button>
                       <RankChip level={j.level ?? 1} />
-                      <ScoreRing valor={score.valor} risco={score.risco} />
                       {j.labelName && j.labelColor && (
                         <Chip color={j.labelColor} size="sm">{j.labelName}</Chip>
                       )}
-                      {j.streakDays ? (
-                        <span className="flex shrink-0 items-center gap-0.5 text-[11px] text-evolution">
-                          <Flame size={11} />
-                          {j.streakDays}
-                        </span>
-                      ) : null}
                     </div>
-                    <p className="mt-0.5 truncate text-xs text-muted">
-                      Entrou em {new Date(j.joinedAt).toLocaleDateString("pt-BR")}
-                      {" · "}
-                      <span className={inativo ? "text-negative" : undefined}>
-                        {d === null ? "nunca ativo" : d === 0 ? "ativo hoje" : `há ${d}d sem atividade`}
-                      </span>
-                    </p>
                   </div>
 
                   <div className="ml-auto flex shrink-0 items-center gap-2.5">

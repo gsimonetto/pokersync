@@ -12,6 +12,7 @@ import {
   fetchCandidateSnapshot,
   decideApplication,
   APPLICATION_STATUS_LABEL,
+  APPLICATION_STATUS_COLOR,
   type CandidateSnapshot,
 } from "@/lib/services/marketplace-service";
 import {
@@ -26,13 +27,6 @@ import {
 function fmtPct(v: number | null): string {
   return v === null ? "—" : `${v >= 0 ? "" : ""}${v}%`;
 }
-
-const STATUS_COLOR: Record<CandidateSnapshot["status"], string> = {
-  pendente: "#E0B24C",
-  aceita: "#2FB89A",
-  recusada: "#e0555a",
-  retirada: "#8A94A3",
-};
 
 // Cracha compacto na lista de candidatos -- so' o essencial pra decidir
 // se vale abrir (nome, ganhos, buy-in, partidas jogadas). O detalhe
@@ -84,7 +78,7 @@ export function CandidateBadge({
         <div className="min-w-0 flex-1">
           <div className="flex flex-wrap items-center gap-2">
             <p className="truncate text-sm font-semibold text-ink">{snap.apelido || snap.nome}</p>
-            <Chip color={STATUS_COLOR[snap.status]} size="sm">
+            <Chip color={APPLICATION_STATUS_COLOR[snap.status]} size="sm">
               {APPLICATION_STATUS_LABEL[snap.status]}
             </Chip>
           </div>
