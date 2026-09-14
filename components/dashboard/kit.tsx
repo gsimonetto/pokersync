@@ -428,15 +428,22 @@ export function StatCardGrid({
     bar?: StatBar;
     locked?: string;
     category?: StatCategory;
+    coaching?: string;
   }[];
 }) {
+  // Um so' aberto por vez dentro da MESMA grade (mesmo padrao do
+  // HeroStrip) -- estado vive aqui (nao dentro de cada StatCard) pra isso
+  // funcionar; cada StatCardGrid renderizado (Preflop, Postflop x2...) tem
+  // o seu proprio estado, entao abrir um card numa grade nao fecha o de
+  // outra.
+  const [open, setOpen] = useState<string | null>(null);
   return (
     <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5">
       {items.map((it) =>
         it.locked ? (
           <LockedMetric key={it.label} label={it.label} reason={it.locked} />
         ) : (
-          <StatCard key={it.label} {...it} />
+          <StatCard key={it.label} {...it} isOpen={open === it.label} onToggle={() => setOpen((cur) => (cur === it.label ? null : it.label))} />
         )
       )}
     </div>
@@ -489,6 +496,9 @@ function StatCard({
   hint,
   bar,
   category,
+  coaching,
+  isOpen,
+  onToggle,
 }: {
   label: string;
   value: string | null;
@@ -497,24 +507,51 @@ function StatCard({
   hint?: string;
   bar?: StatBar;
   category?: StatCategory;
+  coaching?: string;
+  isOpen?: boolean;
+  onToggle?: () => void;
 }) {
   const cor = tone ? TONE_TEXT_CLASS[tone] : "text-ink";
+  // Mesma regra do HeroStrip: card so' vira clicavel quando ha' coaching
+  // pra mostrar (metrica com faixa de referencia E fora dela) -- sem
+  // isso, "clicar" num card que ja' esta' saudavel nao teria nada de novo
+  // pra revelar alem do que o hover (`hint`) ja' mostra.
+  const clickable = !!(coaching && value);
+  const open = clickable && isOpen;
   return (
     <div
-      className="relative min-w-0 rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)]"
-      title={hint}
+      className={`relative min-w-0 rounded-lg border border-hairline bg-elevated p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:border-ink/25 hover:shadow-[0_8px_20px_-12px_rgba(0,0,0,0.6)] ${clickable ? "cursor-pointer" : ""}`}
+      title={clickable ? undefined : hint}
+      onClick={clickable ? onToggle : undefined}
     >
       {category && (
-        <span className={`absolute right-2.5 top-2.5 h-1.5 w-1.5 rounded-full opacity-50 ${CATEGORY_DOT_CLASS[category]}`} title={CATEGORY_LABEL[category]} />
+        // bottom-right (era top-right) -- topo do card agora pode ter o
+        // chevron de "clicavel" na mesma esquina, movido pra nao
+        // sobrepor o dot de categoria.
+        <span className={`absolute bottom-2.5 right-2.5 h-1.5 w-1.5 rounded-full opacity-50 ${CATEGORY_DOT_CLASS[category]}`} title={CATEGORY_LABEL[category]} />
       )}
       <p className="flex items-center gap-1.5 pr-3 text-[10px] font-bold uppercase leading-tight tracking-[0.06em] text-muted/80">
         {Icon && <Icon size={11} className="icon-glow shrink-0" />}
         <span>{label}</span>
+        {clickable && <ChevronDown size={10} className={`ml-auto shrink-0 text-muted/60 transition-transform ${open ? "rotate-180" : ""}`} />}
       </p>
       {/* break-words pelo mesmo motivo do MetricCard -- numero comprido
           sem espaço nao pode forçar a coluna do grid a crescer. */}
       <p className={`mt-1.5 break-words text-lg font-bold leading-none tabular-nums ${value ? cor : "text-muted/30"}`}>{value ?? "—"}</p>
       {bar && value && <ReferenceBar bar={bar} tone={tone} className="mt-2" />}
+      <AnimatePresence>
+        {open && (
+          <motion.div
+            initial={{ height: 0, opacity: 0 }}
+            animate={{ height: "auto", opacity: 1 }}
+            exit={{ height: 0, opacity: 0 }}
+            transition={{ duration: 0.2, ease: "easeOut" }}
+            className="overflow-hidden"
+          >
+            <p className="mt-2 border-t border-hairline pt-2 text-[10.5px] leading-relaxed text-ink/80">{coaching}</p>
+          </motion.div>
+        )}
+      </AnimatePresence>
     </div>
   );
 }

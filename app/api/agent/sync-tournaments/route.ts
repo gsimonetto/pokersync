@@ -4,6 +4,7 @@
 // grava buy-in/colocação/premiação via
 // lib/services/agent-tournament-sync-service.ts em vez de mãos.
 import { authenticateAgentRequest, AgentAuthError } from "@/lib/supabase/agent";
+import { fetchRadarImportScopeFor } from "@/lib/supabase/agent-import-scope";
 import { processAgentTournamentSync, type AgentTournamentSyncInput } from "@/lib/services/agent-tournament-sync-service";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -52,6 +53,15 @@ export async function POST(request: Request) {
 
   const userLimit = rateLimit(`agent-sync-tournaments:user:${user.id}`, 20, 60_000);
   if (!userLimit.allowed) return rateLimitResponse(userLimit.retryAfterSeconds);
+
+  // Mesmo gate de app/api/agent/sync/route.ts -- ver comentário lá.
+  const importScope = await fetchRadarImportScopeFor(supabase, user.id);
+  if (!importScope) {
+    return Response.json(
+      { ok: false, error: "IMPORT_SCOPE_NAO_DEFINIDO", message: "Escolha, na tela do Radar dentro do Player Evolution, o que importar antes de continuar." },
+      { status: 409 }
+    );
+  }
 
   let body: unknown;
   try {

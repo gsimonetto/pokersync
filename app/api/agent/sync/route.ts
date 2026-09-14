@@ -2,6 +2,7 @@
 // arquivos de hand history encontrados no computador do usuário e grava as
 // mãos via lib/services/agent-sync-service.ts.
 import { authenticateAgentRequest, AgentAuthError } from "@/lib/supabase/agent";
+import { fetchRadarImportScopeFor } from "@/lib/supabase/agent-import-scope";
 import { processAgentSync, type AgentSyncInput } from "@/lib/services/agent-sync-service";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -50,6 +51,18 @@ export async function POST(request: Request) {
 
   const userLimit = rateLimit(`agent-sync:user:${user.id}`, 20, 60_000);
   if (!userLimit.allowed) return rateLimitResponse(userLimit.retryAfterSeconds);
+
+  // Pedido explícito: nenhuma mão entra antes de o jogador escolher, na
+  // tela do Radar (Player Evolution), se quer só o que acontecer a partir
+  // de agora ou também o histórico já existente no computador. Recusa o
+  // corpo inteiro em vez de importar parcialmente.
+  const importScope = await fetchRadarImportScopeFor(supabase, user.id);
+  if (!importScope) {
+    return Response.json(
+      { ok: false, error: "IMPORT_SCOPE_NAO_DEFINIDO", message: "Escolha, na tela do Radar dentro do Player Evolution, o que importar antes de continuar." },
+      { status: 409 }
+    );
+  }
 
   let body: unknown;
   try {
