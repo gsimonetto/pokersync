@@ -349,6 +349,22 @@ export async function setSpotSaved(reviewId: string, saved: boolean) {
   await updateReviewProgress(reviewId, { saved });
 }
 
+// Marca que o jogador abriu essa mao na mesa do replayer (RevisorSessao) --
+// distinto de status "concluida" (so setado ao terminar o fluxo guiado de
+// "Analisar mao" em RevisorDetalhe). So grava na primeira vez (nao
+// sobrescreve um viewed_in_replayer_at ja existente) -- quem chama ja
+// evita a chamada repetida vendo esse campo, esse guard e' so' defesa
+// contra corrida.
+export async function markReviewViewedInReplayer(reviewId: string) {
+  const supabase = createClient();
+  const { error } = await supabase
+    .from("hand_reviews")
+    .update({ viewed_in_replayer_at: new Date().toISOString() })
+    .eq("id", reviewId)
+    .is("viewed_in_replayer_at", null);
+  if (error) throw error;
+}
+
 // Leitura leve de "saved" pra quem so precisa desse booleano (ex: o
 // bookmark do Hand Replayer quando navega mão a mão dentro de um
 // torneio) -- sem puxar o resto de ReviewDetail (tags/imagens/respostas)
@@ -418,37 +434,6 @@ export async function fetchUserLeaksWithDrills(days = 30, minOccurrences = 3): P
   });
   if (error) throw error;
   return data ?? [];
-}
-
-export interface ReviewSummary {
-  totalReviews: number;
-  totalConcluded: number;
-  totalErrors: number;
-  totalCorrect: number;
-  totalDoubts: number;
-  worstStreet: string | null;
-  worstCategory: string | null;
-}
-
-// RPC ja existia pronta no banco (contagens + pior rua/categoria dos
-// ultimos N dias) mas nunca era chamada -- o Revisor era so uma lista de
-// maos, sem nenhum numero consolidado (diferente da Banca, que sempre
-// teve Resultado/ROI/ITM no topo).
-export async function fetchReviewSummary(days = 30): Promise<ReviewSummary | null> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("user_review_summary", { p_days: days });
-  if (error) throw error;
-  const r = data?.[0];
-  if (!r) return null;
-  return {
-    totalReviews: r.total_reviews ?? 0,
-    totalConcluded: r.total_concluded ?? 0,
-    totalErrors: r.total_errors ?? 0,
-    totalCorrect: r.total_correct ?? 0,
-    totalDoubts: r.total_doubts ?? 0,
-    worstStreet: r.worst_street ?? null,
-    worstCategory: r.worst_category ?? null,
-  };
 }
 
 // ============================================================

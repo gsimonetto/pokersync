@@ -2,9 +2,9 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash, HelpCircle, XCircle } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getThumbUrl, deleteReview, fetchReviewSummary, type ReviewListItem, type ReviewSummary } from "@/lib/services/hand-review-service";
+import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { LeaksCard } from "./leaks-card";
 import { useConfirm } from "@/components/confirm-dialog";
@@ -61,16 +61,6 @@ export function RevisorFila({
   const [filteredLoading, setFilteredLoading] = useState(true);
   const [filteredError, setFilteredError] = useState("");
   const hasFilter = !!filterHandIds && filterHandIds.length > 0;
-
-  // Resumo consolidado (RPC ja existia pronta, nunca era chamada) --
-  // Revisor era so uma lista de maos sem nenhum numero de topo, diferente
-  // do resto do produto (Banca sempre teve Resultado/ROI/ITM).
-  const [summary, setSummary] = useState<ReviewSummary | null>(null);
-  useEffect(() => {
-    fetchReviewSummary(30)
-      .then(setSummary)
-      .catch(() => {});
-  }, []);
 
   // ---- Sessões ----
   const [sessionsList, setSessionsList] = useState<HandSessionWithCount[]>([]);
@@ -261,6 +251,14 @@ export function RevisorFila({
     });
   }, [sessionsList, sessionSearchQuery]);
 
+  // "Quantos torneios e quantas maos foram revisadas" -- pedido explicito
+  // pra substituir o resumo antigo (Acertei/Errei/Duvida, que media
+  // autoavaliacao de "Analisar mao", nao volume de revisao de verdade).
+  const totalHandsReviewed = useMemo(
+    () => sessionsList.reduce((sum, s) => sum + Number(s.hand_count || 0), 0),
+    [sessionsList]
+  );
+
   const counts = useMemo(() => {
     const acc: Record<string, number> = { pendente: 0, em_revisao: 0, concluida: 0 };
     items.forEach((r) => {
@@ -315,13 +313,14 @@ export function RevisorFila({
 
   return (
     <div>
-      {summary && summary.totalReviews > 0 && (
-        <div className="fade-in-up mb-4 grid grid-cols-2 gap-2.5 sm:grid-cols-5">
-          <SummaryStat icon={Hash} label="Mãos (30d)" value={String(summary.totalReviews)} accent="#5AA6E0" />
-          <SummaryStat icon={CheckCircle2} label="Concluídas" value={String(summary.totalConcluded)} accent="#10b981" />
-          <SummaryStat icon={CheckCircle2} label="Acertei" value={String(summary.totalCorrect)} accent="#10b981" />
-          <SummaryStat icon={XCircle} label="Errei" value={String(summary.totalErrors)} accent="#ef4444" />
-          <SummaryStat icon={HelpCircle} label="Dúvida" value={String(summary.totalDoubts)} accent="#f59e0b" />
+      {!sessionsLoading && sessionsList.length > 0 && (
+        <div className="fade-in-up mb-4">
+          <SummaryStat
+            icon={Hash}
+            label="Torneios e mãos revisadas"
+            value={`${sessionsList.length} torneio${sessionsList.length === 1 ? "" : "s"} · ${totalHandsReviewed} mão${totalHandsReviewed === 1 ? "" : "s"}`}
+            accent="#5AA6E0"
+          />
         </div>
       )}
       {/* Toolbar unica: abas + chips + busca + acao principal na mesma

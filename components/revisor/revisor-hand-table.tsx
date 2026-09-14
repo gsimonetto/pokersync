@@ -196,6 +196,7 @@ export function RevisorHandTable({
   reviewId,
   onOpenHand,
   onFatalError,
+  canAdvanceOnError = true,
   actionsSlot,
   onPrevHand,
   onNextHand,
@@ -228,6 +229,14 @@ export function RevisorHandTable({
   // (usado por quem chama RevisorHandTable fora de uma fila navegavel,
   // ex: RevisorDetalhe).
   onFatalError?: () => void;
+  // Se essa e' a ULTIMA mao da fila filtrada, onFatalError nao tem pra
+  // onde avancar (vira um no-op) — sem essa flag o componente mostrava
+  // "Avançando pra próxima mão…" pra sempre nesse caso (bug reportado:
+  // "quando finalizamos a ultima mao revisada fica carregando"), porque
+  // a troca de mao que fecharia esse indicador nunca acontece. Default
+  // true (mesmo comportamento de antes) pra nao quebrar quem ja usa
+  // onFatalError sem passar isso.
+  canAdvanceOnError?: boolean;
   // Alvo (DOM node) pra onde os botoes Salvar/Compartilhar/Analisar sao
   // portados no celular (createPortal), em vez de renderizarem dentro do
   // proprio card da mesa -- pedido explicito: "os icones precisam ficar
@@ -544,8 +553,11 @@ export function RevisorHandTable({
   if (replayError || !replayState) {
     // Consumidor com fila (RevisorSessao) trata o erro avancando pra
     // proxima mao — mostra so um indicador leve de transicao em vez da
-    // caixa de erro, que ficaria piscando sem o usuario nem ler.
-    if (onFatalError) {
+    // caixa de erro, que ficaria piscando sem o usuario nem ler. So faz
+    // sentido enquanto existir uma proxima mao de verdade pra avancar
+    // (canAdvanceOnError) — na ultima mao da fila nao ha troca que feche
+    // esse indicador, entao cai na caixa de erro normal abaixo.
+    if (onFatalError && canAdvanceOnError) {
       return (
         <div
           style={{
@@ -671,7 +683,16 @@ export function RevisorHandTable({
             botoes de acao migram pro topo da tela via `actionsSlot`,
             ver abaixo. */}
         {!isMobile && (
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0 }}>
+          // FIX (bug reportado: "deixar as cartas por tras da nomenclatura
+          // da mesa e do replayer"): overflow:visible no feltro (ver
+          // PokerTable) deixa as cartas dos assentos "above" (topo da
+          // mesa) vazarem pra CIMA da propria caixa da mesa -- sem esse
+          // header proprio ter um z-index, ele fica em fluxo normal e as
+          // cartas (renderizadas depois no DOM, dentro da mesa abaixo)
+          // pintam por cima dele. position:relative + zIndex acima do
+          // maior usado pelos assentos (6, ver Seat acima) garante que
+          // esse header sempre fica na frente.
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0, position: "relative", zIndex: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
               {onBack && (
                 <ChipButton icon={<ArrowLeft size={13} />} label="Voltar" onClick={onBack} title="Voltar pra fila de mãos" iconOnly />

@@ -10,6 +10,9 @@ import { createListing, type ListingFormat } from "@/lib/services/marketplace-se
 
 const FORMATS: ListingFormat[] = ["MTT", "Cash", "SNG", "Spin"];
 
+const INPUT_CLASS =
+  "w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none transition-colors focus:border-ink/40";
+
 // Criacao de vaga -- so' quem administra ou coach de um time chega
 // aqui (link so' aparece pra eles em /marketplace, e o RPC/policy
 // rejeita no banco mesmo se alguem forcar a URL).
@@ -108,7 +111,7 @@ export default function NovaVagaPage() {
                 value={title}
                 onChange={(e) => setTitle(e.target.value)}
                 placeholder="Ex: Jogador de MTT 100-200 buy-in"
-                className="input"
+                className={INPUT_CLASS}
               />
             </Field>
 
@@ -118,12 +121,12 @@ export default function NovaVagaPage() {
                 onChange={(e) => setDescription(e.target.value)}
                 rows={4}
                 placeholder="Como funciona o staking, expectativas, horários..."
-                className="input resize-none"
+                className={`${INPUT_CLASS} resize-none`}
               />
             </Field>
 
             <Field label="Formato">
-              <select value={format} onChange={(e) => setFormat(e.target.value as ListingFormat)} className="input">
+              <select value={format} onChange={(e) => setFormat(e.target.value as ListingFormat)} className={INPUT_CLASS}>
                 {FORMATS.map((f) => (
                   <option key={f} value={f}>
                     {f}
@@ -134,16 +137,16 @@ export default function NovaVagaPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="Buy-in mínimo (R$)">
-                <input type="number" min="0" value={buyInMin} onChange={(e) => setBuyInMin(e.target.value)} className="input" />
+                <input type="number" min="0" value={buyInMin} onChange={(e) => setBuyInMin(e.target.value)} className={INPUT_CLASS} />
               </Field>
               <Field label="Buy-in máximo (R$)">
-                <input type="number" min="0" value={buyInMax} onChange={(e) => setBuyInMax(e.target.value)} className="input" />
+                <input type="number" min="0" value={buyInMax} onChange={(e) => setBuyInMax(e.target.value)} className={INPUT_CLASS} />
               </Field>
             </div>
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="% de Staking oferecido">
-                <input type="number" min="0" max="100" value={stakingPct} onChange={(e) => setStakingPct(e.target.value)} className="input" />
+                <input type="number" min="0" max="100" value={stakingPct} onChange={(e) => setStakingPct(e.target.value)} className={INPUT_CLASS} />
               </Field>
               <Field label="Vaga expira em (dias, opcional)">
                 <input
@@ -152,7 +155,7 @@ export default function NovaVagaPage() {
                   value={validadeDias}
                   onChange={(e) => setValidadeDias(e.target.value)}
                   placeholder="Sem prazo"
-                  className="input"
+                  className={INPUT_CLASS}
                 />
               </Field>
             </div>
@@ -163,15 +166,15 @@ export default function NovaVagaPage() {
 
             <div className="grid grid-cols-2 gap-4">
               <Field label="ROI mínimo (%)">
-                <input type="number" value={minRoiPct} onChange={(e) => setMinRoiPct(e.target.value)} className="input" />
+                <input type="number" value={minRoiPct} onChange={(e) => setMinRoiPct(e.target.value)} className={INPUT_CLASS} />
               </Field>
               <Field label="Sessões/mês mínimas">
-                <input type="number" min="0" value={minVolume} onChange={(e) => setMinVolume(e.target.value)} className="input" />
+                <input type="number" min="0" value={minVolume} onChange={(e) => setMinVolume(e.target.value)} className={INPUT_CLASS} />
               </Field>
             </div>
 
             <Field label="Score de evolução mínimo (0-100)">
-              <input type="number" min="0" max="100" value={minScore} onChange={(e) => setMinScore(e.target.value)} className="input" />
+              <input type="number" min="0" max="100" value={minScore} onChange={(e) => setMinScore(e.target.value)} className={INPUT_CLASS} />
             </Field>
 
             {erro && <p className="text-sm text-negative">{erro}</p>}
@@ -188,22 +191,6 @@ export default function NovaVagaPage() {
           </div>
         </div>
       </main>
-
-      <style jsx global>{`
-        .input {
-          width: 100%;
-          border-radius: 0.5rem;
-          border: 1px solid var(--color-hairline);
-          background: var(--color-elevated);
-          padding: 0.55rem 0.75rem;
-          font-size: 0.875rem;
-          color: var(--color-ink);
-        }
-        .input:focus {
-          outline: none;
-          border-color: rgba(255, 255, 255, 0.25);
-        }
-      `}</style>
     </AppShell>
   );
 }

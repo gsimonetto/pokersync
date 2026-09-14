@@ -16,6 +16,15 @@ import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/to
 import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
 import { getUsdBrlRate } from "@/lib/services/fx-service";
 import { AppShell } from "@/components/app-shell";
+// FIX (bug reportado: "no celular, aonde aparece valores grandes (como
+// gestor de banca) esta quebrando passando para o proximo card") --
+// Banca tinha sua PROPRIA copia de HeroMetric (fonte fixa, sem
+// min-w-0), desatualizada em relacao a esta versao compartilhada com
+// Estatisticas do time/ficha do jogador (que ja escala a fonte no
+// mobile e quebra o valor pra 2a linha em vez de vazar pro card
+// vizinho). Reaproveitando a mesma pra nao repetir esse tipo de
+// divergencia.
+import { HeroMetric } from "@/components/time/hero-metric";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { FilterPopover } from "@/components/ui/filter-popover";
 import { Modal } from "@/components/ui/modal";
@@ -1853,37 +1862,6 @@ export default function BankrollPage() {
 
     </main>
     </AppShell>
-  );
-}
-
-// Mesmo padrao visual da Performance (Player Evolution): metrica solta
-// dentro de um container comum, sem virar card proprio.
-function HeroMetric({
-  label,
-  value,
-  hint,
-  tone,
-  destaque = false,
-}: {
-  label: string;
-  value: string;
-  hint?: string;
-  tone: "bom" | "ruim" | "neutro";
-  destaque?: boolean;
-}) {
-  const cor = tone === "bom" ? "text-positive" : tone === "ruim" ? "text-negative" : "text-ink";
-  return (
-    <div className="px-6 py-6">
-      <p className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/80">{label}</p>
-      <p
-        className={`mt-2 font-bold leading-none tracking-tight tabular-nums ${
-          destaque ? "text-[2.25rem]" : "text-[1.75rem]"
-        } ${cor}`}
-      >
-        {value}
-      </p>
-      {hint && <p className="mt-2.5 text-[11.5px] text-muted">{hint}</p>}
-    </div>
   );
 }
 

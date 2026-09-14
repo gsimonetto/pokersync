@@ -489,3 +489,10 @@ export const APPLICATION_STATUS_LABEL: Record<ApplicationStatus, string> = {
   recusada: "Recusada",
   retirada: "Retirada",
 };
+
+export const APPLICATION_STATUS_COLOR: Record<ApplicationStatus, string> = {
+  pendente: "#E0B24C",
+  aceita: "#2FB89A",
+  recusada: "#e0555a",
+  retirada: "#8A94A3",
+};
