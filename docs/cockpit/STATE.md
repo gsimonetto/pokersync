@@ -32,9 +32,9 @@ qualquer um pode reproduzir.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC — Progresso Geral: 72%
+## POKERSYNC — Progresso Geral: 73%
 
-🟢 Main    █████████████░░░░░░░ 67%  (25 itens rastreados)
+🟢 Main    ██████████████░░░░░░ 70%  (25 itens rastreados)
 🔵 Radar   █████████████░░░░░░░ 63%  (4 itens rastreados)
 🟣 Solver  █████████████████░░░ 87%  (20 itens rastreados)
 
@@ -42,10 +42,10 @@ qualquer um pode reproduzir.
 
 ## ONDE ESTAMOS?
 
-### PokerSync Main — 67% completo
+### PokerSync Main — 70% completo
 **Trabalho atual:** nenhuma frente "em progresso" ativa — o repositório
 está numa sequência de módulos concluídos (Marketplace, Conquistas,
-LGPD, segurança) sem nada pela metade.
+LGPD, segurança, Score de Evolução) sem nada pela metade.
 **Próximo:** 🔴 P0 — Pipeline pós-flop ponta a ponta (job → contrato →
 UI), porque os 5 leaks reais da base de usuários são todos pós-flop e
 sem isso o loop "leak vira treino" não fecha de verdade.
@@ -106,6 +106,16 @@ Nenhum bloqueio ativo (ver `BLOCKERS.md`). Há 1 item em "atenção"
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## ÚLTIMA ATUALIZAÇÃO
+
+14/09/2026 — MAIN-011 (Score de evolução consolidado) marcado como
+concluído. A fórmula (5 componentes ponderados) já existia pronta na
+view `player_performance_snapshot` desde antes, mas nunca tinha sido
+exibida em nenhuma tela — achado verificando o banco de dados
+diretamente (Supabase MCP), não só o código do repositório. Criado
+`components/analysis/EvolutionScoreCard.tsx` e conectado em
+`app/performance`: número final + nível + os 5 sub-scores com hover
+explicando o que cada um mede. Progresso de Main recalculado pra 70%
+(25 itens), Progresso Geral pra 73%.
 
 14/09/2026 — sincronizado `roadmap.json` com correções que só tinham
 sido aplicadas no painel visual (não no repositório): MAIN-007

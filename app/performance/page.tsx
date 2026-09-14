@@ -11,8 +11,10 @@ import { PreflopPanel, PositionPanel } from "@/components/analysis/PreflopMatrix
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { StatisticsTab } from "@/components/analysis/StatisticsTab";
 import { RadarPanel } from "@/components/analysis/RadarPanel";
+import { EvolutionScoreCard } from "@/components/analysis/EvolutionScoreCard";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
 import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
+import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
 import { isAddonUnlockedFor } from "@/lib/plans/plans-data";
 import { useCurrencyPreference } from "@/lib/hooks/use-currency-preference";
 import {
@@ -53,6 +55,7 @@ export default function PerformancePage() {
   const [tournament, setTournament] = useState<TournamentMetrics | null>(null);
   const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
   const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
+  const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
   const [tab, setTab] = useState<TabKey>("preflop");
@@ -85,16 +88,18 @@ export default function PerformancePage() {
   async function loadAll() {
     setErro("");
     try {
-      const [r, tourn, sessions, po] = await Promise.all([
+      const [r, tourn, sessions, po, p] = await Promise.all([
         fetchAnalysisHandRows(),
         fetchTournamentMetrics(tournamentBuyinFilter),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
+        fetchPlayerPerformance(),
       ]);
       setRows(r);
       setTournament(tourn);
       setTournamentSessions(sessions);
       setPayouts(po);
+      setPerf(p);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar a análise.");
     } finally {
@@ -161,10 +166,17 @@ export default function PerformancePage() {
         {loading ? (
           <p className="text-sm text-muted">Carregando sua análise…</p>
         ) : (
-          // Container único envolvendo filtros + abas + conteúdo — mesmo
-          // padrão de toda ferramenta de tela única do produto (Treino,
-          // Construtor de Ranges, Comparar, Equidade, Árvores), em vez de
-          // caixas separadas competindo por hierarquia visual.
+          <>
+          {/* Score de evolução consolidado (MAIN-011) — fica acima das abas
+              de proposito: resume os 5 componentes num numero so, entao vale
+              pra qualquer aba que o jogador esteja olhando, nao so uma. */}
+          <div className="mb-4">
+            <EvolutionScoreCard perf={perf} />
+          </div>
+          {/* Container único envolvendo filtros + abas + conteúdo — mesmo
+              padrão de toda ferramenta de tela única do produto (Treino,
+              Construtor de Ranges, Comparar, Equidade, Árvores), em vez de
+              caixas separadas competindo por hierarquia visual. */}
           <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
             <TabNav
               value={tab}
@@ -237,6 +249,7 @@ export default function PerformancePage() {
               )}
             </div>
           </div>
+          </>
         )}
       </main>
     </AppShell>
