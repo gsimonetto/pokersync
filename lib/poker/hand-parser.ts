@@ -23,7 +23,7 @@
 // switch nesses literais em ingles), o token e' normalizado via lookup table
 // logo apos o match. Downstream nunca ve portugues.
 
-export type PokerSite = "pokerstars" | "ggpoker" | "desconhecido";
+export type PokerSite = "pokerstars" | "ggpoker" | "partypoker" | "888poker" | "desconhecido";
 
 export interface ParsedAction {
   player: string;
@@ -176,18 +176,27 @@ export class HandParseError extends Error {
   }
 }
 
+// RADAR-004 (2026-09-14): PartyPoker e 888poker adicionados a partir de
+// UMA amostra de cada, fornecida pelo dono do produto como exemplo/gerada
+// (nao capturada de uma mao real jogada) -- mesma cautela ja aplicada ao
+// GGPoker antes de ter amostra real: melhor-tentativa, precisa validar
+// contra hand history real de cada sala assim que aparecer uma.
 function detectSite(text: string): PokerSite {
   if (/PokerStars Hand #|Mão PokerStars #/i.test(text)) return "pokerstars";
   if (/Poker Hand #|GGPoker Hand/i.test(text)) return "ggpoker";
+  if (/Game hand #\d+\s*-\s*Tournament #/i.test(text)) return "partypoker";
+  if (/888poker Hand History/i.test(text)) return "888poker";
   return "desconhecido";
 }
 
 // Divide um texto de sessao em blocos de maos individuais. Bilingue: aceita
 // o inicio de mao tanto em ingles ("PokerStars Hand #") quanto em portugues
-// ("Mão PokerStars #").
+// ("Mão PokerStars #"), alem dos marcadores proprios de PartyPoker
+// ("Game hand #") e 888poker ("***** 888poker Hand History for Game").
 // Sem flag global (so' usado com .test() abaixo) -- o split em si continua
 // usando a versao "gi" embutida no lookahead, como sempre foi.
-const HAND_START = /(?:PokerStars|GGPoker|Poker) Hand #|(?:Mão) (?:PokerStars|GGPoker|Poker) #/i;
+const HAND_START =
+  /(?:PokerStars|GGPoker|Poker) Hand #|(?:Mão) (?:PokerStars|GGPoker|Poker) #|Game hand #\d+\s*-\s*Tournament #|\*{5} 888poker Hand History for Game/i;
 
 export function splitHands(text: string): string[] {
   const trimmed = text.trim();
@@ -268,9 +277,17 @@ function extractHeroCards(text: string, heroName: string | null): string[] | nul
 
 function extractBoardByStreet(text: string) {
   // Marcadores de rua permanecem em ingles mesmo no client PT-BR.
-  const flopM = text.match(/\*\*\* FLOP \*\*\*\s*\[([^\]]+)\]/i);
-  const turnM = text.match(/\*\*\* TURN \*\*\*\s*\[[^\]]+\]\s*\[([^\]]+)\]/i);
-  const riverM = text.match(/\*\*\* RIVER \*\*\*\s*\[[^\]]+\]\s*\[([^\]]+)\]/i);
+  // 888poker (RADAR-004, melhor-tentativa): "** Dealing flop ** [ Kc 7s 2h ]"
+  // em vez de "*** FLOP *** [...]" -- so' confirmado pro flop na amostra
+  // fornecida (a mao terminou ali); turn/river em "** Dealing turn/river **"
+  // com so' a carta nova entre colchetes e' uma extrapolacao por simetria
+  // com o padrao "Dealing X", NAO confirmada contra exemplo real.
+  const flopM =
+    text.match(/\*\*\* FLOP \*\*\*\s*\[([^\]]+)\]/i) ?? text.match(/\*\* Dealing flop \*\*\s*\[([^\]]+)\]/i);
+  const turnM =
+    text.match(/\*\*\* TURN \*\*\*\s*\[[^\]]+\]\s*\[([^\]]+)\]/i) ?? text.match(/\*\* Dealing turn \*\*\s*\[([^\]]+)\]/i);
+  const riverM =
+    text.match(/\*\*\* RIVER \*\*\*\s*\[[^\]]+\]\s*\[([^\]]+)\]/i) ?? text.match(/\*\* Dealing river \*\*\s*\[([^\]]+)\]/i);
   const flop = flopM ? parseCards(flopM[1]) : [];
   const turn = turnM ? parseCards(turnM[1]) : [];
   const river = riverM ? parseCards(riverM[1]) : [];
@@ -323,6 +340,25 @@ function extractStreetActions(
       continue;
     }
 
+    // 888poker (2026-09, RADAR-004): sem ":" depois do nome, e so' UM valor
+    // entre colchetes pro raise ("Hero raises [160]") -- deduzido a partir
+    // da amostra fornecida que esse valor e' o total pro qual a aposta
+    // subiu (raise-to), nao o incremento: numa mesma mao, "Player6 raises
+    // [50]" seguido de "Hero raises [160]" e depois "Player6 calls [110]"
+    // so fecha matematicamente (160-50=110) se [160] for o total, igual o
+    // "to Y" do PokerStars. So' temos o total, entao `amount` (o incremento)
+    // fica undefined de proposito -- nao temos como calcular com seguranca
+    // sem rastrear o pote inteiro, e' melhor faltar o dado do que inventar.
+    const raiseNoColonM = l.match(/^(\S+)\s+raises\s+\[\$?([\d.,]+)\]/i);
+    if (raiseNoColonM) {
+      actions.push({
+        player: raiseNoColonM[1],
+        action: "raises",
+        raiseTo: Number(raiseNoColonM[2].replace(",", "")),
+      });
+      continue;
+    }
+
     // PT-BR usa verbo diferente pra ante ("coloca ante X") vs blind ("paga
     // o small/big blind X") — alternancia cobre os dois em um so regex.
     const postM = l.match(/^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|ante)\s+\$?([\d.,]+)/i);
@@ -331,6 +367,18 @@ function extractStreetActions(
         player: postM[1],
         action: "posts",
         amount: Number(postM[3].replace(",", "")),
+      });
+      continue;
+    }
+
+    // 888poker: mesmo post de blind, mas sem ":" e valor entre colchetes
+    // ("Player8 posts small blind [10]") em vez de solto no fim da linha.
+    const postNoColonM = l.match(/^(\S+)\s+posts\s+(small blind|big blind|ante)\s+\[\$?([\d.,]+)\]/i);
+    if (postNoColonM) {
+      actions.push({
+        player: postNoColonM[1],
+        action: "posts",
+        amount: Number(postNoColonM[3].replace(",", "")),
       });
       continue;
     }
@@ -348,6 +396,20 @@ function extractStreetActions(
       });
       continue;
     }
+
+    // 888poker: mesmas acoes genericas (fold/check/call/bet), sem ":" e
+    // valor entre colchetes em vez de solto ("Player6 calls [110]",
+    // "Hero bets [100]", "Player6 folds" sem valor nenhum).
+    const genericNoColonM = l.match(/^(\S+)\s+(folds|checks|calls|bets|allin|all-in)\s*(?:\[\$?([\d.,]+)\])?/i);
+    if (genericNoColonM) {
+      const canonical = ACTION_WORD_MAP[genericNoColonM[2].toLowerCase()] ?? genericNoColonM[2].toLowerCase();
+      actions.push({
+        player: genericNoColonM[1],
+        action: canonical,
+        amount: genericNoColonM[3] ? Number(genericNoColonM[3].replace(",", "")) : undefined,
+      });
+      continue;
+    }
   }
   return { name: streetName, actions };
 }
@@ -359,7 +421,13 @@ function extractPot(text: string): number | null {
 
 function extractWinner(text: string): string | null {
   const m = text.match(/(\S+) (?:collected|recebeu) \$?[\d.,]+/i);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // 888poker (RADAR-004): valor entre colchetes em vez de solto
+  // ("Hero collected [ 350 ]") -- a amostra fornecida nao tem linha
+  // "Total pot" nenhuma, entao extractPot fica null nesse formato (so'
+  // temos o valor coletado pelo vencedor, nao o pote total antes do rake).
+  const bracketM = text.match(/(\S+) collected \[\s*\$?([\d.,]+)\s*\]/i);
+  return bracketM ? bracketM[1] : null;
 }
 
 // PokerStars escreve essa linha SO na ultima mao de um torneio, quando
@@ -399,7 +467,11 @@ function extractStakes(text: string): string | null {
   // aceitar esse grupo opcional o "(" extra quebrava o casamento e
   // stakes/blinds saiam null em qualquer mao de torneio com ante.
   const m = text.match(/\(\$?([\d.,]+\/\$?[\d.,]+)(?:\([\d.,]+\))?\)/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // 888poker (RADAR-004): blinds ficam SOLTOS no cabecalho ("... Blinds
+  // 10/20 - Tournament #..."), nao dentro de parenteses.
+  const blindsM = text.match(/Blinds (\d+\/\d+)/i);
+  return blindsM ? blindsM[1] : null;
 }
 
 // FIX (2026-09, amostra real GGPoker capturada): "Level7(200/400(60))" --
@@ -409,8 +481,11 @@ function extractStakes(text: string): string | null {
 // mao de torneio com ante (a maioria).
 function extractBlinds(text: string): { smallBlind: number | null; bigBlind: number | null } {
   const m = text.match(/\(\$?([\d.,]+)\/\$?([\d.,]+)(?:\([\d.,]+\))?\)/);
-  if (!m) return { smallBlind: null, bigBlind: null };
-  return { smallBlind: Number(m[1].replace(",", "")), bigBlind: Number(m[2].replace(",", "")) };
+  if (m) return { smallBlind: Number(m[1].replace(",", "")), bigBlind: Number(m[2].replace(",", "")) };
+  // 888poker: ver comentario equivalente em extractStakes.
+  const blindsM = text.match(/Blinds (\d+)\/(\d+)/i);
+  if (blindsM) return { smallBlind: Number(blindsM[1]), bigBlind: Number(blindsM[2]) };
+  return { smallBlind: null, bigBlind: null };
 }
 
 function extractFormat(text: string): string | null {
@@ -442,7 +517,14 @@ function extractShowdown(text: string): ParsedShowdown[] {
 // line usa "#X," (virgula, nao dois-pontos), entao nao ha colisao.
 function extractHandId(text: string): string | null {
   const m = text.match(/#(\w+):/);
-  return m ? m[1] : null;
+  if (m) return m[1];
+  // PartyPoker: "Game hand #1054329871 - Tournament #3482019, ..." -- sem
+  // ":" depois do numero da mao (usa " - " em vez disso).
+  const partyM = text.match(/Game hand #(\w+)/i);
+  if (partyM) return partyM[1];
+  // 888poker: "***** 888poker Hand History for Game 981230491 *****".
+  const eightM = text.match(/888poker Hand History for Game (\w+)/i);
+  return eightM ? eightM[1] : null;
 }
 
 function extractDate(text: string): string | null {
@@ -748,14 +830,40 @@ function extractSeats(
   heroName: string | null
 ): { seats: ParsedSeat[]; buttonSeat: number | null; maxSeats: number | null } {
   const tableM = text.match(/(?:Table|Mesa) '[^']+' (\d+)-max (?:Seat|Lugar) #(\d+) (?:is the button|é o botão)/i);
-  const maxSeats = tableM ? Number(tableM[1]) : null;
-  const buttonSeat = tableM ? Number(tableM[2]) : null;
+  let maxSeats = tableM ? Number(tableM[1]) : null;
+  let buttonSeat = tableM ? Number(tableM[2]) : null;
+
+  // 888poker (RADAR-004): nao tem a linha combinada "Table 'X' N-max Seat
+  // #Y is the button" -- o tamanho da mesa vem do cabecalho ("Table 1
+  // 9-max") e o botao numa linha propria ("Seat 5 is the button").
+  if (buttonSeat === null) {
+    const maxM = text.match(/(\d+)-max/i);
+    if (maxM) maxSeats = Number(maxM[1]);
+    const btnM = text.match(/^Seat (\d+) is the button/im);
+    if (btnM) buttonSeat = Number(btnM[1]);
+  }
+
+  // FIX (2026-09-14, RADAR-004): "in chips"/"em fichas" virou opcional
+  // logo abaixo pra aceitar PartyPoker/888poker (stack solto entre
+  // parenteses, sem sufixo) -- mas isso faz o mesmo regex tambem casar com
+  // as linhas "Seat X: Nome (button) folded..."/"Seat X: Nome (big blind)
+  // collected (540)" da secao de RESUMO no fim da mao (mesmo formato
+  // "Seat N: Nome (...)", sem "in chips", só que com outro conteúdo
+  // dentro do parenteses). Por isso a busca fica restrita ao trecho ANTES
+  // de "*** HOLE CARDS ***"/"** Dealing down cards **" -- e' onde a
+  // listagem de assentos de verdade sempre vive, e o resumo nunca aparece
+  // antes disso.
+  const holeCardsIdx = text.search(/\*\*\* (?:HOLE CARDS|CARTAS DA MÃO) \*\*\*|\*\* Dealing down cards \*\*/i);
+  const seatingSection = holeCardsIdx === -1 ? text : text.slice(0, holeCardsIdx);
 
   const seats: ParsedSeat[] = [];
+  // "in chips"/"em fichas" agora OPCIONAL -- PartyPoker ("Seat 1: Player1
+  // (1,500)") e 888poker ("Seat 1: Player1 ( 1,500 )") listam o stack sem
+  // esse sufixo, so' entre parenteses (com ou sem espaco interno).
   const seatRegex =
-    /^(?:Seat|Lugar) (\d+): (.+?) \(\$?([\d.,]+) (?:in chips|em fichas)(?:,\s*Bounty (?:of|de) \$ ?([\d.,]+))?\)/gim;
+    /^(?:Seat|Lugar) (\d+): (.+?) \(\s*\$?([\d.,]+)\s*(?:in chips|em fichas)?(?:,\s*Bounty (?:of|de) \$ ?([\d.,]+))?\s*\)/gim;
   let m: RegExpExecArray | null;
-  while ((m = seatRegex.exec(text)) !== null) {
+  while ((m = seatRegex.exec(seatingSection)) !== null) {
     const seatNumber = Number(m[1]);
     seats.push({
       seatNumber,
@@ -783,6 +891,13 @@ function extractPreambleBlindActions(text: string): ParsedAction[] {
     const postM = l.match(/^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|ante)\s+\$?([\d.,]+)/i);
     if (postM) {
       actions.push({ player: postM[1], action: "posts", amount: Number(postM[3].replace(",", "")) });
+      continue;
+    }
+    // 888poker (RADAR-004): mesmo post, sem ":" e valor entre colchetes --
+    // ver comentario equivalente em extractStreetActions.
+    const postNoColonM = l.match(/^(\S+)\s+posts\s+(small blind|big blind|ante)\s+\[\$?([\d.,]+)\]/i);
+    if (postNoColonM) {
+      actions.push({ player: postNoColonM[1], action: "posts", amount: Number(postNoColonM[3].replace(",", "")) });
     }
   }
   return actions;
@@ -795,11 +910,16 @@ export function parseHand(rawText: string): ParsedHand {
   const { seats, buttonSeat, maxSeats } = extractSeats(rawText, heroName);
   const { smallBlind, bigBlind } = extractBlinds(rawText);
 
-  const holeCardsMarker = /\*\*\* (?:HOLE CARDS|CARTAS DA MÃO) \*\*\*/i;
-  const flopMarker = /\*\*\* FLOP \*\*\*/i;
-  const turnMarker = /\*\*\* TURN \*\*\*/i;
-  const riverMarker = /\*\*\* RIVER \*\*\*/i;
-  const showdownMarker = /\*\*\* SHOW ?DOWN \*\*\*/i;
+  // 888poker (RADAR-004, melhor-tentativa): marcadores de rua com 2
+  // asteriscos e verbo "Dealing" em vez de 3 asteriscos ("** Dealing down
+  // cards **"/"** Dealing flop **" vs "*** HOLE CARDS ***"/"*** FLOP ***").
+  // So' "hole cards" e "flop" confirmados contra a amostra fornecida;
+  // turn/river/showdown sao extrapolados por simetria, nao confirmados.
+  const holeCardsMarker = /\*\*\* (?:HOLE CARDS|CARTAS DA MÃO) \*\*\*|\*\* Dealing down cards \*\*/i;
+  const flopMarker = /\*\*\* FLOP \*\*\*|\*\* Dealing flop \*\*/i;
+  const turnMarker = /\*\*\* TURN \*\*\*|\*\* Dealing turn \*\*/i;
+  const riverMarker = /\*\*\* RIVER \*\*\*|\*\* Dealing river \*\*/i;
+  const showdownMarker = /\*\*\* SHOW ?DOWN \*\*\*|\*\* Dealing showdown \*\*/i;
 
   const streets: ParsedStreet[] = [];
   const blindActions = extractPreambleBlindActions(rawText);

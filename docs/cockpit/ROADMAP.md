@@ -83,7 +83,7 @@ motor).
 | RADAR-001 | Painel in-app (RadarPanel + gating) | 🟢 | 🟡 P2 | — |
 | RADAR-002 | Agente desktop (repo `pokersync-agent`) | 🟠 | 🟠 P1 | validar contra instalações reais |
 | RADAR-003 | Sync automático (`/api/agent/sync`) | 🟠 | 🟠 P1 | confirmar tráfego real |
-| RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | parser dedicado PartyPoker/888poker |
+| RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | validar parser contra hand history real de cada sala |
 
 *Nota: o código do agente desktop em si (Rust/Tauri) vive no repositório
 `pokersync-agent`, que não está anexado a esta sessão — os itens acima
