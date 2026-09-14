@@ -891,12 +891,19 @@ export default function BankrollPage() {
         </div>
       )}
 
-      <div className="mt-6 grid grid-cols-1 gap-4 lg:grid-cols-2">
+      {/* items-start (era stretch, o default do grid) -- as duas colunas
+          tinham altura forcada igual (min-h-[380px] nos dois Paineis) so'
+          pra ficarem visualmente parelhas, mas o conteudo real de cada
+          uma tem tamanho bem diferente: o grafico (SVG com aspect-ratio
+          fixo) sobra bastante espaco em branco embaixo quando esticado
+          pra bater com a altura do heatmap. Cada card agora tem so' a
+          altura que o proprio conteudo pede. */}
+      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
         <Painel
           titulo="Evolução da banca"
           icone={<LineChart size={14} className="icon-glow text-evolution" />}
           hint="Seu saldo acumulado ao longo do tempo, somando o resultado de cada sessão."
-          className="flex h-full min-h-[380px] flex-col"
+          className="flex flex-col"
           acao={
             <div className="flex flex-wrap items-center gap-2">
               <FilterPopover label="Filtrar por plataforma" active={isPlatformFiltered}>
@@ -982,11 +989,9 @@ export default function BankrollPage() {
           titulo="Consistência de volume"
           icone={<CalendarDays size={14} className="icon-glow text-evolution" />}
           hint="Mostra em quais dias você mais jogou — quanto mais escuro, mais sessões naquele dia."
-          className="flex h-full min-h-[380px] flex-col"
+          className="flex flex-col"
         >
-          <div className="flex flex-1 items-center">
-            <VolumeHeatmap activity={activity} currency={currencyFilter} />
-          </div>
+          <VolumeHeatmap activity={activity} currency={currencyFilter} />
         </Painel>
       </div>
 
@@ -1401,7 +1406,7 @@ export default function BankrollPage() {
                 Instale o Radar PokerSync no seu computador pra importar mãos e torneios automaticamente — hoje o
                 único jeito de trazer dados pra cá sem ele é colar hand history na mão em{" "}
                 <Link href="/performance" className="text-training hover:underline">
-                  Player Evolution → Importar
+                  Performance → Importar
                 </Link>
                 .
               </p>
@@ -2256,15 +2261,16 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
 
   return (
     <div className="mt-3 w-full">
-      {/* justify-start, nao justify-center: centralizar um conteudo mais
-          largo que o container dentro de uma faixa com overflow-x-auto
-          deixa metade cortada dos dois lados sem nenhuma pista visivel
-          de que da' pra rolar -- parecia "quebrado" no celular. Celula
-          menor abaixo de sm pra caber mais semanas sem precisar rolar
-          tanto. */}
-      <div className="flex justify-start gap-[4px] overflow-x-auto pb-1 sm:gap-[8px]">
+      {/* Grid com colunas fluidas (fracao do container, nao mais px fixo)
+          -- pedido explicito: "nao quero barra de rolagem no heatmap".
+          20 semanas fixas nunca cabiam num card normal em px fixo (18-32px
+          por celula), forcando overflow-x-auto o tempo todo. Cada semana
+          agora e' uma fracao igual da largura disponivel; a celula ocupa
+          100% dessa coluna com aspect-square, entao ela encolhe sozinha
+          pra caber sem cortar nem rolar. */}
+      <div className="grid gap-[3px] sm:gap-[6px]" style={{ gridTemplateColumns: `repeat(${weeksCount}, minmax(0, 1fr))` }}>
         {weeks.map((week, wi) => (
-          <div key={wi} className="flex flex-col gap-[4px] sm:gap-[8px]">
+          <div key={wi} className="flex min-w-0 flex-col gap-[3px] sm:gap-[6px]">
             {week.map(({ date, d }) => {
               const a = activity[date];
               const future = d > today;
@@ -2273,7 +2279,7 @@ function VolumeHeatmap({ activity, currency = "BRL" }: { activity: Record<string
                   key={date}
                   onMouseEnter={() => !future && setHoverKey(date)}
                   onMouseLeave={() => setHoverKey((k) => (k === date ? null : k))}
-                  className="size-[18px] shrink-0 rounded-[4px] transition-transform duration-100 hover:scale-110 sm:size-[32px] sm:rounded-[6px]"
+                  className="aspect-square w-full min-w-0 rounded-[3px] transition-transform duration-100 hover:scale-110 sm:rounded-[6px]"
                   style={{ background: future ? "transparent" : cellColor(a) }}
                   title={a ? `${date} · ${a.n} sessão(ões) · ${fmtSigned(a.net)}` : date}
                 />

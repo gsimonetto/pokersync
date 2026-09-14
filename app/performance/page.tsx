@@ -213,7 +213,7 @@ export default function PerformancePage() {
                     )}
                     {tab === "radar" &&
                       (radarUnlocked ? (
-                        <RadarPanel />
+                        <RadarPanel onReset={loadAll} />
                       ) : (
                         <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-xl border border-dashed border-hairline p-8 text-center">
                           <div className="grid size-12 place-items-center rounded-xl border border-hairline bg-elevated text-muted">

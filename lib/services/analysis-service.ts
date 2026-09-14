@@ -566,6 +566,35 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
 // colada manualmente. Duas consultas em vez de embed+!inner porque
 // PostgREST devolveria uma linha de hand_sessions por hand_review
 // batendo no filtro (duplicando sessão com mais de uma mão elegível).
+// ============================================================
+// Resetar Performance — pedido explícito: "se o jogador quiser começar
+// do zero, ele tem essa escolha". Apaga só hand_tags (a fonte crua de
+// TODAS as métricas computadas neste arquivo) — as mãos continuam
+// existindo no Revisor de Mãos e os torneios na Gestão de Banca, então
+// esse reset é só do que o Performance mostra, não um apagão geral.
+// Junto, limpa profiles.radar_import_scope pra o Radar voltar a
+// perguntar o escopo de importação (pedido explícito: "volta a
+// perguntar" — combina com "começar do zero", especialmente se o
+// jogador quer mudar de ideia sobre importar histórico completo ou não).
+//
+// hand_tags NÃO fica "morto" pra sempre: qualquer edição futura na
+// mesma mão em hand_reviews (ex: editar marcador, salvar spot) dispara
+// de novo o trigger hand_reviews_sync_tags_trigger → sync_hand_tags(),
+// recriando a linha daquela mão específica. Isso é esperado (mesmo
+// mecanismo que já existe pro resto do produto), não um bug do reset.
+export async function resetPerformanceStats(): Promise<void> {
+  const supabase = createClient();
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!userData.user) throw new Error("NAO_AUTENTICADO");
+
+  const { error: eTags } = await supabase.from("hand_tags").delete().eq("user_id", userData.user.id);
+  if (eTags) throw eTags;
+
+  const { error: eProfile } = await supabase.from("profiles").update({ radar_import_scope: null }).eq("id", userData.user.id);
+  if (eProfile) throw eProfile;
+}
+
 export async function fetchTournamentSessions(): Promise<HandSession[]> {
   const supabase = createClient();
   const [{ data, error }, { data: importedReviews, error: eReviews }] = await Promise.all([

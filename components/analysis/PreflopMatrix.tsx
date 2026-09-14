@@ -150,6 +150,13 @@ export function PreflopPanel({
                     tone: toneFromRange(metrics.fold_to_3bet_pct, ref.foldTo3bet.min, ref.foldTo3bet.max),
                     bar: statBar(metrics.fold_to_3bet_pct, ref.foldTo3bet.min, ref.foldTo3bet.max, 100),
                     hint: "Frequência que você desiste depois de ser 3-betado, quando você tinha aberto o pote.",
+                    coaching: rangeCoaching(
+                      metrics.fold_to_3bet_pct,
+                      ref.foldTo3bet.min,
+                      ref.foldTo3bet.max,
+                      "Você quase não desiste depois de levar um 3-bet quando tinha aberto o pote. Continuar demais nessa situação deixa sua faixa de mãos previsível e cara de jogar.",
+                      "Você desiste demais depois de levar um 3-bet quando tinha aberto o pote. Jogadores atentos podem passar a te atacar com um 3-bet mais fraco, sabendo que você solta a mão fácil."
+                    ),
                     category: "defesa",
                   },
                   {
@@ -180,6 +187,13 @@ export function PreflopPanel({
                     tone: toneFromRange(metrics.fold_to_steal_sb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max),
                     bar: statBar(metrics.fold_to_steal_sb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max, 100),
                     hint: "Frequência que você desiste no SB contra um open-raise do BTN.",
+                    coaching: rangeCoaching(
+                      metrics.fold_to_steal_sb_vs_btn_pct,
+                      ref.foldToSteal.min,
+                      ref.foldToSteal.max,
+                      "Você quase não desiste no SB contra um open-raise do BTN. Fora de posição contra alguém tentando roubar o pote, continuar demais custa caro no resto da mão.",
+                      "Você desiste demais no SB contra um open-raise do BTN. O BTN pode estar roubando seu blind com qualquer coisa, sabendo que você quase sempre solta."
+                    ),
                     category: "posicional",
                   },
                   {
@@ -189,6 +203,13 @@ export function PreflopPanel({
                     tone: toneFromRange(metrics.fold_to_steal_bb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max),
                     bar: statBar(metrics.fold_to_steal_bb_vs_btn_pct, ref.foldToSteal.min, ref.foldToSteal.max, 100),
                     hint: "Frequência que você desiste no BB contra um open-raise do BTN.",
+                    coaching: rangeCoaching(
+                      metrics.fold_to_steal_bb_vs_btn_pct,
+                      ref.foldToSteal.min,
+                      ref.foldToSteal.max,
+                      "Você quase não desiste no BB contra um open-raise do BTN. Já com parte do blind investido, defender demais ainda te deixa fora de posição em mãos fracas no resto da mão.",
+                      "Você desiste demais no BB contra um open-raise do BTN. Com parte do blind já investido, esse é o ponto onde mais vale defender — o BTN pode estar roubando com qualquer coisa."
+                    ),
                     category: "posicional",
                   },
                   {
@@ -198,6 +219,13 @@ export function PreflopPanel({
                     tone: toneFromRange(metrics.fold_to_steal_bb_vs_sb_pct, ref.foldToSteal.min, ref.foldToSteal.max),
                     bar: statBar(metrics.fold_to_steal_bb_vs_sb_pct, ref.foldToSteal.min, ref.foldToSteal.max, 100),
                     hint: "Frequência que você desiste no BB contra um open-raise do SB.",
+                    coaching: rangeCoaching(
+                      metrics.fold_to_steal_bb_vs_sb_pct,
+                      ref.foldToSteal.min,
+                      ref.foldToSteal.max,
+                      "Você quase não desiste no BB contra um open-raise do SB. Continuar demais te deixa fora de posição em mãos fracas no resto da mão.",
+                      "Você desiste demais no BB contra um open-raise do SB. O SB pode estar roubando seu blind com qualquer coisa, sabendo que você quase sempre solta."
+                    ),
                     category: "posicional",
                   },
                   {

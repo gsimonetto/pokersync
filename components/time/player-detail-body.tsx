@@ -372,7 +372,7 @@ function AbaPerformance({ stats }: { stats: PlayerEvolutionStats | null }) {
           {stats.hands} mão{stats.hands === 1 ? "" : "s"} etiquetada{stats.hands === 1 ? "" : "s"}
         </span>
       </div>
-      <p className="mt-1 text-sm text-muted">Mesmas métricas do Player Evolution, calculadas só com as mãos deste jogador.</p>
+      <p className="mt-1 text-sm text-muted">Mesmas métricas do Performance, calculadas só com as mãos deste jogador.</p>
 
       <ul className="mt-4 divide-y divide-hairline">
         {linhas.map((l) => (

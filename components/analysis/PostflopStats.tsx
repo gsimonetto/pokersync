@@ -153,7 +153,20 @@ export function PostflopTab({
             icon: Target,
             tone: toneFromRange(metrics.cbet_turn_pct, ref.cbetTurn.min, ref.cbetTurn.max),
             bar: statBar(metrics.cbet_turn_pct, ref.cbetTurn.min, ref.cbetTurn.max, 100),
-            hint: "Frequência de apostar no turn quando você já tinha feito c-bet no flop.",
+            // Correcao (auditoria): o texto antigo dizia "quando voce ja
+            // tinha feito c-bet no flop", mas cbet_turn no banco NAO exige
+            // isso -- so' exige ter sido o ultimo a subir no preflop E ser
+            // o primeiro a apostar no turn (pode ter chegado ali com o
+            // flop checado por todo mundo). Texto ajustado pra bater com o
+            // que o numero mede de verdade.
+            hint: "Frequência que você aposta primeiro no turn quando foi o último a subir no preflop, independente do que aconteceu no flop.",
+            coaching: rangeCoaching(
+              metrics.cbet_turn_pct,
+              ref.cbetTurn.min,
+              ref.cbetTurn.max,
+              "Quando você foi o último a subir no preflop e a mão chega ao turn, você quase não aposta primeiro. Está desistindo de manter a pressão numa mão em que ainda tem a iniciativa.",
+              "Você aposta primeiro no turn com frequência alta demais quando foi o último a subir no preflop. Fica fácil de perceber, e o adversário passa a te desafiar de volta."
+            ),
             category: "agressao",
           },
           {
@@ -162,7 +175,17 @@ export function PostflopTab({
             icon: Target,
             tone: toneFromRange(metrics.cbet_river_pct, ref.cbetRiver.min, ref.cbetRiver.max),
             bar: statBar(metrics.cbet_river_pct, ref.cbetRiver.min, ref.cbetRiver.max, 100),
-            hint: "Frequência de apostar no river quando você já vinha apostando flop e turn.",
+            // Mesma correção do Turn C-Bet acima -- não exige ter apostado
+            // flop/turn antes, só ser o último a subir no preflop e o
+            // primeiro a apostar no river.
+            hint: "Frequência que você aposta primeiro no river quando foi o último a subir no preflop, independente do que aconteceu no flop/turn.",
+            coaching: rangeCoaching(
+              metrics.cbet_river_pct,
+              ref.cbetRiver.min,
+              ref.cbetRiver.max,
+              "Quando você foi o último a subir no preflop e a mão chega ao river, você quase não fecha a aposta. Está deixando de cobrar valor ou de completar o blefe numa mão em que ainda tem a iniciativa.",
+              "Você aposta o river com frequência alta demais quando foi o último a subir no preflop. Um adversário atento vai passar a te desafiar de volta com mais frequência."
+            ),
             category: "agressao",
           },
           {
@@ -172,6 +195,13 @@ export function PostflopTab({
             tone: toneFromRange(metrics.fold_to_cbet_turn_pct, ref.foldToCbetTurn.min, ref.foldToCbetTurn.max),
             bar: statBar(metrics.fold_to_cbet_turn_pct, ref.foldToCbetTurn.min, ref.foldToCbetTurn.max, 100),
             hint: "Frequência que você desiste diante de um c-bet de turn adversário.",
+            coaching: rangeCoaching(
+              metrics.fold_to_cbet_turn_pct,
+              ref.foldToCbetTurn.min,
+              ref.foldToCbetTurn.max,
+              "Você paga demais quando o adversário aposta no turn. Desista mais quando as cartas da mesa não ajudam a mão que você tinha.",
+              "Você desiste demais quando o adversário aposta no turn. Isso é fácil de perceber, e o adversário passa a apostar mesmo sem ter nada."
+            ),
             category: "defesa",
           },
           {
@@ -181,6 +211,13 @@ export function PostflopTab({
             tone: toneFromRange(metrics.fold_to_cbet_river_pct, ref.foldToCbetRiver.min, ref.foldToCbetRiver.max),
             bar: statBar(metrics.fold_to_cbet_river_pct, ref.foldToCbetRiver.min, ref.foldToCbetRiver.max, 100),
             hint: "Frequência que você desiste diante de um c-bet de river adversário.",
+            coaching: rangeCoaching(
+              metrics.fold_to_cbet_river_pct,
+              ref.foldToCbetRiver.min,
+              ref.foldToCbetRiver.max,
+              "Você paga demais quando o adversário aposta no river. Nessa altura da mão já dá pra ler melhor o que ele está representando — desista mais quando não bate.",
+              "Você desiste demais quando o adversário aposta no river. O adversário percebe isso e passa a blefar mais nessa situação."
+            ),
             category: "defesa",
           },
         ]}
@@ -220,6 +257,13 @@ export function PostflopTab({
             tone: toneFromRange(metrics.donk_bet_pct, ref.donkBet.min, ref.donkBet.max),
             bar: statBar(metrics.donk_bet_pct, ref.donkBet.min, ref.donkBet.max, 20),
             hint: "Frequência que você aposta fora de posição sem ter sido o último agressor no preflop.",
+            coaching: rangeCoaching(
+              metrics.donk_bet_pct,
+              ref.donkBet.min,
+              ref.donkBet.max,
+              "Você quase nunca aposta fora de posição sem ter sido o último a apostar antes das cartas da mesa aparecerem. Pode estar deixando passar chances de tirar a iniciativa do adversário quando sua mão melhora.",
+              "Você aposta fora de posição sem ter sido o último agressor com frequência alta demais. Isso é incomum o bastante pra virar um padrão fácil de explorar."
+            ),
             category: "agressao",
           },
           {
@@ -229,6 +273,13 @@ export function PostflopTab({
             tone: toneFromRange(metrics.wsd_pct, ref.wsd.min, ref.wsd.max),
             bar: statBar(metrics.wsd_pct, ref.wsd.min, ref.wsd.max, 100),
             hint: "Frequência que você chega ao showdown, entre as mãos em que você viu o flop.",
+            coaching: rangeCoaching(
+              metrics.wsd_pct,
+              ref.wsd.min,
+              ref.wsd.max,
+              "Você chega pouco ao showdown entre as mãos em que viu o flop — pode estar desistindo cedo demais de mãos que ainda tinham chance.",
+              "Você chega ao showdown com frequência alta demais. Pode estar pagando demais em vez de desistir de mãos que já perderam valor."
+            ),
             category: "resultado",
           },
           {
@@ -238,6 +289,13 @@ export function PostflopTab({
             tone: toneFromRange(metrics.wsd_won_pct, ref.wsdWon.min, ref.wsdWon.max),
             bar: statBar(metrics.wsd_won_pct, ref.wsdWon.min, ref.wsdWon.max, 100),
             hint: "Frequência que você ganha o pote quando chega ao showdown.",
+            coaching: rangeCoaching(
+              metrics.wsd_won_pct,
+              ref.wsdWon.min,
+              ref.wsdWon.max,
+              "Quando você chega ao showdown, ganha pouco o pote. Isso sugere que está chegando lá com mãos fracas demais — considere desistir mais antes de chegar no showdown.",
+              "Você ganha o pote quase toda vez que chega ao showdown. Isso é sinal de que só chega lá com mãos muito fortes — pode estar blefando de menos e deixando de ganhar potes que já tinha condições de vencer sem showdown."
+            ),
             category: "resultado",
           },
         ]}
