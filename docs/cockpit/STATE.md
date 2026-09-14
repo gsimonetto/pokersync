@@ -32,20 +32,21 @@ qualquer um pode reproduzir.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC — Progresso Geral: 73%
+## POKERSYNC — Progresso Geral: 77%
 
-🟢 Main    ██████████████░░░░░░ 70%  (25 itens rastreados)
-🔵 Radar   █████████████░░░░░░░ 63%  (4 itens rastreados)
+🟢 Main    ██████████████░░░░░░ 72%  (25 itens rastreados)
+🔵 Radar   ███████████████░░░░░ 74%  (4 itens rastreados)
 🟣 Solver  █████████████████░░░ 87%  (20 itens rastreados)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## ONDE ESTAMOS?
 
-### PokerSync Main — 70% completo
+### PokerSync Main — 72% completo
 **Trabalho atual:** nenhuma frente "em progresso" ativa — o repositório
 está numa sequência de módulos concluídos (Marketplace, Conquistas,
-LGPD, segurança, Score de Evolução) sem nada pela metade.
+LGPD, segurança, Score de Evolução, Sync com agente desktop) sem nada
+pela metade.
 **Próximo:** 🔴 P0 — Pipeline pós-flop ponta a ponta (job → contrato →
 UI), porque os 5 leaks reais da base de usuários são todos pós-flop e
 sem isso o loop "leak vira treino" não fecha de verdade.
@@ -62,12 +63,13 @@ bugs graves corrigidos nesta janela, falta validar num spot real.
 **Próximo:** 🟠 P1 — validar squeeze multiway num spot real (SOLVER-016).
 **Bloqueio:** nenhum.
 
-### Radar PokerSync (addon + agente desktop) — 63% completo
-**Trabalho atual:** validar o agente desktop (Tauri/Rust, repositório
-`pokersync-agent`, fora do escopo de repositórios desta sessão) contra
-instalações reais de usuários.
-**Próximo:** 🟠 P1 — confirmar tráfego real via `/api/agent/sync` e
-suporte a PartyPoker/888poker (hoje só chegam como dado bruto).
+### Radar PokerSync (addon + agente desktop) — 74% completo
+**Trabalho atual:** primeira instalação real confirmada em 14/09/2026 —
+device Windows real (dono do produto, PokerStars) sincronizou com
+sucesso ponta a ponta, verificado direto no banco (RADAR-003/MAIN-012
+concluídos). Falta confirmar com mais usuários e mais salas.
+**Próximo:** 🟡 P2 — suporte a PartyPoker/888poker (hoje só chegam como
+dado bruto) e confirmar a instalação com outros usuários/plataformas.
 **Bloqueio:** nenhum — depende de tempo de uso real, não de código.
 
 **Nota de nomenclatura:** "Radar" não é um terceiro produto/repositório
@@ -85,8 +87,8 @@ ser auditada numa sessão com acesso a esse repositório.
 
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
 🔴 P0 — Reconstruir a UI de cEV/ICM no produto (MAIN-007 — motor pronto, falta a tela)
-🟠 P1 — Validar agente desktop (Radar) contra instalações reais
 🟠 P1 — Validar squeeze multiway num spot real (SOLVER-016)
+🟡 P2 — Confirmar agente desktop (Radar) com mais usuários/salas (PartyPoker/888poker)
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -106,6 +108,18 @@ Nenhum bloqueio ativo (ver `BLOCKERS.md`). Há 1 item em "atenção"
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## ÚLTIMA ATUALIZAÇÃO
+
+14/09/2026 — MAIN-012 e RADAR-003 (sincronização com o agente desktop)
+marcados como concluídos, com tráfego real confirmado. Verificado
+direto no banco (Supabase): device Windows real de
+gsimonetto1@gmail.com (`hand_sync_devices`, agent_version 0.1.0), um
+batch `completed` (`hand_sync_batches`: PokerStars, 196 mãos lidas, 24
+novas, 172 duplicatas, 0 erros) e as 24 mãos de fato gravadas em
+`hand_reviews` com `source='agent'`. RADAR-002 subiu de 50% pra 65%
+(scaffold validado em instalação real, mas o código Rust em si — repo
+`pokersync-agent`/`pokersync-radar` — continua não auditado
+diretamente nesta sessão). Progresso de Main pra 72%, Radar pra 74%,
+Geral pra 77%.
 
 14/09/2026 — MAIN-011 (Score de evolução consolidado) marcado como
 concluído. A fórmula (5 componentes ponderados) já existia pronta na
