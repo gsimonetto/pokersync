@@ -10,7 +10,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC MAIN — 67%
+## POKERSYNC MAIN — 70%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
@@ -24,7 +24,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-008 | Estatísticas de oponente | 🔵 | 🟡 P2 | desenhar schema por jogador |
 | MAIN-009 | HUD em tempo real | 🔵 | ⚪ P3 | não priorizado |
 | MAIN-010 | Plataforma para Times (core) | 🟢 | 🟡 P2 | — |
-| MAIN-011 | Score de evolução consolidado | 🟠 | 🟡 P2 | definir fórmula |
+| MAIN-011 | Score de evolução consolidado | 🟢 | 🟡 P2 | — |
 | MAIN-012 | Sync com agente desktop (schema) | 🟠 | 🟠 P1 | validar com instalações reais |
 | MAIN-013 | Hub de Evolução | 🟢 | ⚪ P3 | — |
 | MAIN-014 | Marketplace de Vagas | 🟢 | 🟡 P2 | — |

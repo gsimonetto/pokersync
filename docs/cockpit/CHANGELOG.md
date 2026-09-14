@@ -4,6 +4,25 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 14/09/2026 — MAIN-011 (Score de evolução consolidado) concluído
+
+A fórmula do score já existia pronta há tempos na view
+`player_performance_snapshot` do Supabase (5 componentes ponderados:
+técnica 25%, conhecimento 20%, disciplina 20%, performance 20%,
+consistência 15%, com neutro=50 quando falta dado), mas nunca tinha
+sido exibida em nenhuma tela do produto — só foi possível achar isso
+consultando o banco diretamente (Supabase MCP), já que não há migração
+SQL desse objeto commitada no repositório.
+
+- Criado `components/analysis/EvolutionScoreCard.tsx`: número final
+  (0-100) + nível (`nivelDoScore`) + os 5 sub-scores, cada um com hover
+  explicando de onde vem o valor (pedido explícito do dono: "intuitivo,
+  que ao passar o mouse mostre o que contempla aquele valor").
+- Conectado em `app/performance`, acima das abas — vale pra qualquer
+  aba que o jogador esteja olhando, não só uma.
+- `MAIN-011` marcado como concluído/100% no `roadmap.json`. Progresso
+  de Main recalculado de 67% pra 70%; Progresso Geral de 72% pra 73%.
+
 ## 14/09/2026 — Sincronização: painel visual e repositório estavam divergentes
 
 A auditoria automática de hoje (rotina `PokerSync Cockpit — auditoria
