@@ -31,14 +31,14 @@ README nunca foi atualizado depois de implementados — achado pela
 auditoria de 11/09/2026.
 **Frente:** Solver (documentação)
 **Prioridade:** 🟡 P2
-**Status:** 📌 PLANEJADA (baixo esforço, sem dependência)
+**Status:** ✅ INCORPORADA (feito em `SOLVER-019`, ver `roadmap.json`)
 
 ### IDEA-004 — Limpar `app/modulos/_backup-page.tsx`
 **Descrição:** arquivo de rascunho/backup encontrado no repositório do
 Main, sem uso aparente. Confirmar com o dono antes de apagar.
 **Frente:** Main (limpeza)
 **Prioridade:** ⚪ P3
-**Status:** 💡 NOVA
+**Status:** ✅ INCORPORADA (feito em `MAIN-025`, ver `roadmap.json`)
 
 ### IDEA-005 — Corrigir comentário desatualizado em `achievements-service.ts`
 **Descrição:** o comentário diz que "nenhum critério automático concede"
@@ -46,7 +46,7 @@ a conquista Founder, mas o código já concede automaticamente no
 pagamento desde um commit posterior. Comentário engana quem ler depois.
 **Frente:** Main (qualidade de código)
 **Prioridade:** ⚪ P3
-**Status:** 📌 PLANEJADA
+**Status:** ✅ INCORPORADA (feito em `MAIN-015`, ver `roadmap.json`)
 
 ### IDEA-006 — Integrações externas de dados
 **Descrição:** ideia original dos documentos de 30/07/2026, mantida:
