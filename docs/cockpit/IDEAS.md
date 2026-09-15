@@ -110,6 +110,30 @@ pós-flop em si já está coberto por MAIN-021, não duplicar):
 **Prioridade:** 🟡 P2 (avaliar depois de MAIN-021 fechar o pós-flop)
 **Status:** 🔎 AVALIAR
 
+### IDEA-011 — Stop-loss / stop-win configurável na Gestão de Banca
+**Descrição:** comparação de 15/09/2026 com os líderes de mercado de
+gestão de banca (Poker Income Tracker, Poker Bankroll Tracker,
+PokerCharts) identificou essa lacuna: hoje o módulo de banca
+(`lib/bankroll/coach.ts`) só tem um alerta fixo de downswing (10/20
+buy-ins) dentro do Coach — não existe um limite de perda/ganho que o
+próprio jogador defina por sessão/dia/semana (ex: "parar aos -3
+buy-ins hoje"). É o recurso mais citado como padrão nos concorrentes e
+o gap mais visível encontrado na auditoria.
+**Frente:** Main (Gestão de Banca)
+**Prioridade:** 🟡 P2
+**Status:** 💡 NOVA
+
+### IDEA-012 — Notificações proativas de limites de banca (stop-loss/BRM)
+**Descrição:** decorre da IDEA-011 — hoje os alertas do Coach e do BRM
+(`notifyBrmAlert()` em `bankroll-service.ts`) só aparecem quando o
+jogador abre a tela de Gestão de Banca. Concorrentes de ponta avisam em
+tempo real (push/notificação) quando um limite é atingido durante a
+sessão, não só depois. Depende de a IDEA-011 existir para ter o que
+notificar; avaliar junto.
+**Frente:** Main (Gestão de Banca / Notificações)
+**Prioridade:** 🟡 P2
+**Status:** 💡 NOVA
+
 ---
 
 ## Como usar
