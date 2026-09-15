@@ -134,6 +134,19 @@ notificar; avaliar junto.
 **Prioridade:** 🟡 P2
 **Status:** 💡 NOVA
 
+### IDEA-013 — Filtro de busca de mãos por posição, stack e resultado (incl. posição vs. posição)
+**Descrição:** comparação de 15/09/2026 do Revisor de Mãos com trackers
+de mercado (PokerTracker 4, Hold'em Manager 3, Hand2Note) identificou
+essa lacuna: hoje a busca de mãos (`revisor-fila.tsx`) só filtra por
+status, tag e sessão vinculada — não há filtro por posição, stack (ex:
+20bb) ou resultado (ganhou/perdeu/showdown). Também falta o cruzamento
+posição vs. posição (ex: "só mãos onde eu era BB contra um raise do
+BTN"), que é o nível de granularidade que permite estudar um confronto
+específico depois de identificar um leak, em vez de só posição isolada.
+**Frente:** Main (Revisor de Mãos)
+**Prioridade:** 🟡 P2
+**Status:** 💡 NOVA
+
 ---
 
 ## Como usar
