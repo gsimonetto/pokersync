@@ -216,6 +216,70 @@ processamento de pagamento.
 **Prioridade:** ⚪ N/A
 **Status:** ❌ DESCARTADA (decisão explícita do dono — não é direção do produto)
 
+### IDEA-016 — bb/100 real pra cash game no Performance
+**Descrição:** análise de 15/09/2026 do módulo Performance: o campo
+`bb_100` (a métrica padrão de mercado pra medir winrate de cash de um
+jeito comparável entre stakes) já existe no tipo de dado
+(`PlayerPerformance`), mas sempre volta `null` — nunca foi ligado a um
+cálculo real. Hoje um jogador de cash não vê essa métrica em lugar
+nenhum, só quem joga torneio tem ROI/ITM% de verdade.
+**Frente:** Main (Performance)
+**Módulo:** Performance (`MAIN-005`, `lib/services/performance-service.ts`)
+**Prioridade:** 🟡 P2
+**Status:** 💡 NOVA
+
+### IDEA-017 — Benchmark real (população ou GTO) em vez de tabela heurística fixa
+**Descrição:** análise de 15/09/2026: as faixas "min/max" que o
+Performance usa pra dizer se uma estatística (VPIP, 3-bet, C-bet etc.)
+está boa ou ruim (`PREFLOP_REFERENCE`/`POSTFLOP_REFERENCE` em
+`analysis-service.ts`) são uma tabela escrita à mão, baseada em
+material de treino genérico — o próprio código já admite que não é
+motor GTO nem dataset auditável. Concorrentes (HM3 Leak Explorer,
+EVLeakFinder) comparam com dado real de milhares de jogadores ou com
+solver GTO de verdade.
+**Frente:** Main (Performance)
+**Módulo:** Performance (`MAIN-005`, `lib/services/analysis-service.ts`)
+**Prioridade:** ⚪ P3 (depende de fonte de dado populacional ou solver — não é baixo esforço)
+**Status:** 🔎 AVALIAR
+
+### IDEA-018 — Avisar (não só esconder) quando a amostra de mãos é pequena
+**Descrição:** análise de 15/09/2026: hoje quando não há mãos
+suficientes pra confiar numa estatística, o filtro correspondente é
+simplesmente desabilitado sem nenhuma explicação
+(`AnalysisFilters.tsx`) — o jogador não entende por que a opção sumiu.
+Ferramentas de mercado mostram um aviso explícito tipo "amostra pequena
+demais, jogue mais mãos antes de confiar nesse número".
+**Frente:** Main (Performance)
+**Módulo:** Performance (`MAIN-005`, `components/analysis/AnalysisFilters.tsx`)
+**Prioridade:** 🟡 P2
+**Status:** 💡 NOVA
+
+### IDEA-019 — Religar o painel de insights automáticos e o "raio-x" de habilidade (código já existe, está desconectado)
+**Descrição:** análise de 15/09/2026 encontrou código órfão real: as
+funções `get_player_insights` (gera frases automáticas tipo "sua
+métrica X piorou") e `get_skill_breakdown` (resumo visual único de
+Preflop/Flop/Turn/River/Posição, no estilo do Leak Buster) já existem
+prontas no backend (`lib/services/performance-service.ts`), mas não são
+chamadas em nenhuma tela do app hoje — ficaram desconectadas. É
+provavelmente o gap mais barato de fechar dos 5 encontrados nesta
+auditoria, porque não precisa construir nada novo, só ligar o que já
+foi feito.
+**Frente:** Main (Performance)
+**Módulo:** Performance (`MAIN-005`/`MAIN-011`, `lib/services/performance-service.ts`)
+**Prioridade:** 🟢 P1 (baixo esforço, alto valor — código pronto)
+**Status:** 💡 NOVA
+
+### IDEA-020 — Filtros por período (data), plataforma/sala e stake no Performance
+**Descrição:** análise de 15/09/2026: hoje o Performance filtra por
+modalidade, profundidade de stack, posição e ação pré-flop, mas não dá
+pra filtrar por data (ex: "só os últimos 30 dias"), por sala/plataforma
+(ex: "só PokerStars"), nem por stake como texto — padrão básico em
+qualquer tracker de mercado.
+**Frente:** Main (Performance)
+**Módulo:** Performance (`MAIN-005`, `components/analysis/AnalysisFilters.tsx`)
+**Prioridade:** 🟡 P2
+**Status:** 💡 NOVA
+
 ---
 
 ## Como usar
