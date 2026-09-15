@@ -145,7 +145,8 @@ sessão, não só depois. Depende de a IDEA-011 existir para ter o que
 notificar; avaliar junto.
 **Frente:** Main (Gestão de Banca / Notificações)
 **Módulo:** Gestor de Banca (`MAIN-001`) — consome o sistema de
-notificações que hoje só existe no Hub de Evolução (`MAIN-013`)
+notificações (`lib/services/notification-service.ts`), não o Hub de
+Evolução
 **Prioridade:** 🟡 P2
 **Status:** 💡 NOVA
 
