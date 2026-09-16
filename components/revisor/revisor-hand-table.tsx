@@ -398,12 +398,12 @@ export function RevisorHandTable({
     try {
       const outcome = await computeHandEv(reviewId);
       if (!outcome.ok || !outcome.computed) {
-        setEvError(outcome.reason || "Não foi possível calcular.");
+        setEvError(outcome.message || "Não foi possível calcular agora.");
       } else if (outcome.result) {
         setEvResult(outcome.result);
       }
-    } catch (e) {
-      setEvError(e instanceof Error ? e.message : "Erro ao calcular.");
+    } catch {
+      setEvError("Não foi possível calcular agora. Verifique sua conexão e tente de novo.");
     } finally {
       setEvLoading(false);
     }
