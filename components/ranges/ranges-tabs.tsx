@@ -1,7 +1,7 @@
 "use client";
 
 import Link from "next/link";
-import { Layers, GitBranch, Calculator, BookOpen, Users, NotebookPen } from "lucide-react";
+import { Layers, Calculator, BookOpen, Users } from "lucide-react";
 import { MobileTabsMenu } from "@/components/ui/mobile-tabs-menu";
 
 type TabKey = "ranges" | "arvores" | "biblioteca" | "journal" | "time" | "equidade";
