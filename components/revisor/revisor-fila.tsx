@@ -279,8 +279,8 @@ export function RevisorFila({
       if (qErr) throw qErr;
       const min = advStackMin.trim() ? Number(advStackMin) : null;
       const max = advStackMax.trim() ? Number(advStackMax) : null;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const rows: ReviewListItem[] = (data ?? [])
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .filter((r: any) => {
           if (advAllInOnly && !heroWentAllIn(r.parsed_data)) return false;
           if (min !== null || max !== null) {
@@ -291,8 +291,10 @@ export function RevisorFila({
           }
           return true;
         })
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
         .map((r: any) => ({
           ...r,
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
           tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
           thumb: r.hand_review_images?.[0]?.storage_path || null,
         }));
