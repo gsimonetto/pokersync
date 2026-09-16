@@ -29,7 +29,7 @@ export async function POST(request: Request) {
   const {
     data: { user },
   } = await supabase.auth.getUser();
-  if (!user) return Response.json({ ok: false, error: "Sessão expirada." }, { status: 401 });
+  if (!user) return Response.json({ ok: false, code: "unauthenticated", error: "Sessão expirada." }, { status: 401 });
 
   // Cada chamada aqui repassa custo de computação pro motor externo
   // (pokersync-solver) -- limite por usuário evita um clique repetido
@@ -41,20 +41,29 @@ export async function POST(request: Request) {
   try {
     body = await request.json();
   } catch {
-    return Response.json({ ok: false, error: "JSON inválido." }, { status: 400 });
+    return Response.json({ ok: false, code: "bad_request", error: "JSON inválido." }, { status: 400 });
   }
-  if (!body.handReviewId) return Response.json({ ok: false, error: "handReviewId ausente." }, { status: 400 });
+  if (!body.handReviewId)
+    return Response.json({ ok: false, code: "bad_request", error: "handReviewId ausente." }, { status: 400 });
 
   const { data: hr, error: eHr } = await supabase
     .from("hand_reviews")
     .select("id, parsed_data, hand_session_id")
     .eq("id", body.handReviewId)
     .single();
-  if (eHr || !hr) return Response.json({ ok: false, error: "Mão não encontrada." }, { status: 404 });
+  if (eHr || !hr) return Response.json({ ok: false, code: "not_found", error: "Mão não encontrada." }, { status: 404 });
 
+  // `code` aqui e' o que o cliente usa pra mostrar uma mensagem amigavel
+  // (ver friendlyEvMessage em hand-ev-service.ts) -- `reason` continua
+  // existindo com o texto tecnico original, so' pra log/debug.
   const parsed = hr.parsed_data as { kind?: string } | null;
   if (!parsed || parsed.kind !== "parsed") {
-    return Response.json({ ok: true, eligible: false, reason: "Mão sem hand history estruturada." });
+    return Response.json({
+      ok: true,
+      eligible: false,
+      code: "not_parsed",
+      reason: "Mão sem hand history estruturada.",
+    });
   }
 
   const confrontation = findEligibleAllInConfrontation(parsed as unknown as ParsedHand);
@@ -62,12 +71,19 @@ export async function POST(request: Request) {
     return Response.json({
       ok: true,
       eligible: false,
+      code: "not_eligible",
       reason: "Não é um all-in preflop com as mãos de todos os envolvidos mostradas no showdown — fora do escopo do cálculo hoje.",
     });
   }
 
   if (!hr.hand_session_id) {
-    return Response.json({ ok: true, eligible: true, computed: false, reason: "Mão não está vinculada a um torneio." });
+    return Response.json({
+      ok: true,
+      eligible: true,
+      computed: false,
+      code: "no_session",
+      reason: "Mão não está vinculada a um torneio.",
+    });
   }
 
   const { data: session } = await supabase
@@ -76,7 +92,13 @@ export async function POST(request: Request) {
     .eq("id", hr.hand_session_id)
     .single();
   if (!session?.tournament_id_ps) {
-    return Response.json({ ok: true, eligible: true, computed: false, reason: "Torneio sem tournament_id_ps identificado." });
+    return Response.json({
+      ok: true,
+      eligible: true,
+      computed: false,
+      code: "no_tournament_id",
+      reason: "Torneio sem tournament_id_ps identificado.",
+    });
   }
 
   const { data: payout } = await supabase
@@ -90,6 +112,7 @@ export async function POST(request: Request) {
       ok: true,
       eligible: true,
       computed: false,
+      code: "no_payouts",
       reason: "Sem estrutura de premiação cadastrada pra esse torneio — cadastre na aba Torneios antes de calcular.",
     });
   }
@@ -102,6 +125,7 @@ export async function POST(request: Request) {
       ok: true,
       eligible: true,
       computed: false,
+      code: "solver_not_configured",
       reason: "Motor GTO ainda não configurado neste ambiente (SOLVER_API_URL/SOLVER_API_KEY ausentes).",
     });
   }
@@ -137,11 +161,17 @@ export async function POST(request: Request) {
     });
     if (!res.ok) {
       const detail = await res.text().catch(() => "");
-      return Response.json({ ok: false, error: `Solver retornou ${res.status}: ${detail}` }, { status: 502 });
+      return Response.json(
+        { ok: false, code: "solver_http_error", error: `Solver retornou ${res.status}: ${detail}` },
+        { status: 502 }
+      );
     }
     solverResult = await res.json();
   } catch (e) {
-    return Response.json({ ok: false, error: e instanceof Error ? e.message : "Falha ao chamar o solver." }, { status: 502 });
+    return Response.json(
+      { ok: false, code: "solver_unreachable", error: e instanceof Error ? e.message : "Falha ao chamar o solver." },
+      { status: 502 }
+    );
   }
 
   const { data: saved, error: eSave } = await supabase
@@ -163,7 +193,7 @@ export async function POST(request: Request) {
     )
     .select()
     .single();
-  if (eSave) return Response.json({ ok: false, error: eSave.message }, { status: 500 });
+  if (eSave) return Response.json({ ok: false, code: "save_failed", error: eSave.message }, { status: 500 });
 
   return Response.json({ ok: true, eligible: true, computed: true, result: saved });
 }

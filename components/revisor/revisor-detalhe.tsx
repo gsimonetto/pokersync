@@ -379,15 +379,13 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
     setEvError("");
     try {
       const outcome = await computeHandEv(reviewId);
-      if (!outcome.ok) {
-        setEvError(outcome.reason || "Erro ao calcular.");
-      } else if (!outcome.computed) {
-        setEvError(outcome.reason || "Não foi possível calcular essa mão.");
+      if (!outcome.ok || !outcome.computed) {
+        setEvError(outcome.message || "Não foi possível calcular agora.");
       } else if (outcome.result) {
         setEvResult(outcome.result);
       }
-    } catch (e) {
-      setEvError(e instanceof Error ? e.message : "Erro ao calcular.");
+    } catch {
+      setEvError("Não foi possível calcular agora. Verifique sua conexão e tente de novo.");
     } finally {
       setEvLoading(false);
     }
