@@ -1015,6 +1015,31 @@ export function RevisorHandTable({
                 iconOnly
               />
             )}
+            {/* EV/ICM no celular (pedido explicito: "nao localizei no
+                celular o botao integrado a mesa") -- o header com o chip
+                desktop some inteiro aqui (ver !isMobile acima), entao o
+                mesmo gatilho precisa migrar pro slot de acoes do topo,
+                igual Salvar/Analisar ja fazem. Depois de calculado, mostra
+                o resultado ao lado (rotulo curto, so' aparece nesse caso
+                raro -- nao compete por espaco na maioria das maos). */}
+            {evEligible &&
+              (evResult ? (
+                <ChipButton
+                  icon={<Gauge size={13} />}
+                  label={`${evResult.heroEquityPct?.toFixed(0)}% eq.`}
+                  onClick={handleComputeEv}
+                  title="Recalcular EV/ICM"
+                />
+              ) : (
+                <ChipButton
+                  icon={evLoading ? <Loader2 size={15} className="animate-spin" /> : <Gauge size={15} />}
+                  label="Calcular EV/ICM"
+                  onClick={handleComputeEv}
+                  disabled={evLoading}
+                  title={evError || "Calcular EV/ICM desse all-in via pokersync-solver"}
+                  iconOnly
+                />
+              ))}
             {canAnalyze && (
               <ChipButton
                 icon={<Target size={15} />}
