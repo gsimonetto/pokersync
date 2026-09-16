@@ -162,7 +162,10 @@ específico depois de identificar um leak, em vez de só posição isolada.
 **Frente:** Main (Revisor de Mãos)
 **Módulo:** Review de Mãos / Revisor (`MAIN-002`, `components/revisor/revisor-fila.tsx`)
 **Prioridade:** 🟡 P2
-**Status:** 💡 NOVA
+**Status:** ✅ INCORPORADA (parcial — implementada em 16/09/2026: nova
+aba "Filtros avançados" com busca por stack em bb e "Só all-in".
+Posição, resultado e cruzamento posição vs. posição ainda não —
+reabrir como ideia nova se isso continuar sendo necessário)
 
 ### IDEA-014 — Mural do Time (ranges, vídeos e avisos, tudo dentro do módulo)
 **Descrição:** investigação de 15/09/2026 a pedido do dono, depois de
@@ -279,6 +282,26 @@ qualquer tracker de mercado.
 **Módulo:** Performance (`MAIN-005`, `components/analysis/AnalysisFilters.tsx`)
 **Prioridade:** 🟡 P2
 **Status:** 💡 NOVA
+
+### IDEA-021 — Construtor de Árvores vira mapa de cobertura do motor (CFR)
+**Descrição:** discussão de 16/09/2026 sobre o Construtor de Árvores
+(hoje removido do menu, IDEA anterior era descartá-lo). Decisão final
+do dono: em vez de descartar, a árvore deveria evoluir pra virar um
+"termômetro" visual de onde o motor CFR (`pokersync-solver`) já
+consegue resolver de verdade uma decisão, e onde ainda depende de
+range manual do jogador. Cada nó ganharia um status (✅ resolvido pelo
+motor / 💡 manual), crescendo sozinho conforme o motor evolui (hoje:
+EV de all-in já jogado e pós-flop turn/river com board+ranges definidos
+são resolvíveis; flop e multiway completo ainda não).
+**Pré-requisito identificado:** antes de acoplar o motor, a árvore
+precisa de uma representação visual de diagrama — hoje é uma lista de
+formulários indentada, sem noção gráfica nenhuma (ver auditoria de UX
+de 15/09/2026 no Construtor de Ranges).
+**Frente:** Main (Construtor de Ranges)
+**Módulo:** Construtor de Ranges — Árvores (`MAIN-004`, `components/ranges/tree-editor.tsx`, hoje fora do menu)
+**Prioridade:** 🟡 P2 (retomar quando a aba voltar a ficar visível)
+**Status:** 🔎 AVALIAR (arquitetura discutida, nada implementado ainda —
+aba está fora do menu por enquanto)
 
 ---
 
