@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash, SlidersHorizontal, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
@@ -29,7 +29,29 @@ const STATUS_META: Record<string, { label: string; color: string; Icon: typeof C
 // de hand_reviews), preservado pra maos manuais/print e importacoes
 // antigas anteriores ao agrupamento (que ficam sem hand_session_id e
 // deliberadamente nao aparecem em Sessões, por decisao: "ignorar antigas").
-type Tab = "sessoes" | "avulsas";
+type Tab = "sessoes" | "avulsas" | "avancados";
+
+// Le' os campos crus do ParsedHand direto do parsed_data (jsonb) -- sem
+// tipar como ParsedHand completo porque so' precisamos de 3 campos, e
+// nem toda mao tem parsed_data no formato "parsed" (print/manual nao tem
+// como entrar nesses filtros, ficam de fora sem erro).
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function heroStackBb(parsed: any): number | null {
+  if (!parsed || parsed.kind !== "parsed" || !parsed.bigBlind) return null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const heroSeat = (parsed.seats || []).find((s: any) => s.playerName === parsed.heroName);
+  if (!heroSeat) return null;
+  return heroSeat.startingChips / parsed.bigBlind;
+}
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function heroWentAllIn(parsed: any): boolean {
+  if (!parsed || parsed.kind !== "parsed") return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const preflop = (parsed.streets || []).find((s: any) => s.name === "preflop");
+  if (!preflop) return false;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (preflop.actions || []).some((a: any) => a.player === parsed.heroName && a.isAllIn);
+}
 
 export function RevisorFila({
   onNova,
@@ -78,6 +100,19 @@ export function RevisorFila({
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
+
+  // ---- Filtros avançados (por stack em bb / all-in) ----
+  // Busca em TODAS as maos do usuario (sessoes + avulsas), diferente das
+  // outras duas abas que sao listas separadas -- aqui o filtro e' o que
+  // importa, nao a origem da mao.
+  const [advStackMin, setAdvStackMin] = useState("");
+  const [advStackMax, setAdvStackMax] = useState("");
+  const [advAllInOnly, setAdvAllInOnly] = useState(false);
+  const [advItems, setAdvItems] = useState<ReviewListItem[]>([]);
+  const [advThumbs, setAdvThumbs] = useState<Record<string, string | null>>({});
+  const [advLoading, setAdvLoading] = useState(false);
+  const [advError, setAdvError] = useState("");
+  const [advSearched, setAdvSearched] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -224,6 +259,58 @@ export function RevisorFila({
     }
   }
 
+  async function loadAdvanced() {
+    setAdvLoading(true);
+    setAdvError("");
+    setAdvSearched(true);
+    try {
+      const supabase = createClient();
+      const { data, error: qErr } = await supabase
+        .from("hand_reviews")
+        .select(
+          `
+          id, title, free_text, status, created_at, updated_at, concluded_at, parsed_data,
+          hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
+          hand_review_images ( id, storage_path, position )
+        `
+        )
+        .eq("user_id", userId!)
+        .order("created_at", { ascending: false });
+      if (qErr) throw qErr;
+      const min = advStackMin.trim() ? Number(advStackMin) : null;
+      const max = advStackMax.trim() ? Number(advStackMax) : null;
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      const rows: ReviewListItem[] = (data ?? [])
+        .filter((r: any) => {
+          if (advAllInOnly && !heroWentAllIn(r.parsed_data)) return false;
+          if (min !== null || max !== null) {
+            const stack = heroStackBb(r.parsed_data);
+            if (stack === null) return false;
+            if (min !== null && stack < min) return false;
+            if (max !== null && stack > max) return false;
+          }
+          return true;
+        })
+        .map((r: any) => ({
+          ...r,
+          tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
+          thumb: r.hand_review_images?.[0]?.storage_path || null,
+        }));
+      setAdvItems(rows);
+      const urls: Record<string, string | null> = {};
+      await Promise.all(
+        rows.map(async (r) => {
+          if (r.thumb) urls[r.id] = await getThumbUrl(r.thumb);
+        })
+      );
+      setAdvThumbs(urls);
+    } catch {
+      setAdvError("Erro ao buscar com esses filtros.");
+    } finally {
+      setAdvLoading(false);
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!(await confirm({ title: "Excluir mão", message: "Essa ação não pode ser desfeita.", confirmLabel: "Excluir" }))) return;
     try {
@@ -333,6 +420,7 @@ export function RevisorFila({
           options={[
             { value: "sessoes", label: "Torneios e sessões" },
             { value: "avulsas", label: "Mãos avulsas" },
+            { value: "avancados", label: "Filtros avançados" },
           ]}
         />
 
@@ -537,6 +625,79 @@ export function RevisorFila({
                 Concluídas: <b className="text-[#10b981]">{counts.concluida}</b>
               </span>
             </div>
+          )}
+        </>
+      )}
+
+      {tab === "avancados" && (
+        <>
+          <div className="mb-4 rounded-xl border border-hairline bg-surface p-3.5">
+            <div className="mb-3 flex items-center gap-2">
+              <SlidersHorizontal size={15} className="icon-glow text-review" />
+              <h3 className="m-0 text-sm font-semibold text-ink">Buscar por posição, stack e resultado</h3>
+            </div>
+            <p className="mb-3 text-xs text-muted">
+              Busca em todas as suas mãos (torneios/sessões e avulsas), independente de onde estão salvas.
+            </p>
+            <div className="flex flex-wrap items-end gap-3">
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted">Stack mín. (bb)</label>
+                <input
+                  type="number"
+                  value={advStackMin}
+                  onChange={(e) => setAdvStackMin(e.target.value)}
+                  placeholder="ex: 10"
+                  className="w-24 rounded-lg border border-hairline bg-void px-2.5 py-1.5 text-sm text-ink outline-none"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-[11px] uppercase tracking-wide text-muted">Stack máx. (bb)</label>
+                <input
+                  type="number"
+                  value={advStackMax}
+                  onChange={(e) => setAdvStackMax(e.target.value)}
+                  placeholder="ex: 25"
+                  className="w-24 rounded-lg border border-hairline bg-void px-2.5 py-1.5 text-sm text-ink outline-none"
+                />
+              </div>
+              <FilterChip
+                label="Só all-in"
+                icon={<Zap size={11} />}
+                active={advAllInOnly}
+                onClick={() => setAdvAllInOnly((v) => !v)}
+              />
+              <button
+                onClick={loadAdvanced}
+                className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
+              >
+                <Search size={14} />
+                Buscar
+              </button>
+            </div>
+          </div>
+
+          {advError && (
+            <div className="mb-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{advError}</div>
+          )}
+
+          {advLoading ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+              Buscando…
+            </div>
+          ) : !advSearched ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+              Escolha os filtros acima e toque em Buscar.
+            </div>
+          ) : advItems.length === 0 ? (
+            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+              Nenhuma mão bate com esses filtros.
+            </div>
+          ) : (
+            <ul className="flex flex-col gap-2.5">
+              {advItems.map((r, idx) => (
+                <ReviewCard key={r.id} item={r} thumb={advThumbs[r.id]} onOpen={() => onOpen(r.id)} delayMs={Math.min(idx, 10) * 30} />
+              ))}
+            </ul>
           )}
         </>
       )}

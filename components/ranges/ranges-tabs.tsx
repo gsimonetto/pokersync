@@ -14,13 +14,17 @@ type TabKey = "ranges" | "arvores" | "biblioteca" | "journal" | "time" | "equida
 // viram um botao com a aba atual + icone de menu (sanduiche), que abre
 // a lista completa (mesmo padrao usado no Painel do Time).
 export function RangesTabs({ active }: { active: TabKey }) {
+  // Árvores e Journal tiradas do menu a pedido do dono (16/09/2026) --
+  // paginas e dados continuam existindo (nada foi apagado), so' nao
+  // aparecem mais na navegacao. Reversivel: e' so' descomentar as linhas
+  // abaixo.
   const tabs: { key: TabKey; href: string; label: string; icon: typeof Layers }[] = [
     { key: "ranges", href: "/ranges", label: "Ranges", icon: Layers },
-    { key: "arvores", href: "/ranges/arvores", label: "Árvores", icon: GitBranch },
+    // { key: "arvores", href: "/ranges/arvores", label: "Árvores", icon: GitBranch },
     { key: "equidade", href: "/ranges/equidade", label: "Equidade", icon: Calculator },
     { key: "biblioteca", href: "/ranges/biblioteca", label: "Biblioteca", icon: BookOpen },
     { key: "time", href: "/ranges/time", label: "Time", icon: Users },
-    { key: "journal", href: "/ranges/journal", label: "Journal", icon: NotebookPen },
+    // { key: "journal", href: "/ranges/journal", label: "Journal", icon: NotebookPen },
   ];
 
   return (

@@ -35,6 +35,8 @@ import {
   type BankrollSessionOption,
 } from "@/lib/services/hand-review-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
+import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility";
+import { computeHandEv, fetchHandEvResult, type HandEvResult } from "@/lib/services/hand-ev-service";
 import { CoachThread } from "./coach-thread";
 import { ShareHandModal } from "./share-hand-modal";
 
@@ -70,6 +72,15 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [showChampion, setShowChampion] = useState(false);
 
   const [parsedHandForTable, setParsedHandForTable] = useState<ParsedHand | null>(null);
+  // Teste da ponte produto -> pokersync-solver (16/09/2026): botao manual
+  // pra calcular cEV/ICM de mao all-in elegivel -- so' aparece quando
+  // findEligibleAllInConfrontation(parsedHandForTable) acha um confronto
+  // de verdade. evEligible fica memorizado no proprio estado (nao e'
+  // recalculado a cada render) porque parsedHandForTable so muda quando a
+  // mao carrega.
+  const [evResult, setEvResult] = useState<HandEvResult | null>(null);
+  const [evLoading, setEvLoading] = useState(false);
+  const [evError, setEvError] = useState("");
   // So existe quando a mao veio da aba Aderencia a Range (ver
   // aderencia-range.tsx) -- ja' calculado la' contra o range+posicao que
   // o jogador escolheu explicitamente, nunca inferido aqui.
@@ -147,6 +158,8 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
 
   async function load() {
     setLoading(true);
+    setEvResult(null);
+    setEvError("");
     try {
       const r = await getReview(reviewId);
       setReview(r);
@@ -156,6 +169,11 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       if (r.parsed_data?.kind === "parsed") {
         setParsedHandForTable(r.parsed_data as ParsedHand);
         setObjectiveVerdict(r.parsed_data.objectiveVerdict ?? null);
+        if (findEligibleAllInConfrontation(r.parsed_data as unknown as ParsedHand)) {
+          fetchHandEvResult(reviewId)
+            .then(setEvResult)
+            .catch(() => {});
+        }
       } else if (r.hand_history) {
         try {
           const parsed = parseHand(r.hand_history);
@@ -356,6 +374,25 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
     }
   }
 
+  async function handleComputeEv() {
+    setEvLoading(true);
+    setEvError("");
+    try {
+      const outcome = await computeHandEv(reviewId);
+      if (!outcome.ok) {
+        setEvError(outcome.reason || "Erro ao calcular.");
+      } else if (!outcome.computed) {
+        setEvError(outcome.reason || "Não foi possível calcular essa mão.");
+      } else if (outcome.result) {
+        setEvResult(outcome.result);
+      }
+    } catch (e) {
+      setEvError(e instanceof Error ? e.message : "Erro ao calcular.");
+    } finally {
+      setEvLoading(false);
+    }
+  }
+
   if (loading) return <p className="text-muted">Carregando…</p>;
   if (!review) return <p className="text-muted">Mão não encontrada.</p>;
 
@@ -392,6 +429,61 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                 )
             )}
           </div>
+        </section>
+      )}
+
+      {parsedHandForTable && findEligibleAllInConfrontation(parsedHandForTable) && (
+        <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
+          <div className="mb-2 flex items-center gap-2">
+            <Gauge size={15} className="icon-glow text-review" />
+            <h3 className="m-0 text-sm font-semibold text-ink">EV/ICM desse all-in</h3>
+          </div>
+          <p className="mb-2.5 text-xs text-muted">
+            Calculado pelo motor do PokerSync (equity real + ICM da premiação do torneio) — compara o resultado
+            esperado com o que aconteceu de fato.
+          </p>
+
+          {evError && <p className="mb-2.5 text-xs text-negative">{evError}</p>}
+
+          {evResult ? (
+            <div className="grid grid-cols-2 gap-2 text-xs">
+              <div className="rounded-lg border border-hairline bg-void p-2">
+                <span className="block text-[10px] uppercase tracking-wide text-muted">Equity</span>
+                <span className="font-semibold text-ink">{evResult.heroEquityPct?.toFixed(1)}%</span>
+              </div>
+              <div className="rounded-lg border border-hairline bg-void p-2">
+                <span className="block text-[10px] uppercase tracking-wide text-muted">Fichas em risco</span>
+                <span className="font-semibold text-ink">{evResult.chipsAtRisk}</span>
+              </div>
+              <div className="rounded-lg border border-hairline bg-void p-2">
+                <span className="block text-[10px] uppercase tracking-wide text-muted">$ICM esperado</span>
+                <span className="font-semibold text-ink">${evResult.heroExpectedIcmDollars?.toFixed(2)}</span>
+              </div>
+              <div className="rounded-lg border border-hairline bg-void p-2">
+                <span className="block text-[10px] uppercase tracking-wide text-muted">Delta $ICM</span>
+                <span className="font-semibold text-ink">
+                  {evResult.heroExpectedIcmDeltaDollars != null && evResult.heroExpectedIcmDeltaDollars >= 0 ? "+" : ""}
+                  ${evResult.heroExpectedIcmDeltaDollars?.toFixed(2)}
+                </span>
+              </div>
+              <button
+                onClick={handleComputeEv}
+                disabled={evLoading}
+                className="col-span-2 mt-1 rounded-lg border border-hairline px-3 py-1.5 text-[11px] font-medium text-muted transition-colors hover:border-ink/40 hover:text-ink disabled:opacity-50"
+              >
+                {evLoading ? "Recalculando…" : "Recalcular"}
+              </button>
+            </div>
+          ) : (
+            <button
+              onClick={handleComputeEv}
+              disabled={evLoading}
+              className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-void disabled:opacity-50"
+            >
+              {evLoading ? <Loader2 size={13} className="animate-spin" /> : <Gauge size={13} />}
+              {evLoading ? "Calculando…" : "Calcular EV/ICM"}
+            </button>
+          )}
         </section>
       )}
 

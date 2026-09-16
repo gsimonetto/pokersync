@@ -64,6 +64,14 @@ export interface ComputeHandEvOutcome {
   ok: boolean;
   computed: boolean;
   reason?: string;
+  result?: HandEvResult;
+}
+
+export async function fetchHandEvResult(handReviewId: string): Promise<HandEvResult | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("hand_ev_results").select("*").eq("hand_review_id", handReviewId).maybeSingle();
+  if (error) throw error;
+  return data ? rowToResult(data) : null;
 }
 
 export async function computeHandEv(handReviewId: string): Promise<ComputeHandEvOutcome> {
@@ -76,7 +84,13 @@ export async function computeHandEv(handReviewId: string): Promise<ComputeHandEv
   if (!res.ok || !body.ok) {
     return { handReviewId, ok: false, computed: false, reason: body.error ?? `HTTP ${res.status}` };
   }
-  return { handReviewId, ok: true, computed: Boolean(body.computed), reason: body.reason };
+  return {
+    handReviewId,
+    ok: true,
+    computed: Boolean(body.computed),
+    reason: body.reason,
+    result: body.result ? rowToResult(body.result) : undefined,
+  };
 }
 
 // Roda sequencial de propósito (não Promise.all) — o solver processa uma
