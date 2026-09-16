@@ -1019,9 +1019,12 @@ export function RevisorHandTable({
                 celular o botao integrado a mesa") -- o header com o chip
                 desktop some inteiro aqui (ver !isMobile acima), entao o
                 mesmo gatilho precisa migrar pro slot de acoes do topo,
-                igual Salvar/Analisar ja fazem. Depois de calculado, mostra
-                o resultado ao lado (rotulo curto, so' aparece nesse caso
-                raro -- nao compete por espaco na maioria das maos). */}
+                igual Salvar/Analisar ja fazem. NUNCA iconOnly aqui (bug
+                corrigido: "nao aconteceu nada quando cliquei") -- iconOnly
+                so mostra o motivo de bloqueio (torneio sem premiacao, etc)
+                via `title`, que e' um tooltip de hover e nunca aparece no
+                toque do celular. Com rotulo em texto, o motivo fica visivel
+                na propria tela em vez de invisivel. */}
             {evEligible &&
               (evResult ? (
                 <ChipButton
@@ -1033,11 +1036,10 @@ export function RevisorHandTable({
               ) : (
                 <ChipButton
                   icon={evLoading ? <Loader2 size={15} className="animate-spin" /> : <Gauge size={15} />}
-                  label="Calcular EV/ICM"
+                  label={evLoading ? "Calculando…" : evError || "Calcular EV/ICM"}
                   onClick={handleComputeEv}
                   disabled={evLoading}
                   title={evError || "Calcular EV/ICM desse all-in via pokersync-solver"}
-                  iconOnly
                 />
               ))}
             {canAnalyze && (
