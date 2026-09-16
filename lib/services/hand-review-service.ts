@@ -64,6 +64,10 @@ export interface ReviewListItem {
   // Spot marcado pra revisar depois -- independente do status (concluida
   // ou nao), fica visivel na Biblioteca sem precisar reabrir a fila toda.
   saved: boolean;
+  // ParsedHand cru (kind: "parsed") ou null -- usado pelos filtros de
+  // stack/all-in em RevisorSpotsSalvos, sem tipar como ParsedHand
+  // completo aqui pra nao acoplar hand-review-service a hand-parser.
+  parsed_data?: unknown;
 }
 
 export interface ReviewDetail extends ReviewListItem {
@@ -220,7 +224,7 @@ export async function listReviews(
     .from("hand_reviews")
     .select(
       `
-      id, title, free_text, status, created_at, updated_at, concluded_at, saved,
+      id, title, free_text, status, created_at, updated_at, concluded_at, saved, parsed_data,
       hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
       hand_review_images ( id, storage_path, position )
     `

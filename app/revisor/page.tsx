@@ -2,7 +2,7 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Bookmark, ListChecks } from "lucide-react";
+import { ArrowLeft, Bookmark, ListChecks, SlidersHorizontal } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { TabNav } from "@/components/ui/tab-nav";
 import { RevisorFila } from "@/components/revisor/revisor-fila";
@@ -10,8 +10,9 @@ import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
 import { RevisorSessao } from "@/components/revisor/revisor-sessao";
 import { RevisorSpotsSalvos } from "@/components/revisor/revisor-spots-salvos";
+import { RevisorFiltrosAvancados } from "@/components/revisor/revisor-filtros-avancados";
 
-type Screen = "fila" | "salvos" | "nova" | "sessao" | "detalhe";
+type Screen = "fila" | "salvos" | "filtros" | "nova" | "sessao" | "detalhe";
 
 // Navegacao interna do Revisor de Maos (2026-08 v2): agora inclui a tela
 // "sessao" (master-detail de torneio/cash). Fluxo esperado:
@@ -41,10 +42,10 @@ function RevisorPageInner() {
   const filterLabel = searchParams.get("label") ?? undefined;
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  // De onde "detalhe" foi aberto (fila normal ou biblioteca de salvos) —
-  // sem isso, voltar de um spot salvo caia sempre na fila em vez de
-  // voltar pra biblioteca de onde o usuario realmente veio.
-  const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos">("fila");
+  // De onde "detalhe" foi aberto (fila normal, salvos ou filtros
+  // avancados) — sem isso, voltar de um spot salvo/filtrado caia sempre
+  // na fila em vez de voltar pra onde o usuario realmente veio.
+  const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos" | "filtros">("fila");
 
   useEffect(() => {
     const shared = searchParams.get("shared");
@@ -69,6 +70,11 @@ function RevisorPageInner() {
     setSelectedSessionId(null);
     setScreen("salvos");
   }
+  function goFiltros() {
+    setSelectedReviewId(null);
+    setSelectedSessionId(null);
+    setScreen("filtros");
+  }
   function goNova() {
     setScreen("nova");
   }
@@ -86,6 +92,11 @@ function RevisorPageInner() {
     setSelectedReviewId(reviewId);
     setScreen("detalhe");
   }
+  function goDetalheFromFiltros(reviewId: string) {
+    setDetalheOrigin("filtros");
+    setSelectedReviewId(reviewId);
+    setScreen("detalhe");
+  }
   // Voltar do detalhe: se ha sessao ativa no contexto, volta pra ela;
   // senao volta pra onde a mao foi aberta (fila normal ou biblioteca de
   // salvos).
@@ -95,6 +106,8 @@ function RevisorPageInner() {
       setScreen("sessao");
     } else if (detalheOrigin === "salvos") {
       goSalvos();
+    } else if (detalheOrigin === "filtros") {
+      goFiltros();
     } else {
       goFila();
     }
@@ -108,14 +121,15 @@ function RevisorPageInner() {
           conteudo moram dentro da MESMA caixa, em vez de boiar soltos
           contra o fundo. Sem AppHeader (barra sticky) de proposito. */}
       <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-        {(screen === "fila" || screen === "salvos") && (
+        {(screen === "fila" || screen === "salvos" || screen === "filtros") && (
           <TabNav
             className="mb-4"
             value={screen}
-            onChange={(s) => (s === "fila" ? goFila() : goSalvos())}
+            onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : goFiltros())}
             options={[
               { value: "fila", label: "Fila", icon: ListChecks },
               { value: "salvos", label: "Salvos", icon: Bookmark },
+              { value: "filtros", label: "Filtros avançados", icon: SlidersHorizontal },
             ]}
           />
         )}
@@ -146,6 +160,7 @@ function RevisorPageInner() {
           />
         )}
         {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
+        {screen === "filtros" && <RevisorFiltrosAvancados onOpen={goDetalheFromFiltros} />}
         {screen === "nova" && (
           <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
         )}
