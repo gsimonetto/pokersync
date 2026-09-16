@@ -12,7 +12,7 @@ import { RevisorSessao } from "@/components/revisor/revisor-sessao";
 import { RevisorSpotsSalvos } from "@/components/revisor/revisor-spots-salvos";
 import { RevisorFiltrosAvancados } from "@/components/revisor/revisor-filtros-avancados";
 
-type Screen = "fila" | "salvos" | "filtros" | "nova" | "sessao" | "detalhe";
+type Screen = "fila" | "salvos" | "filtros" | "filtro-replay" | "nova" | "sessao" | "detalhe";
 
 // Navegacao interna do Revisor de Maos (2026-08 v2): agora inclui a tela
 // "sessao" (master-detail de torneio/cash). Fluxo esperado:
@@ -42,10 +42,15 @@ function RevisorPageInner() {
   const filterLabel = searchParams.get("label") ?? undefined;
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  // De onde "detalhe" foi aberto (fila normal, salvos ou filtros
-  // avancados) — sem isso, voltar de um spot salvo/filtrado caia sempre
-  // na fila em vez de voltar pra onde o usuario realmente veio.
-  const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos" | "filtros">("fila");
+  // Resultado dos Filtros avancados que o jogador clicou pra ver na mesa
+  // (replayer) -- guardado enquanto ele navega pro "Analisar mao" e volta,
+  // pra reabrir o mesmo conjunto de maos filtradas em vez de voltar pro
+  // formulario de filtro.
+  const [filtroReviewIds, setFiltroReviewIds] = useState<string[]>([]);
+  // De onde "detalhe" foi aberto (fila normal, salvos ou replayer dos
+  // filtros avancados) — sem isso, voltar de um spot salvo/filtrado caia
+  // sempre na fila em vez de voltar pra onde o usuario realmente veio.
+  const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos" | "filtro-replay">("fila");
 
   useEffect(() => {
     const shared = searchParams.get("shared");
@@ -92,22 +97,30 @@ function RevisorPageInner() {
     setSelectedReviewId(reviewId);
     setScreen("detalhe");
   }
-  function goDetalheFromFiltros(reviewId: string) {
-    setDetalheOrigin("filtros");
+  // Abre o replayer (mesa + lista, igual a uma sessao) com o resultado do
+  // filtro -- pedido explicito: clicar numa mao filtrada deve mostrar ela
+  // na mesa de verdade, nao ir direto pro fluxo de "Analisar mao".
+  function goFiltroReplay(reviewIds: string[], selectedId: string) {
+    setFiltroReviewIds(reviewIds);
+    setSelectedReviewId(selectedId);
+    setScreen("filtro-replay");
+  }
+  function goDetalheFromFiltroReplay(reviewId: string) {
+    setDetalheOrigin("filtro-replay");
     setSelectedReviewId(reviewId);
     setScreen("detalhe");
   }
   // Voltar do detalhe: se ha sessao ativa no contexto, volta pra ela;
-  // senao volta pra onde a mao foi aberta (fila normal ou biblioteca de
-  // salvos).
+  // senao volta pra onde a mao foi aberta (fila normal, biblioteca de
+  // salvos ou replayer dos filtros avancados).
   function backFromDetalhe() {
     if (selectedSessionId) {
       setSelectedReviewId(null);
       setScreen("sessao");
     } else if (detalheOrigin === "salvos") {
       goSalvos();
-    } else if (detalheOrigin === "filtros") {
-      goFiltros();
+    } else if (detalheOrigin === "filtro-replay") {
+      setScreen("filtro-replay");
     } else {
       goFila();
     }
@@ -160,7 +173,16 @@ function RevisorPageInner() {
           />
         )}
         {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
-        {screen === "filtros" && <RevisorFiltrosAvancados onOpen={goDetalheFromFiltros} />}
+        {screen === "filtros" && <RevisorFiltrosAvancados onOpen={goFiltroReplay} />}
+        {screen === "filtro-replay" && filtroReviewIds.length > 0 && (
+          <RevisorSessao
+            reviewIds={filtroReviewIds}
+            title="Filtros avançados"
+            initialSelectedId={selectedReviewId ?? undefined}
+            onOpenHand={goDetalheFromFiltroReplay}
+            onBack={goFiltros}
+          />
+        )}
         {screen === "nova" && (
           <RevisorNovaMao onSaved={goFila} onSavedAndReview={goDetalhe} onSavedToSession={goSessao} onCancel={goFila} />
         )}
