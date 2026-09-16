@@ -132,10 +132,25 @@ function didHeroEnterHand(
 
 export function RevisorSessao({
   sessionId,
+  reviewIds,
+  title,
+  initialSelectedId,
   onOpenHand,
   onBack,
 }: {
-  sessionId: string;
+  // Um dos dois: sessionId (torneio/cash de verdade, ordem cronologica) ou
+  // reviewIds (lista arbitraria de maos, ex: resultado dos Filtros
+  // avancados — mesma mesa/replayer, so' a origem dos dados muda, sem
+  // duplicar esse componente inteiro).
+  sessionId?: string;
+  reviewIds?: string[];
+  // Rotulo mostrado no header da mesa (RevisorHandTable) no lugar do nome
+  // do torneio, quando a origem e' reviewIds (nao existe "sessao" nesse
+  // caso).
+  title?: string;
+  // Mao que deve vir pre-selecionada (ex: a que o jogador clicou nos
+  // Filtros avancados) -- sem isso a primeira mao da lista sempre abre.
+  initialSelectedId?: string;
   onOpenHand: (reviewId: string) => void;
   // Botao de voltar do modo tela-cheia no celular (ver ModalPortal
   // abaixo) -- a tela normal (fora do celular) ja tem seu proprio botao
@@ -145,7 +160,9 @@ export function RevisorSessao({
   onBack: () => void;
 }) {
   const isMobile = useIsMobile();
-  const [session, setSession] = useState<HandSession | null>(null);
+  // So' o campo realmente usado por esta tela (label no header da mesa) —
+  // no modo reviewIds nao existe uma linha de hand_sessions de verdade.
+  const [session, setSession] = useState<{ label: string | null } | null>(null);
   const [hands, setHands] = useState<HandInListing[]>([]);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
@@ -183,6 +200,9 @@ export function RevisorSessao({
     return () => window.removeEventListener("resize", measure);
   }, []);
 
+  const HANDS_SELECT =
+    "id, title, hand_history, parsed_data, created_at, status, viewed_in_replayer_at, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )";
+
   useEffect(() => {
     let cancelled = false;
     async function load() {
@@ -190,22 +210,36 @@ export function RevisorSessao({
       setError(null);
       try {
         const supabase = createClient();
-        const [{ data: s, error: sErr }, { data: hs, error: hErr }] = await Promise.all([
-          supabase.from("hand_sessions").select("*").eq("id", sessionId).single(),
-          supabase
-            .from("hand_reviews")
-            .select("id, title, hand_history, parsed_data, created_at, status, viewed_in_replayer_at, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )")
-            .eq("hand_session_id", sessionId)
-            .order("created_at", { ascending: true }),
-        ]);
-        if (cancelled) return;
-        if (sErr) throw sErr;
-        if (hErr) throw hErr;
-        setSession(s as HandSession);
-        setHands((hs as HandInListing[]) ?? []);
-        setSelectedId(hs && hs.length > 0 ? (hs[0] as HandInListing).id : null);
+        let handsList: HandInListing[];
+        let sessionLabel: string | null;
+        if (reviewIds) {
+          // Filtros avancados: sem hand_sessions de verdade, sem ordem
+          // cronologica implicita -- reordena o resultado do .in() pra
+          // bater com a ordem em que o filtro devolveu as maos (mais
+          // relevante/recente primeiro, decidido la').
+          const { data: hs, error: hErr } = await supabase.from("hand_reviews").select(HANDS_SELECT).in("id", reviewIds);
+          if (cancelled) return;
+          if (hErr) throw hErr;
+          const byId = new Map(((hs as HandInListing[]) ?? []).map((h) => [h.id, h]));
+          handsList = reviewIds.map((id) => byId.get(id)).filter((h): h is HandInListing => Boolean(h));
+          sessionLabel = title ?? "Filtros avançados";
+        } else {
+          const [{ data: s, error: sErr }, { data: hs, error: hErr }] = await Promise.all([
+            supabase.from("hand_sessions").select("*").eq("id", sessionId!).single(),
+            supabase.from("hand_reviews").select(HANDS_SELECT).eq("hand_session_id", sessionId!).order("created_at", { ascending: true }),
+          ]);
+          if (cancelled) return;
+          if (sErr) throw sErr;
+          if (hErr) throw hErr;
+          handsList = (hs as HandInListing[]) ?? [];
+          sessionLabel = (s as HandSession | null)?.label ?? null;
+        }
+        setSession({ label: sessionLabel });
+        setHands(handsList);
+        const preselect = initialSelectedId && handsList.some((h) => h.id === initialSelectedId) ? initialSelectedId : null;
+        setSelectedId(preselect ?? (handsList.length > 0 ? handsList[0].id : null));
       } catch (e) {
-        if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao carregar a sessão.");
+        if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao carregar as mãos.");
       } finally {
         if (!cancelled) setLoading(false);
       }
@@ -214,7 +248,8 @@ export function RevisorSessao({
     return () => {
       cancelled = true;
     };
-  }, [sessionId]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [sessionId, reviewIds?.join(",")]);
 
   // Parse da mao selecionada — feito lazy (so quando o usuario seleciona).
   // Cacheia por id pra nao reparsear ao trocar de volta.

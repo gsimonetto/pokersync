@@ -3,12 +3,14 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Trophy, Layers, ArrowLeft } from "lucide-react";
+import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Trophy, Layers, ArrowLeft, Gauge } from "lucide-react";
 import { PokerTable } from "@/components/drill/poker-table";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { OpponentStatsModal } from "./opponent-stats-modal";
 import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
 import { fetchOpponentsStatsForHand, type OpponentStats } from "@/lib/services/opponent-stats-service";
+import { computeHandEv, fetchHandEvResult, type HandEvResult } from "@/lib/services/hand-ev-service";
+import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility";
 import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poker/hand-replay-projector";
 import type { BorderRingConfig } from "@/lib/poker/seat-layout";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
@@ -365,6 +367,48 @@ export function RevisorHandTable({
     }
   }
 
+  // EV/ICM (pokersync-solver) direto no header da mesa — pedido explicito:
+  // ver a mao na mesa E a informacao que vem da API no mesmo lugar, em vez
+  // de precisar abrir "Analisar mão" pra achar isso. So aparece pra mao
+  // elegivel (all-in com showdown, ver hand-ev-eligibility.ts).
+  const evEligible = useMemo(() => findEligibleAllInConfrontation(parsedHand) !== null, [parsedHand]);
+  const [evResult, setEvResult] = useState<HandEvResult | null>(null);
+  const [evLoading, setEvLoading] = useState(false);
+  const [evError, setEvError] = useState("");
+
+  useEffect(() => {
+    setEvResult(null);
+    setEvError("");
+    if (!reviewId || !evEligible) return;
+    let cancelled = false;
+    fetchHandEvResult(reviewId)
+      .then((r) => {
+        if (!cancelled) setEvResult(r);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [reviewId, evEligible]);
+
+  async function handleComputeEv() {
+    if (!reviewId) return;
+    setEvLoading(true);
+    setEvError("");
+    try {
+      const outcome = await computeHandEv(reviewId);
+      if (!outcome.ok || !outcome.computed) {
+        setEvError(outcome.reason || "Não foi possível calcular.");
+      } else if (outcome.result) {
+        setEvResult(outcome.result);
+      }
+    } catch (e) {
+      setEvError(e instanceof Error ? e.message : "Erro ao calcular.");
+    } finally {
+      setEvLoading(false);
+    }
+  }
+
   // Resolvido uma vez por mao (a situacao preflop nao muda step a step,
   // so a rua muda). Consulta situation_dictionary no Supabase — por isso
   // e' assincrono e comeca null ate resolver.
@@ -702,6 +746,23 @@ export function RevisorHandTable({
                 icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
                 label={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`}
               />
+              {evEligible &&
+                (evResult ? (
+                  <InfoChip
+                    icon={<Gauge size={12} color="rgba(255,255,255,0.45)" />}
+                    label={`Equity ${evResult.heroEquityPct?.toFixed(0)}% · ${
+                      evResult.heroExpectedIcmDeltaDollars != null && evResult.heroExpectedIcmDeltaDollars >= 0 ? "+" : ""
+                    }$${evResult.heroExpectedIcmDeltaDollars?.toFixed(2)} ICM`}
+                  />
+                ) : (
+                  <ChipButton
+                    icon={evLoading ? <Loader2 size={13} className="animate-spin" /> : <Gauge size={13} />}
+                    label={evLoading ? "Calculando…" : evError || "Calcular EV/ICM"}
+                    onClick={handleComputeEv}
+                    disabled={evLoading}
+                    title="Calcular EV/ICM desse all-in via pokersync-solver"
+                  />
+                ))}
             </div>
 
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexShrink: 0 }}>

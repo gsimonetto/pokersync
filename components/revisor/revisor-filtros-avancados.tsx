@@ -59,7 +59,15 @@ function heroWentAllIn(parsed: any): boolean {
   return (preflop.actions || []).some((a: any) => a.player === parsed.heroName && a.isAllIn);
 }
 
-export function RevisorFiltrosAvancados({ onOpen }: { onOpen: (id: string) => void }) {
+export function RevisorFiltrosAvancados({
+  onOpen,
+}: {
+  // Abre o replayer (mesa + lista, igual ao master-detail de sessao) com
+  // TODAS as maos que bateram no filtro, ja' com a que foi clicada
+  // pre-selecionada -- pedido explicito: ver a mao na mesa de verdade, nao
+  // ir direto pro fluxo de "Analisar mao".
+  onOpen: (reviewIds: string[], selectedId: string) => void;
+}) {
   const [positions, setPositions] = useState<HeroPosition[]>([]);
   const [stackDepths, setStackDepths] = useState<StackDepthBucket[]>([]);
   const [allInOnly, setAllInOnly] = useState(false);
@@ -170,7 +178,7 @@ export function RevisorFiltrosAvancados({ onOpen }: { onOpen: (id: string) => vo
           {items.map((r, idx) => (
             <li
               key={r.id}
-              onClick={() => onOpen(r.id)}
+              onClick={() => onOpen(items.map((i) => i.id), r.id)}
               style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
               className="fade-in-up flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-lg"
             >
