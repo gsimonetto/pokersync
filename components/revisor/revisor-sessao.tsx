@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Loader2, ChevronRight, Search, X, List, ArrowLeft } from "lucide-react";
+import { AlertTriangle, Loader2, ChevronRight, Search, X, List, ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard, sortCardsDesc } from "@/components/drill/card";
@@ -174,6 +174,40 @@ export function RevisorSessao({
 
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [gridHeight, setGridHeight] = useState<number | null>(null);
+
+  // Tela cheia DE VERDADE no celular (pedido explicito: "a barra de URL
+  // em cima e embaixo do navegador, queria tirar isso ao expandir") -- o
+  // modo tela-cheia atual (ModalPortal com position:fixed) so cobre a
+  // viewport visivel, mas nao esconde a barra de endereco do navegador
+  // (isso e' só a Fullscreen API de verdade). Suporte real: Android
+  // Chrome/Firefox sim; Safari do iPhone NAO suporta Fullscreen API em
+  // elemento arbitrario (so' em <video>) -- nesses casos o botao nem
+  // aparece, em vez de mostrar um botao que nao faz nada.
+  const fullscreenRef = useRef<HTMLDivElement | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [fullscreenSupported, setFullscreenSupported] = useState(false);
+
+  useEffect(() => {
+    setFullscreenSupported(typeof document !== "undefined" && document.fullscreenEnabled === true);
+    function onChange() {
+      setIsFullscreen(document.fullscreenElement === fullscreenRef.current);
+    }
+    document.addEventListener("fullscreenchange", onChange);
+    return () => document.removeEventListener("fullscreenchange", onChange);
+  }, []);
+
+  async function toggleFullscreen() {
+    try {
+      if (document.fullscreenElement) {
+        await document.exitFullscreen();
+      } else {
+        await fullscreenRef.current?.requestFullscreen();
+      }
+    } catch {
+      // navegador recusou (ex: fora de um gesto direto do usuario) --
+      // sem crash, o botao continua disponivel pra tentar de novo.
+    }
+  }
   // Gaveta da lista de maos no mobile (pedido explicito: "adapte o
   // revisor de maos igual ao modo treino") -- mesmo padrao da gaveta de
   // filtros do Treino: lista some por padrao no celular, abre como
@@ -674,7 +708,10 @@ export function RevisorSessao({
     return (
       <ModalPortal>
         <RevisorResponsiveStyles />
-        <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "#000", display: "flex", flexDirection: "column", fontFamily: F }}>
+        <div
+          ref={fullscreenRef}
+          style={{ position: "fixed", inset: 0, zIndex: 100, background: "#000", display: "flex", flexDirection: "column", fontFamily: F }}
+        >
           <div style={{ display: "flex", alignItems: "center", gap: 8, padding: "10px 12px", flexShrink: 0 }}>
             <button
               onClick={onBack}
@@ -703,6 +740,24 @@ export function RevisorSessao({
             >
               <List size={16} />
             </button>
+            {/* Tela cheia de verdade (esconde a barra de URL do
+                navegador) -- so aparece quando o navegador suporta a
+                Fullscreen API em elemento arbitrario (nao existe no
+                Safari do iPhone). */}
+            {fullscreenSupported && (
+              <button
+                onClick={toggleFullscreen}
+                aria-label={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
+                title={isFullscreen ? "Sair da tela cheia" : "Tela cheia (esconde a barra do navegador)"}
+                style={{
+                  all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
+                  width: 34, height: 34, borderRadius: 9, background: "#1A1A1A",
+                  border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0,
+                }}
+              >
+                {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
+              </button>
+            )}
 
             {/* Alvo do portal de RevisorHandTable (Salvar/Compartilhar/
                 Analisar) -- pedido explicito: "os icones precisam ficar
