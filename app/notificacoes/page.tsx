@@ -93,7 +93,7 @@ export default function NotificacoesPage() {
   return (
     <main className="px-6 py-10 text-ink">
       <AppHeader
-        backHref="/modulos"
+        backHref="/inicio"
         // Sem `title` o subtitulo ("Tudo lido" / "N por ler") ficava
         // sozinho na linha do topo, ocupando o lugar do titulo: uma
         // linha de STATUS lida como se fosse o nome da tela. A regra do

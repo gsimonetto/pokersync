@@ -1322,7 +1322,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   </button>
                 )}
                 <button
-                  onClick={() => (isMobile ? router.push("/modulos") : setFiltersOpen(false))}
+                  onClick={() => (isMobile ? router.push("/inicio") : setFiltersOpen(false))}
                   title={isMobile ? "Fechar treino" : "Esconder filtros"}
                   aria-label={isMobile ? "Fechar treino" : "Esconder filtros"}
                   style={{ display: "flex", alignItems: "center", justifyContent: "center", width: 30, height: 30, borderRadius: 8, background: "#1A1A1A", border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.6)", cursor: "pointer" }}

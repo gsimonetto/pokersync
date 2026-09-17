@@ -23,7 +23,7 @@ import { usePresenceHeartbeat } from "@/lib/hooks/use-presence-heartbeat";
 // (lib/modules-data.tsx) -- os dois levam pro mesmo /hub, entao usar
 // icones diferentes pra mesma tela so' confundia no reconhecimento.
 const TABS = [
-  { label: "Início", href: "/modulos", icon: House },
+  { label: "Início", href: "/inicio", icon: House },
   { label: "Tarefas", href: "/hub", icon: Trophy },
 ] as const;
 
@@ -46,7 +46,7 @@ function isHiddenRoute(pathname: string) {
 // "/revisor/admin" tambem fica de fora: painel oculto (sem link no fluxo
 // do jogador, acesso direto por URL restrito a um unico e-mail) que
 // nunca foi migrado pro AppShell.
-const APP_SHELL_ROUTE_PREFIXES = ["/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace"];
+const APP_SHELL_ROUTE_PREFIXES = ["/inicio", "/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace"];
 const APP_SHELL_EXCLUDED_PREFIXES = ["/time/convite", "/revisor/admin"];
 
 function usaAppShell(pathname: string) {

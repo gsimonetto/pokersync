@@ -6,7 +6,7 @@ import { createClient } from "@/lib/supabase/server";
 // (placeholder do bootstrap do projeto), que ficou exposta no dominio
 // principal depois do corte de DNS.
 //
-// A partir da Home Diário (app/diario/page.tsx), quem loga cai direto
+// A partir da Home Diário (app/inicio/page.tsx), quem loga cai direto
 // nela em vez do grid de módulos -- /modulos continua existindo e
 // acessível por um link dentro do próprio Diário, so deixou de ser o
 // destino padrão pós-login.
@@ -16,5 +16,5 @@ export default async function Home() {
     data: { user },
   } = await supabase.auth.getUser();
 
-  redirect(user ? "/diario" : "/login");
+  redirect(user ? "/inicio" : "/login");
 }
