@@ -3,7 +3,13 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { TriangleAlert } from "lucide-react";
-import { fetchAnalysisHandRows, computeReferenceProfile, PREFLOP_REFERENCE, type MetricRange } from "@/lib/services/analysis-service";
+import {
+  fetchAnalysisHandRows,
+  computeReferenceProfile,
+  computeMetricTrend,
+  PREFLOP_REFERENCE,
+  type MetricRange,
+} from "@/lib/services/analysis-service";
 import { fetchSessions } from "@/lib/services/bankroll-service";
 import { aggregate } from "@/lib/bankroll/calc";
 import type { AnalysisHandRow } from "@/types/analysis";
@@ -24,7 +30,10 @@ interface MetricChange {
   melhorou: boolean;
   piorou: boolean;
   magnitude: number; // |distAntes - distDepois| -- quanto maior, mais a métrica se moveu em relação à faixa saudável
+  trend: number[]; // computeMetricTrend em blocos de volume -- alimenta o sparkline do tile
 }
+
+export type WeekMood = "positivo" | "atencao" | "neutro";
 
 const MIN_HANDS_PER_METADE = 20; // amostra mínima em CADA metade pra não virar ruído
 
@@ -42,7 +51,13 @@ function bbDefensePct(rows: AnalysisHandRow[]): number | null {
   return pct(opp.filter((r) => r.blindDefended === true).length, opp.length);
 }
 
-function buildChange(label: string, oldVal: number | null, newVal: number | null, range: MetricRange): MetricChange | null {
+function buildChange(
+  label: string,
+  oldVal: number | null,
+  newVal: number | null,
+  range: MetricRange,
+  trend: number[]
+): MetricChange | null {
   if (oldVal === null || newVal === null) return null;
   const distAntes = distanciaDaFaixa(oldVal, range);
   const distDepois = distanciaDaFaixa(newVal, range);
@@ -55,7 +70,34 @@ function buildChange(label: string, oldVal: number | null, newVal: number | null
     // pequena migrando de lado dentro da própria faixa.
     piorou: distDepois > distAntes + 2,
     magnitude: Math.abs(distAntes - distDepois),
+    trend,
   };
+}
+
+// Sparkline minimalista (stroke fino, sem eixo/grade) -- no lugar do
+// "antes X%" cru, mostra a FORMA da tendência num piscar de olho.
+// Precisa de 2+ pontos; com menos que isso (amostra pequena demais pro
+// computeMetricTrend bucketar), simplesmente não renderiza nada.
+function Sparkline({ values, positivo }: { values: number[]; positivo: boolean }) {
+  if (values.length < 2) return null;
+  const w = 56;
+  const h = 18;
+  const min = Math.min(...values);
+  const max = Math.max(...values);
+  const range = max - min || 1;
+  const points = values
+    .map((v, i) => {
+      const x = (i / (values.length - 1)) * w;
+      const y = h - ((v - min) / range) * h;
+      return `${x.toFixed(1)},${y.toFixed(1)}`;
+    })
+    .join(" ");
+  const cor = positivo ? "var(--color-positive)" : "var(--color-evolution)";
+  return (
+    <svg width={w} height={h} viewBox={`0 0 ${w} ${h}`} className="mt-1" aria-hidden="true">
+      <polyline points={points} fill="none" stroke={cor} strokeWidth={1.5} strokeLinecap="round" strokeLinejoin="round" />
+    </svg>
+  );
 }
 
 function headlineFor(c: MetricChange): string {
@@ -65,7 +107,7 @@ function headlineFor(c: MetricChange): string {
   return `Você está evoluindo: seu ${c.label} foi de ${c.oldPct}% pra ${c.newPct}%, mais perto da faixa ideal.`;
 }
 
-export function InsightsCard({ style }: { style?: React.CSSProperties }) {
+export function InsightsCard({ style, onMood }: { style?: React.CSSProperties; onMood?: (mood: WeekMood) => void }) {
   const [changes, setChanges] = useState<MetricChange[] | null>(null);
   const [insuficiente, setInsuficiente] = useState(false);
   const [roi, setRoi] = useState<{ value: number; n: number } | null>(null);
@@ -101,21 +143,30 @@ export function InsightsCard({ style }: { style?: React.CSSProperties }) {
           "VPIP",
           pct(antes.filter((r) => r.vpip).length, antes.length),
           pct(depois.filter((r) => r.vpip).length, depois.length),
-          ref.vpip
+          ref.vpip,
+          computeMetricTrend(rows, (subset) => pct(subset.filter((r) => r.vpip).length, subset.length), 5)
         );
         const pfr = buildChange(
           "PFR",
           pct(antes.filter((r) => r.pfr).length, antes.length),
           pct(depois.filter((r) => r.pfr).length, depois.length),
-          ref.pfr
+          ref.pfr,
+          computeMetricTrend(rows, (subset) => pct(subset.filter((r) => r.pfr).length, subset.length), 5)
         );
         const threeBet = buildChange(
           "3-Bet",
           pct(antes.filter((r) => r.threeBet).length, antes.length),
           pct(depois.filter((r) => r.threeBet).length, depois.length),
-          ref.threeBet
+          ref.threeBet,
+          computeMetricTrend(rows, (subset) => pct(subset.filter((r) => r.threeBet).length, subset.length), 5)
         );
-        const bbDefense = buildChange("BB Defense", bbDefensePct(antes), bbDefensePct(depois), ref.foldToSteal);
+        const bbDefense = buildChange(
+          "BB Defense",
+          bbDefensePct(antes),
+          bbDefensePct(depois),
+          ref.foldToSteal,
+          computeMetricTrend(rows, bbDefensePct, 5)
+        );
 
         setChanges([vpip, pfr, threeBet, bbDefense].filter((c): c is MetricChange => c !== null));
       } catch {
@@ -143,6 +194,18 @@ export function InsightsCard({ style }: { style?: React.CSSProperties }) {
     headline = `Seu ROI este mês está em ${roi.value >= 0 ? "+" : ""}${roi.value}% em ${roi.n} ${roi.n === 1 ? "sessão" : "sessões"}.`;
   }
 
+  // "Humor da semana" pro container geral do Diário (ver InsightsCard
+  // no app/inicio/page.tsx) -- um alerta pesa mais que qualquer melhora
+  // (o jogador precisa notar isso primeiro), só cai pra positivo com
+  // melhora real ou ROI positivo, neutro é o padrão sem sinal nenhum.
+  useEffect(() => {
+    if (loading || !onMood) return;
+    if (alertas.length > 0) onMood("atencao");
+    else if (melhoras.length > 0 || (roi && roi.n > 0 && roi.value >= 0)) onMood("positivo");
+    else onMood("neutro");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [loading, alertas.length, melhoras.length, roi?.n, roi?.value]);
+
   return (
     <section className="fade-in-up rounded-2xl border border-hairline bg-surface p-5" style={style}>
       <h2 className="text-[13px] font-bold uppercase tracking-[0.1em] text-muted">Insights da semana</h2>
@@ -169,7 +232,11 @@ export function InsightsCard({ style }: { style?: React.CSSProperties }) {
                     {c.piorou && <TriangleAlert size={11} className="text-evolution" aria-label="Piorou" />}
                   </p>
                   <p className="mt-1.5 text-lg font-bold tabular-nums text-ink">{c.newPct}%</p>
-                  <p className="mt-0.5 text-[10px] text-muted/70">antes {c.oldPct}%</p>
+                  {c.trend.length >= 2 ? (
+                    <Sparkline values={c.trend} positivo={!c.piorou} />
+                  ) : (
+                    <p className="mt-0.5 text-[10px] text-muted/70">antes {c.oldPct}%</p>
+                  )}
                 </div>
               ))}
               {roi && (

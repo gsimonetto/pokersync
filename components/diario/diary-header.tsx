@@ -24,7 +24,42 @@ function dataDeHoje(): string {
   return hoje.charAt(0).toUpperCase() + hoje.slice(1);
 }
 
-export function DiaryHeader({ nome, streakDays }: { nome: string; streakDays: number | null }) {
+const DIAS_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+// Bolinha por dia dos últimos 7 -- não é o mesmo dado que streakDays
+// (contagem corrida): aqui dá pra ver EM QUAL dia especificamente o
+// jogador não apareceu, reforçando a ideia de hábito/diário em vez de
+// só um número.
+function StreakTracker({ last7Days }: { last7Days: boolean[] }) {
+  const hoje = new Date();
+  return (
+    <div className="mt-3 flex items-center gap-1.5" aria-label="Atividade dos últimos 7 dias">
+      {last7Days.map((ativo, i) => {
+        const d = new Date(hoje);
+        d.setDate(d.getDate() - (last7Days.length - 1 - i));
+        return (
+          <div key={i} className="flex flex-col items-center gap-1">
+            <span
+              className={`size-2.5 rounded-full ${ativo ? "bg-positive" : "bg-hairline"}`}
+              title={d.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "short" })}
+            />
+            <span className="text-[9px] font-medium text-muted/70">{DIAS_SEMANA[d.getDay()]}</span>
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export function DiaryHeader({
+  nome,
+  streakDays,
+  last7Days,
+}: {
+  nome: string;
+  streakDays: number | null;
+  last7Days?: boolean[] | null;
+}) {
   const agora = new Date().getHours();
   const primeiro = nome ? primeiroNome(nome) : "";
 
@@ -56,6 +91,7 @@ export function DiaryHeader({ nome, streakDays }: { nome: string; streakDays: nu
           Sequência de {streakDays} {streakDays === 1 ? "dia" : "dias"} escrevendo seu diário
         </p>
       )}
+      {last7Days && last7Days.length === 7 && <StreakTracker last7Days={last7Days} />}
     </header>
   );
 }

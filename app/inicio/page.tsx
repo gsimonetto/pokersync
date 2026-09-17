@@ -8,11 +8,22 @@ import { AppShell } from "@/components/app-shell";
 import { DiaryHeader } from "@/components/diario/diary-header";
 import { AgendaCard } from "@/components/diario/agenda-card";
 import { WeeklyGoalsCard } from "@/components/diario/weekly-goals-card";
-import { InsightsCard } from "@/components/diario/insights-card";
+import { InsightsCard, type WeekMood } from "@/components/diario/insights-card";
+import { ReflectionPrompt } from "@/components/diario/reflection-prompt";
 import { WhatToDoCard } from "@/components/diario/what-to-do-card";
 import { LeaksCard } from "@/components/revisor/leaks-card";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
-import { fetchProgress } from "@/lib/services/xp-service";
+import { fetchProgress, fetchLast7DaysActivity } from "@/lib/services/xp-service";
+
+// Cor de humor da semana (pedido: "cor de acordo com o saldo dos
+// insights") -- um traço fino na lateral do bloco de cards em vez de um
+// gradiente de fundo (mais discreto, sem virar "tema colorido" cada
+// vez que abre a tela). Neutro fica com a borda padrão do app.
+const MOOD_BORDER: Record<WeekMood, string> = {
+  positivo: "border-positive/40",
+  atencao: "border-evolution/40",
+  neutro: "border-hairline",
+};
 
 // Home Diário — "diário do jogador": lista vertical de cards separados,
 // largura total (sem max-w, mesma convenção do resto do AppShell —
@@ -28,14 +39,21 @@ export default function DiarioPage() {
   const router = useRouter();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [streakDays, setStreakDays] = useState<number | null>(null);
+  const [last7Days, setLast7Days] = useState<boolean[] | null>(null);
+  const [weekMood, setWeekMood] = useState<WeekMood>("neutro");
 
   useEffect(() => {
     let alive = true;
     (async () => {
-      const [profileRes, progressRes] = await Promise.allSettled([fetchProfile(), fetchProgress()]);
+      const [profileRes, progressRes, activityRes] = await Promise.allSettled([
+        fetchProfile(),
+        fetchProgress(),
+        fetchLast7DaysActivity(),
+      ]);
       if (!alive) return;
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
       if (progressRes.status === "fulfilled") setStreakDays(progressRes.value.streak_days);
+      if (activityRes.status === "fulfilled") setLast7Days(activityRes.value);
     })();
     return () => {
       alive = false;
@@ -57,7 +75,7 @@ export default function DiarioPage() {
           conteúdo com várias colunas internas). */}
       <main className="w-full px-4 py-6 md:px-6">
         <div className="flex items-start justify-between gap-3">
-          <DiaryHeader nome={nome} streakDays={streakDays} />
+          <DiaryHeader nome={nome} streakDays={streakDays} last7Days={last7Days} />
           <Link
             href="/modulos"
             className="mt-1 flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline px-2.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
@@ -67,10 +85,11 @@ export default function DiarioPage() {
           </Link>
         </div>
 
-        <div className="mt-4 flex flex-col gap-4">
+        <div className={`mt-4 flex flex-col gap-4 border-l-2 pl-4 transition-colors duration-500 ${MOOD_BORDER[weekMood]}`}>
+          <ReflectionPrompt />
           <AgendaCard style={{ animationDelay: "60ms" }} />
           <WeeklyGoalsCard style={{ animationDelay: "120ms" }} />
-          <InsightsCard style={{ animationDelay: "180ms" }} />
+          <InsightsCard style={{ animationDelay: "180ms" }} onMood={setWeekMood} />
           <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
             {/* LeaksCard já é seu próprio card com título/estilo — some
                 sozinho (retorna null) quando não há leak recorrente
