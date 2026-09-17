@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import Link from "next/link";
 import { fetchGoals, fetchSessions, fetchStudyLogs } from "@/lib/services/bankroll-service";
 import { goalProgress } from "@/lib/bankroll/calc";
 import type { Goal, Session, StudyLog } from "@/lib/bankroll/types";
@@ -64,7 +65,12 @@ export function WeeklyGoalsCard({ style }: { style?: React.CSSProperties }) {
       {loading ? (
         <p className="mt-4 text-sm text-muted">Carregando…</p>
       ) : metasSemanais.length === 0 ? (
-        <p className="mt-4 text-sm text-muted">Nenhuma meta semanal definida ainda.</p>
+        <p className="mt-4 text-sm text-muted">
+          Nenhuma meta semanal definida ainda.{" "}
+          <Link href="/modulos" className="font-semibold text-ink underline underline-offset-2 hover:text-training">
+            Criar em Gestão de Banca → Minhas Metas
+          </Link>
+        </p>
       ) : (
         <ul className="mt-4 flex flex-col gap-4">
           {metasSemanais.map((g) => {
