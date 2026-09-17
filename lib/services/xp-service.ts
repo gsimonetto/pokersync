@@ -106,6 +106,32 @@ export async function fetchProgress(): Promise<Progress> {
   );
 }
 
+// Últimos 7 dias (mais antigo -> hoje), cada um true se o jogador
+// registrou algum evento de XP naquele dia -- usado pro tracker visual
+// de sequência do Diário (bolinhas), que precisa saber QUAIS dias
+// especificamente, não só a contagem corrida (streak_days). xp_events
+// já existe e tem RLS de leitura só das próprias linhas (auth.uid() =
+// user_id), então dá pra consultar direto do cliente sem RPC nova.
+export async function fetchLast7DaysActivity(): Promise<boolean[]> {
+  const supabase = createClient();
+  const hoje = new Date();
+  const inicio = new Date(hoje);
+  inicio.setDate(inicio.getDate() - 6);
+  inicio.setHours(0, 0, 0, 0);
+
+  const { data, error } = await supabase.from("xp_events").select("created_at").gte("created_at", inicio.toISOString());
+  if (error) return new Array(7).fill(false);
+
+  const diasComAtividade = new Set((data ?? []).map((r) => new Date(r.created_at).toDateString()));
+  const dias: boolean[] = [];
+  for (let i = 6; i >= 0; i--) {
+    const d = new Date(hoje);
+    d.setDate(d.getDate() - i);
+    dias.push(diasComAtividade.has(d.toDateString()));
+  }
+  return dias;
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchActiveMissions(): Promise<any[]> {
   const supabase = createClient();
