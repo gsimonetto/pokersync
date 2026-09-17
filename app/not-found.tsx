@@ -15,10 +15,10 @@ export default function NotFound() {
         <p className="mt-2 text-sm text-muted">O link pode estar errado ou a página pode ter mudado de lugar.</p>
       </div>
       <Link
-        href="/modulos"
+        href="/inicio"
         className="rounded-lg bg-ink px-4 py-2 text-sm font-semibold text-void transition-transform hover:scale-[1.02]"
       >
-        Voltar para os módulos
+        Voltar para o início
       </Link>
     </main>
   );

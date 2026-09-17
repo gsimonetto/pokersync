@@ -102,7 +102,7 @@ export async function GET(request: Request) {
 
       // Login com Google já cria sessão de verdade — aqui SIM deixamos
       // o usuário entrar direto, sem precisar digitar senha de novo.
-      redirect("/modulos");
+      redirect("/inicio");
     }
 
     redirect("/login?erro_confirmacao=1");

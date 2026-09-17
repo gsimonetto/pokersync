@@ -334,7 +334,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           }`}
         >
           {!collapsed && (
-            <Link href="/modulos" aria-label="Ir para Módulos">
+            <Link href="/inicio" aria-label="Ir para Início">
               <Logo className="h-10 w-auto" />
             </Link>
           )}
@@ -362,7 +362,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           <div className="fixed inset-0 bg-black/60" onClick={() => setMobileOpen(false)} aria-hidden="true" />
           <div className="relative flex h-full w-[264px] flex-col border-r border-hairline bg-surface">
             <div className="flex h-16 shrink-0 items-center justify-between border-b border-hairline px-5">
-              <Link href="/modulos" aria-label="Ir para Módulos" onClick={() => setMobileOpen(false)}>
+              <Link href="/inicio" aria-label="Ir para Início" onClick={() => setMobileOpen(false)}>
                 <Logo className="h-10 w-auto" />
               </Link>
               <button
@@ -394,9 +394,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           </button>
           <div className="flex items-center gap-1.5">
             <Link
-              href="/modulos"
+              href="/inicio"
               className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
-                pathname === "/modulos" ? "text-ink" : "text-muted"
+                pathname === "/inicio" ? "text-ink" : "text-muted"
               }`}
               aria-label="Início"
               title="Início"

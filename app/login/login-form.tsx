@@ -121,7 +121,7 @@ export default function LoginForm() {
   // redirect, achado em auditoria de seguranca).
   const [redirectTo] = useState(() => {
     const raw = searchParams.get("redirectTo");
-    return raw && /^\/(?!\/|\\)/.test(raw) ? raw : "/modulos";
+    return raw && /^\/(?!\/|\\)/.test(raw) ? raw : "/inicio";
   });
   const [expirado] = useState(() => searchParams.get("expirado") === "1");
   const [senhaRedefinida] = useState(() => searchParams.get("senha_redefinida") === "1");

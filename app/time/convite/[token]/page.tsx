@@ -86,7 +86,7 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
               <p className="mt-1 text-sm text-muted">
                 {MOTIVO[info?.reason ?? ""] ?? "Não foi possível validar este convite."} Peça um novo link ao time.
               </p>
-              <Link href="/modulos" className="mt-4 inline-block text-sm text-muted underline hover:text-ink">
+              <Link href="/inicio" className="mt-4 inline-block text-sm text-muted underline hover:text-ink">
                 Voltar para o início
               </Link>
             </div>
