@@ -6,7 +6,7 @@
 // sync (device, batch, dedupe, contagem).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
-import { splitHands, parseHand, handDateToISO, type ParsedHand } from "@/lib/poker/hand-parser";
+import { splitHands, parseHand, validateParsedHand, handDateToISO, type ParsedHand } from "@/lib/poker/hand-parser";
 import { extractTournamentInfo } from "@/lib/services/hand-session-service";
 
 export interface AgentDeviceInfo {
@@ -223,6 +223,11 @@ export async function processAgentSync(
     let parsed: ParsedHand | null = null;
     try {
       parsed = parseHand(block.rawText);
+      // RADAR-011: parseHand pode "conseguir" um resultado incompleto (ex.:
+      // mesa sem jogadores) sem lançar erro -- validateParsedHand pega isso
+      // e conta como erro de sync em vez de deixar uma mão quebrada entrar
+      // como se tivesse dado certo.
+      validateParsedHand(parsed);
     } catch {
       errors += 1;
       continue;

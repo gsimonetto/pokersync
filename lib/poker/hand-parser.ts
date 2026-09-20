@@ -860,8 +860,19 @@ function extractSeats(
   // "in chips"/"em fichas" agora OPCIONAL -- PartyPoker ("Seat 1: Player1
   // (1,500)") e 888poker ("Seat 1: Player1 ( 1,500 )") listam o stack sem
   // esse sufixo, so' entre parenteses (com ou sem espaco interno).
+  //
+  // FIX (2026-09-20, RADAR-011): o sufixo de bounty tem DUAS ordens
+  // diferentes no PokerStars real -- "Bounty of/de $X" (torneio PKO/Mystery
+  // Bounty PT-BR, formato original que este regex cobria) e "$X bounty"
+  // (formato padrao do client em ingles, minusculo, valor ANTES da
+  // palavra). Antes so' o primeiro casava -- toda mao de torneio bounty no
+  // formato "$X bounty" ficava com a linha "Seat" inteira sem match (o
+  // trecho ", $X bounty)" sobrava depois de "in chips" sem nada pra
+  // consumi-lo), entao a mao inteira perdia TODOS os assentos (nao so' o
+  // bounty), zerando heroPosition/VPIP/PFR pra ela. Ver 189/342 maos
+  // afetadas num sync real auditado em 2026-09-20.
   const seatRegex =
-    /^(?:Seat|Lugar) (\d+): (.+?) \(\s*\$?([\d.,]+)\s*(?:in chips|em fichas)?(?:,\s*Bounty (?:of|de) \$ ?([\d.,]+))?\s*\)/gim;
+    /^(?:Seat|Lugar) (\d+): (.+?) \(\s*\$?([\d.,]+)\s*(?:in chips|em fichas)?(?:,\s*(?:Bounty (?:of|de) \$\s?|\$)([\d.,]+)(?:\s*bounty)?)?\s*\)/gim;
   let m: RegExpExecArray | null;
   while ((m = seatRegex.exec(seatingSection)) !== null) {
     const seatNumber = Number(m[1]);
