@@ -95,6 +95,13 @@ export interface ParsedHand {
   // wonTournament, nao essa frase). Usado pra badge de 2o/3o lugar e "FT"
   // na lista de torneios.
   heroFinishPlace: number | null;
+  // Quantos bounties o heroi ganhou NESSA mao (0 na imensa maioria --
+  // só torneios PKO/Mystery Bounty tem essa linha, e mesmo lá só quando
+  // o heroi eliminou alguem). Quase sempre 0 ou 1, mas um all-in do
+  // heroi pode eliminar mais de um oponente na mesma mao (side pots),
+  // entao e' contagem, nao boolean. Somado entre todas as maos pra virar
+  // "Bounties conquistados" no Performance (ver StatisticsTab.tsx).
+  heroBountiesWon: number;
   // Matchup de posicao — SO preenchido quando exatamente 2 jogadores
   // chegam vivos ao flop (heroi + 1 villain). Com 3+ jogadores no flop
   // nao existe um "IP/OOP" unico valido, entao fica null de proposito
@@ -458,6 +465,20 @@ function extractHeroFinishPlace(text: string, heroName: string | null): number |
   if (!m || m[1] !== heroName) return null;
   const place = Number(m[2]);
   return Number.isFinite(place) ? place : null;
+}
+
+// Conta quantas vezes o heroi aparece na linha de premio de bounty
+// ("X wins $Y for eliminating Z and their own bounty increases..." /
+// "X ganha $ Y por eliminar Z e seu proprio 'bounty' aumenta..."). So'
+// existe em torneio PKO/Mystery Bounty. Ancora no heroName exato (em vez
+// do \S+ generico usado em extractHeroFinishPlace) porque nome de
+// jogador pode ter espaco (ex: "Glow of Mind") -- \S+ ia cortar no meio.
+function extractHeroBountiesWon(text: string, heroName: string | null): number {
+  if (!heroName) return 0;
+  const escaped = heroName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(`^${escaped} (?:wins \\$[\\d.,]+ for eliminating |ganha \\$ ?[\\d.,]+ por eliminar )`, "gim");
+  const matches = text.match(re);
+  return matches ? matches.length : 0;
 }
 
 function extractStakes(text: string): string | null {
@@ -986,6 +1007,7 @@ export function parseHand(rawText: string): ParsedHand {
     winner: extractWinner(rawText),
     wonTournament: extractWonTournament(rawText),
     heroFinishPlace: extractHeroFinishPlace(rawText, heroName),
+    heroBountiesWon: extractHeroBountiesWon(rawText, heroName),
     streets,
     rawText,
     seats,

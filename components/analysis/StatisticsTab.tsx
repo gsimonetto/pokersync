@@ -16,6 +16,7 @@ import {
   Flame,
   Snowflake,
   ChevronDown,
+  Target,
 } from "lucide-react";
 import { Painel, StatList } from "@/components/dashboard/kit";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -199,6 +200,12 @@ export function StatisticsTab({
               value: totalTorneiosCount > 0 ? fmtMoneyPlain(totalGanhosImportado) : null,
               icon: Trophy,
               tone: totalGanhosImportado > 0 ? "bom" : undefined,
+            },
+            {
+              label: "Bounties conquistados",
+              value: metrics.total_bounties_won > 0 ? String(metrics.total_bounties_won) : null,
+              icon: Target,
+              tone: metrics.total_bounties_won > 0 ? "bom" : undefined,
             },
             { label: "Jogando desde", value: fmtSince(metrics.since), icon: CalendarClock },
             { label: "Último torneio", value: fmtSince(metrics.until), icon: CalendarCheck },
