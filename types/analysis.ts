@@ -211,6 +211,13 @@ export interface TournamentMetrics {
   chip_ev_total: number | null; // cEV acumulado, em chips
   cev_per_game: number | null;
   ev_roi_pct: number | null;
+  // Total de bounties (recompensas por eliminação) que o herói já
+  // conquistou, somado em TODAS as mãos importadas (torneio PKO/Mystery
+  // Bounty) — independe do filtro de buy-in, mesmo espírito de
+  // "Torneios"/"Ganhos" em StatisticsTab.tsx (conta tudo que foi
+  // importado). Vem de hand_reviews.parsed_data->heroBountiesWon (ver
+  // extractHeroBountiesWon em hand-parser.ts), não de hand_sessions.
+  total_bounties_won: number;
 }
 
 export interface BlindLevelPerformance {

@@ -445,7 +445,12 @@ interface ImportedTournament {
 }
 
 export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): Promise<TournamentMetrics> {
-  const [sessionsAll, payouts, evResults] = await Promise.all([fetchTournamentSessions(), fetchTournamentPayouts(), fetchHandEvResults()]);
+  const [sessionsAll, payouts, evResults, totalBountiesWon] = await Promise.all([
+    fetchTournamentSessions(),
+    fetchTournamentPayouts(),
+    fetchHandEvResults(),
+    fetchTotalBountiesWon(),
+  ]);
   const payoutByTournament = new Map(payouts.map((p) => [p.tournamentIdPs, p]));
 
   const tournaments: ImportedTournament[] = sessionsAll
@@ -550,7 +555,22 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
     chip_ev_total: evResults.length > 0 ? Math.round(chipEvTotal * 100) / 100 : null,
     cev_per_game: evResults.length > 0 && tournaments.length > 0 ? Math.round((chipEvTotal / tournaments.length) * 100) / 100 : null,
     ev_roi_pct: evResults.length > 0 && invested > 0 ? Math.round((netEvProfit / invested) * 1000) / 10 : null,
+    total_bounties_won: totalBountiesWon,
   };
+}
+
+// Soma heroBountiesWon de TODAS as mãos importadas (hand_reviews) do
+// jogador — cada mão de torneio PKO/Mystery Bounty em que o herói
+// eliminou alguém conta o valor extraído em extractHeroBountiesWon
+// (hand-parser.ts). Independe de buy-in/sessão: mãos avulsas coladas
+// manualmente no Revisor também contam, mesmo espírito de "Torneios"/
+// "Ganhos" (conta tudo que foi importado). Mão sem heroBountiesWon
+// (ainda não reprocessada, ou parsed_data nulo) soma 0, nunca quebra.
+async function fetchTotalBountiesWon(): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("hand_reviews").select("bounties:parsed_data->>heroBountiesWon");
+  if (error) throw error;
+  return (data ?? []).reduce((acc, row) => acc + (Number((row as { bounties: string | null }).bounties) || 0), 0);
 }
 
 // Sessões de torneio (hand_sessions, mesmo agrupador do Revisor) — é onde
