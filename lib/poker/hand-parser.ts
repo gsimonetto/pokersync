@@ -102,6 +102,10 @@ export interface ParsedHand {
   // entao e' contagem, nao boolean. Somado entre todas as maos pra virar
   // "Bounties conquistados" no Performance (ver StatisticsTab.tsx).
   heroBountiesWon: number;
+  // Valor em dolar dos bounties da linha acima, somado (0 quando
+  // heroBountiesWon e' 0). Mesma fonte (linha "wins $Y for eliminating"/
+  // "ganha $ Y por eliminar"), so' que somando o valor em vez de contar.
+  heroBountyCashWon: number;
   // Matchup de posicao — SO preenchido quando exatamente 2 jogadores
   // chegam vivos ao flop (heroi + 1 villain). Com 3+ jogadores no flop
   // nao existe um "IP/OOP" unico valido, entao fica null de proposito
@@ -473,12 +477,20 @@ function extractHeroFinishPlace(text: string, heroName: string | null): number |
 // existe em torneio PKO/Mystery Bounty. Ancora no heroName exato (em vez
 // do \S+ generico usado em extractHeroFinishPlace) porque nome de
 // jogador pode ter espaco (ex: "Glow of Mind") -- \S+ ia cortar no meio.
-function extractHeroBountiesWon(text: string, heroName: string | null): number {
-  if (!heroName) return 0;
+function extractHeroBountiesWon(text: string, heroName: string | null): { count: number; cashWon: number } {
+  if (!heroName) return { count: 0, cashWon: 0 };
   const escaped = heroName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-  const re = new RegExp(`^${escaped} (?:wins \\$[\\d.,]+ for eliminating |ganha \\$ ?[\\d.,]+ por eliminar )`, "gim");
-  const matches = text.match(re);
-  return matches ? matches.length : 0;
+  // Grupo 1 captura o valor do bounty (mesmo em ambos idiomas) -- usado
+  // pra somar o total em dolar, nao so contar quantas vezes aconteceu.
+  const re = new RegExp(`^${escaped} (?:wins \\$([\\d.,]+) for eliminating |ganha \\$ ?([\\d.,]+) por eliminar )`, "gim");
+  let count = 0;
+  let cashWon = 0;
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text)) !== null) {
+    count++;
+    cashWon += Number((m[1] ?? m[2]).replace(",", ""));
+  }
+  return { count, cashWon: Math.round(cashWon * 100) / 100 };
 }
 
 function extractStakes(text: string): string | null {
@@ -993,6 +1005,8 @@ export function parseHand(rawText: string): ParsedHand {
   const rawFormat = extractFormat(rawText);
   const format = rawFormat === "MTT" && maxSeats !== null && maxSeats <= 3 ? "SNG" : rawFormat;
 
+  const heroBounties = extractHeroBountiesWon(rawText, heroName);
+
   return {
     site,
     handId: extractHandId(rawText),
@@ -1007,7 +1021,8 @@ export function parseHand(rawText: string): ParsedHand {
     winner: extractWinner(rawText),
     wonTournament: extractWonTournament(rawText),
     heroFinishPlace: extractHeroFinishPlace(rawText, heroName),
-    heroBountiesWon: extractHeroBountiesWon(rawText, heroName),
+    heroBountiesWon: heroBounties.count,
+    heroBountyCashWon: heroBounties.cashWon,
     streets,
     rawText,
     seats,

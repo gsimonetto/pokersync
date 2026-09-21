@@ -555,7 +555,8 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
     chip_ev_total: evResults.length > 0 ? Math.round(chipEvTotal * 100) / 100 : null,
     cev_per_game: evResults.length > 0 && tournaments.length > 0 ? Math.round((chipEvTotal / tournaments.length) * 100) / 100 : null,
     ev_roi_pct: evResults.length > 0 && invested > 0 ? Math.round((netEvProfit / invested) * 1000) / 10 : null,
-    total_bounties_won: totalBountiesWon,
+    total_bounties_won: totalBountiesWon.count,
+    total_bounty_cash_won: Math.round(totalBountiesWon.cash * 100) / 100,
   };
 }
 
@@ -566,11 +567,19 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
 // manualmente no Revisor também contam, mesmo espírito de "Torneios"/
 // "Ganhos" (conta tudo que foi importado). Mão sem heroBountiesWon
 // (ainda não reprocessada, ou parsed_data nulo) soma 0, nunca quebra.
-async function fetchTotalBountiesWon(): Promise<number> {
+async function fetchTotalBountiesWon(): Promise<{ count: number; cash: number }> {
   const supabase = createClient();
-  const { data, error } = await supabase.from("hand_reviews").select("bounties:parsed_data->>heroBountiesWon");
+  const { data, error } = await supabase
+    .from("hand_reviews")
+    .select("count:parsed_data->>heroBountiesWon, cash:parsed_data->>heroBountyCashWon");
   if (error) throw error;
-  return (data ?? []).reduce((acc, row) => acc + (Number((row as { bounties: string | null }).bounties) || 0), 0);
+  return (data ?? []).reduce(
+    (acc, row) => {
+      const r = row as { count: string | null; cash: string | null };
+      return { count: acc.count + (Number(r.count) || 0), cash: acc.cash + (Number(r.cash) || 0) };
+    },
+    { count: 0, cash: 0 }
+  );
 }
 
 // Sessões de torneio (hand_sessions, mesmo agrupador do Revisor) — é onde
