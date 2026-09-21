@@ -218,6 +218,9 @@ export interface TournamentMetrics {
   // importado). Vem de hand_reviews.parsed_data->heroBountiesWon (ver
   // extractHeroBountiesWon em hand-parser.ts), não de hand_sessions.
   total_bounties_won: number;
+  // Valor em dólar somado dos bounties acima (hand_reviews.parsed_data->
+  // heroBountyCashWon) — 0 quando total_bounties_won é 0.
+  total_bounty_cash_won: number;
 }
 
 export interface BlindLevelPerformance {

@@ -203,7 +203,10 @@ export function StatisticsTab({
             },
             {
               label: "Bounties conquistados",
-              value: metrics.total_bounties_won > 0 ? String(metrics.total_bounties_won) : null,
+              value:
+                metrics.total_bounties_won > 0
+                  ? `${metrics.total_bounties_won} (${fmtMoneyPlain(metrics.total_bounty_cash_won) ?? "$0"})`
+                  : null,
               icon: Target,
               tone: metrics.total_bounties_won > 0 ? "bom" : undefined,
             },
