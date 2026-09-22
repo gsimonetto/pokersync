@@ -20,25 +20,53 @@ export function PainelStyles() {
         flex: 1 1 auto;
       }
 
-      /* Fundo de fichas de poker (public/fichas-painel.svg, desenhado em
-         vetor) + a grade de pontos da tela de login por cima. O fundo
-         existe por um motivo prático, não decorativo: o efeito de vidro
-         fosco dos cards borra o que está ATRÁS deles -- sobre preto liso
-         não há o que borrar e o vidro some. O próprio SVG já traz um véu
-         escuro pra garantir a leitura do texto. */
+      /* Fundo: foto de ases e fichas em preto e dourado
+         (public/fundo-painel.jpg, escolhida pelo usuário). Substitui a
+         grade de pontos e as fichas desenhadas em vetor. Continua
+         existindo por um motivo prático: o vidro fosco dos cards borra o
+         que está ATRÁS deles, e sobre preto liso o efeito some.
+
+         A foto é pequena e em pé (450x800). Esticada na largura de um
+         monitor ela ficaria quase 4x maior que o original, borrada. Por
+         isso, no celular (tela em pé, como a foto) ela cobre a tela
+         inteira, e no computador fica encostada à direita, na altura da
+         tela, com a borda esquerda sumindo no preto. As bordas da própria
+         foto já são pretas, então ela se funde com o fundo da página. */
       .painel::before {
         content: "";
         position: absolute;
-        inset: 0;
+        top: 0;
+        left: 0;
+        right: 0;
+        /* No celular a página rola: a foto ocupa só a primeira tela e o
+           resto da página segue preto, em vez de esticar a foto pela
+           altura inteira do conteúdo. */
+        height: 100svh;
         z-index: -1;
         background-image:
-          radial-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
-          url("/fichas-painel.svg");
-        background-size: 32px 32px, cover;
-        background-attachment: scroll, fixed;
-        background-position: center, center;
-        background-repeat: repeat, no-repeat;
+          linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)),
+          url("/fundo-painel.jpg");
+        background-size: cover, cover;
+        background-position: center, center 65%;
+        background-repeat: no-repeat;
+        /* Some aos poucos embaixo, sem corte seco entre foto e preto. */
+        -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
+        mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
         pointer-events: none;
+      }
+      @media (min-width: 1280px) {
+        /* No computador a foto cobre a área toda. Ela fica bem maior que
+           o original (450x800), mas quase tudo dela é visto ATRAVÉS do
+           vidro fosco dos cards, que já desfoca -- e o fundo da própria
+           foto é desfocado (profundidade de campo), então a ampliação
+           não aparece. Encostada à direita no tamanho original, ela
+           ficava escondida atrás da coluna da direita e quase não se via. */
+        .painel::before {
+          height: 100%;
+          background-position: center, center 62%;
+          -webkit-mask-image: none;
+          mask-image: none;
+        }
       }
       .painel::after {
         content: "";
