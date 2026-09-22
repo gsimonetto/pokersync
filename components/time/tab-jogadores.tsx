@@ -3,19 +3,15 @@
 import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { ChevronRight, ChevronDown, Info, Search, ArrowUpDown, MoreVertical, X, Tag, UserCog, Send, UserMinus, MessageCircle } from "lucide-react";
+import { ChevronRight, ChevronDown, Info, Search, ArrowUpDown, Send, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { Chip } from "@/components/chip";
-import { RankChip } from "@/components/ui/rank-chip";
 import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { PlayerDetailModal } from "@/components/time/player-detail-modal";
 import {
-  assignCoach,
   assignTeamDrill,
   calcularScore,
   fetchTeamLeakPlayers,
-  removeMember,
-  setMemberLabel,
   traduzErroTime,
   type TeamDashboardRow,
   type TeamLabel,
@@ -25,14 +21,13 @@ import {
 import { BRL } from "@/lib/format";
 
 // Lista de jogadores. Decisoes de UX:
-// - nivel colado ao nome (identidade do jogador, nao metrica);
-// - etiqueta como chip colorido, sempre visivel na linha;
-// - coach e demais acoes administrativas saem da linha e vao para um
-//   menu "Acoes" (⋮) com modal — a linha fica para leitura, o admin
-//   so abre a modal quando de fato vai alterar algo;
+// - mesmo cartão "elenco de time" usado pros coaches/admin na aba
+//   Perfil (foto grande + nome embaixo) — so' identidade + dinheiro
+//   ganho/contribuído ao time; tudo mais (score, streak, etiqueta,
+//   coach, remover, conversar) mora na ficha completa, que abre ao
+//   clicar no nome/foto;
 // - filtro por etiqueta em cima, porque time grande se organiza por
-//   buy-in e o coach quase sempre olha um recorte, nao a lista toda;
-// - linha inteira clicavel para a ficha — menos fricção que um botao.
+//   buy-in e o coach quase sempre olha um recorte, nao a lista toda.
 
 type Ordem = "nome" | "risco" | "xp" | "treinos" | "acerto" | "revisadas" | "resultado";
 
@@ -76,10 +71,8 @@ export function TabJogadores({
   const [filtroLabel, setFiltroLabel] = useState<string>("todas");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("nome");
-  const [acaoAberta, setAcaoAberta] = useState<TeamDashboardRow | null>(null);
-  const [expandidos, setExpandidos] = useState<Set<string>>(new Set());
   // Ficha cadastral abre em modal em vez de navegar pra fora da lista --
-  // preserva filtro, busca e linhas expandidas ao fechar.
+  // preserva filtro e busca ao fechar.
   const [fichaAberta, setFichaAberta] = useState<string | null>(null);
 
   // Conversar nunca abre um chat solto -- sempre manda pra Central de
@@ -88,15 +81,6 @@ export function TabJogadores({
   // deep-link da notificacao).
   function abrirConversa(userId: string) {
     router.push(`/modulos?chat=${userId}`);
-  }
-
-  function alternarExpandido(userId: string) {
-    setExpandidos((prev) => {
-      const next = new Set(prev);
-      if (next.has(userId)) next.delete(userId);
-      else next.add(userId);
-      return next;
-    });
   }
 
   const lista = useMemo(() => {
@@ -170,326 +154,47 @@ export function TabJogadores({
       {lista.length === 0 ? (
         <p className="mt-6 text-sm text-muted">Nenhum jogador neste recorte.</p>
       ) : (
-        <ul className="mt-4 flex flex-col gap-2.5">
-          {lista.map((j, idx) => {
-            const pct = j.treinos > 0 ? Math.round((j.acertosGto / j.treinos) * 100) : null;
-            const aberto = expandidos.has(j.userId);
-            return (
-              // Crachá do jogador -- mesmo tratamento visual (card com
-              // borda/fundo elevado) usado no Marketplace pro crachá do
-              // candidato, pra consistência entre as duas listas de
-              // pessoas do produto.
-              <li key={j.userId} className="rounded-lg border border-hairline bg-elevated p-3 transition-colors hover:border-white/15">
-                {/* Flex com quebra, nao grid de colunas fixas -- o grid
-                    antigo (16/84/36/36/36px fixos + 1fr pro nome) nao
-                    sobrava espaço nenhum pro nome+badges no celular
-                    (badges empilhavam por cima do avatar/resultado em vez
-                    de so' quebrar linha), reportado como lista quebrada.
-                    Com flex-wrap, resultado+ações formam um bloco que
-                    desce pra segunda linha inteiro quando não cabe, em
-                    vez de cada coluna colidir com a vizinha. */}
-                <div className="flex flex-wrap items-center gap-x-2.5 gap-y-2">
-                  <span className={`w-4 shrink-0 text-center text-[13px] font-bold tnum ${
-                    ordem !== "nome" ? (idx === 0 ? "text-evolution" : "text-muted") : "invisible"
-                  }`}>
-                    {ordem !== "nome" ? idx + 1 : "·"}
-                  </span>
-
-                  <Avatar id={j.avatarId} url={j.avatarUrl} size={38} className="shrink-0" />
-
-                  <div className="min-w-0 flex-1 basis-40">
-                    {/* Lista fica so' com identidade + etiqueta (pedido
-                        explicito: "manter essa tela clean... as
-                        informacoes necessarias precisam estar dentro do
-                        perfil quando o coach clicar") -- score, streak,
-                        data de entrada e inatividade saem daqui; todas ja
-                        aparecem na ficha completa (PlayerDetailModal),
-                        que abre ao clicar no nome ou em "Ver ficha
-                        completa" abaixo. */}
-                    <div className="flex flex-wrap items-center gap-2">
-                      <button onClick={() => setFichaAberta(j.userId)} className="truncate text-sm font-medium hover:underline">
-                        {j.nome}
-                      </button>
-                      <RankChip level={j.level ?? 1} />
-                      {j.labelName && j.labelColor && (
-                        <Chip color={j.labelColor} size="sm">{j.labelName}</Chip>
-                      )}
-                    </div>
-                  </div>
-
-                  <div className="ml-auto flex shrink-0 items-center gap-2.5">
-                    <div className="text-right">
-                      {ordem === "xp" ? (
-                        <>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">XP no período</p>
-                          <p className="text-[13px] font-medium tnum text-evolution">{j.xpPeriodo} XP</p>
-                        </>
-                      ) : (
-                        <>
-                          <p className="text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">Resultado</p>
-                          <p className={`text-[13px] font-medium tnum ${
-                            j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-ink/90"
-                          }`}>
-                            {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
-                          </p>
-                        </>
-                      )}
-                    </div>
-
-                    {podeConversar && (
-                      <button
-                        onClick={() => abrirConversa(j.userId)}
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-                        aria-label={`Conversar com ${j.nome}`}
-                      >
-                        <MessageCircle size={15} />
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => alternarExpandido(j.userId)}
-                      className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-                      aria-label={aberto ? `Recolher informações de ${j.nome}` : `Ver informações de ${j.nome}`}
-                    >
-                      <ChevronDown size={15} className={`transition-transform ${aberto ? "rotate-180" : ""}`} />
-                    </button>
-
-                    {isAdmin && (
-                      <button
-                        onClick={() => setAcaoAberta(j)}
-                        className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink print:hidden"
-                        aria-label={`Ações para ${j.nome}`}
-                      >
-                        <MoreVertical size={15} />
-                      </button>
-                    )}
-                  </div>
-                </div>
-
-                {aberto && (
-                  // Sem fundo/borda proprios: o card ja e' bg-elevated
-                  // agora, uma segunda caixa da mesma cor so' empilhava
-                  // contorno sem contraste -- um divisor simples basta.
-                  <div className="mt-2.5 ml-[74px] border-t border-hairline pt-3">
-                    <div className="grid grid-cols-4 gap-3 sm:max-w-xs">
-                      <Metrica label="Treinos" valor={String(j.treinos)} />
-                      <Metrica label="GTO" valor={pct === null ? "—" : `${pct}%`} />
-                      <Metrica label="Revisadas" valor={String(j.maosRevisadas)} />
-                      <Metrica label="Jogos" valor={String(j.jogosNoTime)} />
-                    </div>
-                    <button
-                      onClick={() => setFichaAberta(j.userId)}
-                      className="mt-2.5 flex items-center gap-1 border-t border-hairline pt-2.5 text-[12px] font-medium text-ink hover:underline"
-                    >
-                      Ver ficha completa <ChevronRight size={13} />
-                    </button>
-                  </div>
-                )}
-              </li>
-            );
-          })}
+        // Cartela estilo "elenco de time" -- mesmo card usado pra
+        // coaches/admin na aba Perfil (foto grande, nome embaixo): so'
+        // identidade + dinheiro ganho/contribuído ao time. O resto
+        // (score, streak, treinos, etiqueta, ações de admin) mora na
+        // ficha completa, que abre ao clicar no nome.
+        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
+          {lista.map((j) => (
+            <li key={j.userId} className="flex flex-col items-center gap-2.5 rounded-lg border border-hairline bg-elevated px-3 py-4 text-center transition-colors hover:border-white/15">
+              <button onClick={() => setFichaAberta(j.userId)} aria-label={`Ver ficha de ${j.nome}`}>
+                <Avatar id={j.avatarId} url={j.avatarUrl} size={72} />
+              </button>
+              <div className="min-w-0">
+                <button onClick={() => setFichaAberta(j.userId)} className="truncate text-sm font-semibold hover:underline">
+                  {j.nome}
+                </button>
+                <p className={`mt-1 text-[13px] font-medium tnum ${
+                  j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-muted"
+                }`}>
+                  {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
+                </p>
+              </div>
+            </li>
+          ))}
         </ul>
-      )}
-
-      {acaoAberta && (
-        <AcoesJogadorModal
-          jogador={acaoAberta}
-          labels={labels}
-          coaches={coaches}
-          isAdmin={isAdmin}
-          onFechar={() => setAcaoAberta(null)}
-          onAbrirConversa={() => {
-            abrirConversa(acaoAberta.userId);
-            setAcaoAberta(null);
-          }}
-          onChange={onChange}
-          onErro={onErro}
-        />
       )}
       </section>
 
       {fichaAberta && (
-        <PlayerDetailModal playerId={fichaAberta} onFechar={() => setFichaAberta(null)} />
+        <PlayerDetailModal
+          playerId={fichaAberta}
+          onFechar={() => setFichaAberta(null)}
+          jogador={jogadores.find((j) => j.userId === fichaAberta)}
+          labels={labels}
+          coaches={coaches}
+          isAdmin={isAdmin}
+          podeConversar={podeConversar}
+          onAbrirConversa={() => abrirConversa(fichaAberta)}
+          onChange={onChange}
+          onErro={onErro}
+        />
       )}
-    </div>
-  );
-}
-
-// ------------------------------------------------------------
-// Modal de ações por jogador. Etiqueta, coach e remoção são
-// exclusivas de admin; conversar é liberado também pro coach (o
-// backend send_team_message já aceita qualquer par do mesmo time).
-// ------------------------------------------------------------
-function AcoesJogadorModal({
-  jogador,
-  labels,
-  coaches,
-  isAdmin,
-  onFechar,
-  onAbrirConversa,
-  onChange,
-  onErro,
-}: {
-  jogador: TeamDashboardRow;
-  labels: TeamLabel[];
-  coaches: { userId: string; nome: string }[];
-  isAdmin: boolean;
-  onFechar: () => void;
-  onAbrirConversa: () => void;
-  onChange: () => void;
-  onErro: (s: string) => void;
-}) {
-  const [labelId, setLabelId] = useState(jogador.labelId ?? "");
-  const [coachId, setCoachId] = useState(jogador.coachId ?? "");
-  const [salvando, setSalvando] = useState(false);
-  const [confirmarRemover, setConfirmarRemover] = useState(false);
-  const [removendo, setRemovendo] = useState(false);
-
-  async function salvarEtiquetaCoach() {
-    setSalvando(true);
-    try {
-      if (labelId !== (jogador.labelId ?? "")) await setMemberLabel(jogador.userId, labelId || null);
-      if (coachId !== (jogador.coachId ?? "")) await assignCoach(jogador.userId, coachId || null);
-      onChange();
-      onFechar();
-    } catch (e) {
-      onErro(traduzErroTime(e));
-    } finally {
-      setSalvando(false);
-    }
-  }
-
-  async function confirmarRemocao() {
-    setRemovendo(true);
-    try {
-      await removeMember(jogador.userId);
-      onChange();
-      onFechar();
-    } catch (e) {
-      onErro(traduzErroTime(e));
-    } finally {
-      setRemovendo(false);
-    }
-  }
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
-      <div
-        className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="flex items-center gap-3">
-          <Avatar id={jogador.avatarId} url={jogador.avatarUrl} size={36} />
-          <div className="min-w-0 flex-1">
-            <p className="truncate text-sm font-semibold">{jogador.nome}</p>
-            <p className="text-xs text-muted">Ações do jogador</p>
-          </div>
-          <button onClick={onFechar} className="grid h-7 w-7 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="mt-5 space-y-4">
-          {isAdmin && (
-            <>
-              <div>
-                <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                  <Tag size={12} /> Etiqueta
-                </label>
-                <select
-                  value={labelId}
-                  onChange={(e) => setLabelId(e.target.value)}
-                  className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
-                >
-                  <option value="">Sem etiqueta</option>
-                  {labels.map((l) => (
-                    <option key={l.id} value={l.id}>{l.name}</option>
-                  ))}
-                </select>
-              </div>
-
-              {coaches.length > 0 && (
-                <div>
-                  <label className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
-                    <UserCog size={12} /> Coach
-                  </label>
-                  <select
-                    value={coachId}
-                    onChange={(e) => setCoachId(e.target.value)}
-                    className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
-                  >
-                    <option value="">Sem coach</option>
-                    {coaches.map((c) => (
-                      <option key={c.userId} value={c.userId}>{c.nome}</option>
-                    ))}
-                  </select>
-                </div>
-              )}
-
-              <button
-                onClick={salvarEtiquetaCoach}
-                disabled={salvando}
-                className="w-full rounded-lg bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.01] disabled:opacity-50"
-              >
-                {salvando ? "Salvando…" : "Salvar alterações"}
-              </button>
-            </>
-          )}
-
-          <div className={isAdmin ? "border-t border-hairline pt-4" : undefined}>
-            <button
-              onClick={onAbrirConversa}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-hairline px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-ink/40"
-            >
-              <MessageCircle size={14} />
-              Abrir conversa
-            </button>
-          </div>
-
-          {isAdmin && (
-            <div className="border-t border-hairline pt-4">
-              {!confirmarRemover ? (
-                <button
-                  onClick={() => setConfirmarRemover(true)}
-                  className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-negative/40 px-4 py-2 text-sm font-medium text-negative transition-colors hover:bg-negative/10"
-                >
-                  <UserMinus size={14} />
-                  Remover do time
-                </button>
-              ) : (
-                <div className="rounded-lg border border-negative/40 bg-negative/10 p-3">
-                  <p className="text-[13px] text-negative">Remover {jogador.nome} do time? Essa ação não pode ser desfeita.</p>
-                  <div className="mt-2 flex gap-2">
-                    <button
-                      onClick={() => setConfirmarRemover(false)}
-                      className="flex-1 rounded-lg border border-hairline px-3 py-1.5 text-[13px] text-ink hover:border-ink/40"
-                    >
-                      Cancelar
-                    </button>
-                    <button
-                      onClick={confirmarRemocao}
-                      disabled={removendo}
-                      className="flex-1 rounded-lg bg-negative px-3 py-1.5 text-[13px] font-semibold text-void transition-transform hover:scale-[1.01] disabled:opacity-50"
-                    >
-                      {removendo ? "Removendo…" : "Confirmar remoção"}
-                    </button>
-                  </div>
-                </div>
-              )}
-            </div>
-          )}
-        </div>
-      </div>
-    </div>
-  );
-}
-
-function Metrica({ label, valor, tom }: { label: string; valor: string; tom?: "positivo" | "negativo" }) {
-  const cor = tom === "positivo" ? "text-positive" : tom === "negativo" ? "text-negative" : "text-ink/90";
-  return (
-    <div className="min-w-0">
-      <p className="truncate text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">{label}</p>
-      <p className={`text-[13px] font-medium tnum ${cor}`}>{valor}</p>
     </div>
   );
 }

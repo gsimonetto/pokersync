@@ -10,7 +10,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC MAIN — 72%
+## POKERSYNC MAIN — 81%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
@@ -20,8 +20,8 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-004 | Construtor de Ranges e Árvores | 🟢 | 🟡 P2 | — |
 | MAIN-005 | Player Evolution (core) | 🟢 | 🟡 P2 | — |
 | MAIN-006 | Módulo de Análise | 🟢 | 🟠 P1 | — |
-| MAIN-007 | cEV/ICM por mão (consumo) | ⚠️ | 🔴 P0 | reconstruir a UI removida em 12/09 |
-| MAIN-008 | Estatísticas de oponente | 🔵 | 🟡 P2 | desenhar schema por jogador |
+| MAIN-007 | cEV/ICM por mão (consumo) | 🟢 | 🔴 P0 | — |
+| MAIN-008 | Estatísticas de oponente | 🟢 | 🟡 P2 | — |
 | MAIN-009 | HUD em tempo real | 🔵 | ⚪ P3 | não priorizado |
 | MAIN-010 | Plataforma para Times (core) | 🟢 | 🟡 P2 | — |
 | MAIN-011 | Score de evolução consolidado | 🟢 | 🟡 P2 | — |
@@ -39,6 +39,9 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-023 | `engine_version` em `hand_ev_results` | 🟢 | ⚪ P3 | — |
 | MAIN-024 | Sincronizar board externo do roadmap | 🔵 | ⚪ P3 | avaliar aposentar em favor do Cockpit |
 | MAIN-025 | Limpeza: arquivo de backup órfão | 🟢 | ⚪ P3 | — |
+| MAIN-026 | Sistema de Amigos (chat 1:1 fora de Time) | 🟢 | 🟡 P2 | — |
+| MAIN-027 | Widget de torneios ao vivo (BSOP/WSOP) | 🟢 | 🟡 P2 | — |
+| MAIN-028 | Central de Notificações | 🟢 | ⚪ P3 | — |
 
 ### Destaque — MAIN-003 Modo Treino
 **Objetivo:** treinar o jogador com spots reais gerados pelo motor.
@@ -52,36 +55,60 @@ dado ilustrativo/de teste, removida em 13/09/2026 a pedido do dono.
 **Próximo passo:** ver MAIN-021 (pipeline pós-flop ponta a ponta).
 **Dependências:** MAIN-021.
 
-### Destaque — MAIN-007 cEV/ICM por mão ⚠️ precisa atenção
+### Destaque — MAIN-008 Estatísticas de oponente 🟢 concluído (achado da auditoria de 22/09)
+**Objetivo:** mostrar estatísticas do oponente (VPIP, PFR, 3-Bet etc.),
+não só do próprio jogador.
+**O que existe:** construído em 15/09/2026, mas nunca tinha entrado no
+roadmap — a última auditoria (14/09) ficou pra trás. Não depende mais
+só do parser: a tabela `hand_opponent_tags` no banco real já tem 4939
+linhas de 147 oponentes distintos, preenchida automaticamente por um
+trigger toda vez que uma mão é salva no Revisor. As estatísticas (VPIP,
+PFR, 3-Bet, Fold to 3-Bet, C-Bet, Fold to C-Bet, fator de agressão,
+WTSD, W$SD) aparecem num card clicável no assento do oponente dentro
+do Revisor de Mãos, que abre um modal com o detalhe completo.
+**O que falta:** nada no Revisor. O mesmo recurso existe no Modo Treino
+mas está desligado por flag (`HUD_ENABLED=false`), a pedido explícito —
+isso é uma decisão tomada, não uma pendência.
+**Dependências:** nenhuma.
+
+### Destaque — MAIN-007 cEV/ICM por mão 🟢 concluído
 **Objetivo:** mostrar o EV real (ajustado por sorte) de mãos all-in já
 jogadas.
 **O que existe:** endpoint no produto pronto e mergeado
 (`app/api/hand-ev/compute`), chama o motor via HTTP. Deploy do motor
 confirmado ativo (BLOQUEIO-001 resolvido) e `SOLVER_API_URL`/
 `SOLVER_API_KEY` já configuradas no Vercel (Production) desde
-03/09/2026 — isso tudo é real e continua valendo.
-**O que falta:** a auditoria de 13/09/2026 marcou este item como
-concluído por causa da mensagem de um commit ("confirma que está
-pronto ponta a ponta"), sem checar que a UI de consumo (painel "cEV &
-ICM" em `StatisticsTab.tsx`) tinha sido removida do produto horas
-antes, em 12/09/2026, a pedido do dono (pra reavaliar depois). Hoje
-não existe nenhuma tela que chame o cálculo — corrigido nesta
-auditoria (14/09/2026), consistente com a ADR-015 (código é sempre a
-fonte de verdade, nunca a mensagem de commit).
-**Próximo passo:** decidir onde reexibir cEV/ICM no produto (Revisor
-por mão? Performance de volta?) e reconstruir a UI — motor e deploy já
-estão prontos, falta só a camada de produto.
+03/09/2026. A UI removida em 12/09/2026 foi reconstruída no Revisor de
+Mãos (`revisor-detalhe.tsx` e `revisor-hand-table.tsx`, inclusive
+versão mobile) entre 15 e 16/09/2026: botão "Calcular EV/ICM",
+mensagens de erro em linguagem simples e cards de resultado — tudo
+chamando `computeHandEv`/`fetchHandEvResult` (`hand-ev-service.ts`),
+que hoje têm chamadores reais confirmados por grep no repo.
+**O que falta:** nada — heads-up e multiway (SOLVER-014) já estão os
+dois em produção via essa mesma tela.
 **Dependências:** SOLVER-013, SOLVER-018 (ambos concluídos do lado do
 motor).
 
+### Destaque — MAIN-026/027/028: 3 módulos prontos que nunca entraram no roadmap
+Achados na mesma auditoria de 22/09/2026, todos já em produção:
+- **MAIN-026 Sistema de Amigos:** chat 1:1 entre jogadores que não têm
+  time em comum (pedido de amizade por apelido+código, presença
+  online, mensagens diretas).
+- **MAIN-027 Torneios ao vivo:** widget na agenda/diário que mostra
+  quando um torneio de grife (BSOP/WSOP) está transmitindo ao vivo no
+  YouTube, com link direto.
+- **MAIN-028 Central de Notificações:** `/notificacoes`, com
+  categorias (sistema/tarefas/time), marcar lida/excluir e contador de
+  não lidas — usada por vários outros módulos pra deep-link.
+
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## RADAR POKERSYNC (addon + agente desktop) — 80%
+## RADAR POKERSYNC (addon + agente desktop) — 89%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
 | RADAR-001 | Painel in-app (RadarPanel + gating) | 🟢 | 🟡 P2 | — |
-| RADAR-002 | Agente desktop (repo `pokersync-agent`/`pokersync-radar`) | 🟠 | 🟠 P1 | validado com 1 instalação Windows real; confirmar mais usuários/salas |
+| RADAR-002 | Agente desktop (repo `pokersync-agent`/`pokersync-radar`) | 🟢 | 🟠 P1 | — |
 | RADAR-003 | Sync automático (`/api/agent/sync`) | 🟢 | 🟠 P1 | — |
 | RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | validar parser contra hand history real de cada sala |
 
@@ -109,7 +136,7 @@ no banco de dados (Supabase), não por leitura direta do código Rust.*
 | SOLVER-011 | Pós-flop flop | 🟠 | 🟡 P2 | rodar mais iterações |
 | SOLVER-012 | EV por ação pós-flop | 🟢 | 🟡 P2 | — |
 | SOLVER-013 | cEV/ICM heads-up por mão | 🟢 | 🔴 P0 | — |
-| SOLVER-014 | cEV/ICM multiway | 🟠 | 🟡 P2 | avaliar consumo no produto |
+| SOLVER-014 | cEV/ICM multiway | 🟢 | 🟡 P2 | — |
 | SOLVER-015 | 3-bet real pré-flop | 🔵 | 🟡 P2 | não iniciado |
 | SOLVER-016 | Squeeze multiway validado | 🔵 | 🟡 P2 | rodar spot real offline |
 | SOLVER-017 | CI (GitHub Actions) | 🟢 | ⚪ P3 | — |
@@ -146,9 +173,9 @@ Solver: SOLVER-013 cEV/ICM por mão (🟢 pronto no motor)
    ↓
 Solver: SOLVER-018 Deploy Railway (🟢 confirmado ativo)
    ↓
-Main: MAIN-007 cEV/ICM (⚠️ motor pronto, UI removida em 12/09 — falta reconstruir)
+Main: MAIN-007 cEV/ICM (🟢 UI reconstruída no Revisor de Mãos, heads-up + multiway)
 
-Radar: RADAR-002 Agente desktop (parcial, validado com 1 instalação Windows real)
+Radar: RADAR-002 Agente desktop (🟢 concluído, validado com instalação Windows real e no PC do dono)
    ↓
 Main: MAIN-012 Sync com agente (🟢 tráfego real confirmado 14/09/2026)
    ↓
