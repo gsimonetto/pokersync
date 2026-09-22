@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { NotebookPen, Plus, Trash2 } from "lucide-react";
 import { addAnnotation, deleteAnnotation, fetchAnnotations } from "@/lib/services/bankroll-service";
 import type { Annotation } from "@/lib/bankroll/types";
-import { CardHint, PainelCard } from "./painel-card";
+import { CardHint, Linha, PainelCard, Selo } from "./painel-card";
 
 // Bloco de anotações rápidas. Grava nas MESMAS anotações da Gestão de
 // Banca (bankroll_annotations), que já aparecem no gráfico de evolução —
@@ -65,20 +65,20 @@ export function QuickNotesCard({ style, className }: { style?: React.CSSProperti
   }
 
   return (
-    <PainelCard title="Anotações rápidas" icon={<NotebookPen size={13} />} style={style} className={className}>
+    <PainelCard title="Anotações rápidas" icon={<NotebookPen size={15} />} style={style} className={className}>
       <form onSubmit={salvar} className="flex items-center gap-2">
         <input
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Insight da sessão…"
           maxLength={280}
-          className="min-w-0 flex-1 rounded-xl border border-hairline bg-white/[0.04] px-3 py-2 text-sm placeholder:text-muted/50 focus:border-ink/30 focus:outline-none"
+          className="min-w-0 flex-1 rounded-2xl border border-white/5 bg-white/[0.03] px-3.5 py-2.5 text-sm transition-colors placeholder:text-muted/50 focus:border-ink/25 focus:bg-white/[0.06] focus:outline-none"
         />
         <button
           type="submit"
           disabled={!texto.trim() || salvando}
           aria-label="Salvar anotação"
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-ink text-void transition-colors hover:bg-white/90 disabled:opacity-40"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ink text-void transition-colors hover:bg-white/90 disabled:opacity-40"
         >
           <Plus size={16} />
         </button>
@@ -92,24 +92,29 @@ export function QuickNotesCard({ style, className }: { style?: React.CSSProperti
           <CardHint>Nenhuma anotação ainda. Escreva o que funcionou (ou não) na última sessão.</CardHint>
         </div>
       ) : (
-        <ul className="painel-scroll mt-4 flex max-h-[190px] flex-col gap-2.5 overflow-y-auto pr-1">
+        <ul className="painel-scroll mt-4 flex max-h-[210px] flex-col gap-2 overflow-y-auto pr-1">
           {notas.map((n) => (
-            <li key={n.id} className="group flex items-start gap-2.5">
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-ink" />
-              <span className="min-w-0 flex-1">
-                <span className="block text-sm leading-snug text-white/85">{n.note}</span>
-                <span className="text-[11px] text-muted/60">
-                  {new Date(`${n.date}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-                </span>
-              </span>
-              <button
-                type="button"
-                onClick={() => remover(n.id)}
-                aria-label="Apagar anotação"
-                className="shrink-0 text-white/0 transition-colors hover:text-negative focus:text-negative group-hover:text-muted/50"
-              >
-                <Trash2 size={14} />
-              </button>
+            <li key={n.id} className="group/nota">
+              <Linha>
+                <div className="flex items-start gap-3">
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-[13px] leading-relaxed text-ink/90">{n.note}</span>
+                    <span className="mt-1.5 block">
+                      <Selo cor="#c4c7c8">
+                        {new Date(`${n.date}T12:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
+                      </Selo>
+                    </span>
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => remover(n.id)}
+                    aria-label="Apagar anotação"
+                    className="shrink-0 text-transparent transition-colors hover:text-negative focus:text-negative group-hover/nota:text-muted/50"
+                  >
+                    <Trash2 size={14} />
+                  </button>
+                </div>
+              </Linha>
             </li>
           ))}
         </ul>

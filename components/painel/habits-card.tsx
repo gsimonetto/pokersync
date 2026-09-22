@@ -2,15 +2,22 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { CheckCircle2, Target } from "lucide-react";
+import { BookOpen, CheckCircle2, Flame, Target, TrendingUp } from "lucide-react";
 import { fetchGoals, fetchSessions, fetchStudyLogs } from "@/lib/services/bankroll-service";
 import { goalProgress } from "@/lib/bankroll/calc";
 import { fetchLast7DaysActivity } from "@/lib/services/xp-service";
 import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
 import type { Goal, Session, StudyLog } from "@/lib/bankroll/types";
-import { CardHint, PainelCard } from "./painel-card";
+import { CardHint, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
 
 const ROTULO: Record<Goal["type"], string> = { volume: "Volume", estudo: "Estudo" };
+
+// Ícone e cor por tipo de meta — mesma identidade de cor dos módulos de
+// origem (volume vem da Banca, estudo vem do Revisor/estudo).
+const VISUAL: Record<Goal["type"], { icone: typeof Target; cor: string }> = {
+  volume: { icone: TrendingUp, cor: "#5AA6E0" },
+  estudo: { icone: BookOpen, cor: "#A855F7" },
+};
 
 // Iniciais dos últimos 7 dias, do mais antigo pro de hoje — mesma ordem
 // que fetchLast7DaysActivity() devolve.
@@ -63,7 +70,7 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
   return (
     <PainelCard
       title="Metas e hábitos"
-      icon={<Target size={13} />}
+      icon={<Target size={15} />}
       action={
         drillsHoje != null && (
           <span className="tnum inline-flex items-center gap-1.5 rounded-full bg-training/12 px-2.5 py-1 text-[11px] font-semibold text-training">
@@ -87,29 +94,40 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
               </Link>
             </CardHint>
           ) : (
-            <ul className="flex flex-col gap-3.5">
+            <ul className="flex flex-col gap-2.5">
               {semanais.map((g) => {
                 const p = goalProgress(g, sessions, studyLogs);
                 const pct = Math.min(100, Math.round(p.pct));
+                const { icone: Icone, cor } = VISUAL[g.type];
                 return (
                   <li key={g.id}>
-                    <div className="flex items-baseline justify-between text-sm">
-                      <span className="font-medium">{ROTULO[g.type]}</span>
-                      <span className="tnum text-xs text-muted">
-                        {Math.round(p.current)}/{g.target} {g.unit}
-                      </span>
-                    </div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
-                      <div
-                        className="h-full rounded-full transition-[width] duration-700"
-                        style={{
-                          width: `${pct}%`,
-                          // Barra branca, como o botão principal da tela de login — a cor
-                          // aqui não carrega significado (o significado é o quanto encheu).
-                          background: "linear-gradient(90deg, #ffffff, rgba(255,255,255,0.55))",
-                        }}
-                      />
-                    </div>
+                    <Linha>
+                      <div className="flex items-center gap-3">
+                        <TileIcone cor={cor}>
+                          <Icone size={14} />
+                        </TileIcone>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-baseline justify-between gap-2">
+                            <span className="text-sm font-medium">{ROTULO[g.type]}</span>
+                            <span className="tnum text-xs text-muted">
+                              {Math.round(p.current)}/{g.target} {g.unit}
+                            </span>
+                          </div>
+                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
+                            <div
+                              className="h-full rounded-full transition-[width] duration-700"
+                              style={{
+                                width: `${pct}%`,
+                                // Barra na cor da meta — o mesmo código de cor do
+                                // quadradinho ao lado, pra ligar os dois num olhar.
+                                background: `linear-gradient(90deg, ${cor}, ${cor}66)`,
+                              }}
+                            />
+                          </div>
+                        </div>
+                        <Selo cor={pct >= 100 ? "#22c55e" : "#c4c7c8"}>{pct}%</Selo>
+                      </div>
+                    </Linha>
                   </li>
                 );
               })}
@@ -117,23 +135,36 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
           )}
 
           {dias && (
-            <div className="mt-5 border-t border-hairline pt-4">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-muted/70">Últimos 7 dias</p>
-              <div className="mt-2.5 flex items-center justify-between">
-                {dias.map((ativo, i) => (
-                  <div key={i} className="flex flex-col items-center gap-1.5">
-                    <span className="text-[10px] text-muted/60">{letras[i]}</span>
-                    <span
-                      aria-label={ativo ? "dia ativo" : "dia sem atividade"}
-                      className={`grid h-6 w-6 place-items-center rounded-full text-[10px] ${
-                        ativo ? "bg-ink text-void" : "border border-hairline text-transparent"
-                      }`}
-                    >
-                      {ativo ? "✓" : "·"}
+            <div className="mt-4">
+              <Linha>
+                <div className="flex items-center gap-3">
+                  <TileIcone cor="#F59E0B">
+                    <Flame size={14} />
+                  </TileIcone>
+                  <span className="min-w-0 flex-1">
+                    <span className="block text-sm font-medium">Dias ativos</span>
+                    <span className="block text-[11px] text-muted/60">nesta semana</span>
+                  </span>
+                  <Selo cor={dias.filter(Boolean).length >= 5 ? "#22c55e" : "#c4c7c8"}>
+                    {dias.filter(Boolean).length} de 7
+                  </Selo>
+                </div>
+                <div className="mt-3 flex items-center justify-between">
+                  {dias.map((ativo, i) => (
+                    <span key={i} className="flex flex-col items-center gap-1.5">
+                      <span className="text-[9px] text-muted/50">{letras[i]}</span>
+                      <span
+                        aria-label={ativo ? "dia ativo" : "dia sem atividade"}
+                        className={`grid h-6 w-6 place-items-center rounded-full text-[10px] ${
+                          ativo ? "bg-ink text-void" : "border border-hairline text-transparent"
+                        }`}
+                      >
+                        ✓
+                      </span>
                     </span>
-                  </div>
-                ))}
-              </div>
+                  ))}
+                </div>
+              </Linha>
             </div>
           )}
         </>
