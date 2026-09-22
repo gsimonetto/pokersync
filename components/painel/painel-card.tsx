@@ -32,7 +32,7 @@ export function PainelCard({
         if (!r) return;
         setMouse({ x: e.clientX - r.left, y: e.clientY - r.top });
       }}
-      className={`group fade-in-up relative flex flex-col overflow-hidden rounded-3xl border border-hairline bg-surface p-5 sm:p-6 ${className}`}
+      className={`painel-vidro group fade-in-up relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-5 sm:p-6 ${className}`}
       style={style}
     >
       {/* -inset-px cobre a borda também, senão o brilho para 1px antes
@@ -96,7 +96,7 @@ export function Selo({ children, cor }: { children: ReactNode; cor: string }) {
 // texto solto sobre o fundo do card.
 export function Linha({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`rounded-2xl border border-white/5 bg-white/[0.03] p-3 transition-colors hover:border-white/10 hover:bg-white/[0.06] ${className}`}>
+    <div className={`painel-bloco rounded-2xl border border-white/5 p-3 transition-colors hover:border-white/15 ${className}`}>
       {children}
     </div>
   );

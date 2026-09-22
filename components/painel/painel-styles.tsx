@@ -15,22 +15,29 @@ export function PainelStyles() {
         isolation: isolate;
       }
 
-      /* Grade de pontos + brilho de canto — os mesmos dois elementos de
-         fundo da tela de login (app/login/login-form.tsx), aqui como
-         pseudo-elementos pra não sujar o HTML da página. */
+      /* Fundo de fichas de poker (public/fichas-painel.svg, desenhado em
+         vetor) + a grade de pontos da tela de login por cima. O fundo
+         existe por um motivo prático, não decorativo: o efeito de vidro
+         fosco dos cards borra o que está ATRÁS deles -- sobre preto liso
+         não há o que borrar e o vidro some. O próprio SVG já traz um véu
+         escuro pra garantir a leitura do texto. */
       .painel::before {
         content: "";
-        position: fixed;
+        position: absolute;
         inset: 0;
         z-index: -1;
-        background-image: radial-gradient(#ffffff 1px, transparent 1px);
-        background-size: 32px 32px;
-        opacity: 0.04;
+        background-image:
+          radial-gradient(rgba(255, 255, 255, 0.55) 1px, transparent 1px),
+          url("/fichas-painel.svg");
+        background-size: 32px 32px, cover;
+        background-attachment: scroll, fixed;
+        background-position: center, center;
+        background-repeat: repeat, no-repeat;
         pointer-events: none;
       }
       .painel::after {
         content: "";
-        position: fixed;
+        position: absolute;
         top: -8rem;
         left: -8rem;
         width: 24rem;
@@ -50,6 +57,29 @@ export function PainelStyles() {
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
+      }
+
+      /* Vidro fosco do card: semitransparente + desfoque do que está
+         atrás (backdrop-filter). Os dois andam juntos -- card opaco não
+         deixa ver o fundo, e desfoque sem transparência não tem efeito.
+         O -webkit- continua necessário pro Safari. */
+      .painel-vidro {
+        background-color: rgba(17, 17, 17, 0.62);
+        backdrop-filter: blur(22px) saturate(130%);
+        -webkit-backdrop-filter: blur(22px) saturate(130%);
+      }
+      /* Navegador sem suporte a backdrop-filter cai num card sólido, que
+         é o comportamento anterior -- nunca num card transparente e
+         ilegível por cima das fichas. */
+      @supports not ((backdrop-filter: blur(1px)) or (-webkit-backdrop-filter: blur(1px))) {
+        .painel-vidro { background-color: #111111; }
+      }
+
+      /* Blocos internos das listas ficam um pouco mais opacos que o card,
+         senão as fichas atravessam duas camadas de vidro e o texto perde
+         contraste. */
+      .painel-vidro .painel-bloco {
+        background-color: rgba(255, 255, 255, 0.05);
       }
 
       /* Barra de rolagem fina dentro dos cards (notas, listas). Mesma
