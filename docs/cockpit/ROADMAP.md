@@ -10,7 +10,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC MAIN — 74%
+## POKERSYNC MAIN — 81%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
@@ -21,7 +21,7 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-005 | Player Evolution (core) | 🟢 | 🟡 P2 | — |
 | MAIN-006 | Módulo de Análise | 🟢 | 🟠 P1 | — |
 | MAIN-007 | cEV/ICM por mão (consumo) | 🟢 | 🔴 P0 | — |
-| MAIN-008 | Estatísticas de oponente | 🔵 | 🟡 P2 | desenhar schema por jogador |
+| MAIN-008 | Estatísticas de oponente | 🟢 | 🟡 P2 | — |
 | MAIN-009 | HUD em tempo real | 🔵 | ⚪ P3 | não priorizado |
 | MAIN-010 | Plataforma para Times (core) | 🟢 | 🟡 P2 | — |
 | MAIN-011 | Score de evolução consolidado | 🟢 | 🟡 P2 | — |
@@ -39,6 +39,9 @@ Prioridade: 🔴 P0 · 🟠 P1 · 🟡 P2 · ⚪ P3
 | MAIN-023 | `engine_version` em `hand_ev_results` | 🟢 | ⚪ P3 | — |
 | MAIN-024 | Sincronizar board externo do roadmap | 🔵 | ⚪ P3 | avaliar aposentar em favor do Cockpit |
 | MAIN-025 | Limpeza: arquivo de backup órfão | 🟢 | ⚪ P3 | — |
+| MAIN-026 | Sistema de Amigos (chat 1:1 fora de Time) | 🟢 | 🟡 P2 | — |
+| MAIN-027 | Widget de torneios ao vivo (BSOP/WSOP) | 🟢 | 🟡 P2 | — |
+| MAIN-028 | Central de Notificações | 🟢 | ⚪ P3 | — |
 
 ### Destaque — MAIN-003 Modo Treino
 **Objetivo:** treinar o jogador com spots reais gerados pelo motor.
@@ -51,6 +54,22 @@ spot pós-flop real no estoque hoje — a única linha que existia era um
 dado ilustrativo/de teste, removida em 13/09/2026 a pedido do dono.
 **Próximo passo:** ver MAIN-021 (pipeline pós-flop ponta a ponta).
 **Dependências:** MAIN-021.
+
+### Destaque — MAIN-008 Estatísticas de oponente 🟢 concluído (achado da auditoria de 22/09)
+**Objetivo:** mostrar estatísticas do oponente (VPIP, PFR, 3-Bet etc.),
+não só do próprio jogador.
+**O que existe:** construído em 15/09/2026, mas nunca tinha entrado no
+roadmap — a última auditoria (14/09) ficou pra trás. Não depende mais
+só do parser: a tabela `hand_opponent_tags` no banco real já tem 4939
+linhas de 147 oponentes distintos, preenchida automaticamente por um
+trigger toda vez que uma mão é salva no Revisor. As estatísticas (VPIP,
+PFR, 3-Bet, Fold to 3-Bet, C-Bet, Fold to C-Bet, fator de agressão,
+WTSD, W$SD) aparecem num card clicável no assento do oponente dentro
+do Revisor de Mãos, que abre um modal com o detalhe completo.
+**O que falta:** nada no Revisor. O mesmo recurso existe no Modo Treino
+mas está desligado por flag (`HUD_ENABLED=false`), a pedido explícito —
+isso é uma decisão tomada, não uma pendência.
+**Dependências:** nenhuma.
 
 ### Destaque — MAIN-007 cEV/ICM por mão 🟢 concluído
 **Objetivo:** mostrar o EV real (ajustado por sorte) de mãos all-in já
@@ -69,6 +88,18 @@ que hoje têm chamadores reais confirmados por grep no repo.
 dois em produção via essa mesma tela.
 **Dependências:** SOLVER-013, SOLVER-018 (ambos concluídos do lado do
 motor).
+
+### Destaque — MAIN-026/027/028: 3 módulos prontos que nunca entraram no roadmap
+Achados na mesma auditoria de 22/09/2026, todos já em produção:
+- **MAIN-026 Sistema de Amigos:** chat 1:1 entre jogadores que não têm
+  time em comum (pedido de amizade por apelido+código, presença
+  online, mensagens diretas).
+- **MAIN-027 Torneios ao vivo:** widget na agenda/diário que mostra
+  quando um torneio de grife (BSOP/WSOP) está transmitindo ao vivo no
+  YouTube, com link direto.
+- **MAIN-028 Central de Notificações:** `/notificacoes`, com
+  categorias (sistema/tarefas/time), marcar lida/excluir e contador de
+  não lidas — usada por vários outros módulos pra deep-link.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 

@@ -2,13 +2,14 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, X } from "lucide-react";
+import { ExternalLink, MessageCircle, MoreVertical, X } from "lucide-react";
 import { Avatar } from "@/components/avatar";
 import { RankChip } from "@/components/ui/rank-chip";
 import { ScoreRing } from "@/components/ui/score-ring";
 import { PeriodSelector } from "@/components/period-selector";
 import { PlayerDetailBody } from "@/components/time/player-detail-body";
 import { ModalPortal } from "@/components/modal-portal";
+import { AcoesJogadorModal } from "@/components/time/acoes-jogador-modal";
 import {
   calcularScore,
   calcularTendencia,
@@ -28,6 +29,8 @@ import {
   type PlayerDetail,
   type PlayerSharedHand,
   type PlayerLeak,
+  type TeamDashboardRow,
+  type TeamLabel,
 } from "@/lib/services/team-service";
 
 const PERIODOS = [
@@ -44,13 +47,34 @@ const PERIODOS = [
 export function PlayerDetailModal({
   playerId,
   onFechar,
+  jogador,
+  labels,
+  coaches,
+  isAdmin,
+  podeConversar,
+  onAbrirConversa,
+  onChange,
+  onErro: onErroPai,
 }: {
   playerId: string;
   onFechar: () => void;
+  // Props opcionais abaixo: só quando a ficha é aberta a partir da aba
+  // Jogadores (lista de admin/coach), pra abrir "Conversar" e o menu de
+  // ações (etiqueta, coach, remover) direto daqui — essas ações saíram
+  // do card da lista e moraram todas pra dentro da ficha completa.
+  jogador?: TeamDashboardRow;
+  labels?: TeamLabel[];
+  coaches?: { userId: string; nome: string }[];
+  isAdmin?: boolean;
+  podeConversar?: boolean;
+  onAbrirConversa?: () => void;
+  onChange?: () => void;
+  onErro?: (s: string) => void;
 }) {
   const [dias, setDias] = useState(30);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
+  const [acoesAbertas, setAcoesAbertas] = useState(false);
   const [p, setP] = useState<PlayerDetail | null>(null);
   const [atividade, setAtividade] = useState<PlayerActivityDay[]>([]);
   const [leaks, setLeaks] = useState<PlayerLeak[]>([]);
@@ -117,6 +141,26 @@ export function PlayerDetailModal({
             </div>
             <div className="flex items-center gap-2">
               <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
+              {podeConversar && onAbrirConversa && (
+                <button
+                  onClick={onAbrirConversa}
+                  title="Conversar"
+                  aria-label="Conversar"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                >
+                  <MessageCircle size={14} />
+                </button>
+              )}
+              {jogador && labels && coaches && onChange && onErroPai && (
+                <button
+                  onClick={() => setAcoesAbertas(true)}
+                  title="Ações do jogador"
+                  aria-label="Ações do jogador"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                >
+                  <MoreVertical size={14} />
+                </button>
+              )}
               <Link
                 href={`/time/jogador/${playerId}`}
                 title="Abrir ficha completa em outra página"
@@ -162,6 +206,26 @@ export function PlayerDetailModal({
           </div>
         </div>
       </div>
+
+      {acoesAbertas && jogador && labels && coaches && onChange && onErroPai && (
+        <AcoesJogadorModal
+          jogador={jogador}
+          labels={labels}
+          coaches={coaches}
+          isAdmin={Boolean(isAdmin)}
+          onFechar={() => setAcoesAbertas(false)}
+          onAbrirConversa={() => {
+            setAcoesAbertas(false);
+            onAbrirConversa?.();
+          }}
+          onChange={() => {
+            onChange();
+            carregar();
+          }}
+          onRemoved={onFechar}
+          onErro={onErroPai}
+        />
+      )}
     </ModalPortal>
   );
 }
