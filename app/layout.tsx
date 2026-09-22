@@ -16,6 +16,10 @@ export const metadata: Metadata = {
   title: "PokerSync — Organize. Estude. Evolua.",
   description:
     "Plataforma de estudo, gestao de banca e evolucao continua para jogadores de poker.",
+  icons: {
+    icon: "/pokersync-logo.svg",
+    apple: "/pokersync-logo.svg",
+  },
 };
 
 export default function RootLayout({
