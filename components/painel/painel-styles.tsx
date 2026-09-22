@@ -37,9 +37,19 @@ export function PainelStyles() {
         height: 24rem;
         z-index: -1;
         border-radius: 9999px;
-        background: rgba(255, 255, 255, 0.06);
+        /* Mesmo brilho de canto da tela de login, com um toque do roxo da
+           marca -- o fundo continua preto, só a luz é colorida. */
+        background: rgba(168, 85, 247, 0.16);
         filter: blur(140px);
         pointer-events: none;
+      }
+
+      /* Nome do jogador no cabeçalho, no degradê roxo da identidade. */
+      .painel-roxo {
+        background: linear-gradient(92deg, #c084fc, #818cf8);
+        -webkit-background-clip: text;
+        background-clip: text;
+        color: transparent;
       }
 
       /* Barra de rolagem fina dentro dos cards (notas, listas). Mesma

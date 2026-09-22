@@ -72,13 +72,13 @@ export function QuickNotesCard({ style, className }: { style?: React.CSSProperti
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Insight da sessão…"
           maxLength={280}
-          className="min-w-0 flex-1 rounded-2xl border border-white/5 bg-white/[0.03] px-3.5 py-2.5 text-sm transition-colors placeholder:text-muted/50 focus:border-ink/25 focus:bg-white/[0.06] focus:outline-none"
+          className="min-w-0 flex-1 rounded-2xl border border-white/5 bg-white/[0.03] px-3.5 py-2.5 text-sm transition-colors placeholder:text-muted/50 focus:border-[#a855f7]/70 focus:bg-white/[0.06] focus:outline-none"
         />
         <button
           type="submit"
           disabled={!texto.trim() || salvando}
           aria-label="Salvar anotação"
-          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-ink text-void transition-colors hover:bg-white/90 disabled:opacity-40"
+          className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl bg-[#a855f7] text-white transition-colors hover:bg-[#9333ea] disabled:opacity-40"
         >
           <Plus size={16} />
         </button>
