@@ -353,7 +353,7 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
           <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
             <Link
               href={atual.href}
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-void shadow-lg shadow-black/40 transition-colors hover:bg-white/90"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#a855f7] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-[#a855f7]/25 transition-colors hover:bg-[#9333ea]"
             >
               {atual.cta}
               <ArrowRight size={13} />

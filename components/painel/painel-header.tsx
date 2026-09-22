@@ -83,7 +83,7 @@ export function PainelHeader() {
       <div>
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
           <span className="text-muted">{agora ? saudacao(hora) : "Olá"},</span>{" "}
-          {nome || "jogador"} 👋
+          <span className="painel-roxo">{nome || "jogador"}</span> 👋
         </h1>
         <p className="mt-2 text-[13px] text-muted/70">Estude · Jogue · Revise · Evolua</p>
 
@@ -116,7 +116,7 @@ export function PainelHeader() {
         </div>
 
         <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3">
-          <TileIcone cor="#2FB89A">
+          <TileIcone cor="#a855f7">
             <Wallet size={15} />
           </TileIcone>
           <div>
