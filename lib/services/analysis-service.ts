@@ -222,12 +222,16 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
 // revisar UMA mão pontual — mas não entram nas métricas agregadas daqui.
 const IMPORTED_HAND_SOURCES = ["agent", "import"] as const;
 
-export async function fetchAnalysisHandRows(): Promise<AnalysisHandRow[]> {
+// `since` -- corte do botão do Radar dentro do Performance (aba "a partir
+// de agora"): quando presente, só entram mãos importadas cujo
+// hand_reviews.created_at seja igual ou posterior a esse instante. null/
+// undefined = sem corte, comportamento de sempre (mostra tudo importado).
+export async function fetchAnalysisHandRows(since?: string | null): Promise<AnalysisHandRow[]> {
   const supabase = createClient();
   // Sem paginação: hoje a base tem ~200 mãos por usuário. Quando o volume
   // crescer (agente desktop em produção), isto precisa virar RPC agregada
   // no Postgres — não filtrar 50k linhas no cliente.
-  const { data, error } = await supabase
+  let query = supabase
     .from("hand_tags")
     .select(
       "hand_review_id, pot_type, hero_position, stack_depth_bucket, matchup, vpip, pfr, three_bet, computed_at, " +
@@ -243,6 +247,8 @@ export async function fetchAnalysisHandRows(): Promise<AnalysisHandRow[]> {
     )
     .in("hand_reviews.source", IMPORTED_HAND_SOURCES as unknown as string[])
     .order("computed_at", { ascending: true });
+  if (since) query = query.gte("hand_reviews.created_at", since);
+  const { data, error } = await query;
   if (error) throw error;
   // Filtro do lado do cliente como rede de segurança — o filtro acima em
   // "hand_reviews.source" depende do PostgREST aplicar corretamente num
@@ -620,7 +626,13 @@ export async function resetPerformanceStats(): Promise<void> {
   const { error: eTags } = await supabase.from("hand_tags").delete().eq("user_id", userData.user.id);
   if (eTags) throw eTags;
 
-  const { error: eProfile } = await supabase.from("profiles").update({ radar_import_scope: null }).eq("id", userData.user.id);
+  const { error: eProfile } = await supabase
+    .from("profiles")
+    // radar_scope_performance/_since junto: mesmo pedido de "volta a
+    // perguntar" agora vale também pro corte de exibição do botão do
+    // Radar dentro do Performance (ver radar-module-scope-service.ts).
+    .update({ radar_import_scope: null, radar_scope_performance: null, radar_scope_performance_since: null })
+    .eq("id", userData.user.id);
   if (eProfile) throw eProfile;
 }
 

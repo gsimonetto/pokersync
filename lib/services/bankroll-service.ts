@@ -128,6 +128,39 @@ export async function deleteSession(id: string) {
   if (error) throw error;
 }
 
+// "Zerar módulo" do botão do Radar dentro da Gestão de Banca -- apaga só
+// as sessões que o Agente importou sozinho (imported_hand_session_id
+// preenchido), nunca as que o jogador registrou manualmente. Marca o
+// torneio de origem como excluído da banca (mesmo campo/rota que
+// handleRemove em app/banca/page.tsx usa ao excluir uma sessão importada
+// individualmente) -- sem isso, o próximo carregamento veria o torneio
+// "pendente de importar" de novo e recriaria a sessão sozinho.
+export async function resetBancaRadarImports(): Promise<void> {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { data: imported, error: eSel } = await supabase
+    .from("bankroll_sessions")
+    .select("id, imported_hand_session_id")
+    .eq("user_id", userId)
+    .not("imported_hand_session_id", "is", null);
+  if (eSel) throw eSel;
+  const rows = imported ?? [];
+  if (rows.length === 0) return;
+
+  const { error: eDel } = await supabase
+    .from("bankroll_sessions")
+    .delete()
+    .in(
+      "id",
+      rows.map((r) => r.id)
+    );
+  if (eDel) throw eDel;
+
+  const handSessionIds = rows.map((r) => r.imported_hand_session_id as string);
+  const { error: eExcl } = await supabase.from("hand_sessions").update({ bankroll_excluded: true }).in("id", handSessionIds);
+  if (eExcl) throw eExcl;
+}
+
 // Fechamento de sessao / diario pos-sessao: edita uma sessao ja salva com
 // os campos de reflexao. Nao mexe em resultado/buy-in — so o diario.
 export async function updateSessionDiary(

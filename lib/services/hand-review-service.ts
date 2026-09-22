@@ -259,6 +259,25 @@ export async function deleteReview(reviewId: string) {
   if (error) throw error;
 }
 
+// "Zerar módulo" do botão do Radar dentro do Revisor de Mãos -- apaga só
+// as mãos que o Agente importou sozinho (source "agent"/"import"), nunca
+// as que o jogador colou ou tirou print manualmente. hand_sessions
+// (torneio agrupador) não é apagada aqui: fica órfã sem mãos, mesmo
+// comportamento já descrito em deleteHandSession/excludeSessionFromBankroll
+// pra torneio sem mão nenhuma.
+export async function resetRevisorRadarImports(): Promise<void> {
+  const supabase = createClient();
+  const { data: userData, error: userErr } = await supabase.auth.getUser();
+  if (userErr) throw userErr;
+  if (!userData.user) throw new Error("NAO_AUTENTICADO");
+  const { error } = await supabase
+    .from("hand_reviews")
+    .delete()
+    .eq("user_id", userData.user.id)
+    .in("source", ["agent", "import"]);
+  if (error) throw error;
+}
+
 export async function getReview(reviewId: string): Promise<ReviewDetail> {
   const supabase = createClient();
   const { data, error } = await supabase

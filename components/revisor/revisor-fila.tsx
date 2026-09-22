@@ -4,12 +4,16 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
+import { getThumbUrl, deleteReview, resetRevisorRadarImports, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { LeaksCard } from "./leaks-card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { RadarModuleMenu } from "@/components/radar/radar-module-menu";
+import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
+
+const IMPORTED_HAND_SOURCES = ["agent", "import"];
 
 const FILTERS = [
   { id: "todas", label: "Todas", status: null as string | null },
@@ -79,6 +83,16 @@ export function RevisorFila({
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState("");
 
+  // Corte do botão do Radar (ver components/radar/radar-module-menu.tsx) --
+  // quando setado, esconde mão/sessão IMPORTADA pelo Radar de antes desse
+  // instante. Mão colada/print à mão nunca é escondida.
+  const [radarSince, setRadarSince] = useState<string | null>(null);
+  // Ids de hand_sessions visíveis dado o corte -- null = sem corte, todas
+  // visíveis. Uma sessão só é escondida se TODAS as suas mãos forem
+  // importadas e anteriores ao corte (sessão com pelo menos 1 mão manual
+  // ou 1 mão recente continua aparecendo).
+  const [radarVisibleSessionIds, setRadarVisibleSessionIds] = useState<Set<string> | null>(null);
+
   useEffect(() => {
     (async () => {
       try {
@@ -106,16 +120,55 @@ export function RevisorFila({
   }, []);
 
   useEffect(() => {
+    fetchRadarModuleScope("revisor")
+      .then((s) => setRadarSince(s.scope === "from_now" ? s.since : null))
+      .catch(() => {});
+  }, []);
+
+  useEffect(() => {
     if (!userId || tab !== "sessoes" || hasFilter) return;
     loadSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [userId, tab, hasFilter]);
 
+  // Recalcula quais torneios/sessões ficam visíveis sempre que a lista ou
+  // o corte mudam -- consulta enxuta (só hand_session_id/source/created_at),
+  // não duplica o que listSessionsWithCount já trouxe.
+  useEffect(() => {
+    if (!userId || !radarSince || sessionsList.length === 0) {
+      setRadarVisibleSessionIds(null);
+      return;
+    }
+    (async () => {
+      const supabase = createClient();
+      const { data, error: qErr } = await supabase
+        .from("hand_reviews")
+        .select("hand_session_id, source, created_at")
+        .eq("user_id", userId)
+        .in(
+          "hand_session_id",
+          sessionsList.map((s) => s.id)
+        );
+      if (qErr) {
+        setRadarVisibleSessionIds(null);
+        return;
+      }
+      const visible = new Set<string>();
+      for (const row of data ?? []) {
+        const sessionId = row.hand_session_id as string;
+        const isImported = IMPORTED_HAND_SOURCES.includes(row.source as string);
+        const recentEnough = !isImported || (row.created_at as string) >= radarSince;
+        if (recentEnough) visible.add(sessionId);
+      }
+      setRadarVisibleSessionIds(visible);
+    })();
+  }, [userId, radarSince, sessionsList]);
+
   useEffect(() => {
     if (!userId || tab !== "avulsas" || hasFilter) return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, filter, tab, hasFilter]);
+  }, [userId, filter, tab, hasFilter, radarSince]);
 
   useEffect(() => {
     if (!userId || !hasFilter) return;
@@ -191,7 +244,7 @@ export function RevisorFila({
         .from("hand_reviews")
         .select(
           `
-          id, title, free_text, status, created_at, updated_at, concluded_at,
+          id, title, free_text, status, source, created_at, updated_at, concluded_at,
           hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
           hand_review_images ( id, storage_path, position )
         `
@@ -200,6 +253,7 @@ export function RevisorFila({
         .is("hand_session_id", null)
         .order("created_at", { ascending: false });
       if (status) q = q.eq("status", status);
+      if (radarSince) q = q.or(`created_at.gte.${radarSince},source.not.in.(${IMPORTED_HAND_SOURCES.join(",")})`);
       const { data, error: qErr } = await q;
       if (qErr) throw qErr;
       // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -246,10 +300,11 @@ export function RevisorFila({
   const filteredSessions = useMemo(() => {
     const q = sessionSearchQuery.trim().toLowerCase();
     return sessionsList.filter((s) => {
+      if (radarVisibleSessionIds && !radarVisibleSessionIds.has(s.id)) return false;
       if (q && !s.label.toLowerCase().includes(q)) return false;
       return true;
     });
-  }, [sessionsList, sessionSearchQuery]);
+  }, [sessionsList, sessionSearchQuery, radarVisibleSessionIds]);
 
   // "Quantos torneios e quantas maos foram revisadas" -- pedido explicito
   // pra substituir o resumo antigo (Acertei/Errei/Duvida, que media
@@ -358,13 +413,25 @@ export function RevisorFila({
             <FilterChip key={f.id} label={f.label} active={filter === f.id} onClick={() => setFilter(f.id)} />
           ))}
 
-        <button
-          onClick={onNova}
-          className="ml-auto inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
-        >
-          <Plus size={16} />
-          Nova mão
-        </button>
+        <div className="ml-auto flex items-center gap-2">
+          <button
+            onClick={onNova}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
+          >
+            <Plus size={16} />
+            Nova mão
+          </button>
+          <RadarModuleMenu
+            module="revisor"
+            moduleLabel="o Revisor de Mãos"
+            onScopeChange={({ since }) => setRadarSince(since)}
+            onReset={async () => {
+              await resetRevisorRadarImports();
+              setRadarSince(null);
+              await Promise.all([loadSessions(), load()]);
+            }}
+          />
+        </div>
       </div>
 
       {tab === "sessoes" && sessionSearchOpen && (
