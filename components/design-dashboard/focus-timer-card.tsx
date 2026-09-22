@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Check, Pause, Play, RotateCcw, Timer } from "lucide-react";
 import { addStudyLog } from "@/lib/services/bankroll-service";
+import { EVENTO_INICIAR_FOCO } from "./quick-actions-bar";
 import { GlassCard } from "./glass-card";
 
 const PRESETS = [15, 25, 50];
@@ -52,17 +53,30 @@ export function FocusTimerCard({ style, className }: { style?: React.CSSProperti
     setErro(null);
   }, []);
 
+  const iniciar = useCallback(() => {
+    setRestante((atual) => {
+      const base = atual > 0 ? atual : minutosAlvo * 60;
+      fimRef.current = Date.now() + base * 1000;
+      return base;
+    });
+    setRodando(true);
+    setRegistrado(false);
+  }, [minutosAlvo]);
+
+  // Botão "Iniciar foco" da barra de ações rápidas (fora deste card).
+  useEffect(() => {
+    const aoPedir = () => iniciar();
+    window.addEventListener(EVENTO_INICIAR_FOCO, aoPedir);
+    return () => window.removeEventListener(EVENTO_INICIAR_FOCO, aoPedir);
+  }, [iniciar]);
+
   function alternar() {
     if (rodando) {
       setRodando(false);
       fimRef.current = null;
       return;
     }
-    const base = restante > 0 ? restante : minutosAlvo * 60;
-    setRestante(base);
-    fimRef.current = Date.now() + base * 1000;
-    setRodando(true);
-    setRegistrado(false);
+    iniciar();
   }
 
   async function registrarEstudo() {

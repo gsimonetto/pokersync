@@ -4,9 +4,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Home, Target, BookOpen, TrendingUp, LineChart, Layers, Users } from "lucide-react";
 
-// Dock flutuante estilo macOS — navegação principal no mobile (onde a
-// sidebar some) e atalho rápido no desktop. Mesmas rotas reais da
-// sidebar; o ativo ganha a pílula roxa.
+// Dock flutuante estilo macOS — navegação SÓ no celular, onde a barra
+// lateral não cabe. No computador ele fica escondido (lg:hidden): ali a
+// lateral já faz esse papel e os dois juntos eram navegação duplicada.
+// O rodapé do computador passou a ser da barra de ações rápidas.
 const DOCK = [
   { href: "/design/dashboard", label: "Painel", icon: Home, cor: "#a855f7" },
   { href: "/treino", label: "Treino", icon: Target, cor: "#2FB89A" },
@@ -23,7 +24,7 @@ export function DashboardDock() {
   return (
     <nav
       aria-label="Navegação rápida"
-      className="psd-card fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-end gap-1.5 px-3 py-2.5 sm:gap-2 sm:px-4"
+      className="psd-card fixed bottom-4 left-1/2 z-30 flex -translate-x-1/2 items-end gap-1.5 px-3 py-2.5 sm:gap-2 sm:px-4 lg:hidden"
     >
       {DOCK.map(({ href, label, icon: Icon, cor }) => {
         const ativo = pathname === href;

@@ -4,6 +4,7 @@ import { DashboardStyles } from "@/components/design-dashboard/dashboard-styles"
 import { DashboardSidebar } from "@/components/design-dashboard/dashboard-sidebar";
 import { DashboardDock } from "@/components/design-dashboard/dashboard-dock";
 import { DashboardHeader } from "@/components/design-dashboard/dashboard-header";
+import { QuickActionsBar } from "@/components/design-dashboard/quick-actions-bar";
 import { FocusTimerCard } from "@/components/design-dashboard/focus-timer-card";
 import { HabitsCard } from "@/components/design-dashboard/habits-card";
 import { ReviewHandsCard } from "@/components/design-dashboard/review-hands-card";
@@ -32,11 +33,16 @@ export default function DashboardPrototipoPage() {
       <main className="px-4 pb-32 pt-6 sm:px-6 sm:pt-8 lg:pl-[100px] lg:pr-6">
         <DashboardHeader />
 
+        {/* Ações rápidas: fileira rolável logo abaixo do cabeçalho no
+            celular, barra flutuante no rodapé do computador (onde o
+            dock de navegação deixou de existir). */}
+        <QuickActionsBar />
+
         {/* Grade dos widgets: 1 coluna no celular, 2 no tablet, 3 no
             desktop. A ordem foi escolhida pra não sobrar buraco em
             nenhuma das três larguras -- a lista de mãos ocupa duas
             colunas e fecha a última linha. */}
-        <div className="mt-7 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
+        <div className="mt-5 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
           <AgendaCard style={{ animationDelay: "40ms" }} />
           <HabitsCard style={{ animationDelay: "100ms" }} />
           <FocusTimerCard style={{ animationDelay: "160ms" }} />
@@ -46,6 +52,9 @@ export default function DashboardPrototipoPage() {
 
       </main>
 
+      {/* Navegação de rodapé só no celular: no computador ela duplicaria
+          a barra lateral (pedido do usuário), e lá o rodapé passou a ser
+          das ações rápidas. */}
       <DashboardDock />
     </div>
   );
