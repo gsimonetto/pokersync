@@ -1,11 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import Link from "next/link";
-import { BookOpen, Star } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { listReviews, setSpotSaved, type ReviewListItem } from "@/lib/services/hand-review-service";
-import { CardHint, Linha, PainelCard, TileIcone } from "./painel-card";
+import { BookOpen, Plus, Star } from "lucide-react";
+import { setSpotSaved, type ReviewListItem } from "@/lib/services/hand-review-service";
+import { CardHint, Esqueleto, Linha, PainelCard, TileIcone } from "./painel-card";
+import { usePainelDados } from "./painel-dados";
+import { num } from "./formato";
+
+// Quantas mãos cabem no card sem rolagem; o total aparece no rodapé.
+const VISIVEIS = 5;
 
 function rotulo(r: ReviewListItem): string {
   const t = r.title?.trim();
@@ -20,7 +24,10 @@ function quando(iso: string): string {
   if (dias <= 0) return "hoje";
   if (dias === 1) return "ontem";
   if (dias < 7) return `${dias} dias`;
-  return new Date(iso).toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+  return new Date(iso).toLocaleDateString("pt-BR", {
+    day: "2-digit",
+    month: "2-digit",
+  });
 }
 
 // "Mãos para revisar": a fila real do módulo Revisor (hand_reviews), só
@@ -28,41 +35,20 @@ function quando(iso: string): string {
 // salvo" de verdade (setSpotSaved) — é a mesma marcação que aparece na
 // Biblioteca do Revisor, não um favorito só desta tela.
 export function ReviewHandsCard({ style, className }: { style?: React.CSSProperties; className?: string }) {
-  const [itens, setItens] = useState<ReviewListItem[]>([]);
-  const [carregando, setCarregando] = useState(true);
+  const { carregando, pendentes, setPendentes } = usePainelDados();
   const [salvando, setSalvando] = useState<string | null>(null);
-
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      try {
-        const supabase = createClient();
-        const { data } = await supabase.auth.getUser();
-        if (!data.user) return;
-        const todas = await listReviews(data.user.id);
-        if (!vivo) return;
-        setItens(todas.filter((r) => r.status !== "concluida").slice(0, 5));
-      } catch {
-        // sem sessão/Supabase: card mostra o estado vazio, sem quebrar a tela
-      } finally {
-        if (vivo) setCarregando(false);
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
+  const itens = pendentes.slice(0, VISIVEIS);
 
   async function alternarSalvo(r: ReviewListItem) {
     const novo = !r.saved;
     setSalvando(r.id);
     // Atualiza na tela antes da resposta do banco (a lista é curta e a
     // ação é reversível); se falhar, volta ao estado anterior.
-    setItens((lista) => lista.map((x) => (x.id === r.id ? { ...x, saved: novo } : x)));
+    setPendentes((lista) => lista.map((x) => (x.id === r.id ? { ...x, saved: novo } : x)));
     try {
       await setSpotSaved(r.id, novo);
     } catch {
-      setItens((lista) => lista.map((x) => (x.id === r.id ? { ...x, saved: !novo } : x)));
+      setPendentes((lista) => lista.map((x) => (x.id === r.id ? { ...x, saved: !novo } : x)));
     } finally {
       setSalvando(null);
     }
@@ -73,18 +59,21 @@ export function ReviewHandsCard({ style, className }: { style?: React.CSSPropert
       title="Mãos para revisar"
       icon={<BookOpen size={15} />}
       action={
+        // Mesmo formato do "Nova meta" do card de metas. Fica no topo
+        // porque o canto de baixo à direita é do botão flutuante de conversa.
         <Link
           href="/revisor"
-          className="rounded-full border border-hairline px-2.5 py-1 text-[11px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+          className="inline-flex items-center gap-1 rounded-full border border-hairline px-2.5 py-1 text-[11px] font-semibold text-muted transition-colors hover:border-[#d4af37]/50 hover:text-ink"
         >
-          Ver todas
+          <Plus size={12} />
+          Enviar mão
         </Link>
       }
       style={style}
       className={className}
     >
       {carregando ? (
-        <CardHint>Carregando…</CardHint>
+        <Esqueleto linhas={3} />
       ) : itens.length === 0 ? (
         <CardHint>
           Nenhuma mão na fila.{" "}
@@ -93,37 +82,53 @@ export function ReviewHandsCard({ style, className }: { style?: React.CSSPropert
           </Link>
         </CardHint>
       ) : (
-        <ul className="flex flex-col gap-2">
-          {itens.map((r) => (
-            <li key={r.id}>
-              <Linha>
-                <div className="flex items-center gap-3">
-                  <Link href="/revisor" className="flex min-w-0 flex-1 items-center gap-3">
-                    <TileIcone cor="#A855F7">
-                      <BookOpen size={14} />
-                    </TileIcone>
-                    <span className="min-w-0 flex-1">
-                      <span className="block truncate text-sm">{rotulo(r)}</span>
-                      <span className="block truncate text-[11px] text-muted/60">
-                        {r.tags.length > 0 ? r.tags.map((t) => t.label).join(" · ") : `enviada ${quando(r.created_at)}`}
+        <>
+          <ul className="flex flex-col gap-2">
+            {itens.map((r) => (
+              <li key={r.id}>
+                <Linha>
+                  <div className="flex items-center gap-3">
+                    <Link href="/revisor" className="flex min-w-0 flex-1 items-center gap-3">
+                      <TileIcone cor="#A855F7">
+                        <BookOpen size={14} />
+                      </TileIcone>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">{rotulo(r)}</span>
+                        <span className="block truncate text-[11px] text-muted">
+                          {r.tags.length > 0
+                            ? r.tags.map((t) => t.label).join(" · ")
+                            : `enviada ${quando(r.created_at)}`}
+                        </span>
                       </span>
-                    </span>
-                  </Link>
-                  <button
-                    type="button"
-                    onClick={() => alternarSalvo(r)}
-                    disabled={salvando === r.id}
-                    aria-label={r.saved ? "Tirar dos spots salvos" : "Salvar spot"}
-                    aria-pressed={r.saved}
-                    className="shrink-0 text-muted/40 transition-colors hover:text-evolution disabled:opacity-40"
-                  >
-                    <Star size={15} className={r.saved ? "fill-evolution text-evolution" : ""} />
-                  </button>
-                </div>
-              </Linha>
-            </li>
-          ))}
-        </ul>
+                    </Link>
+                    <button
+                      type="button"
+                      onClick={() => alternarSalvo(r)}
+                      disabled={salvando === r.id}
+                      aria-label={r.saved ? "Tirar dos spots salvos" : "Salvar spot"}
+                      aria-pressed={r.saved}
+                      className="shrink-0 text-muted/70 transition-colors hover:text-[#d4af37] disabled:opacity-40"
+                    >
+                      <Star size={15} className={r.saved ? "fill-[#d4af37] text-[#d4af37]" : ""} />
+                    </button>
+                  </div>
+                </Linha>
+              </li>
+            ))}
+          </ul>
+          {/* Rodapé: o total da fila (o card só mostra as primeiras). À
+            esquerda de propósito: o canto direito fica sob o botão
+            flutuante de conversa. */}
+          <p className="mt-auto pt-3 text-[12px] text-muted">
+            {pendentes.length > VISIVEIS
+              ? `Mostrando ${num(VISIVEIS)} de ${num(pendentes.length)} na fila`
+              : `${num(pendentes.length)} ${pendentes.length === 1 ? "mão" : "mãos"} na fila`}
+            {" · "}
+            <Link href="/revisor" className="font-semibold text-[#d4af37] transition-colors hover:text-[#f1d78a]">
+              Ver todas
+            </Link>
+          </p>
+        </>
       )}
     </PainelCard>
   );

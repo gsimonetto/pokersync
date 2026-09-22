@@ -42,9 +42,10 @@ export function fmtSignedMoneyIn(v: number, currency: string) {
   return (n > 0 ? "+" : "") + fmtMoneyIn(n, currency);
 }
 
+// Vírgula decimal (padrão brasileiro): toFixed escrevia "+18.4%".
 export function fmtPct(v: number, digits = 1) {
   const n = Number(v) || 0;
-  return (n > 0 ? "+" : "") + n.toFixed(digits) + "%";
+  return (n > 0 ? "+" : "") + n.toLocaleString("pt-BR", { minimumFractionDigits: digits, maximumFractionDigits: digits }) + "%";
 }
 
 export const WEEKDAYS = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];

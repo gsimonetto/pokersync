@@ -1,11 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import { Activity, BookOpen, Flame, Percent, Target, Trophy } from "lucide-react";
-import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
-import { fetchProgress, type Progress } from "@/lib/services/xp-service";
-import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
+import { MAX_LEVEL, xpForNextLevel, type Progress } from "@/lib/services/xp-service";
+import type { PlayerPerformance } from "@/lib/services/performance-service";
 import { CardHint, Linha, PainelCard, TileIcone } from "./painel-card";
+import { usePainelDados } from "./painel-dados";
+import { num, pct } from "./formato";
 
 type Indicador = {
   rotulo: string;
@@ -13,18 +13,20 @@ type Indicador = {
   detalhe: string;
   icone: typeof Flame;
   cor: string;
+  /** Barrinha opcional (0-100), hoje só pro progresso de nível. */
+  progresso?: number;
 };
 
-// Números que o app JÁ calcula hoje, reunidos num mosaico só. Tudo vem
-// da view player_performance (a mesma do módulo Performance) e do
-// user_progress (Hub de Evolução) -- nada é recalculado aqui.
-function montar(perf: PlayerPerformance | null, progresso: Progress | null, drillsHoje: number | null): Indicador[] {
+// Números que o app JÁ calcula, reunidos num mosaico. Vêm da view
+// player_performance (a mesma do módulo Performance) e do user_progress
+// (Hub de Evolução) -- nada é recalculado aqui.
+function montar(perf: PlayerPerformance | null, progresso: Progress | null): Indicador[] {
   const lista: Indicador[] = [];
 
   if (perf?.score_geral != null) {
     lista.push({
       rotulo: "Score geral",
-      valor: String(Math.round(perf.score_geral)),
+      valor: num(perf.score_geral),
       detalhe: "de 100",
       icone: Activity,
       cor: "#22D3EE",
@@ -32,25 +34,33 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null, dril
   }
   if (perf?.roi_pct != null) {
     lista.push({
-      rotulo: "ROI",
-      valor: `${perf.roi_pct > 0 ? "+" : ""}${perf.roi_pct.toFixed(1)}%`,
-      detalhe: `${perf.num_sessoes ?? 0} sessões`,
+      // "total" no rótulo: é o ROI de todo o histórico. Sem isso ele
+      // parecia do mesmo período dos "30 dias" mostrados no cabeçalho.
+      rotulo: "ROI total",
+      valor: pct(perf.roi_pct, { sinal: true }),
+      detalhe: `${num(perf.num_sessoes ?? 0)} sessões`,
       icone: Percent,
       cor: perf.roi_pct >= 0 ? "#22c55e" : "#e0555a",
     });
   }
   if (progresso) {
+    // Progresso até o próximo nível, com a MESMA conta do Hub de Evolução
+    // (xp_current / xpForNextLevel). Antes só aparecia o XP total, que
+    // não diz quanto falta pra subir.
+    const noMaximo = progresso.level >= MAX_LEVEL;
+    const necessario = noMaximo ? 0 : xpForNextLevel(progresso.level);
     lista.push({
       rotulo: "Nível",
-      valor: String(progresso.level),
-      detalhe: `${progresso.xp_total} XP no total`,
+      valor: num(progresso.level),
+      detalhe: noMaximo ? "nível máximo" : `${num(progresso.xp_current)}/${num(necessario)} XP`,
       icone: Trophy,
-      cor: "#E0B24C",
+      cor: "#d4af37",
+      progresso: noMaximo ? 100 : Math.min(100, (progresso.xp_current / Math.max(1, necessario)) * 100),
     });
     lista.push({
       rotulo: "Sequência",
-      valor: String(progresso.streak_days),
-      detalhe: `melhor: ${progresso.streak_best} dias`,
+      valor: num(progresso.streak_days),
+      detalhe: `melhor: ${num(progresso.streak_best)} dias`,
       icone: Flame,
       cor: "#F59E0B",
     });
@@ -58,8 +68,11 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null, dril
   if (perf?.taxa_acerto_treino_pct != null) {
     lista.push({
       rotulo: "Acerto no treino",
-      valor: `${Math.round(perf.taxa_acerto_treino_pct)}%`,
-      detalhe: drillsHoje != null ? `${drillsHoje} drill${drillsHoje === 1 ? "" : "s"} hoje` : `${perf.num_drills ?? 0} drills`,
+      valor: pct(perf.taxa_acerto_treino_pct, { casas: 0 }),
+      // Antes: "0 drills hoje" ao lado de um acerto de TODO o histórico --
+      // dois períodos no mesmo quadro. Os drills de hoje já aparecem em
+      // "Sua semana", no card de metas.
+      detalhe: `em ${num(perf.num_drills ?? 0)} drills`,
       icone: Target,
       cor: "#2FB89A",
     });
@@ -67,7 +80,7 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null, dril
   if (perf?.maos_revisadas != null) {
     lista.push({
       rotulo: "Mãos revisadas",
-      valor: String(perf.maos_revisadas),
+      valor: num(perf.maos_revisadas),
       detalhe: "no total",
       icone: BookOpen,
       cor: "#A855F7",
@@ -78,36 +91,17 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null, dril
 }
 
 export function IndicatorsCard({ style, className }: { style?: React.CSSProperties; className?: string }) {
-  const [itens, setItens] = useState<Indicador[]>([]);
-  const [carregando, setCarregando] = useState(true);
-
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      const [perf, progresso, drills] = await Promise.allSettled([
-        fetchPlayerPerformance(),
-        fetchProgress(),
-        fetchTodayTrainingCount(),
-      ]);
-      if (!vivo) return;
-      setItens(
-        montar(
-          perf.status === "fulfilled" ? perf.value : null,
-          progresso.status === "fulfilled" ? progresso.value : null,
-          drills.status === "fulfilled" ? drills.value : null
-        )
-      );
-      setCarregando(false);
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
+  const { carregando, performance, progresso } = usePainelDados();
+  const itens = montar(performance, progresso);
 
   return (
     <PainelCard title="Seus indicadores" icon={<Activity size={15} />} style={style} className={className}>
       {carregando ? (
-        <CardHint>Carregando…</CardHint>
+        <div className="grid grid-cols-2 gap-2 xl:grid-cols-3">
+          {Array.from({ length: 6 }, (_, i) => (
+            <div key={i} className="painel-esqueleto h-[92px] rounded-2xl" />
+          ))}
+        </div>
       ) : itens.length === 0 ? (
         <CardHint>Os indicadores aparecem assim que você registrar sessões, drills ou mãos.</CardHint>
       ) : (
@@ -115,21 +109,26 @@ export function IndicatorsCard({ style, className }: { style?: React.CSSProperti
         // inteira tem que caber sem rolagem, e 3x2 cabe onde 2x3 não
         // cabia. No celular continua 2 colunas, que é o confortável.
         <ul className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-          {itens.map(({ rotulo, valor, detalhe, icone: Icone, cor }) => (
+          {itens.map(({ rotulo, valor, detalhe, icone: Icone, cor, progresso: barra }) => (
             <li key={rotulo}>
               <Linha className="h-full !p-2.5">
                 <span className="flex items-center gap-2">
                   <TileIcone cor={cor}>
                     <Icone size={14} />
                   </TileIcone>
-                  <span className="min-w-0 text-[10px] font-semibold uppercase leading-tight tracking-[0.08em] text-muted/70">
+                  <span className="min-w-0 text-[11px] font-semibold uppercase leading-tight tracking-[0.05em] text-muted/80">
                     {rotulo}
                   </span>
                 </span>
                 <p className="tnum mt-2 text-[22px] font-light leading-none" style={{ color: cor }}>
                   {valor}
                 </p>
-                <p className="mt-1 text-[10px] leading-tight text-muted/60">{detalhe}</p>
+                {barra != null && (
+                  <div className="mt-1.5 h-1 overflow-hidden rounded-full bg-white/10">
+                    <div className="h-full rounded-full" style={{ width: `${barra}%`, background: cor }} />
+                  </div>
+                )}
+                <p className="tnum mt-1 text-[11px] leading-tight text-muted/80">{detalhe}</p>
               </Linha>
             </li>
           ))}

@@ -2,6 +2,9 @@ import { aggregate, evolutionSeries, groupStats, brmReading, tiltImpact } from "
 import { fmtMoney, fmtPct } from "./format";
 import type { Session, BrmThreshold } from "./types";
 
+// "12,5" em vez de "12.5" (vírgula decimal, padrão brasileiro).
+const fmtBuyIns = (n: number) => n.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
+
 const MIN_SAMPLE = 12;
 const MIN_SAMPLE_DIM = 8;
 const DD_WARN = 10;
@@ -132,21 +135,21 @@ export function buildCoachTips(
         tips.push({
           id: "brm",
           level: "bad",
-          title: `Banca abaixo do minimo pra ${reading.format} (${reading.buyInsCovered} buy-ins)`,
+          title: `Banca abaixo do minimo pra ${reading.format} (${fmtBuyIns(reading.buyInsCovered)} buy-ins)`,
           text: `Seu threshold de movedown em ${reading.format} e' ${reading.threshold.movedownBuyins} buy-ins. Considere descer de stake ate reforcar a banca.`,
         });
       } else if (reading.status === "moveup") {
         tips.push({
           id: "brm",
           level: "good",
-          title: `Banca cobre ${reading.buyInsCovered} buy-ins em ${reading.format}`,
+          title: `Banca cobre ${fmtBuyIns(reading.buyInsCovered)} buy-ins em ${reading.format}`,
           text: `Acima do seu threshold de moveup (${reading.threshold.moveupBuyins} buy-ins). Pode considerar subir de stake com disciplina.`,
         });
       } else {
         tips.push({
           id: "brm",
           level: "info",
-          title: `Banca cobre ${reading.buyInsCovered} buy-ins em ${reading.format}`,
+          title: `Banca cobre ${fmtBuyIns(reading.buyInsCovered)} buy-ins em ${reading.format}`,
           text: `Dentro da faixa (entre ${reading.threshold.movedownBuyins} e ${reading.threshold.moveupBuyins} buy-ins). Mantenha o stake atual.`,
         });
       }

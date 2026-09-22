@@ -77,19 +77,33 @@ export function PainelStyles() {
         height: 24rem;
         z-index: -1;
         border-radius: 9999px;
-        /* Mesmo brilho de canto da tela de login, com um toque do roxo da
-           marca -- o fundo continua preto, só a luz é colorida. */
-        background: rgba(168, 85, 247, 0.16);
+        /* Brilho de canto em dourado, o mesmo tom da foto de fundo (a cor
+           de destaque do Painel passou de roxo pra dourado). */
+        background: rgba(212, 175, 55, 0.10);
         filter: blur(140px);
         pointer-events: none;
       }
 
-      /* Nome do jogador no cabeçalho, no degradê roxo da identidade. */
-      .painel-roxo {
-        background: linear-gradient(92deg, #c084fc, #818cf8);
+      /* Nome do jogador no cabeçalho, em degradê dourado. */
+      .painel-ouro {
+        background: linear-gradient(92deg, #f1d78a, #d4af37 55%, #b8932a);
         -webkit-background-clip: text;
         background-clip: text;
         color: transparent;
+      }
+
+      /* Bloco de carregamento: pulsa devagar no formato do conteúdo, pra
+         tela não "pular" quando os dados chegam. */
+      @keyframes painel-pulso {
+        0%, 100% { opacity: 0.55; }
+        50% { opacity: 1; }
+      }
+      .painel-esqueleto {
+        background: rgba(255, 255, 255, 0.05);
+        animation: painel-pulso 1.6s ease-in-out infinite;
+      }
+      @media (prefers-reduced-motion: reduce) {
+        .painel-esqueleto { animation: none; }
       }
 
       /* Vidro fosco do card: semitransparente + desfoque do que está
