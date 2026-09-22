@@ -6,6 +6,7 @@ import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { Dashboard } from "@/components/dashboard";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
+import { isSupabaseConfigured } from "@/lib/supabase/client";
 
 function formatDate() {
   return new Intl.DateTimeFormat("pt-BR", {
@@ -21,7 +22,10 @@ export default function InicioPage() {
   const [currentTime, setCurrentTime] = useState("");
 
   useEffect(() => {
-    fetchProfile().then(setProfile).catch(() => undefined);
+    if (isSupabaseConfigured) {
+      fetchProfile().then(setProfile).catch(() => undefined);
+    }
+
     const updateClock = () =>
       setCurrentTime(
         new Intl.DateTimeFormat("pt-BR", {
