@@ -1,107 +1,88 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { Bell, Clock3, LayoutGrid, WalletCards } from "lucide-react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { LayoutGrid } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { DiaryHeader } from "@/components/diario/diary-header";
-import { AgendaCard } from "@/components/diario/agenda-card";
-import { WeeklyGoalsCard } from "@/components/diario/weekly-goals-card";
-import { InsightsCard, type WeekMood } from "@/components/diario/insights-card";
-import { ReflectionPrompt } from "@/components/diario/reflection-prompt";
-import { WhatToDoCard } from "@/components/diario/what-to-do-card";
-import { LeaksCard } from "@/components/revisor/leaks-card";
+import { Dashboard } from "@/components/dashboard";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
-import { fetchProgress, fetchLast7DaysActivity } from "@/lib/services/xp-service";
 
-// Cor de humor da semana (pedido: "cor de acordo com o saldo dos
-// insights") -- um traço fino na lateral do bloco de cards em vez de um
-// gradiente de fundo (mais discreto, sem virar "tema colorido" cada
-// vez que abre a tela). Neutro fica com a borda padrão do app.
-const MOOD_BORDER: Record<WeekMood, string> = {
-  positivo: "border-positive/40",
-  atencao: "border-evolution/40",
-  neutro: "border-hairline",
-};
+function formatDate() {
+  return new Intl.DateTimeFormat("pt-BR", {
+    weekday: "long",
+    day: "numeric",
+    month: "long",
+    year: "numeric",
+  }).format(new Date());
+}
 
-// Home Diário — "diário do jogador": lista vertical de cards separados,
-// largura total (sem max-w, mesma convenção do resto do AppShell —
-// ver components/app-shell.tsx), identidade de app de hábito pessoal
-// (Day One/Oura), animação em cascata por card na entrada (fade-in-up
-// global já respeita prefers-reduced-motion, ver app/globals.css). A
-// antiga Home (app/modulos/page.tsx) continua existindo como hub de
-// navegação — acessível pelo link "Ver módulos" no cabeçalho desta
-// tela. Sem card de Score de Evolução aqui (pedido explícito: as 5
-// colunas de métrica dele não cabem bem numa tela de diário — ele
-// continua existindo no módulo de Análise).
-export default function DiarioPage() {
-  const router = useRouter();
+export default function InicioPage() {
   const [profile, setProfile] = useState<Profile | null>(null);
-  const [streakDays, setStreakDays] = useState<number | null>(null);
-  const [last7Days, setLast7Days] = useState<boolean[] | null>(null);
-  const [weekMood, setWeekMood] = useState<WeekMood>("neutro");
+  const [currentTime, setCurrentTime] = useState("");
 
   useEffect(() => {
-    let alive = true;
-    (async () => {
-      const [profileRes, progressRes, activityRes] = await Promise.allSettled([
-        fetchProfile(),
-        fetchProgress(),
-        fetchLast7DaysActivity(),
-      ]);
-      if (!alive) return;
-      if (profileRes.status === "fulfilled") setProfile(profileRes.value);
-      if (progressRes.status === "fulfilled") setStreakDays(progressRes.value.streak_days);
-      if (activityRes.status === "fulfilled") setLast7Days(activityRes.value);
-    })();
-    return () => {
-      alive = false;
-    };
+    fetchProfile().then(setProfile).catch(() => undefined);
+    const updateClock = () =>
+      setCurrentTime(
+        new Intl.DateTimeFormat("pt-BR", {
+          hour: "2-digit",
+          minute: "2-digit",
+        }).format(new Date()),
+      );
+    updateClock();
+    const interval = setInterval(updateClock, 30_000);
+    return () => clearInterval(interval);
   }, []);
 
-  function irParaTreino(leak: { drill_id?: string }) {
-    if (!leak?.drill_id) return;
-    router.push(`/treino?suggestionId=${leak.drill_id}`);
-  }
-
-  const nome = profile?.apelido?.trim() || profile?.nome?.trim() || "";
+  const nome = profile?.apelido?.trim() || profile?.nome?.trim() || "jogador";
 
   return (
     <AppShell>
-      {/* w-full sem max-w/mx-auto (convenção do AppShell) -- uma coluna
-          só de cards largos, cada um ocupando a tela toda, igual ao
-          wireframe validado (nada de sidebar estreita espremendo
-          conteúdo com várias colunas internas). */}
-      <main className="w-full px-4 py-6 md:px-6">
-        <div className="flex items-start justify-between gap-3">
-          <DiaryHeader nome={nome} streakDays={streakDays} last7Days={last7Days} />
-          <Link
-            href="/modulos"
-            className="mt-1 flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline px-2.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
-          >
-            <LayoutGrid size={13} />
-            Ver módulos
-          </Link>
-        </div>
-
-        <div className={`mt-4 flex flex-col gap-4 border-l-2 pl-4 transition-colors duration-500 ${MOOD_BORDER[weekMood]}`}>
-          <ReflectionPrompt />
-          <AgendaCard style={{ animationDelay: "60ms" }} />
-          <WeeklyGoalsCard style={{ animationDelay: "120ms" }} />
-          <InsightsCard style={{ animationDelay: "180ms" }} onMood={setWeekMood} />
-          <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
-            {/* LeaksCard já é seu próprio card com título/estilo — some
-                sozinho (retorna null) quando não há leak recorrente
-                ainda, então não envolvemos com um título duplicado
-                aqui. */}
-            <div className="fade-in-up" style={{ animationDelay: "240ms" }}>
-              <LeaksCard onPractice={irParaTreino} />
+      <main className="min-h-screen bg-void text-ink">
+        <header className="border-b border-hairline/60 bg-void/80 px-4 py-6 backdrop-blur-xl md:px-8 lg:px-10">
+          <div className="mx-auto flex max-w-7xl items-start justify-between gap-6">
+            <div>
+              <p className="mb-2 text-xs font-semibold uppercase tracking-[0.18em] text-muted/70">
+                {formatDate()}
+              </p>
+              <h1 className="text-3xl font-bold tracking-tight md:text-4xl">
+                Bom dia, <span className="text-review">{nome}</span>.
+              </h1>
+              <p className="mt-2 text-sm text-muted">
+                Foco · Estude · Execute · Evolua
+              </p>
             </div>
-            <WhatToDoCard style={{ animationDelay: "300ms" }} />
+
+            <div className="flex items-center gap-3">
+              <div className="hidden items-center gap-2 rounded-xl border border-hairline bg-surface/60 px-4 py-3 sm:flex">
+                <Clock3 size={17} className="text-review" />
+                <span className="font-mono text-sm tnum text-ink">{currentTime}</span>
+              </div>
+              <div className="hidden items-center gap-2 rounded-xl border border-hairline bg-surface/60 px-4 py-3 lg:flex">
+                <WalletCards size={17} className="text-positive" />
+                <div>
+                  <p className="text-[10px] uppercase tracking-wider text-muted/60">Bankroll total</p>
+                  <p className="font-mono text-sm font-semibold tnum text-ink">$ 2.480,00</p>
+                </div>
+              </div>
+              <button className="flex size-11 items-center justify-center rounded-xl border border-hairline bg-surface/60 text-muted transition-colors hover:border-review/40 hover:text-review">
+                <Bell size={18} />
+                <span className="sr-only">Notificações</span>
+              </button>
+              <Link
+                href="/modulos"
+                className="hidden items-center gap-2 rounded-xl border border-hairline bg-surface/60 px-3 py-3 text-xs font-semibold text-muted transition-colors hover:border-review/40 hover:text-ink md:flex"
+              >
+                <LayoutGrid size={15} />
+                Módulos
+              </Link>
+            </div>
           </div>
-        </div>
+        </header>
+
+        <Dashboard />
       </main>
     </AppShell>
   );
 }
+
