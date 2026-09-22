@@ -3,7 +3,6 @@ import { Space_Grotesk } from "next/font/google";
 import "./globals.css";
 import { TopNav } from "@/components/top-nav";
 import { ConfirmProvider } from "@/components/confirm-dialog";
-import { Analytics } from "@vercel/analytics/next";
 
 const spaceGrotesk = Space_Grotesk({
   subsets: ["latin"],
@@ -16,10 +15,6 @@ export const metadata: Metadata = {
   title: "PokerSync — Organize. Estude. Evolua.",
   description:
     "Plataforma de estudo, gestao de banca e evolucao continua para jogadores de poker.",
-  icons: {
-    icon: "/pokersync-logo.svg",
-    apple: "/pokersync-logo.svg",
-  },
 };
 
 export default function RootLayout({
@@ -32,7 +27,6 @@ export default function RootLayout({
           <TopNav />
           {children}
         </ConfirmProvider>
-        <Analytics />
       </body>
     </html>
   );
