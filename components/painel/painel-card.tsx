@@ -53,7 +53,11 @@ export function PainelCard({
 
       <header className="relative flex items-center justify-between gap-3">
         <h2 className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
-          {icon && <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.06] text-muted">{icon}</span>}
+          {icon && (
+            <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.06] text-muted">
+              {icon}
+            </span>
+          )}
           {title}
         </h2>
         {action}
@@ -73,7 +77,11 @@ export function TileIcone({ children, cor, grande = false }: { children: ReactNo
   return (
     <span
       className={`grid shrink-0 place-items-center rounded-xl ${grande ? "h-10 w-10" : "h-8 w-8"}`}
-      style={{ background: `${cor}1f`, color: cor, boxShadow: `inset 0 0 0 1px ${cor}33` }}
+      style={{
+        background: `${cor}1f`,
+        color: cor,
+        boxShadow: `inset 0 0 0 1px ${cor}33`,
+      }}
     >
       {children}
     </span>
@@ -85,7 +93,7 @@ export function TileIcone({ children, cor, grande = false }: { children: ReactNo
 export function Selo({ children, cor }: { children: ReactNode; cor: string }) {
   return (
     <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[10px] font-bold uppercase tracking-[0.08em]"
+      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.05em]"
       style={{ background: `${cor}1f`, color: cor }}
     >
       {children}
@@ -98,13 +106,28 @@ export function Selo({ children, cor }: { children: ReactNode; cor: string }) {
 // texto solto sobre o fundo do card.
 export function Linha({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
-    <div className={`painel-bloco rounded-2xl border border-white/5 p-3 transition-colors hover:border-white/15 ${className}`}>
+    <div
+      className={`painel-bloco rounded-2xl border border-white/5 p-3 transition-colors hover:border-white/15 ${className}`}
+    >
       {children}
     </div>
   );
 }
 
-// Estado vazio/carregando padronizado — sem isto cada card inventava a
+// Blocos de carregamento no formato do conteúdo (em vez do texto
+// "Carregando…"): o card já nasce com a altura certa e a tela não pula
+// quando os dados chegam. `linhas` = quantos blocos; `altura` = de cada um.
+export function Esqueleto({ linhas = 3, altura = 44 }: { linhas?: number; altura?: number }) {
+  return (
+    <div className="flex flex-col gap-2" aria-busy="true" aria-label="Carregando">
+      {Array.from({ length: linhas }, (_, i) => (
+        <div key={i} className="painel-esqueleto rounded-2xl" style={{ height: altura }} />
+      ))}
+    </div>
+  );
+}
+
+// Estado vazio padronizado — sem isto cada card inventava a
 // própria frase e o grid ficava desalinhado no primeiro carregamento.
 export function CardHint({ children }: { children: ReactNode }) {
   return <p className="text-sm text-muted">{children}</p>;

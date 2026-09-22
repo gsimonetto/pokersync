@@ -1,16 +1,25 @@
 "use client";
 
-import { useCallback, useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import Link from "next/link";
-import { AlertTriangle, ArrowRight, BookOpen, Check, Info, LineChart, Sparkles, Target, ThumbsUp, TrendingUp } from "lucide-react";
-import { createClient } from "@/lib/supabase/client";
-import { fetchBrmThresholds, fetchGoals, fetchSessions, fetchSettings, fetchStudyLogs } from "@/lib/services/bankroll-service";
+import {
+  AlertTriangle,
+  ArrowRight,
+  BookOpen,
+  Check,
+  Info,
+  LineChart,
+  Sparkles,
+  Target,
+  ThumbsUp,
+  TrendingUp,
+} from "lucide-react";
 import { buildCoachTips } from "@/lib/bankroll/coach";
 import { goalProgress } from "@/lib/bankroll/calc";
-import { fetchPlayerInsights, fetchPlayerPerformance } from "@/lib/services/performance-service";
-import { listReviews } from "@/lib/services/hand-review-service";
-import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
-import { CardHint, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
+import { Esqueleto, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
+import { usePainelDados, type PainelDados } from "./painel-dados";
+import { num, pct } from "./formato";
+import { fracaoDaSemana, situacaoMeta, textoProgresso } from "./metas";
 
 // Memória de "já vi isso", no navegador (não no banco: é preferência de
 // leitura, não precisa sincronizar entre aparelhos). Mesmo padrão já
@@ -87,28 +96,19 @@ function gravarMemoria(memoria: Record<string, number>) {
 // Junta num só lugar o que cada módulo tem a dizer hoje. Nada aqui é
 // texto inventado na hora: são as mesmas regras que a Gestão de Banca
 // (buildCoachTips), o Performance (get_player_insights + top_leaks), o
-// Revisor (fila), as Metas e o Treino já usam nas telas deles.
-async function montarDicas(): Promise<Dica[]> {
+// Revisor (fila), as Metas e o Treino já usam nas telas deles. Os dados
+// vêm do carregador único do Painel (painel-dados.tsx).
+function montarDicas(d: PainelDados): Dica[] {
   const dicas: Dica[] = [];
 
-  const [sessoes, settings, thresholds, metas, logsEstudo, perf, insights, drillsHoje] = await Promise.allSettled([
-    fetchSessions(),
-    fetchSettings(),
-    fetchBrmThresholds(),
-    fetchGoals(),
-    fetchStudyLogs(),
-    fetchPlayerPerformance(),
-    fetchPlayerInsights(),
-    fetchTodayTrainingCount(),
-  ]);
-
-  const listaSessoes = sessoes.status === "fulfilled" ? sessoes.value : [];
-
   // --- Gestão de Banca -------------------------------------------------
-  if (listaSessoes.length > 0) {
-    const tips = buildCoachTips(listaSessoes, {
-      bankroll: settings.status === "fulfilled" ? settings.value.bankroll : undefined,
-      brmThresholds: thresholds.status === "fulfilled" ? thresholds.value : undefined,
+  // Banca = a MESMA conta da tela de Banca (base + lucro + depósitos -
+  // saques). Antes ia só a base cadastrada, e o "cobre X buy-ins" daqui
+  // não batia com o de lá.
+  if (d.sessoes.length > 0) {
+    const tips = buildCoachTips(d.sessoes, {
+      bankroll: d.bancaAtual ?? undefined,
+      brmThresholds: d.limitesBrm,
     });
     for (const t of tips) {
       if (t.id === "empty") continue;
@@ -126,90 +126,74 @@ async function montarDicas(): Promise<Dica[]> {
   }
 
   // --- Performance ------------------------------------------------------
-  if (perf.status === "fulfilled" && perf.value) {
-    for (const leak of (perf.value.top_leaks ?? []).slice(0, 2)) {
-      dicas.push({
-        chave: `leak:${leak.code}:${leak.ocorrencias}`,
-        modulo: "Performance",
-        cor: "#22D3EE",
-        nivel: "atencao",
-        titulo: `Vazamento recorrente: ${leak.label ?? leak.code}`,
-        texto: `Apareceu ${leak.ocorrencias} ${leak.ocorrencias === 1 ? "vez" : "vezes"} nas suas mãos revisadas. Treinar essa situação é o caminho mais curto de ganho agora.`,
-        href: "/treino",
-        cta: "Treinar essa situação",
-      });
-    }
+  for (const leak of (d.performance?.top_leaks ?? []).slice(0, 2)) {
+    dicas.push({
+      chave: `leak:${leak.code}:${leak.ocorrencias}`,
+      modulo: "Performance",
+      cor: "#22D3EE",
+      nivel: "atencao",
+      titulo: `Vazamento recorrente: ${leak.label ?? leak.code}`,
+      texto: `Apareceu ${num(leak.ocorrencias)} ${leak.ocorrencias === 1 ? "vez" : "vezes"} nas suas mãos revisadas. Treinar essa situação é o caminho mais curto de ganho agora.`,
+      href: "/treino",
+      cta: "Treinar essa situação",
+    });
   }
-  if (insights.status === "fulfilled") {
-    for (const frase of insights.value.slice(0, 3)) {
-      dicas.push({
-        chave: `insight:${frase}`,
-        modulo: "Performance",
-        cor: "#22D3EE",
-        nivel: "info",
-        titulo: "Comparando seus períodos",
-        texto: frase,
-        href: "/performance",
-        cta: "Ver análise completa",
-      });
-    }
+  for (const frase of d.insights.slice(0, 3)) {
+    dicas.push({
+      chave: `insight:${frase}`,
+      modulo: "Performance",
+      cor: "#22D3EE",
+      nivel: "info",
+      titulo: "Comparando seus períodos",
+      texto: frase,
+      href: "/performance",
+      cta: "Ver análise completa",
+    });
   }
 
   // --- Revisor ----------------------------------------------------------
-  try {
-    const supabase = createClient();
-    const { data } = await supabase.auth.getUser();
-    if (data.user) {
-      const pendentes = (await listReviews(data.user.id)).filter((r) => r.status !== "concluida");
-      if (pendentes.length > 0) {
-        dicas.push({
-          chave: `revisor:fila:${pendentes.length}`,
-          modulo: "Revisor",
-          cor: "#A855F7",
-          nivel: pendentes.length >= 5 ? "atencao" : "info",
-          titulo: `${pendentes.length} ${pendentes.length === 1 ? "mão esperando" : "mãos esperando"} revisão`,
-          texto:
-            pendentes.length >= 5
-              ? "A fila está crescendo. Mão marcada e não revisada não vira aprendizado — reserve um bloco hoje."
-              : "Revisar enquanto a mão está fresca na memória rende muito mais que revisar semanas depois.",
-          href: "/revisor",
-          cta: "Abrir a fila",
-        });
-      }
-    }
-  } catch {
-    // sem sessão: o Revisor simplesmente não contribui com dica nenhuma
+  const fila = d.pendentes.length;
+  if (fila > 0) {
+    dicas.push({
+      chave: `revisor:fila:${fila}`,
+      modulo: "Revisor",
+      cor: "#A855F7",
+      nivel: fila >= 5 ? "atencao" : "info",
+      titulo: `${num(fila)} ${fila === 1 ? "mão esperando" : "mãos esperando"} revisão`,
+      texto:
+        fila >= 5
+          ? "A fila está crescendo. Mão marcada e não revisada não vira aprendizado — reserve um bloco hoje."
+          : "Revisar enquanto a mão está fresca na memória rende muito mais que revisar semanas depois.",
+      href: "/revisor",
+      cta: "Abrir a fila",
+    });
   }
 
   // --- Metas -------------------------------------------------------------
-  if (metas.status === "fulfilled" && listaSessoes.length >= 0) {
-    const hoje = new Date().toISOString().slice(0, 10);
-    const semanais = metas.value.filter((g) => g.period === "semanal" && g.deadline >= hoje);
-    const logs = logsEstudo.status === "fulfilled" ? logsEstudo.value : [];
-    // Fração da semana já vivida (segunda a domingo) — a mesma heurística
-    // de ritmo usada no card de metas do Diário.
-    const fracaoSemana = (new Date().getDay() || 7) / 7;
-    for (const meta of semanais) {
-      const p = goalProgress(meta, listaSessoes, logs);
-      if (p.pct / 100 < fracaoSemana - 0.2) {
-        dicas.push({
-          chave: `meta:${meta.id}:atrasada`,
-          modulo: "Metas",
-          cor: "#E0B24C",
-          nivel: "atencao",
-          titulo: `Meta de ${meta.type === "volume" ? "volume" : "estudo"} atrás do ritmo`,
-          texto: `Você está em ${Math.round(p.current)} de ${meta.target} ${meta.unit} e a semana já passou de ${Math.round(fracaoSemana * 100)}%. Dá pra recuperar distribuindo o que falta nos próximos dias.`,
-          href: "/banca",
-          cta: "Ver minhas metas",
-        });
-      }
-    }
+  // Mesma regra de "atrasada" do card de metas (metas.ts), com a semana
+  // começando no domingo como a conta de progresso. Antes o Coach contava
+  // a partir da segunda e, todo domingo, dava a semana por 100% vivida.
+  const hoje = new Date().toISOString().slice(0, 10);
+  const fracao = fracaoDaSemana();
+  for (const meta of d.metas.filter((g) => g.period === "semanal" && g.deadline >= hoje)) {
+    const p = goalProgress(meta, d.todasSessoes, d.logsEstudo);
+    if (situacaoMeta(p.pct) !== "atrasada") continue;
+    dicas.push({
+      chave: `meta:${meta.id}:atrasada`,
+      modulo: "Metas",
+      cor: "#E0B24C",
+      nivel: "atencao",
+      titulo: `Meta de ${meta.type === "volume" ? "volume" : "estudo"} atrás do ritmo`,
+      texto: `Você está em ${textoProgresso(meta, p.current)} e a semana já passou de ${pct(fracao * 100, { casas: 0 })}. Dá pra recuperar distribuindo o que falta nos próximos dias.`,
+      href: "/banca",
+      cta: "Ver minhas metas",
+    });
   }
 
   // --- Treino -------------------------------------------------------------
-  if (drillsHoje.status === "fulfilled" && drillsHoje.value === 0) {
+  if (d.drillsHoje === 0) {
     dicas.push({
-      chave: `treino:zero:${new Date().toISOString().slice(0, 10)}`,
+      chave: `treino:zero:${hoje}`,
       modulo: "Treino",
       cor: "#2FB89A",
       nivel: "info",
@@ -228,58 +212,42 @@ async function montarDicas(): Promise<Dica[]> {
 // (pedido do usuário), então a mesma frase não fica ocupando o card
 // todo dia.
 export function AiCoachCard({ style, className }: { style?: React.CSSProperties; className?: string }) {
-  const [dicas, setDicas] = useState<Dica[]>([]);
-  const [memoria, setMemoria] = useState<Record<string, number>>({});
+  const dados = usePainelDados();
+  const [fila, setFila] = useState<Dica[] | null>(null);
   const [indice, setIndice] = useState(0);
-  const [carregando, setCarregando] = useState(true);
 
+  // Fila = o que ainda não foi visto. Montada UMA vez, quando os dados
+  // chegam: se o jogador remove uma mão da fila do Revisor ou cria uma
+  // meta, o Coach não se reembaralha debaixo dos olhos de quem está lendo
+  // (a lista nova vale no próximo acesso).
   useEffect(() => {
-    let vivo = true;
-    setMemoria(lerMemoria());
-    (async () => {
-      const lista = await montarDicas().catch(() => [] as Dica[]);
-      if (!vivo) return;
-      setDicas(lista);
-      setCarregando(false);
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
+    if (dados.carregando || fila !== null) return;
+    const vistos = lerMemoria();
+    setFila(montarDicas(dados).filter((d) => vistos[d.chave] == null));
+  }, [dados, fila]);
 
-  // Fila = o que ainda não foi visto. Calculada uma vez por carregamento
-  // (a memória só é relida no próximo acesso) pra que marcar a dica atual
-  // como lida não a faça sumir debaixo dos olhos de quem está lendo.
-  const fila = useMemo(() => {
-    if (carregando) return [];
-    return dicas.filter((d) => memoria[d.chave] == null);
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [dicas, carregando]);
+  const carregando = fila === null;
 
-  const atual = fila[indice] ?? null;
-
-  const marcarVista = useCallback((chave: string) => {
-    const atualizada = { ...lerMemoria(), [chave]: Date.now() };
-    gravarMemoria(atualizada);
-    setMemoria(atualizada);
-  }, []);
+  const atual = fila?.[indice] ?? null;
 
   // Marca como lida assim que a dica aparece na tela.
   useEffect(() => {
-    if (atual) marcarVista(atual.chave);
-  }, [atual, marcarVista]);
+    if (atual) gravarMemoria({ ...lerMemoria(), [atual.chave]: Date.now() });
+  }, [atual]);
 
   const estilo = atual ? ESTILO[atual.nivel] : ESTILO.info;
-  const restantes = Math.max(0, fila.length - indice - 1);
+  const total = fila?.length ?? 0;
+  const proximas = fila ? fila.slice(indice + 1, indice + 3) : [];
 
   return (
     <PainelCard
       title="AI Coach"
       icon={<Sparkles size={15} />}
       action={
-        fila.length > 0 && (
-          <span className="tnum text-[11px] text-muted/60">
-            {Math.min(indice + 1, fila.length)} de {fila.length}
+        atual &&
+        total > 1 && (
+          <span className="tnum text-[11px] text-muted">
+            {num(indice + 1)} de {num(total)}
           </span>
         )
       }
@@ -287,12 +255,12 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
       className={className}
     >
       {carregando ? (
-        <CardHint>Lendo seus módulos…</CardHint>
+        <Esqueleto linhas={4} />
       ) : !atual ? (
         <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
           <Check size={22} className="text-positive" />
           <p className="mt-2 text-sm font-medium">Tudo em dia por aqui</p>
-          <p className="mt-1 max-w-[34ch] text-[13px] text-muted/70">
+          <p className="mt-1 max-w-[34ch] text-[13px] text-muted">
             Você já viu tudo que era relevante hoje. Volte depois de jogar, revisar ou treinar.
           </p>
         </div>
@@ -326,11 +294,11 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
 
           {/* O que vem depois — mostra que o Coach tem fila, e o jogador
               já sabe o que o espera antes de clicar em "Já vi". */}
-          {fila.length > indice + 1 && (
+          {proximas.length > 0 && (
             <div className="mt-5">
-              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/50">A seguir</p>
+              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">A seguir</p>
               <ul className="mt-2 flex flex-col gap-1.5">
-                {fila.slice(indice + 1, indice + 3).map((d) => {
+                {proximas.map((d) => {
                   const Icone = ICONE_MODULO[d.modulo] ?? Sparkles;
                   return (
                     <li key={d.chave}>
@@ -350,10 +318,13 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
             </div>
           )}
 
-          <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
+          {/* Botões logo abaixo do conteúdo (não colados no rodapé do
+              card): com poucas dicas, ficavam longe do texto a que se
+              referem. */}
+          <div className="flex flex-wrap items-center gap-2 pt-5">
             <Link
               href={atual.href}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#a855f7] px-4 py-2 text-xs font-semibold text-white shadow-lg shadow-[#a855f7]/25 transition-colors hover:bg-[#9333ea]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition-colors hover:bg-[#e2c35a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
             >
               {atual.cta}
               <ArrowRight size={13} />
@@ -361,9 +332,9 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
             <button
               type="button"
               onClick={() => setIndice((i) => i + 1)}
-              className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-white/30 hover:text-ink"
+              className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-[#d4af37]/50 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
             >
-              {restantes > 0 ? `Já vi · próxima (${restantes})` : "Já vi"}
+              {proximas.length > 0 ? "Já vi, próxima" : "Já vi"}
             </button>
           </div>
         </div>

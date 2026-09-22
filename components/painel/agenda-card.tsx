@@ -3,22 +3,22 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { Cake, CalendarDays, ChevronLeft, ChevronRight, Radio, Trophy, Users } from "lucide-react";
-import { fetchTeamBirthdays, fetchTeamEvents, type TeamBirthday, type TeamEvent } from "@/lib/services/team-calendar-service";
-import { fetchTeamDashboardCached } from "@/lib/services/team-service";
-import { fetchLiveTournaments, youtubeWatchUrl, type LiveStreamChannel } from "@/lib/services/live-stream-service";
-import { fetchSessions } from "@/lib/services/bankroll-service";
+import { youtubeWatchUrl } from "@/lib/services/live-stream-service";
 import { net } from "@/lib/bankroll/calc";
 import { formatBRL } from "@/lib/format";
-import type { Session } from "@/lib/bankroll/types";
-import { CardHint, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
+import { CardHint, Esqueleto, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
+import { usePainelDados } from "./painel-dados";
+import { dataLonga, mesAno } from "./formato";
 
 const SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 
 // Um item do dia. `cor` vale tanto pro quadradinho de ícone quanto pra
 // bolinha que marca o dia na grade -- é o que liga as duas leituras.
+type Tipo = "evento" | "aniversario" | "sessao" | "ao-vivo";
+
 type Item = {
   id: string;
-  tipo: "evento" | "aniversario" | "sessao" | "ao-vivo";
+  tipo: Tipo;
   titulo: string;
   detalhe: string;
   cor: string;
@@ -26,7 +26,17 @@ type Item = {
   href?: string;
   externo?: boolean;
   selo?: string;
+  corSelo?: string;
 };
+
+// Legenda das bolinhas: sem ela, o jogador precisava clicar num dia pra
+// descobrir o que cada cor queria dizer. Só aparece o que existe no mês.
+const LEGENDA: { tipo: Tipo; texto: string; cor: string }[] = [
+  { tipo: "sessao", texto: "Sessões", cor: "#5AA6E0" },
+  { tipo: "evento", texto: "Time", cor: "#6366F1" },
+  { tipo: "aniversario", texto: "Aniversários", cor: "#E0559E" },
+  { tipo: "ao-vivo", texto: "Ao vivo", cor: "#e0555a" },
+];
 
 const CHAVE = (d: Date) =>
   `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
@@ -36,11 +46,17 @@ const CHAVE = (d: Date) =>
 function gradeDoMes(ref: Date): (number | null)[] {
   const primeiro = new Date(ref.getFullYear(), ref.getMonth(), 1);
   const totalDias = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
-  return [...Array.from({ length: primeiro.getDay() }, () => null), ...Array.from({ length: totalDias }, (_, i) => i + 1)];
+  return [
+    ...Array.from({ length: primeiro.getDay() }, () => null),
+    ...Array.from({ length: totalDias }, (_, i) => i + 1),
+  ];
 }
 
 function hora(iso: string): string {
-  return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
+  return new Date(iso).toLocaleTimeString("pt-BR", {
+    hour: "2-digit",
+    minute: "2-digit",
+  });
 }
 
 // Calendário do mês, clicável: cada dia mostra bolinhas do que acontece
@@ -66,43 +82,10 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
     setDiaEscolhido(CHAVE(agora));
   }, []);
 
-  const [eventos, setEventos] = useState<TeamEvent[]>([]);
-  const [aniversarios, setAniversarios] = useState<TeamBirthday[]>([]);
-  const [sessoes, setSessoes] = useState<Session[]>([]);
-  const [aoVivo, setAoVivo] = useState<LiveStreamChannel[]>([]);
-  const [carregando, setCarregando] = useState(true);
-
-  useEffect(() => {
-    let vivo = true;
-    (async () => {
-      // Sem time cadastrado, a RLS devolve vazio ou erro de permissão nos
-      // dois primeiros — os catches deixam o calendário funcionar assim
-      // mesmo, só com as sessões do próprio jogador.
-      const [ev, live, sess] = await Promise.all([
-        fetchTeamEvents({ onlyUpcoming: false, limit: 200 }).catch(() => [] as TeamEvent[]),
-        fetchLiveTournaments().catch(() => [] as LiveStreamChannel[]),
-        fetchSessions().catch(() => [] as Session[]),
-      ]);
-      if (!vivo) return;
-      setEventos(ev);
-      setAoVivo(live);
-      setSessoes(sess);
-      setCarregando(false);
-
-      // Aniversários dependem de saber quem é do time: primeiro os
-      // membros, depois a RPC que só devolve quem está no meu time.
-      try {
-        const membros = await fetchTeamDashboardCached();
-        const nivers = await fetchTeamBirthdays(membros.map((m) => m.userId));
-        if (vivo) setAniversarios(nivers);
-      } catch {
-        // sem time ou sem permissão: calendário segue sem aniversários
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
-  }, []);
+  // Sem time cadastrado, eventos e aniversários chegam vazios e o
+  // calendário funciona só com as sessões do próprio jogador. As sessões
+  // seguem o mesmo corte do Radar da Gestão de Banca.
+  const { carregando, eventos, aniversarios, sessoes, aoVivo } = usePainelDados();
 
   // Tudo indexado por dia. Aniversário se repete todo ano, então entra
   // pelo dia/mês do mês em exibição, não pela data de nascimento crua.
@@ -152,7 +135,10 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
         cor: "#5AA6E0",
         icone: Trophy,
         href: "/banca",
-        selo: `${resultado >= 0 ? "+" : ""}${formatBRL(resultado)}`,
+        selo: `${resultado > 0 ? "+" : ""}${formatBRL(resultado)}`,
+        // Resultado em verde/vermelho, como no resto do app -- em azul
+        // (cor da sessão) o jogador não lia de relance se ganhou ou perdeu.
+        corSelo: resultado > 0 ? "#22c55e" : resultado < 0 ? "#e0555a" : "#c4c7c8",
       });
     }
 
@@ -174,6 +160,14 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
   }, [eventos, aniversarios, sessoes, aoVivo, mesRef, hoje]);
 
   const dias = useMemo(() => (mesRef ? gradeDoMes(mesRef) : []), [mesRef]);
+
+  const tiposNoMes = useMemo(() => {
+    const tipos = new Set<Tipo>();
+    if (!mesRef) return tipos;
+    const prefixo = CHAVE(mesRef).slice(0, 7);
+    for (const [chave, itens] of porDia) if (chave.startsWith(prefixo)) for (const it of itens) tipos.add(it.tipo);
+    return tipos;
+  }, [porDia, mesRef]);
   const itensDoDia = diaEscolhido ? (porDia.get(diaEscolhido) ?? []) : [];
   const dataEscolhida = diaEscolhido ? new Date(`${diaEscolhido}T12:00:00`) : null;
 
@@ -195,9 +189,7 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
           >
             <ChevronLeft size={15} />
           </button>
-          <span className="min-w-[96px] text-center text-[11px] capitalize text-muted/70">
-            {mesRef ? mesRef.toLocaleDateString("pt-BR", { month: "long", year: "numeric" }) : ""}
-          </span>
+          <span className="min-w-[108px] text-center text-[12px] text-muted">{mesRef ? mesAno(mesRef) : ""}</span>
           <button
             type="button"
             onClick={() => mudarMes(1)}
@@ -213,7 +205,7 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
     >
       <div className="grid grid-cols-7 gap-y-1 text-center">
         {SEMANA.map((l, i) => (
-          <span key={i} className="pb-1 text-[10px] font-semibold text-muted/50">
+          <span key={i} className="pb-1 text-[11px] font-semibold text-muted/70">
             {l}
           </span>
         ))}
@@ -235,13 +227,13 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
               aria-pressed={escolhido}
               className={`relative mx-auto grid h-9 w-9 place-items-center rounded-xl text-[12px] transition-colors ${
                 escolhido
-                  ? "bg-[#a855f7] font-semibold text-white shadow-lg shadow-[#a855f7]/30"
+                  ? "bg-[#d4af37] font-semibold text-black shadow-lg shadow-[#d4af37]/25"
                   : ehHoje
-                    ? "bg-white/[0.08] font-semibold text-ink ring-1 ring-inset ring-[#a855f7]/50"
+                    ? "bg-white/[0.08] font-semibold text-[#f1d78a] ring-1 ring-inset ring-[#d4af37]/60"
                     : itens.length > 0
                       ? "text-ink hover:bg-white/[0.06]"
-                      : "text-muted/60 hover:bg-white/[0.04]"
-              }`}
+                      : "text-muted/70 hover:bg-white/[0.04]"
+              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60`}
             >
               <span className="tnum leading-none">{dia}</span>
               {cores.length > 0 && (
@@ -250,7 +242,7 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
                     <span
                       key={c}
                       className="h-1 w-1 rounded-full"
-                      style={{ background: escolhido ? "#ffffffcc" : c }}
+                      style={{ background: escolhido ? "#000000b3" : c }}
                     />
                   ))}
                 </span>
@@ -260,16 +252,23 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
         })}
       </div>
 
+      {tiposNoMes.size > 0 && (
+        <div className="mt-2 flex flex-wrap justify-center gap-x-3.5 gap-y-1">
+          {LEGENDA.filter((l) => tiposNoMes.has(l.tipo)).map((l) => (
+            <span key={l.tipo} className="flex items-center gap-1.5 text-[11px] text-muted">
+              <span className="h-1.5 w-1.5 rounded-full" style={{ background: l.cor }} />
+              {l.texto}
+            </span>
+          ))}
+        </div>
+      )}
+
       <div className="mt-4 border-t border-hairline pt-4">
-        <p className="text-[11px] font-semibold capitalize text-muted">
-          {dataEscolhida
-            ? dataEscolhida.toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })
-            : "—"}
-        </p>
+        <p className="text-[12px] font-semibold text-muted">{dataEscolhida ? dataLonga(dataEscolhida) : "—"}</p>
 
         {carregando || !diaEscolhido ? (
           <div className="mt-3">
-            <CardHint>Carregando…</CardHint>
+            <Esqueleto linhas={2} />
           </div>
         ) : itensDoDia.length === 0 ? (
           <div className="mt-3">
@@ -292,9 +291,9 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
                     </TileIcone>
                     <span className="min-w-0 flex-1">
                       <span className="block truncate text-sm">{it.titulo}</span>
-                      <span className="block truncate text-[11px] text-muted/60">{it.detalhe}</span>
+                      <span className="block truncate text-[11px] text-muted">{it.detalhe}</span>
                     </span>
-                    {it.selo && <Selo cor={it.cor}>{it.selo}</Selo>}
+                    {it.selo && <Selo cor={it.corSelo ?? it.cor}>{it.selo}</Selo>}
                   </span>
                 </Linha>
               );
