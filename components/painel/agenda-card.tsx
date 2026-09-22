@@ -281,7 +281,7 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
             </CardHint>
           </div>
         ) : (
-          <ul className="painel-scroll mt-3 flex max-h-[176px] flex-col gap-2 overflow-y-auto pr-1">
+          <ul className="mt-3 flex flex-col gap-2">
             {itensDoDia.map((it) => {
               const Icone = it.icone;
               const conteudo = (

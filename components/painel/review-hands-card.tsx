@@ -93,7 +93,7 @@ export function ReviewHandsCard({ style, className }: { style?: React.CSSPropert
           </Link>
         </CardHint>
       ) : (
-        <ul className="painel-scroll flex max-h-[260px] flex-col gap-2 overflow-y-auto pr-1">
+        <ul className="flex flex-col gap-2">
           {itens.map((r) => (
             <li key={r.id}>
               <Linha>

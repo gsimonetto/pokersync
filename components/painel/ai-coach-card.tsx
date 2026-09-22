@@ -330,7 +330,7 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
             <div className="mt-5">
               <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/50">A seguir</p>
               <ul className="mt-2 flex flex-col gap-1.5">
-                {fila.slice(indice + 1, indice + 4).map((d) => {
+                {fila.slice(indice + 1, indice + 3).map((d) => {
                   const Icone = ICONE_MODULO[d.modulo] ?? Sparkles;
                   return (
                     <li key={d.chave}>
