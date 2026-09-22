@@ -16,6 +16,9 @@ import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/to
 import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
 import { getUsdBrlRate } from "@/lib/services/fx-service";
 import { AppShell } from "@/components/app-shell";
+import { RadarModuleMenu } from "@/components/radar/radar-module-menu";
+import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
+import { resetBancaRadarImports } from "@/lib/services/bankroll-service";
 // FIX (bug reportado: "no celular, aonde aparece valores grandes (como
 // gestor de banca) esta quebrando passando para o proximo card") --
 // Banca tinha sua PROPRIA copia de HeroMetric (fonte fixa, sem
@@ -178,6 +181,10 @@ export default function BankrollPage() {
   const [agentPayouts, setAgentPayouts] = useState<TournamentPayout[]>([]);
   const [importingAgent, setImportingAgent] = useState(false);
   const [agentDevice, setAgentDevice] = useState<AgentDeviceStatus | null>(null);
+  // Corte do botão do Radar (ver components/radar/radar-module-menu.tsx) --
+  // quando setado, esconde sessões IMPORTADAS pelo Radar jogadas antes
+  // desse instante. Sessão registrada manualmente nunca é escondida.
+  const [radarSince, setRadarSince] = useState<string | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -218,14 +225,25 @@ export default function BankrollPage() {
     fetchMostRecentAgentDevice()
       .then(setAgentDevice)
       .catch(() => setAgentDevice(null));
+    fetchRadarModuleScope("banca")
+      .then((s) => setRadarSince(s.scope === "from_now" ? s.since : null))
+      .catch(() => {});
   }, []);
+
+  // Só esconde sessão IMPORTADA (importedHandSessionId) jogada antes do
+  // corte -- sessão registrada à mão continua sempre visível.
+  const radarVisibleSessions = useMemo(() => {
+    if (!radarSince) return sessions;
+    const cutoffDate = radarSince.slice(0, 10);
+    return sessions.filter((s) => !s.importedHandSessionId || s.date >= cutoffDate);
+  }, [sessions, radarSince]);
 
   const base = Number(bankroll) || 0;
 
   // Moeda: so' entra em jogo quando o jogador de fato usa mais de uma —
   // nesse caso currencyFilter nunca pode ficar preso numa moeda que nao
   // existe mais nos dados (ex: apagou a unica sessao em USD).
-  const currencies = useMemo(() => currenciesInUse(sessions, transactions), [sessions, transactions]);
+  const currencies = useMemo(() => currenciesInUse(radarVisibleSessions, transactions), [radarVisibleSessions, transactions]);
   const isMultiCurrency = currencies.length > 1;
   useEffect(() => {
     if (currencies.length > 0 && !currencies.includes(currencyFilter)) {
@@ -333,8 +351,8 @@ export default function BankrollPage() {
   }, [loading, pendingAgentTournaments.length]);
   const fmtSigned = (v: number) => fmtSignedMoneyIn(v, currencyFilter);
   const currencySessions = useMemo(
-    () => (isMultiCurrency ? sessions.filter((s) => (s.currency || "BRL") === currencyFilter) : sessions),
-    [sessions, currencyFilter, isMultiCurrency]
+    () => (isMultiCurrency ? radarVisibleSessions.filter((s) => (s.currency || "BRL") === currencyFilter) : radarVisibleSessions),
+    [radarVisibleSessions, currencyFilter, isMultiCurrency]
   );
   const currencyTransactions = useMemo(
     () => (isMultiCurrency ? transactions.filter((t) => (t.currency || "BRL") === currencyFilter) : transactions),
@@ -382,13 +400,13 @@ export default function BankrollPage() {
   const perCurrencyBalances = useMemo(
     () =>
       currencies.map((c) => {
-        const sess = sessions.filter((s) => (s.currency || "BRL") === c);
+        const sess = radarVisibleSessions.filter((s) => (s.currency || "BRL") === c);
         const tx = transactions.filter((t) => (t.currency || "BRL") === c);
         const a = aggregate(sess);
         const balance = netWorth(c === REFERENCE_CURRENCY ? base : 0, a.profit, tx).playingBankroll;
         return { currency: c, balance };
       }),
-    [currencies, sessions, transactions, base, REFERENCE_CURRENCY]
+    [currencies, radarVisibleSessions, transactions, base, REFERENCE_CURRENCY]
   );
   const consolidatedTotal = useMemo(
     () => perCurrencyBalances.reduce((sum, p) => sum + p.balance * fxRateOf(p.currency), 0),
@@ -413,8 +431,8 @@ export default function BankrollPage() {
   );
   const filteredSeries = useMemo(() => filterSeriesByRange(series, range), [series, range]);
   const tips = useMemo(
-    () => buildCoachTips(sessions, { bankroll: nw.playingBankroll, brmThresholds }),
-    [sessions, nw.playingBankroll, brmThresholds]
+    () => buildCoachTips(radarVisibleSessions, { bankroll: nw.playingBankroll, brmThresholds }),
+    [radarVisibleSessions, nw.playingBankroll, brmThresholds]
   );
   // Dica some sozinha 24h depois de aparecer pela 1a vez (ou na hora, se
   // dispensada) -- mesma memoria do Assistente do coach (Time > Jogadores):
@@ -426,14 +444,14 @@ export default function BankrollPage() {
   }, [tips]);
   const tipsVisiveis = tips.filter((t) => coachTipVisivel(t.id));
   const currentBrm = useMemo(
-    () => brmReading(sessions, nw.playingBankroll, brmThresholds),
-    [sessions, nw.playingBankroll, brmThresholds]
+    () => brmReading(radarVisibleSessions, nw.playingBankroll, brmThresholds),
+    [radarVisibleSessions, nw.playingBankroll, brmThresholds]
   );
   const tiltStats = useMemo(() => tiltImpact(platformSessions), [platformSessions]);
   const rate = useMemo(() => hourlyRate(platformSessions), [platformSessions]);
   const activity = useMemo(() => dailyActivity(platformSessions), [platformSessions]);
   const calcThreshold = useMemo(() => thresholdFor(brmThresholds, calcFormat), [brmThresholds, calcFormat]);
-  const ruin = useMemo(() => riskOfRuin(sessions, nw.playingBankroll), [sessions, nw.playingBankroll]);
+  const ruin = useMemo(() => riskOfRuin(radarVisibleSessions, nw.playingBankroll), [radarVisibleSessions, nw.playingBankroll]);
   const comparison = useMemo(() => compareMonths(platformSessions), [platformSessions]);
   const currentDrawdown = useMemo(() => drawdownBuyIns(platformSessions, agg.avgBuyIn), [platformSessions, agg.avgBuyIn]);
   const roiDelta = comparison.current.roi - comparison.previous.roi;
@@ -840,6 +858,16 @@ export default function BankrollPage() {
             >
               <Wallet size={17} />
             </button>
+            <RadarModuleMenu
+              module="banca"
+              moduleLabel="a Gestão de Banca"
+              onScopeChange={({ since }) => setRadarSince(since)}
+              onReset={async () => {
+                await resetBancaRadarImports();
+                setRadarSince(null);
+                setSessions(await fetchSessions());
+              }}
+            />
           </div>
         </div>
 

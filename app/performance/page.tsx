@@ -17,6 +17,8 @@ import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
 import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
 import { isAddonUnlockedFor } from "@/lib/plans/plans-data";
 import { useCurrencyPreference } from "@/lib/hooks/use-currency-preference";
+import { RadarModuleMenu } from "@/components/radar/radar-module-menu";
+import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
 import {
   fetchAnalysisHandRows,
   applyAnalysisFilters,
@@ -27,6 +29,7 @@ import {
   buyinBucketOf,
   fetchTournamentMetrics,
   fetchTournamentSessions,
+  resetPerformanceStats,
 } from "@/lib/services/analysis-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
@@ -76,6 +79,11 @@ export default function PerformancePage() {
   // dentro do player evolution"), mas o conteudo so' aparece pra quem tem
   // o addon (mesma logica de lib/plans/plans-data.ts usada em app-shell.tsx).
   const [radarUnlocked, setRadarUnlocked] = useState<boolean | null>(null);
+  // Corte do botão do Radar (ver components/radar/radar-module-menu.tsx) --
+  // só afeta Preflop/Postflop/Por posição (fetchAnalysisHandRows). A aba
+  // Estatísticas (Total Games/ROI/ITM/Lucro) vem de fetchTournamentMetrics/
+  // fetchTournamentSessions, que ainda não respeitam esse corte.
+  const [radarSince, setRadarSince] = useState<string | null>(null);
 
   useEffect(() => {
     Promise.all([fetchMyPlanState(), fetchHasActiveTeamAccess()])
@@ -83,13 +91,16 @@ export default function PerformancePage() {
         setRadarUnlocked(isAddonUnlockedFor(plan, "radar", radarAddon, hasTeamAccess));
       })
       .catch(() => setRadarUnlocked(false));
+    fetchRadarModuleScope("performance")
+      .then((s) => setRadarSince(s.scope === "from_now" ? s.since : null))
+      .catch(() => {});
   }, []);
 
-  async function loadAll() {
+  async function loadAll(since: string | null = radarSince) {
     setErro("");
     try {
       const [r, tourn, sessions, po, p] = await Promise.all([
-        fetchAnalysisHandRows(),
+        fetchAnalysisHandRows(since),
         fetchTournamentMetrics(tournamentBuyinFilter),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
@@ -183,12 +194,27 @@ export default function PerformancePage() {
               onChange={setTab}
               options={TABS}
               trailing={
-                <AnalysisFilters
-                  filters={filters}
-                  onChange={setFilters}
-                  availableStackDepths={availableStackDepths}
-                  availablePositions={availablePositions}
-                />
+                <div className="flex items-center gap-2">
+                  <AnalysisFilters
+                    filters={filters}
+                    onChange={setFilters}
+                    availableStackDepths={availableStackDepths}
+                    availablePositions={availablePositions}
+                  />
+                  <RadarModuleMenu
+                    module="performance"
+                    moduleLabel="o Performance"
+                    onScopeChange={({ since }) => {
+                      setRadarSince(since);
+                      loadAll(since);
+                    }}
+                    onReset={async () => {
+                      await resetPerformanceStats();
+                      setRadarSince(null);
+                      await loadAll(null);
+                    }}
+                  />
+                </div>
               }
             />
 
