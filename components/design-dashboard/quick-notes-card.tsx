@@ -4,7 +4,6 @@ import { useEffect, useState } from "react";
 import { NotebookPen, Plus, Trash2 } from "lucide-react";
 import { addAnnotation, deleteAnnotation, fetchAnnotations } from "@/lib/services/bankroll-service";
 import type { Annotation } from "@/lib/bankroll/types";
-import { ID_CAMPO_NOTA } from "./quick-actions-bar";
 import { CardHint, GlassCard } from "./glass-card";
 
 // Bloco de anotações rápidas. Grava nas MESMAS anotações da Gestão de
@@ -69,7 +68,6 @@ export function QuickNotesCard({ style, className }: { style?: React.CSSProperti
     <GlassCard title="Anotações rápidas" icon={<NotebookPen size={13} />} style={style} className={className}>
       <form onSubmit={salvar} className="flex items-center gap-2">
         <input
-          id={ID_CAMPO_NOTA}
           value={texto}
           onChange={(e) => setTexto(e.target.value)}
           placeholder="Insight da sessão…"
