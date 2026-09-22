@@ -265,14 +265,16 @@ const ACTION_WORD_MAP: Record<string, string> = {
 // verdade -- e todo o resto (cartas, posicao, resultado) saia errado a
 // partir dai.
 function extractHeroName(text: string): string | null {
-  const en = text.match(/Dealt to (\S+) \[/i);
+  // (.+?) e nao \S+: o nome do heroi tambem pode ter espaco. O colchete
+  // das cartas ancora o fim do nome, e "." nao atravessa quebra de linha.
+  const en = text.match(/Dealt to (.+?) \[/i);
   if (en) return en[1];
   // PT-BR: nome e cartas vem na MESMA linha ("simoNetto11 recebe [4c 2h]"),
   // nao ha linha "Dealt to" separada. Ancorado no inicio de linha pra nao
   // confundir com outras ocorrencias da palavra "recebe" (ex: "recebeu" no
   // sumario usa palavra diferente, mas por seguranca a ancora de linha evita
   // falso-positivo em qualquer texto livre).
-  const pt = text.match(/^(\S+) recebe \[/m);
+  const pt = text.match(/^(.+?) recebe \[/m);
   return pt ? pt[1] : null;
 }
 
@@ -309,12 +311,33 @@ function extractBoardByStreet(text: string) {
 // para", "folds/checks/calls/bets"/"desiste/passa/iguala/aposta", e o
 // "Uncalled bet...returned"/"Aposta não-igualada...voltou". Cada palavra de
 // acao e' normalizada via ACTION_WORD_MAP antes de virar ParsedAction.
+// FIX (2026-09, mão real reportada: MTT $33, all-in de 3 jogadores com um
+// deles chamado "eliandro tab"): nome de jogador PODE ter espaço -- o
+// PokerStars aceita ("eliandro tab", "Glow of Mind"). Os regexes de ação
+// capturavam o nome com \S+, que para no primeiro espaço: a linha
+// "eliandro tab: raises 800 to 1600" não casava com nada e era DESCARTADA
+// inteira. O replayer mostrava a mão como heads-up (o terceiro jogador
+// nunca apostava), o pote saía menor e o vencedor virava "tab".
+//
+// Em vez de tentar adivinhar onde o nome termina, casa contra os nomes
+// REAIS dos assentos, que já foram lidos antes das ações (do mais longo
+// pro mais curto, pra "Ana Paula" ganhar de "Ana" quando os dois sentam
+// na mesma mesa). Sem assentos identificados, cai no \S+ antigo -- mesmo
+// comportamento de antes, nada piora.
+function playerNamePattern(seats: ParsedSeat[]): string {
+  const names = [...new Set(seats.map((s) => s.playerName).filter(Boolean))].sort((a, b) => b.length - a.length);
+  if (names.length === 0) return "\\S+";
+  return names.map((n) => n.replace(/[.*+?^${}()|[\]\\]/g, "\\$&")).join("|");
+}
+
 function extractStreetActions(
   text: string,
   streetName: ParsedStreet["name"],
   marker: RegExp,
-  nextMarker: RegExp | null
+  nextMarker: RegExp | null,
+  playerPattern: string = "\\S+"
 ): { name: ParsedStreet["name"]; actions: ParsedAction[] } | null {
+  const P = playerPattern;
   const start = text.search(marker);
   if (start === -1) return null;
   const afterStart = text.slice(start);
@@ -339,7 +362,7 @@ function extractStreetActions(
       continue;
     }
 
-    const raiseM = l.match(/^(\S+):\s+(?:raises|aumenta)\s+\$?([\d.,]+)\s+(?:to|para)\s+\$?([\d.,]+)/i);
+    const raiseM = l.match(new RegExp(`^(${P}):\\s+(?:raises|aumenta)\\s+\\$?([\\d.,]+)\\s+(?:to|para)\\s+\\$?([\\d.,]+)`, "i"));
     if (raiseM) {
       actions.push({
         player: raiseM[1],
@@ -360,7 +383,7 @@ function extractStreetActions(
     // "to Y" do PokerStars. So' temos o total, entao `amount` (o incremento)
     // fica undefined de proposito -- nao temos como calcular com seguranca
     // sem rastrear o pote inteiro, e' melhor faltar o dado do que inventar.
-    const raiseNoColonM = l.match(/^(\S+)\s+raises\s+\[\$?([\d.,]+)\]/i);
+    const raiseNoColonM = l.match(new RegExp(`^(${P})\\s+raises\\s+\\[\\$?([\\d.,]+)\\]`, "i"));
     if (raiseNoColonM) {
       actions.push({
         player: raiseNoColonM[1],
@@ -372,7 +395,10 @@ function extractStreetActions(
 
     // PT-BR usa verbo diferente pra ante ("coloca ante X") vs blind ("paga
     // o small/big blind X") — alternancia cobre os dois em um so regex.
-    const postM = l.match(/^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|ante)\s+\$?([\d.,]+)/i);
+    // "posts the ante" (PokerStars/GGPoker em inglês) além de "posts ante":
+    // sem o "the" opcional nenhum ante dessas salas era lido, e o pote
+    // reconstruído saía menor que o real.
+    const postM = l.match(new RegExp(`^(${P}):\\s+(?:posts|paga o|coloca)\\s+(?:the\\s+)?(small blind|big blind|ante)\\s+\\$?([\\d.,]+)`, "i"));
     if (postM) {
       actions.push({
         player: postM[1],
@@ -384,7 +410,7 @@ function extractStreetActions(
 
     // 888poker: mesmo post de blind, mas sem ":" e valor entre colchetes
     // ("Player8 posts small blind [10]") em vez de solto no fim da linha.
-    const postNoColonM = l.match(/^(\S+)\s+posts\s+(small blind|big blind|ante)\s+\[\$?([\d.,]+)\]/i);
+    const postNoColonM = l.match(new RegExp(`^(${P})\\s+posts\\s+(small blind|big blind|ante)\\s+\\[\\$?([\\d.,]+)\\]`, "i"));
     if (postNoColonM) {
       actions.push({
         player: postNoColonM[1],
@@ -395,7 +421,7 @@ function extractStreetActions(
     }
 
     const genericM = l.match(
-      /^(\S+):\s+(folds|checks|calls|bets|allin|all-in|desiste|passa|iguala|aposta)\s*(?:\$?([\d.,]+))?/i
+      new RegExp(`^(${P}):\\s+(folds|checks|calls|bets|allin|all-in|desiste|passa|iguala|aposta)\\s*(?:\\$?([\\d.,]+))?`, "i")
     );
     if (genericM) {
       const canonical = ACTION_WORD_MAP[genericM[2].toLowerCase()] ?? genericM[2].toLowerCase();
@@ -411,7 +437,7 @@ function extractStreetActions(
     // 888poker: mesmas acoes genericas (fold/check/call/bet), sem ":" e
     // valor entre colchetes em vez de solto ("Player6 calls [110]",
     // "Hero bets [100]", "Player6 folds" sem valor nenhum).
-    const genericNoColonM = l.match(/^(\S+)\s+(folds|checks|calls|bets|allin|all-in)\s*(?:\[\$?([\d.,]+)\])?/i);
+    const genericNoColonM = l.match(new RegExp(`^(${P})\\s+(folds|checks|calls|bets|allin|all-in)\\s*(?:\\[\\$?([\\d.,]+)\\])?`, "i"));
     if (genericNoColonM) {
       const canonical = ACTION_WORD_MAP[genericNoColonM[2].toLowerCase()] ?? genericNoColonM[2].toLowerCase();
       actions.push({
@@ -430,14 +456,17 @@ function extractPot(text: string): number | null {
   return m ? Number(m[1].replace(",", "")) : null;
 }
 
-function extractWinner(text: string): string | null {
-  const m = text.match(/(\S+) (?:collected|recebeu) \$?[\d.,]+/i);
+function extractWinner(text: string, playerPattern: string = "\\S+"): string | null {
+  // Nome completo do vencedor (ver playerNamePattern): com \S+ o
+  // "eliandro tab collected 28840" virava vencedor "tab".
+  const P = playerPattern;
+  const m = text.match(new RegExp(`(${P}) (?:collected|recebeu) \\$?[\\d.,]+`, "i"));
   if (m) return m[1];
   // 888poker (RADAR-004): valor entre colchetes em vez de solto
   // ("Hero collected [ 350 ]") -- a amostra fornecida nao tem linha
   // "Total pot" nenhuma, entao extractPot fica null nesse formato (so'
   // temos o valor coletado pelo vencedor, nao o pote total antes do rake).
-  const bracketM = text.match(/(\S+) collected \[\s*\$?([\d.,]+)\s*\]/i);
+  const bracketM = text.match(new RegExp(`(${P}) collected \\[\\s*\\$?([\\d.,]+)\\s*\\]`, "i"));
   return bracketM ? bracketM[1] : null;
 }
 
@@ -464,10 +493,16 @@ function extractWonTournament(text: string): boolean {
 // aqui, ja aparece como oponente sumindo da mesa nas maos seguintes).
 function extractHeroFinishPlace(text: string, heroName: string | null): number | null {
   if (!heroName) return null;
-  const re = /(\S+) (?:finished the tournament in|terminou o torneio em) (\d+)(?:st|nd|rd|th|[ºª°])? (?:place|lugar)/i;
+  // Ancorado no nome EXATO do heroi (que pode ter espaco) em vez de \S+:
+  // antes, heroi com espaco no nome nunca tinha a colocacao lida.
+  const escaped = heroName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  const re = new RegExp(
+    `(?:^|\\n)${escaped} (?:finished the tournament in|terminou o torneio em) (\\d+)(?:st|nd|rd|th|[ºª°])? (?:place|lugar)`,
+    "i"
+  );
   const m = text.match(re);
-  if (!m || m[1] !== heroName) return null;
-  const place = Number(m[2]);
+  if (!m) return null;
+  const place = Number(m[1]);
   return Number.isFinite(place) ? place : null;
 }
 
@@ -527,7 +562,8 @@ function extractFormat(text: string): string | null {
   return null;
 }
 
-function extractShowdown(text: string): ParsedShowdown[] {
+function extractShowdown(text: string, playerPattern: string = "\\S+"): ParsedShowdown[] {
+  const P = playerPattern;
   const startIdx = text.search(/\*\*\* SHOW ?DOWN \*\*\*/i);
   if (startIdx === -1) return [];
   const summaryIdx = text.search(/\*\*\* (?:SUMMARY|SUM[AÁ]RIO) \*\*\*/i);
@@ -536,7 +572,7 @@ function extractShowdown(text: string): ParsedShowdown[] {
   const results: ParsedShowdown[] = [];
   for (const rawLine of block.split("\n")) {
     const l = rawLine.trim();
-    const m = l.match(/^(\S+):\s+(?:shows|mostra)\s+\[([^\]]+)\]\s+\(([^)]+)\)/i);
+    const m = l.match(new RegExp(`^(${P}):\\s+(?:shows|mostra)\\s+\\[([^\\]]+)\\]\\s+\\(([^)]+)\\)`, "i"));
     if (m) {
       results.push({ player: m[1], cards: parseCards(m[2]), handDescription: m[3] });
     }
@@ -926,20 +962,23 @@ function extractSeats(
 // Posts de blind/ante ANTES de "*** HOLE CARDS ***"/"*** CARTAS DA MÃO ***"
 // — mesma logica bilingue de extractStreetActions, mas so pro trecho antes
 // do marcador (esses posts nunca sao alcancados pelo scan de preflop normal).
-function extractPreambleBlindActions(text: string): ParsedAction[] {
+function extractPreambleBlindActions(text: string, playerPattern: string = "\\S+"): ParsedAction[] {
+  const P = playerPattern;
   const holeCardsIdx = text.search(/\*\*\* (?:HOLE CARDS|CARTAS DA MÃO) \*\*\*/i);
   const preamble = holeCardsIdx === -1 ? text : text.slice(0, holeCardsIdx);
   const actions: ParsedAction[] = [];
   for (const rawLine of preamble.split("\n")) {
     const l = rawLine.trim();
-    const postM = l.match(/^(\S+):\s+(?:posts|paga o|coloca)\s+(small blind|big blind|ante)\s+\$?([\d.,]+)/i);
+    // Nome com espaço e "posts the ante": ver playerNamePattern e o
+    // comentário equivalente em extractStreetActions.
+    const postM = l.match(new RegExp(`^(${P}):\\s+(?:posts|paga o|coloca)\\s+(?:the\\s+)?(small blind|big blind|ante)\\s+\\$?([\\d.,]+)`, "i"));
     if (postM) {
       actions.push({ player: postM[1], action: "posts", amount: Number(postM[3].replace(",", "")) });
       continue;
     }
     // 888poker (RADAR-004): mesmo post, sem ":" e valor entre colchetes --
     // ver comentario equivalente em extractStreetActions.
-    const postNoColonM = l.match(/^(\S+)\s+posts\s+(small blind|big blind|ante)\s+\[\$?([\d.,]+)\]/i);
+    const postNoColonM = l.match(new RegExp(`^(${P})\\s+posts\\s+(small blind|big blind|ante)\\s+\\[\\$?([\\d.,]+)\\]`, "i"));
     if (postNoColonM) {
       actions.push({ player: postNoColonM[1], action: "posts", amount: Number(postNoColonM[3].replace(",", "")) });
     }
@@ -965,19 +1004,22 @@ export function parseHand(rawText: string): ParsedHand {
   const riverMarker = /\*\*\* RIVER \*\*\*|\*\* Dealing river \*\*/i;
   const showdownMarker = /\*\*\* SHOW ?DOWN \*\*\*|\*\* Dealing showdown \*\*/i;
 
+  // Nomes reais da mesa (podem ter espaço) -- ver playerNamePattern.
+  const P = playerNamePattern(seats);
+
   const streets: ParsedStreet[] = [];
-  const blindActions = extractPreambleBlindActions(rawText);
-  const preflop = extractStreetActions(rawText, "preflop", holeCardsMarker, flopMarker);
+  const blindActions = extractPreambleBlindActions(rawText, P);
+  const preflop = extractStreetActions(rawText, "preflop", holeCardsMarker, flopMarker, P);
   if (preflop) {
     streets.push({ ...preflop, board: [], actions: [...blindActions, ...preflop.actions] });
   } else if (blindActions.length) {
     streets.push({ name: "preflop", board: [], actions: blindActions });
   }
-  const flopSt = extractStreetActions(rawText, "flop", flopMarker, turnMarker);
+  const flopSt = extractStreetActions(rawText, "flop", flopMarker, turnMarker, P);
   if (flopSt) streets.push({ ...flopSt, board: flop });
-  const turnSt = extractStreetActions(rawText, "turn", turnMarker, riverMarker);
+  const turnSt = extractStreetActions(rawText, "turn", turnMarker, riverMarker, P);
   if (turnSt) streets.push({ ...turnSt, board: [...flop, ...turn] });
-  const riverSt = extractStreetActions(rawText, "river", riverMarker, showdownMarker);
+  const riverSt = extractStreetActions(rawText, "river", riverMarker, showdownMarker, P);
   if (riverSt) streets.push({ ...riverSt, board: [...flop, ...turn, ...river] });
 
   // Motor de posicoes: preenche seat.position pra TODOS os assentos (nao
@@ -1018,7 +1060,7 @@ export function parseHand(rawText: string): ParsedHand {
     heroPosition,
     board,
     pot: extractPot(rawText),
-    winner: extractWinner(rawText),
+    winner: extractWinner(rawText, P),
     wonTournament: extractWonTournament(rawText),
     heroFinishPlace: extractHeroFinishPlace(rawText, heroName),
     heroBountiesWon: heroBounties.count,
@@ -1030,7 +1072,7 @@ export function parseHand(rawText: string): ParsedHand {
     maxSeats,
     smallBlind,
     bigBlind,
-    showdown: extractShowdown(rawText),
+    showdown: extractShowdown(rawText, P),
     villainPosition,
     heroInPosition,
     postflopTags,

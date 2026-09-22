@@ -295,18 +295,26 @@ export function RevisorSessao({
     if (!selectedHand || selectedId == null) return;
     if (selectedId in parsedCache) return; // ja resolvido
     let parsed: ParsedHand | null = null;
-    // Se ja veio parseado do import (parsed_data.kind === "parsed"), usa
-    // direto — evita reparsear texto. Fluxo de colagem manual, precisa
-    // parsear do hand_history bruto.
-    if (selectedHand.parsed_data && (selectedHand.parsed_data as { kind?: string }).kind === "parsed") {
-      parsed = selectedHand.parsed_data as unknown as ParsedHand;
-    } else if (selectedHand.hand_history) {
+    // Reparseia do hand_history bruto SEMPRE que ele existir, e so' cai no
+    // parsed_data salvo quando nao ha texto (ou o parse falha). Antes era
+    // o contrario: o parsed_data gravado no import tinha prioridade -- e
+    // com isso nenhuma correcao do parser chegava nas maos ja importadas.
+    // Caso real (2026-09): all-in de 3 jogadores num MTT $33 com um
+    // oponente chamado "eliandro tab"; o parser antigo descartava as
+    // acoes de nomes com espaco, e o replay continuava mostrando a mao
+    // como heads-up mesmo depois do parser corrigido. Reparsear UMA mao
+    // (a aberta na mesa) custa pouco -- a lista continua usando o
+    // parsed_data, sem reparsear nada.
+    if (selectedHand.hand_history) {
       try {
         parsed = parseHand(selectedHand.hand_history);
       } catch (e) {
         if (!(e instanceof HandParseError)) console.warn("[RevisorSessao] parse falhou:", e);
         parsed = null;
       }
+    }
+    if (!parsed && selectedHand.parsed_data && (selectedHand.parsed_data as { kind?: string }).kind === "parsed") {
+      parsed = selectedHand.parsed_data as unknown as ParsedHand;
     }
     setParsedCache((prev) => ({ ...prev, [selectedId]: parsed }));
   }, [selectedHand, selectedId, parsedCache]);
