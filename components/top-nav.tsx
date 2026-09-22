@@ -46,7 +46,10 @@ function isHiddenRoute(pathname: string) {
 // "/revisor/admin" tambem fica de fora: painel oculto (sem link no fluxo
 // do jogador, acesso direto por URL restrito a um unico e-mail) que
 // nunca foi migrado pro AppShell.
-const APP_SHELL_ROUTE_PREFIXES = ["/inicio", "/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace"];
+// "/design" nao usa o AppShell: sao as maquetes de UI (hoje
+// /design/dashboard), que trazem sidebar e dock proprios -- o TopNav
+// global por cima duplicaria navegacao e cobriria a lateral flutuante.
+const APP_SHELL_ROUTE_PREFIXES = ["/inicio", "/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace", "/design"];
 const APP_SHELL_EXCLUDED_PREFIXES = ["/time/convite", "/revisor/admin"];
 
 function usaAppShell(pathname: string) {
