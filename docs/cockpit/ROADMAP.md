@@ -72,12 +72,12 @@ motor).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## RADAR POKERSYNC (addon + agente desktop) — 80%
+## RADAR POKERSYNC (addon + agente desktop) — 89%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
 | RADAR-001 | Painel in-app (RadarPanel + gating) | 🟢 | 🟡 P2 | — |
-| RADAR-002 | Agente desktop (repo `pokersync-agent`/`pokersync-radar`) | 🟠 | 🟠 P1 | validado com 1 instalação Windows real; confirmar mais usuários/salas |
+| RADAR-002 | Agente desktop (repo `pokersync-agent`/`pokersync-radar`) | 🟢 | 🟠 P1 | — |
 | RADAR-003 | Sync automático (`/api/agent/sync`) | 🟢 | 🟠 P1 | — |
 | RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | validar parser contra hand history real de cada sala |
 
@@ -144,7 +144,7 @@ Solver: SOLVER-018 Deploy Railway (🟢 confirmado ativo)
    ↓
 Main: MAIN-007 cEV/ICM (🟢 UI reconstruída no Revisor de Mãos, heads-up + multiway)
 
-Radar: RADAR-002 Agente desktop (parcial, validado com 1 instalação Windows real)
+Radar: RADAR-002 Agente desktop (🟢 concluído, validado com instalação Windows real e no PC do dono)
    ↓
 Main: MAIN-012 Sync com agente (🟢 tráfego real confirmado 14/09/2026)
    ↓
