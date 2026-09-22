@@ -13,6 +13,11 @@ export function PainelStyles() {
       .painel {
         position: relative;
         isolation: isolate;
+        /* Cresce até o fim da área de conteúdo (o AppShell põe o <main>
+           dentro de um flex column). Sem isto, numa tela alta o fundo de
+           fichas terminava junto com os cards e sobrava uma faixa preta
+           embaixo. */
+        flex: 1 1 auto;
       }
 
       /* Fundo de fichas de poker (public/fichas-painel.svg, desenhado em

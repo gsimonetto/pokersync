@@ -32,7 +32,7 @@ export function PainelCard({
         if (!r) return;
         setMouse({ x: e.clientX - r.left, y: e.clientY - r.top });
       }}
-      className={`painel-vidro group fade-in-up relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-5 sm:p-6 ${className}`}
+      className={`painel-vidro group fade-in-up relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-4 sm:p-5 ${className}`}
       style={style}
     >
       {/* -inset-px cobre a borda também, senão o brilho para 1px antes
@@ -58,7 +58,9 @@ export function PainelCard({
         </h2>
         {action}
       </header>
-      <div className="relative mt-5 flex min-h-0 flex-1 flex-col">{children}</div>
+      {/* O corpo é quem rola quando o card fica mais baixo que o
+          conteúdo -- assim a TELA nunca ganha barra de rolagem. */}
+      <div className="painel-scroll relative mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
     </section>
   );
 }

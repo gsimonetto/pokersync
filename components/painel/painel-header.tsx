@@ -78,44 +78,47 @@ export function PainelHeader() {
 
   const hora = agora?.getHours() ?? 0;
 
+  // No computador o cabeçalho precisa ser BAIXO: a tela inteira tem que
+  // caber na janela sem barra de rolagem, então cada pixel gasto aqui
+  // sai do espaço dos cards. Por isso a sequência fica ao lado da
+  // saudação (não embaixo) e o relógio ao lado da banca.
   return (
-    <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
-      <div>
-        <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
+    <header className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between lg:gap-6">
+      <div className="min-w-0">
+        <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">
           <span className="text-muted">{agora ? saudacao(hora) : "Olá"},</span>{" "}
           <span className="painel-roxo">{nome || "jogador"}</span> 👋
         </h1>
-        <p className="mt-2 text-[13px] text-muted/70">Estude · Jogue · Revise · Evolua</p>
-
-        {streak != null && streak > 0 && (
-          <p className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-hairline bg-surface py-1.5 pl-1.5 pr-3.5">
-            <TileIcone cor="#F59E0B">
-              <Flame size={14} />
-            </TileIcone>
-            <span className="text-xs font-semibold text-evolution">
-              {streak} {streak === 1 ? "dia seguido" : "dias seguidos"}
-            </span>
-          </p>
-        )}
+        <div className="mt-1.5 flex flex-wrap items-center gap-3">
+          <p className="text-[12px] text-muted/70">Estude · Jogue · Revise · Evolua</p>
+          {streak != null && streak > 0 && (
+            <p className="inline-flex items-center gap-1.5 rounded-full border border-evolution/25 bg-evolution/10 px-2.5 py-1">
+              <Flame size={12} className="text-evolution" />
+              <span className="text-[11px] font-semibold text-evolution">
+                {streak} {streak === 1 ? "dia seguido" : "dias seguidos"}
+              </span>
+            </p>
+          )}
+        </div>
       </div>
 
-      <div className="flex items-center gap-5 sm:flex-col sm:items-end sm:gap-3">
+      <div className="flex shrink-0 items-center gap-4">
         <div className="text-right">
           {/* 24h, sem AM/PM: é o formato usado no Brasil (a referência
               visual é americana, ali o "AM" fazia sentido). */}
-          <p className="tnum text-4xl font-light leading-none sm:text-5xl">
+          <p className="tnum text-3xl font-light leading-none sm:text-4xl">
             {agora
               ? `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
               : "--:--"}
           </p>
-          <p className="mt-1.5 text-[11px] capitalize text-muted/70">
+          <p className="mt-1 text-[11px] capitalize text-muted/70">
             {agora
-              ? agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
+              ? agora.toLocaleDateString("pt-BR", { weekday: "short", day: "numeric", month: "short" })
               : ""}
           </p>
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3">
+        <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-3.5 py-2.5">
           <TileIcone cor="#a855f7">
             <Wallet size={15} />
           </TileIcone>

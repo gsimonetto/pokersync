@@ -111,10 +111,13 @@ export function IndicatorsCard({ style, className }: { style?: React.CSSProperti
       ) : itens.length === 0 ? (
         <CardHint>Os indicadores aparecem assim que você registrar sessões, drills ou mãos.</CardHint>
       ) : (
-        <ul className="grid grid-cols-2 gap-2.5">
+        // Três colunas no computador: o card fica baixo quando a tela
+        // inteira tem que caber sem rolagem, e 3x2 cabe onde 2x3 não
+        // cabia. No celular continua 2 colunas, que é o confortável.
+        <ul className="grid grid-cols-2 gap-2 xl:grid-cols-3">
           {itens.map(({ rotulo, valor, detalhe, icone: Icone, cor }) => (
             <li key={rotulo}>
-              <Linha className="h-full">
+              <Linha className="h-full !p-2.5">
                 <span className="flex items-center gap-2">
                   <TileIcone cor={cor}>
                     <Icone size={14} />
@@ -123,10 +126,10 @@ export function IndicatorsCard({ style, className }: { style?: React.CSSProperti
                     {rotulo}
                   </span>
                 </span>
-                <p className="tnum mt-2.5 text-[26px] font-light leading-none" style={{ color: cor }}>
+                <p className="tnum mt-2 text-[22px] font-light leading-none" style={{ color: cor }}>
                   {valor}
                 </p>
-                <p className="mt-1.5 text-[11px] text-muted/60">{detalhe}</p>
+                <p className="mt-1 text-[10px] leading-tight text-muted/60">{detalhe}</p>
               </Linha>
             </li>
           ))}
