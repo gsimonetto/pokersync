@@ -1,11 +1,13 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { BookOpen, CheckCircle2, Flame, Plus, Target, Trash2, TrendingUp, X } from "lucide-react";
 import { addGoal, deleteGoal, fetchGoals, fetchSessions, fetchStudyLogs } from "@/lib/services/bankroll-service";
 import { goalProgress } from "@/lib/bankroll/calc";
 import { fetchLast7DaysActivity } from "@/lib/services/xp-service";
 import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
+import { fetchAnalysisHandRows } from "@/lib/services/analysis-service";
+import type { AnalysisHandRow } from "@/types/analysis";
 import type { Goal, GoalType, Session, StudyLog } from "@/lib/bankroll/types";
 import { CardHint, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
 
@@ -28,6 +30,12 @@ function iniciaisDaSemana(): string[] {
   return Array.from({ length: 7 }, (_, i) => letras[(hoje - 6 + i + 7) % 7]);
 }
 
+// Chave de dia no fuso do jogador (não em UTC): uma mão importada às 23h
+// de segunda tem que contar na segunda, não na terça.
+function chaveLocal(d: Date): string {
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+}
+
 // Prazo padrão de uma meta semanal: domingo desta semana. Serve como
 // sugestão no formulário; o jogador pode trocar.
 function fimDaSemana(): string {
@@ -39,14 +47,16 @@ function fimDaSemana(): string {
 // "Metas da semana": o jogador cria as próprias metas aqui mesmo, com
 // barra de progresso. É o mesmo sistema de metas da Gestão de Banca
 // (bankroll_goals + goalProgress), então o que for criado aqui aparece
-// lá e vice-versa — não é uma lista paralela. Embaixo, a sequência de
-// dias ativos vinda do Hub (xp_events).
+// lá e vice-versa — não é uma lista paralela. Embaixo, "Sua semana":
+// dias ativos vindos do Hub (xp_events) e o volume de mãos importadas
+// por dia, com o total da semana anterior pra comparar.
 export function HabitsCard({ style, className }: { style?: React.CSSProperties; className?: string }) {
   const [goals, setGoals] = useState<Goal[]>([]);
   const [sessions, setSessions] = useState<Session[]>([]);
   const [studyLogs, setStudyLogs] = useState<StudyLog[]>([]);
   const [dias, setDias] = useState<boolean[] | null>(null);
   const [drillsHoje, setDrillsHoje] = useState<number | null>(null);
+  const [maos, setMaos] = useState<AnalysisHandRow[] | null>(null);
   const [carregando, setCarregando] = useState(true);
 
   // Formulário de nova meta
@@ -60,12 +70,17 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
   useEffect(() => {
     let vivo = true;
     (async () => {
-      const [g, s, l, d, t] = await Promise.allSettled([
+      // Só as mãos dos últimos 14 dias (esta semana + a anterior, pra
+      // comparar) -- sem o corte, a consulta traria o histórico inteiro.
+      const corte = new Date();
+      corte.setDate(corte.getDate() - 14);
+      const [g, s, l, d, t, m] = await Promise.allSettled([
         fetchGoals(),
         fetchSessions(),
         fetchStudyLogs(),
         fetchLast7DaysActivity(),
         fetchTodayTrainingCount(),
+        fetchAnalysisHandRows(corte.toISOString()),
       ]);
       if (!vivo) return;
       if (g.status === "fulfilled") setGoals(g.value);
@@ -73,6 +88,7 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
       if (l.status === "fulfilled") setStudyLogs(l.value);
       if (d.status === "fulfilled") setDias(d.value);
       if (t.status === "fulfilled") setDrillsHoje(t.value);
+      if (m.status === "fulfilled") setMaos(m.value);
       setCarregando(false);
     })();
     return () => {
@@ -91,6 +107,33 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
     setPrazo(fimDaSemana());
   }, []);
   const semanais = goals.filter((g) => g.period === "semanal" && g.deadline >= hoje);
+
+  // Volume de mãos da semana: quantas mãos IMPORTADAS (Radar ou importação
+  // em lote -- mesma regra do Performance, mão colada à mão não conta) por
+  // dia nos últimos 7 dias, na mesma ordem das bolinhas de dias ativos,
+  // mais o total dos 7 dias anteriores pra comparação. A data é a da
+  // importação (hand_reviews.created_at): é o que o banco guarda hoje.
+  const volume = useMemo(() => {
+    if (!maos || !hoje) return null;
+    const agora = new Date();
+    const dias7 = Array.from({ length: 7 }, (_, i) => {
+      const d = new Date(agora);
+      d.setDate(agora.getDate() - (6 - i));
+      return chaveLocal(d);
+    });
+    const porDia = new Map<string, number>();
+    let anterior = 0;
+    const inicioAnterior = new Date(agora);
+    inicioAnterior.setDate(agora.getDate() - 13);
+    const chaveInicioAnterior = chaveLocal(inicioAnterior);
+    for (const r of maos) {
+      const chave = chaveLocal(new Date(r.playedAt));
+      if (dias7.includes(chave)) porDia.set(chave, (porDia.get(chave) ?? 0) + 1);
+      else if (chave >= chaveInicioAnterior && chave < dias7[0]) anterior++;
+    }
+    const contagens = dias7.map((c) => porDia.get(c) ?? 0);
+    return { contagens, semana: contagens.reduce((a, b) => a + b, 0), anterior, maximo: Math.max(1, ...contagens) };
+  }, [maos, hoje]);
 
   async function salvarMeta(e: React.FormEvent) {
     e.preventDefault();
@@ -265,9 +308,16 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
                     <Flame size={14} />
                   </TileIcone>
                   <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium">Dias ativos</span>
-                    <span className="flex items-center gap-1.5 text-[11px] text-muted/60">
-                      nesta semana
+                    <span className="block text-sm font-medium">Sua semana</span>
+                    <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted/60">
+                      {volume ? (
+                        <span className="tnum">
+                          <span className="font-semibold text-ink/90">{volume.semana}</span> mãos
+                          {volume.anterior > 0 && <> · {volume.anterior} na anterior</>}
+                        </span>
+                      ) : (
+                        <span>dias ativos</span>
+                      )}
                       {drillsHoje != null && (
                         <>
                           <span aria-hidden>·</span>
@@ -280,23 +330,41 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
                     </span>
                   </span>
                   <Selo cor={dias.filter(Boolean).length >= 5 ? "#22c55e" : "#c4c7c8"}>
-                    {dias.filter(Boolean).length} de 7
+                    {dias.filter(Boolean).length} de 7 dias
                   </Selo>
                 </div>
-                <div className="mt-3 flex items-center justify-between">
-                  {dias.map((ativo, i) => (
-                    <span key={i} className="flex flex-col items-center gap-1.5">
-                      <span className="text-[9px] text-muted/50">{letras[i] ?? ""}</span>
-                      <span
-                        aria-label={ativo ? "dia ativo" : "dia sem atividade"}
-                        className={`grid h-6 w-6 place-items-center rounded-full text-[10px] ${
-                          ativo ? "bg-[#a855f7] text-white" : "border border-hairline text-transparent"
-                        }`}
-                      >
-                        ✓
+                {/* Cada coluna é um dia: a barrinha é o volume de mãos
+                    importadas naquele dia (altura relativa ao dia mais
+                    cheio da semana) e a bolinha diz se houve atividade no
+                    app. Juntas respondem "joguei E estudei nesta semana?". */}
+                <div className="mt-3 flex items-end justify-between">
+                  {dias.map((ativo, i) => {
+                    const qtd = volume?.contagens[i] ?? 0;
+                    return (
+                      <span key={i} className="flex flex-col items-center gap-1.5">
+                        {volume && volume.semana > 0 && (
+                          <span className="flex h-5 items-end" title={`${qtd} ${qtd === 1 ? "mão" : "mãos"}`}>
+                            <span
+                              className="w-1.5 rounded-full"
+                              style={{
+                                height: qtd > 0 ? `${Math.max(3, Math.round((qtd / volume.maximo) * 20))}px` : "2px",
+                                background: qtd > 0 ? "#c084fc" : "rgba(255,255,255,0.12)",
+                              }}
+                            />
+                          </span>
+                        )}
+                        <span className="text-[9px] text-muted/50">{letras[i] ?? ""}</span>
+                        <span
+                          aria-label={ativo ? "dia ativo" : "dia sem atividade"}
+                          className={`grid h-6 w-6 place-items-center rounded-full text-[10px] ${
+                            ativo ? "bg-[#a855f7] text-white" : "border border-hairline text-transparent"
+                          }`}
+                        >
+                          ✓
+                        </span>
                       </span>
-                    </span>
-                  ))}
+                    );
+                  })}
                 </div>
               </Linha>
             </div>
