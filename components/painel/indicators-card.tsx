@@ -5,7 +5,7 @@ import { Activity, BookOpen, Flame, Percent, Target, Trophy } from "lucide-react
 import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
 import { fetchProgress, type Progress } from "@/lib/services/xp-service";
 import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
-import { CardHint, GlassCard } from "./glass-card";
+import { CardHint, PainelCard } from "./painel-card";
 
 type Indicador = {
   rotulo: string;
@@ -105,7 +105,7 @@ export function IndicatorsCard({ style, className }: { style?: React.CSSProperti
   }, []);
 
   return (
-    <GlassCard title="Seus indicadores" icon={<Activity size={13} />} style={style} className={className}>
+    <PainelCard title="Seus indicadores" icon={<Activity size={13} />} style={style} className={className}>
       {carregando ? (
         <CardHint>Carregando…</CardHint>
       ) : itens.length === 0 ? (
@@ -113,19 +113,19 @@ export function IndicatorsCard({ style, className }: { style?: React.CSSProperti
       ) : (
         <ul className="grid grid-cols-2 gap-2.5">
           {itens.map(({ rotulo, valor, detalhe, icone: Icone, cor }) => (
-            <li key={rotulo} className="rounded-2xl border border-white/8 bg-white/[0.03] p-3">
-              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-white/40">
+            <li key={rotulo} className="rounded-2xl border border-hairline bg-white/[0.03] p-3">
+              <span className="flex items-center gap-1.5 text-[10px] font-semibold uppercase tracking-[0.1em] text-muted/70">
                 <Icone size={12} color={cor} />
                 {rotulo}
               </span>
               <p className="tnum mt-1.5 text-2xl font-light leading-none" style={{ color: cor }}>
                 {valor}
               </p>
-              <p className="mt-1 text-[11px] text-white/35">{detalhe}</p>
+              <p className="mt-1 text-[11px] text-muted/60">{detalhe}</p>
             </li>
           ))}
         </ul>
       )}
-    </GlassCard>
+    </PainelCard>
   );
 }

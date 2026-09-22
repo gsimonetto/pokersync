@@ -8,7 +8,7 @@ import { goalProgress } from "@/lib/bankroll/calc";
 import { fetchLast7DaysActivity } from "@/lib/services/xp-service";
 import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
 import type { Goal, Session, StudyLog } from "@/lib/bankroll/types";
-import { CardHint, GlassCard } from "./glass-card";
+import { CardHint, PainelCard } from "./painel-card";
 
 const ROTULO: Record<Goal["type"], string> = { volume: "Volume", estudo: "Estudo" };
 
@@ -61,7 +61,7 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
   const letras = iniciaisDaSemana();
 
   return (
-    <GlassCard
+    <PainelCard
       title="Metas e hábitos"
       icon={<Target size={13} />}
       action={
@@ -82,7 +82,7 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
           {semanais.length === 0 ? (
             <CardHint>
               Nenhuma meta semanal ativa.{" "}
-              <Link href="/banca" className="font-semibold text-[color:var(--psd-neon-soft)] underline underline-offset-2">
+              <Link href="/banca" className="font-semibold text-ink underline underline-offset-2">
                 Criar na Gestão de Banca
               </Link>
             </CardHint>
@@ -95,16 +95,18 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
                   <li key={g.id}>
                     <div className="flex items-baseline justify-between text-sm">
                       <span className="font-medium">{ROTULO[g.type]}</span>
-                      <span className="tnum text-xs text-white/50">
+                      <span className="tnum text-xs text-muted">
                         {Math.round(p.current)}/{g.target} {g.unit}
                       </span>
                     </div>
-                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/8">
+                    <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-white/10">
                       <div
                         className="h-full rounded-full transition-[width] duration-700"
                         style={{
                           width: `${pct}%`,
-                          background: "linear-gradient(90deg, #c084fc, #6366f1)",
+                          // Barra branca, como o botão principal da tela de login — a cor
+                          // aqui não carrega significado (o significado é o quanto encheu).
+                          background: "linear-gradient(90deg, #ffffff, rgba(255,255,255,0.55))",
                         }}
                       />
                     </div>
@@ -115,16 +117,16 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
           )}
 
           {dias && (
-            <div className="mt-5 border-t border-white/8 pt-4">
-              <p className="text-[11px] uppercase tracking-[0.12em] text-white/40">Últimos 7 dias</p>
+            <div className="mt-5 border-t border-hairline pt-4">
+              <p className="text-[11px] uppercase tracking-[0.12em] text-muted/70">Últimos 7 dias</p>
               <div className="mt-2.5 flex items-center justify-between">
                 {dias.map((ativo, i) => (
                   <div key={i} className="flex flex-col items-center gap-1.5">
-                    <span className="text-[10px] text-white/35">{letras[i]}</span>
+                    <span className="text-[10px] text-muted/60">{letras[i]}</span>
                     <span
                       aria-label={ativo ? "dia ativo" : "dia sem atividade"}
                       className={`grid h-6 w-6 place-items-center rounded-full text-[10px] ${
-                        ativo ? "psd-active text-white" : "border border-white/10 text-transparent"
+                        ativo ? "bg-ink text-void" : "border border-hairline text-transparent"
                       }`}
                     >
                       {ativo ? "✓" : "·"}
@@ -136,6 +138,6 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
           )}
         </>
       )}
-    </GlassCard>
+    </PainelCard>
   );
 }

@@ -26,7 +26,7 @@ function ultimos30Dias(sessions: Session[]): Session[] {
   return sessions.filter((s) => s.date >= iso);
 }
 
-export function DashboardHeader() {
+export function PainelHeader() {
   const [nome, setNome] = useState("");
   const [streak, setStreak] = useState<number | null>(null);
   const [banca, setBanca] = useState<number | null>(null);
@@ -76,16 +76,16 @@ export function DashboardHeader() {
   }, []);
 
   const hora = agora?.getHours() ?? 0;
-  const corDelta = delta30 == null || delta30 === 0 ? "text-white/50" : delta30 > 0 ? "text-positive" : "text-negative";
+  const corDelta = delta30 == null || delta30 === 0 ? "text-muted" : delta30 > 0 ? "text-positive" : "text-negative";
 
   return (
     <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
       <div>
         <h1 className="text-3xl font-semibold leading-tight sm:text-4xl">
-          {agora ? saudacao(hora) : "Olá"},{" "}
-          <span className="psd-neon-text">{nome || "jogador"}</span> 👋
+          <span className="text-muted">{agora ? saudacao(hora) : "Olá"},</span>{" "}
+          {nome || "jogador"} 👋
         </h1>
-        <p className="mt-2 text-[13px] text-white/45">Estude · Jogue · Revise · Evolua</p>
+        <p className="mt-2 text-[13px] text-muted/70">Estude · Jogue · Revise · Evolua</p>
 
         {streak != null && streak > 0 && (
           <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-evolution/30 bg-evolution/10 px-3 py-1 text-xs font-semibold text-evolution">
@@ -102,26 +102,26 @@ export function DashboardHeader() {
               ? `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
               : "--:--"}
           </p>
-          <p className="mt-1.5 text-[11px] capitalize text-white/40">
+          <p className="mt-1.5 text-[11px] capitalize text-muted/70">
             {agora
               ? agora.toLocaleDateString("pt-BR", { weekday: "long", day: "numeric", month: "long" })
               : ""}
           </p>
         </div>
 
-        <div className="psd-card flex items-center gap-3 px-4 py-2.5">
-          <Wallet size={16} className="text-[color:var(--psd-neon-soft)]" />
+        <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-2.5">
+          <Wallet size={16} className="text-ink" />
           <div>
-            <p className="text-[10px] uppercase tracking-[0.12em] text-white/40">Banca total</p>
+            <p className="text-[10px] uppercase tracking-[0.12em] text-muted/70">Banca total</p>
             <p className="tnum text-base font-semibold leading-tight">
               {banca == null ? "—" : formatBRL(banca)}
             </p>
           </div>
           {delta30 != null && (
-            <p className={`tnum border-l border-white/10 pl-3 text-xs font-semibold ${corDelta}`}>
+            <p className={`tnum border-l border-hairline pl-3 text-xs font-semibold ${corDelta}`}>
               {delta30 > 0 ? "+" : ""}
               {formatBRL(delta30)}
-              <span className="block text-[10px] font-normal text-white/35">30 dias</span>
+              <span className="block text-[10px] font-normal text-muted/60">30 dias</span>
             </p>
           )}
         </div>

@@ -10,7 +10,7 @@ import { goalProgress } from "@/lib/bankroll/calc";
 import { fetchPlayerInsights, fetchPlayerPerformance } from "@/lib/services/performance-service";
 import { listReviews } from "@/lib/services/hand-review-service";
 import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
-import { CardHint, GlassCard } from "./glass-card";
+import { CardHint, PainelCard } from "./painel-card";
 
 // Memória de "já vi isso", no navegador (não no banco: é preferência de
 // leitura, não precisa sincronizar entre aparelhos). Mesmo padrão já
@@ -42,7 +42,7 @@ const ESTILO: Record<Nivel, { borda: string; texto: string }> = {
   ruim: { borda: "border-negative/40", texto: "text-negative" },
   atencao: { borda: "border-evolution/40", texto: "text-evolution" },
   bom: { borda: "border-positive/40", texto: "text-positive" },
-  info: { borda: "border-[color:var(--psd-line-strong)]", texto: "text-[color:var(--psd-neon-soft)]" },
+  info: { borda: "border-ink/30", texto: "text-ink" },
 };
 
 function lerMemoria(): Record<string, number> {
@@ -254,12 +254,12 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
   const restantes = Math.max(0, fila.length - indice - 1);
 
   return (
-    <GlassCard
+    <PainelCard
       title="AI Coach"
       icon={<Sparkles size={13} />}
       action={
         fila.length > 0 && (
-          <span className="tnum text-[11px] text-white/35">
+          <span className="tnum text-[11px] text-muted/60">
             {Math.min(indice + 1, fila.length)} de {fila.length}
           </span>
         )
@@ -273,7 +273,7 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
         <div className="flex flex-1 flex-col items-center justify-center py-6 text-center">
           <Check size={22} className="text-positive" />
           <p className="mt-2 text-sm font-medium">Tudo em dia por aqui</p>
-          <p className="mt-1 max-w-[34ch] text-[13px] text-white/45">
+          <p className="mt-1 max-w-[34ch] text-[13px] text-muted/70">
             Você já viu tudo que era relevante hoje. Volte depois de jogar, revisar ou treinar.
           </p>
         </div>
@@ -284,18 +284,18 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
             {atual.modulo}
           </span>
           <h3 className={`mt-2 text-[15px] font-semibold leading-snug ${estilo.texto}`}>{atual.titulo}</h3>
-          <p className="mt-2 text-[13px] leading-relaxed text-white/65">{atual.texto}</p>
+          <p className="mt-2 text-[13px] leading-relaxed text-muted">{atual.texto}</p>
 
           {/* O que vem depois — mostra que o Coach tem fila, e o jogador
               já sabe o que o espera antes de clicar em "Já vi". */}
           {fila.length > indice + 1 && (
-            <ul className="mt-5 flex flex-col gap-2 border-t border-white/8 pt-4">
-              <li className="text-[10px] font-bold uppercase tracking-[0.12em] text-white/30">A seguir</li>
+            <ul className="mt-5 flex flex-col gap-2 border-t border-hairline pt-4">
+              <li className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/50">A seguir</li>
               {fila.slice(indice + 1, indice + 4).map((d) => (
-                <li key={d.chave} className="flex items-center gap-2 text-[12px] text-white/40">
+                <li key={d.chave} className="flex items-center gap-2 text-[12px] text-muted/70">
                   <span className="h-1 w-1 shrink-0 rounded-full" style={{ background: d.cor }} />
                   <span className="truncate">
-                    <span className="text-white/55">{d.modulo}</span> · {d.titulo}
+                    <span className="text-muted">{d.modulo}</span> · {d.titulo}
                   </span>
                 </li>
               ))}
@@ -305,7 +305,7 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
           <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
             <Link
               href={atual.href}
-              className="psd-active inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold text-white transition-transform hover:scale-[1.03]"
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-xs font-semibold text-void shadow-lg shadow-black/40 transition-colors hover:bg-white/90"
             >
               {atual.cta}
               <ArrowRight size={13} />
@@ -313,13 +313,13 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
             <button
               type="button"
               onClick={() => setIndice((i) => i + 1)}
-              className="rounded-full border border-white/12 px-3.5 py-1.5 text-xs font-semibold text-white/55 transition-colors hover:border-white/30 hover:text-white"
+              className="rounded-full border border-hairline px-3.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/30 hover:text-white"
             >
               {restantes > 0 ? `Já vi · próxima (${restantes})` : "Já vi"}
             </button>
           </div>
         </div>
       )}
-    </GlassCard>
+    </PainelCard>
   );
 }

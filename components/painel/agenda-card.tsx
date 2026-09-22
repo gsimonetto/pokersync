@@ -5,7 +5,7 @@ import Link from "next/link";
 import { CalendarDays, Radio } from "lucide-react";
 import { fetchTeamEvents, type TeamEvent } from "@/lib/services/team-calendar-service";
 import { fetchLiveTournaments, youtubeWatchUrl, type LiveStreamChannel } from "@/lib/services/live-stream-service";
-import { CardHint, GlassCard } from "./glass-card";
+import { CardHint, PainelCard } from "./painel-card";
 
 const SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -79,11 +79,11 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
   }, [eventos, hoje]);
 
   return (
-    <GlassCard
+    <PainelCard
       title="Próximas sessões"
       icon={<CalendarDays size={13} />}
       action={
-        <span className="text-[11px] capitalize text-white/40">
+        <span className="text-[11px] capitalize text-muted/70">
           {hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
         </span>
       }
@@ -92,7 +92,7 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
     >
       <div className="grid grid-cols-7 gap-y-1.5 text-center">
         {SEMANA.map((l, i) => (
-          <span key={i} className="text-[10px] font-semibold text-white/30">
+          <span key={i} className="text-[10px] font-semibold text-muted/50">
             {l}
           </span>
         ))}
@@ -104,31 +104,31 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
             <span key={dia} className="relative grid place-items-center">
               <span
                 className={`tnum grid h-7 w-7 place-items-center rounded-full text-[11px] ${
-                  ehHoje ? "psd-active font-semibold text-white" : "text-white/60"
+                  ehHoje ? "bg-ink font-semibold text-void" : "text-muted"
                 }`}
               >
                 {dia}
               </span>
               {temEvento && !ehHoje && (
-                <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-[color:var(--psd-neon-soft)]" />
+                <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-ink" />
               )}
             </span>
           );
         })}
       </div>
 
-      <div className="mt-4 border-t border-white/8 pt-3.5">
+      <div className="mt-4 border-t border-hairline pt-3.5">
         {carregando ? (
           <CardHint>Carregando…</CardHint>
         ) : aoVivo.length === 0 && eventos.length === 0 ? (
           <CardHint>
             Nada agendado.{" "}
-            <Link href="/time" className="font-semibold text-[color:var(--psd-neon-soft)] underline underline-offset-2">
+            <Link href="/time" className="font-semibold text-ink underline underline-offset-2">
               Ver calendário do time
             </Link>
           </CardHint>
         ) : (
-          <ul className="psd-scroll flex max-h-[150px] flex-col gap-2.5 overflow-y-auto pr-1">
+          <ul className="painel-scroll flex max-h-[150px] flex-col gap-2.5 overflow-y-auto pr-1">
             {aoVivo.slice(0, 2).map((c) => (
               <li key={c.channelId}>
                 <a
@@ -149,10 +149,10 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
             ))}
             {eventos.slice(0, 3).map((e) => (
               <li key={e.id} className="flex items-center gap-2.5">
-                <span className="h-8 w-[3px] shrink-0 rounded-full bg-[color:var(--psd-neon)]" />
+                <span className="h-8 w-[3px] shrink-0 rounded-full bg-ink/60" />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-sm">{e.title}</span>
-                  <span className="block text-[11px] text-white/40">
+                  <span className="block text-[11px] text-muted/70">
                     {diaDe(e.startsAt)} · {horaDe(e.startsAt)}
                   </span>
                 </span>
@@ -161,6 +161,6 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
           </ul>
         )}
       </div>
-    </GlassCard>
+    </PainelCard>
   );
 }
