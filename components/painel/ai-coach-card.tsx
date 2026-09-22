@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { ArrowRight, Check, Sparkles } from "lucide-react";
+import { AlertTriangle, ArrowRight, BookOpen, Check, Info, LineChart, Sparkles, Target, ThumbsUp, TrendingUp } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { fetchBrmThresholds, fetchGoals, fetchSessions, fetchSettings, fetchStudyLogs } from "@/lib/services/bankroll-service";
 import { buildCoachTips } from "@/lib/bankroll/coach";
@@ -10,7 +10,7 @@ import { goalProgress } from "@/lib/bankroll/calc";
 import { fetchPlayerInsights, fetchPlayerPerformance } from "@/lib/services/performance-service";
 import { listReviews } from "@/lib/services/hand-review-service";
 import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
-import { CardHint, PainelCard } from "./painel-card";
+import { CardHint, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
 
 // Memória de "já vi isso", no navegador (não no banco: é preferência de
 // leitura, não precisa sincronizar entre aparelhos). Mesmo padrão já
@@ -37,6 +37,25 @@ type Dica = {
 };
 
 const PESO: Record<Nivel, number> = { ruim: 0, atencao: 1, info: 2, bom: 3 };
+
+// Ícone por módulo de origem — o mesmo de lib/modules-data.tsx, pra
+// dica de Banca parecer Banca e dica de Treino parecer Treino.
+const ICONE_MODULO: Record<string, typeof Target> = {
+  Banca: TrendingUp,
+  Performance: LineChart,
+  Revisor: BookOpen,
+  Metas: Target,
+  Treino: Target,
+};
+
+// Selo de urgência, pra dizer em uma palavra o peso da dica (mesma ideia
+// dos "High"/"Medium" da referência visual).
+const URGENCIA: Record<Nivel, { texto: string; cor: string; icone: typeof Info }> = {
+  ruim: { texto: "Prioridade", cor: "#e0555a", icone: AlertTriangle },
+  atencao: { texto: "Atenção", cor: "#f59e0b", icone: AlertTriangle },
+  bom: { texto: "Boa notícia", cor: "#22c55e", icone: ThumbsUp },
+  info: { texto: "Dica", cor: "#c4c7c8", icone: Info },
+};
 
 const ESTILO: Record<Nivel, { borda: string; texto: string }> = {
   ruim: { borda: "border-negative/40", texto: "text-negative" },
@@ -256,7 +275,7 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
   return (
     <PainelCard
       title="AI Coach"
-      icon={<Sparkles size={13} />}
+      icon={<Sparkles size={15} />}
       action={
         fila.length > 0 && (
           <span className="tnum text-[11px] text-muted/60">
@@ -278,34 +297,63 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
           </p>
         </div>
       ) : (
-        <div className={`flex flex-1 flex-col border-l-2 pl-4 ${estilo.borda}`}>
-          <span className="flex items-center gap-2 text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: atual.cor }}>
-            <span className="h-1.5 w-1.5 rounded-full" style={{ background: atual.cor }} />
-            {atual.modulo}
-          </span>
-          <h3 className={`mt-2 text-[15px] font-semibold leading-snug ${estilo.texto}`}>{atual.titulo}</h3>
-          <p className="mt-2 text-[13px] leading-relaxed text-muted">{atual.texto}</p>
+        <div className="flex flex-1 flex-col">
+          <div className="flex items-start gap-3.5">
+            <TileIcone cor={atual.cor} grande>
+              {(() => {
+                const Icone = ICONE_MODULO[atual.modulo] ?? Sparkles;
+                return <Icone size={17} />;
+              })()}
+            </TileIcone>
+
+            <div className="min-w-0 flex-1">
+              <div className="flex flex-wrap items-center gap-2">
+                <span className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: atual.cor }}>
+                  {atual.modulo}
+                </span>
+                <Selo cor={URGENCIA[atual.nivel].cor}>
+                  {(() => {
+                    const Icone = URGENCIA[atual.nivel].icone;
+                    return <Icone size={10} />;
+                  })()}
+                  {URGENCIA[atual.nivel].texto}
+                </Selo>
+              </div>
+              <h3 className={`mt-1.5 text-[17px] font-semibold leading-snug ${estilo.texto}`}>{atual.titulo}</h3>
+              <p className="mt-2 text-[13px] leading-relaxed text-muted">{atual.texto}</p>
+            </div>
+          </div>
 
           {/* O que vem depois — mostra que o Coach tem fila, e o jogador
               já sabe o que o espera antes de clicar em "Já vi". */}
           {fila.length > indice + 1 && (
-            <ul className="mt-5 flex flex-col gap-2 border-t border-hairline pt-4">
-              <li className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/50">A seguir</li>
-              {fila.slice(indice + 1, indice + 4).map((d) => (
-                <li key={d.chave} className="flex items-center gap-2 text-[12px] text-muted/70">
-                  <span className="h-1 w-1 shrink-0 rounded-full" style={{ background: d.cor }} />
-                  <span className="truncate">
-                    <span className="text-muted">{d.modulo}</span> · {d.titulo}
-                  </span>
-                </li>
-              ))}
-            </ul>
+            <div className="mt-5">
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/50">A seguir</p>
+              <ul className="mt-2 flex flex-col gap-1.5">
+                {fila.slice(indice + 1, indice + 4).map((d) => {
+                  const Icone = ICONE_MODULO[d.modulo] ?? Sparkles;
+                  return (
+                    <li key={d.chave}>
+                      <Linha className="px-3 py-2">
+                        <span className="flex items-center gap-2.5">
+                          <TileIcone cor={d.cor}>
+                            <Icone size={12} />
+                          </TileIcone>
+                          <span className="min-w-0 flex-1 truncate text-[12px] text-muted">{d.titulo}</span>
+                          <Selo cor={URGENCIA[d.nivel].cor}>{URGENCIA[d.nivel].texto}</Selo>
+                        </span>
+                      </Linha>
+                    </li>
+                  );
+                })}
+              </ul>
+            </div>
           )}
 
-          <div className="mt-auto flex flex-wrap items-center gap-2 pt-4">
+          <div className="mt-auto flex flex-wrap items-center gap-2 pt-5">
             <Link
               href={atual.href}
-              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-3.5 py-1.5 text-xs font-semibold text-void shadow-lg shadow-black/40 transition-colors hover:bg-white/90"
+              className="inline-flex items-center gap-1.5 rounded-full bg-ink px-4 py-2 text-xs font-semibold text-void shadow-lg shadow-black/40 transition-colors hover:bg-white/90"
             >
               {atual.cta}
               <ArrowRight size={13} />
@@ -313,7 +361,7 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
             <button
               type="button"
               onClick={() => setIndice((i) => i + 1)}
-              className="rounded-full border border-hairline px-3.5 py-1.5 text-xs font-semibold text-muted transition-colors hover:border-white/30 hover:text-white"
+              className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-white/30 hover:text-ink"
             >
               {restantes > 0 ? `Já vi · próxima (${restantes})` : "Já vi"}
             </button>

@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { CalendarDays, Radio } from "lucide-react";
+import { CalendarDays, Radio, Users } from "lucide-react";
 import { fetchTeamEvents, type TeamEvent } from "@/lib/services/team-calendar-service";
 import { fetchLiveTournaments, youtubeWatchUrl, type LiveStreamChannel } from "@/lib/services/live-stream-service";
-import { CardHint, PainelCard } from "./painel-card";
+import { CardHint, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
 
 const SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
 
@@ -81,7 +81,7 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
   return (
     <PainelCard
       title="Próximas sessões"
-      icon={<CalendarDays size={13} />}
+      icon={<CalendarDays size={15} />}
       action={
         <span className="text-[11px] capitalize text-muted/70">
           {hoje.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
@@ -103,14 +103,14 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
           return (
             <span key={dia} className="relative grid place-items-center">
               <span
-                className={`tnum grid h-7 w-7 place-items-center rounded-full text-[11px] ${
-                  ehHoje ? "bg-ink font-semibold text-void" : "text-muted"
+                className={`tnum grid h-7 w-7 place-items-center rounded-xl text-[11px] transition-colors ${
+                  ehHoje ? "bg-ink font-semibold text-void" : temEvento ? "bg-white/[0.06] text-ink" : "text-muted"
                 }`}
               >
                 {dia}
               </span>
               {temEvento && !ehHoje && (
-                <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-ink" />
+                <span className="absolute -bottom-0.5 h-1 w-1 rounded-full bg-[#6366F1]" />
               )}
             </span>
           );
@@ -128,34 +128,39 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
             </Link>
           </CardHint>
         ) : (
-          <ul className="painel-scroll flex max-h-[150px] flex-col gap-2.5 overflow-y-auto pr-1">
+          <ul className="painel-scroll flex max-h-[168px] flex-col gap-2 overflow-y-auto pr-1">
             {aoVivo.slice(0, 2).map((c) => (
               <li key={c.channelId}>
-                <a
-                  href={youtubeWatchUrl(c.videoId)}
-                  target="_blank"
-                  rel="noreferrer"
-                  className="flex items-center gap-2.5 transition-opacity hover:opacity-80"
-                >
-                  <span className="h-8 w-[3px] shrink-0 rounded-full bg-negative" />
-                  <span className="min-w-0 flex-1">
-                    <span className="block truncate text-sm">{c.videoTitle || c.name}</span>
-                    <span className="flex items-center gap-1 text-[11px] text-negative">
-                      <Radio size={10} /> ao vivo · {c.name}
+                <a href={youtubeWatchUrl(c.videoId)} target="_blank" rel="noreferrer" className="block">
+                  <Linha>
+                    <span className="flex items-center gap-3">
+                      <TileIcone cor="#e0555a">
+                        <Radio size={14} />
+                      </TileIcone>
+                      <span className="min-w-0 flex-1">
+                        <span className="block truncate text-sm">{c.videoTitle || c.name}</span>
+                        <span className="block truncate text-[11px] text-muted/60">{c.name}</span>
+                      </span>
+                      <Selo cor="#e0555a">ao vivo</Selo>
                     </span>
-                  </span>
+                  </Linha>
                 </a>
               </li>
             ))}
             {eventos.slice(0, 3).map((e) => (
-              <li key={e.id} className="flex items-center gap-2.5">
-                <span className="h-8 w-[3px] shrink-0 rounded-full bg-ink/60" />
-                <span className="min-w-0 flex-1">
-                  <span className="block truncate text-sm">{e.title}</span>
-                  <span className="block text-[11px] text-muted/70">
-                    {diaDe(e.startsAt)} · {horaDe(e.startsAt)}
+              <li key={e.id}>
+                <Linha>
+                  <span className="flex items-center gap-3">
+                    <TileIcone cor="#6366F1">
+                      <Users size={14} />
+                    </TileIcone>
+                    <span className="min-w-0 flex-1">
+                      <span className="block truncate text-sm">{e.title}</span>
+                      <span className="block text-[11px] text-muted/60">{horaDe(e.startsAt)}</span>
+                    </span>
+                    <Selo cor="#c4c7c8">{diaDe(e.startsAt)}</Selo>
                   </span>
-                </span>
+                </Linha>
               </li>
             ))}
           </ul>

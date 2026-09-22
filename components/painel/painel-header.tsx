@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { Flame, Wallet } from "lucide-react";
+import { Selo, TileIcone } from "./painel-card";
 import { fetchProfile } from "@/lib/services/profile-service";
 import { fetchProgress } from "@/lib/services/xp-service";
 import { fetchSessions, fetchSettings, fetchTransactions } from "@/lib/services/bankroll-service";
@@ -76,7 +77,6 @@ export function PainelHeader() {
   }, []);
 
   const hora = agora?.getHours() ?? 0;
-  const corDelta = delta30 == null || delta30 === 0 ? "text-muted" : delta30 > 0 ? "text-positive" : "text-negative";
 
   return (
     <header className="flex flex-col gap-5 sm:flex-row sm:items-start sm:justify-between">
@@ -88,15 +88,21 @@ export function PainelHeader() {
         <p className="mt-2 text-[13px] text-muted/70">Estude · Jogue · Revise · Evolua</p>
 
         {streak != null && streak > 0 && (
-          <p className="mt-3 inline-flex items-center gap-1.5 rounded-full border border-evolution/30 bg-evolution/10 px-3 py-1 text-xs font-semibold text-evolution">
-            <Flame size={13} />
-            {streak} {streak === 1 ? "dia seguido" : "dias seguidos"}
+          <p className="mt-4 inline-flex items-center gap-2 rounded-2xl border border-hairline bg-surface py-1.5 pl-1.5 pr-3.5">
+            <TileIcone cor="#F59E0B">
+              <Flame size={14} />
+            </TileIcone>
+            <span className="text-xs font-semibold text-evolution">
+              {streak} {streak === 1 ? "dia seguido" : "dias seguidos"}
+            </span>
           </p>
         )}
       </div>
 
       <div className="flex items-center gap-5 sm:flex-col sm:items-end sm:gap-3">
         <div className="text-right">
+          {/* 24h, sem AM/PM: é o formato usado no Brasil (a referência
+              visual é americana, ali o "AM" fazia sentido). */}
           <p className="tnum text-4xl font-light leading-none sm:text-5xl">
             {agora
               ? `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
@@ -109,8 +115,10 @@ export function PainelHeader() {
           </p>
         </div>
 
-        <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-2.5">
-          <Wallet size={16} className="text-ink" />
+        <div className="flex items-center gap-3 rounded-2xl border border-hairline bg-surface px-4 py-3">
+          <TileIcone cor="#2FB89A">
+            <Wallet size={15} />
+          </TileIcone>
           <div>
             <p className="text-[10px] uppercase tracking-[0.12em] text-muted/70">Banca total</p>
             <p className="tnum text-base font-semibold leading-tight">
@@ -118,11 +126,13 @@ export function PainelHeader() {
             </p>
           </div>
           {delta30 != null && (
-            <p className={`tnum border-l border-hairline pl-3 text-xs font-semibold ${corDelta}`}>
-              {delta30 > 0 ? "+" : ""}
-              {formatBRL(delta30)}
-              <span className="block text-[10px] font-normal text-muted/60">30 dias</span>
-            </p>
+            <div className="border-l border-hairline pl-3">
+              <Selo cor={delta30 > 0 ? "#22c55e" : delta30 < 0 ? "#e0555a" : "#c4c7c8"}>
+                {delta30 > 0 ? "+" : ""}
+                {formatBRL(delta30)}
+              </Selo>
+              <p className="mt-1 text-[10px] text-muted/60">30 dias</p>
+            </div>
           )}
         </div>
       </div>
