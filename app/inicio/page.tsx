@@ -4,10 +4,10 @@ import { AppShell } from "@/components/app-shell";
 import { PainelStyles } from "@/components/painel/painel-styles";
 import { PainelHeader } from "@/components/painel/painel-header";
 import { AiCoachCard } from "@/components/painel/ai-coach-card";
-import { IndicatorsCard } from "@/components/painel/indicators-card";
 import { AgendaCard } from "@/components/painel/agenda-card";
+import { IndicatorsCard } from "@/components/painel/indicators-card";
 import { HabitsCard } from "@/components/painel/habits-card";
-import { QuickNotesCard } from "@/components/painel/quick-notes-card";
+import { ReviewHandsCard } from "@/components/painel/review-hands-card";
 
 // Painel — tela de início do jogador. Substitui o "diário" anterior
 // (lista vertical de cards de reflexão/agenda/metas/insights): a mesma
@@ -31,14 +31,16 @@ export default function InicioPage() {
         <PainelStyles />
         <PainelHeader />
 
-        {/* 1 coluna no celular, 2 no tablet, 3 no computador. O Coach
-            ocupa duas colunas: é o card que se lê primeiro. */}
+        {/* Duas faixas: em cima o que exige leitura (Coach e Calendário,
+            lado a lado e da mesma altura -- a grade já estica os dois
+            pela linha); embaixo os três cards de consulta rápida, em
+            tamanho normal. */}
         <div className="mt-6 grid grid-cols-1 gap-4 md:grid-cols-2 xl:grid-cols-3">
-          <AiCoachCard className="md:col-span-2" style={{ animationDelay: "40ms" }} />
-          <IndicatorsCard style={{ animationDelay: "100ms" }} />
-          <AgendaCard style={{ animationDelay: "160ms" }} />
+          <AiCoachCard className="md:col-span-1 xl:col-span-2" style={{ animationDelay: "40ms" }} />
+          <AgendaCard style={{ animationDelay: "100ms" }} />
+          <IndicatorsCard style={{ animationDelay: "160ms" }} />
           <HabitsCard style={{ animationDelay: "220ms" }} />
-          <QuickNotesCard style={{ animationDelay: "280ms" }} />
+          <ReviewHandsCard style={{ animationDelay: "280ms" }} />
         </div>
       </main>
     </AppShell>
