@@ -1,6 +1,6 @@
 "use client";
 
-import { useMemo, useState } from "react";
+import { useMemo } from "react";
 import {
   Trophy,
   Award,
@@ -15,12 +15,10 @@ import {
   Flag,
   Flame,
   Snowflake,
-  ChevronDown,
   Target,
 } from "lucide-react";
 import { Painel, StatList } from "@/components/dashboard/kit";
 import { FilterChip } from "@/components/ui/filter-chip";
-import { TournamentPayoutsPanel } from "@/components/analysis/TournamentPayoutsPanel";
 import { buyinBucketOf } from "@/lib/services/analysis-service";
 import { BUYIN_BUCKET_LABEL, type BuyinBucket, type TournamentMetrics } from "@/types/analysis";
 import type { HandSession } from "@/lib/services/hand-session-service";
@@ -96,12 +94,6 @@ export function StatisticsTab({
     onBuyinFilterChange(buyinFilter.includes(b) ? buyinFilter.filter((x) => x !== b) : [...buyinFilter, b]);
   }
 
-  // Estrutura de premiação: por padrão só mostra a contagem
-  // (registradas/pendentes) em vez do grid com 1 card por torneio — o
-  // grid pesa muito nessa aba pra quem já tem dezenas de torneios
-  // importados. Clicar num dos números expande e revela a lista de
-  // verdade (mesmo componente TournamentPayoutsPanel).
-  const [premiacaoOpen, setPremiacaoOpen] = useState(false);
   const payoutByTournament = useMemo(() => new Map(payouts.map((p) => [p.tournamentIdPs, p])), [payouts]);
 
   // Torneios importados só via Tournament Summary (tournament_payouts),
@@ -145,19 +137,6 @@ export function StatisticsTab({
       }, 0) + payoutOnlyList.reduce((acc, p) => acc + (p.heroPayoutAmount ?? 0), 0),
     [filteredSessions, payoutByTournament, payoutOnlyList]
   );
-
-  const payoutRegisteredCount = useMemo(
-    () =>
-      filteredSessions.filter((s) => {
-        const p = s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps) : undefined;
-        return p != null && (p.heroPayoutAmount != null || p.places.length > 0);
-      }).length +
-      // Torneio só-de-payout é, por definição, já registrado (é o único
-      // dado que ele tem).
-      payoutOnlyList.length,
-    [filteredSessions, payoutByTournament, payoutOnlyList]
-  );
-  const payoutPendingCount = totalTorneiosCount - payoutRegisteredCount;
 
   return (
     <div className="space-y-4">
@@ -294,40 +273,6 @@ export function StatisticsTab({
           </button>
         )}
       </div>
-
-      <Painel titulo="Estrutura de premiação" icone={<Award size={14} className="icon-glow text-training" />}>
-        <p className="mb-3 text-xs leading-relaxed text-muted">
-          Quanto cada torneio pagou — vem automaticamente do agente desktop (Radar PokerSync) sincronizando o resumo de cada
-          torneio.
-        </p>
-
-        <div className="flex flex-wrap items-center gap-5">
-          <button type="button" onClick={() => setPremiacaoOpen(true)} className="text-left">
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">Registradas</p>
-            <p className="mt-0.5 text-xl font-bold tabular-nums text-positive">{payoutRegisteredCount}</p>
-          </button>
-          <button type="button" onClick={() => setPremiacaoOpen(true)} className="text-left" disabled={payoutPendingCount === 0}>
-            <p className="text-[10px] font-bold uppercase tracking-[0.1em] text-muted/80">Pendentes</p>
-            <p className={`mt-0.5 text-xl font-bold tabular-nums ${payoutPendingCount > 0 ? "text-evolution" : "text-muted/30"}`}>
-              {payoutPendingCount}
-            </p>
-          </button>
-          <button
-            type="button"
-            onClick={() => setPremiacaoOpen((v) => !v)}
-            className="ml-auto flex items-center gap-1 text-[11.5px] font-semibold text-muted hover:text-ink"
-          >
-            {premiacaoOpen ? "Recolher" : "Ver torneios"}
-            <ChevronDown size={13} className={`transition-transform ${premiacaoOpen ? "rotate-180" : ""}`} />
-          </button>
-        </div>
-
-        {premiacaoOpen && (
-          <div className="mt-3 border-t border-hairline pt-3">
-            <TournamentPayoutsPanel sessions={filteredSessions} payouts={payouts} formatUsd={formatUsd} />
-          </div>
-        )}
-      </Painel>
     </div>
   );
 }
