@@ -128,7 +128,7 @@ export function FunilQuadro({
   }
 
   return (
-    <div className={`painel-scroll flex-1 overflow-auto pb-2 md:min-h-[420px] ${umaRaia ? "flex flex-col" : ""}`}>
+    <div className={`painel-scroll flex-1 overflow-auto pb-2 [@media(min-width:768px)_and_(min-height:600px)]:min-h-[420px] ${umaRaia ? "flex flex-col" : ""}`}>
       <div className={`inline-flex min-w-full flex-col ${umaRaia ? "min-h-0 flex-1" : ""}`}>
         {/* Cabeçalho das fases -- fixo no topo quando há raias. */}
         <div className={`sticky top-0 z-10 flex gap-3 pb-2 ${umaRaia ? "" : "bg-[#0d0d0d]/95 backdrop-blur-sm"}`}>

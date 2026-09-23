@@ -13,6 +13,7 @@ import { fetchTeamDashboardCached, traduzErroTime, type MyTeam, type TeamDashboa
 // a barra de ferramentas quebra em várias linhas e a área visível do
 // navegador é menor que 100vh, então altura fixa fazia o quadro vazar
 // pra fora do painel -- lá a aba cresce com o conteúdo e a página rola.
+// "Tela grande" = larga E alta: celular deitado é largo mas baixo.
 export function FunilAba({ time, onErro }: { time: MyTeam; onErro: (s: string) => void }) {
   const [linhas, setLinhas] = useState<TeamDashboardRow[] | null>(null);
   const [agendarPlayerId, setAgendarPlayerId] = useState<string | null>(null);
@@ -41,7 +42,7 @@ export function FunilAba({ time, onErro }: { time: MyTeam; onErro: (s: string) =
   if (linhas === null) return <div className="painel-esqueleto h-[480px] rounded-3xl" />;
 
   return (
-    <div className="flex flex-col md:h-[calc(100vh-15rem)] md:min-h-[520px]">
+    <div className="flex flex-col [@media(min-width:768px)_and_(min-height:600px)]:h-[calc(100vh-15rem)] [@media(min-width:768px)_and_(min-height:600px)]:min-h-[520px]">
       <Funil
         teamId={time.team.id}
         jogadores={jogadores}
