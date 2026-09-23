@@ -3,7 +3,12 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell } from "lucide-react";
+import { Lock, Plus, Clock, Flame, Target, BookOpen, CalendarDays, Check, X, Video, Dumbbell, UserRound, Route, ShieldCheck, SunMoon } from "lucide-react";
+import { motion } from "framer-motion";
+import { PainelVisual } from "@/components/dashboard/kit";
+import { EASE } from "@/components/painel/painel-card";
+import { PerfEstilos } from "@/components/performance/perf-estilos";
+import { PainelCard } from "@/components/time/painel-card";
 import { Chip } from "@/components/chip";
 import { AppShell } from "@/components/app-shell";
 import { ACCENT } from "@/lib/modules-data";
@@ -11,10 +16,12 @@ import { TeamBanner } from "@/components/time/team-banner";
 import { fetchDrillFacets } from "@/lib/services/drill-service";
 import {
   createTeam,
+  fetchMeuPerfilVisivelTime,
   fetchMyMembership,
   fetchMyPlan,
   fetchMyTeam,
   planoPermiteCriarTime,
+  setPerfilVisivelTime,
   traduzErroTime,
   type MyMembership,
   type MyTeam,
@@ -79,13 +86,24 @@ export default function TimePage() {
 
   return (
     <AppShell>
-      <main className="w-full px-6 py-10 text-ink">
+      {/* Mesmo visual do painel do time e da Performance (vidro, brilho
+          suave de fundo) -- vale pra todas as telas daqui (aluno,
+          aguardando aprovação, criar time). */}
+      <PainelVisual value="vidro">
+      <main className="perf w-full px-4 pb-12 pt-6 text-ink md:px-6">
+        <PerfEstilos />
         {erro && (
           <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
         )}
 
         {loading ? (
-          <p className="text-sm text-muted">Carregando…</p>
+          <div className="grid max-w-5xl gap-3.5">
+            <div className="painel-esqueleto h-[180px] rounded-3xl" />
+            <div className="grid gap-3.5 md:grid-cols-2">
+              <div className="painel-esqueleto h-[220px] rounded-3xl" />
+              <div className="painel-esqueleto h-[220px] rounded-3xl" />
+            </div>
+          </div>
         ) : membership?.status === "pendente" ? (
           <AguardandoAprovacao membership={membership} />
         ) : data ? (
@@ -96,6 +114,7 @@ export default function TimePage() {
           <SemPlanoCard />
         )}
       </main>
+      </PainelVisual>
     </AppShell>
   );
 }
@@ -103,7 +122,7 @@ export default function TimePage() {
 // ------------------------------------------------------------
 function AguardandoAprovacao({ membership }: { membership: MyMembership }) {
   return (
-    <section className="max-w-xl rounded-xl border border-evolution/40 bg-surface p-6">
+    <section className="painel-vidro max-w-xl rounded-3xl border border-evolution/40 p-6">
       <div className="flex items-start gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg bg-evolution/15 text-evolution">
           <Clock size={18} />
@@ -120,53 +139,167 @@ function AguardandoAprovacao({ membership }: { membership: MyMembership }) {
   );
 }
 
-// Jogador nao gerencia nada: ve o vinculo, o coach e onde estudar.
+// Jogador nao gerencia nada: ve o vinculo, o coach, a meta do funil e
+// os eventos. Mesmo visual do painel do coach (vidro), em duas colunas no
+// computador: o que fazer agora (meta + eventos) à esquerda, o vínculo e
+// o que o time enxerga à direita.
 function VisaoJogador({ data }: { data: MyTeam }) {
   const eu = data.members.find((m) => m.isMe);
   const meuCoach = data.members.find((m) => m.userId === eu?.coachId);
   const coaches = data.members.filter((m) => m.isCoach);
+  // Rotina de treino visível ao coach (LGPD): null = ainda não escolheu
+  // (fica oculta e mostramos o aviso); undefined = banco ainda sem a
+  // coluna, então nem aviso nem chave aparecem.
+  const [rotinaVisivel, setRotinaVisivel] = useState<boolean | null | undefined>(undefined);
+  const [salvandoRotina, setSalvandoRotina] = useState(false);
+
+  useEffect(() => {
+    fetchMeuPerfilVisivelTime()
+      .then(setRotinaVisivel)
+      .catch(() => setRotinaVisivel(undefined));
+  }, []);
+
+  async function escolherRotina(v: boolean) {
+    setSalvandoRotina(true);
+    try {
+      await setPerfilVisivelTime(v);
+      setRotinaVisivel(v);
+    } catch {
+      // Mantém a escolha anterior na tela se não salvou.
+    } finally {
+      setSalvandoRotina(false);
+    }
+  }
 
   return (
-    <div className="max-w-2xl space-y-5">
-      {coaches.length > 0 && (
-        <div className="flex flex-wrap items-center justify-end gap-1.5">
-          <span className="text-[11px] font-semibold uppercase tracking-wide text-muted">
-            Coach{coaches.length > 1 ? "es" : ""}
-          </span>
-          {coaches.map((c) => (
-            <Chip key={c.userId} color={data.team.accent} size="sm">{c.name}</Chip>
-          ))}
+    <div className="mx-auto max-w-5xl space-y-3.5">
+      <motion.div initial={{ opacity: 0, y: 12 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.5, ease: EASE }}>
+        <TeamBanner
+          name={data.team.name}
+          accent={data.team.accent}
+          logoUrl={data.team.logoUrl}
+          bannerUrl={data.team.bannerUrl}
+        />
+      </motion.div>
+
+      {rotinaVisivel === null && <AvisoRotina salvando={salvandoRotina} onEscolher={escolherRotina} />}
+
+      <div className="grid gap-3.5 md:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
+        <div className="space-y-3.5">
+          <MetaDoFunil />
+          <EventosDoJogador />
         </div>
-      )}
-      <TeamBanner
-        name={data.team.name}
-        accent={data.team.accent}
-        logoUrl={data.team.logoUrl}
-        bannerUrl={data.team.bannerUrl}
-      />
 
-      <section className="rounded-xl border border-hairline bg-surface p-6">
-        <p className="text-xs text-muted">
-          Você entrou em {eu ? new Date(eu.joinedAt).toLocaleDateString("pt-BR") : "—"}
-          {meuCoach ? ` · seu coach é ${meuCoach.name}` : " · ainda sem coach atribuído"}
-        </p>
-      </section>
+        <div className="space-y-3.5">
+          <PainelCard titulo="Seu vínculo" icone={<UserRound size={15} />}>
+            <dl className="space-y-2.5 text-[13px]">
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted">Entrou em</dt>
+                <dd className="font-semibold tabular-nums">{eu ? new Date(eu.joinedAt).toLocaleDateString("pt-BR") : "—"}</dd>
+              </div>
+              <div className="flex items-center justify-between gap-3">
+                <dt className="text-muted">Seu coach</dt>
+                <dd className="font-semibold">{meuCoach?.name ?? "ainda sem coach"}</dd>
+              </div>
+              {coaches.length > 0 && (
+                <div className="flex flex-wrap items-center justify-between gap-2 border-t border-white/[0.06] pt-2.5">
+                  <dt className="text-muted">Coach{coaches.length > 1 ? "es" : ""} do time</dt>
+                  <dd className="flex flex-wrap justify-end gap-1">
+                    {coaches.map((c) => (
+                      <Chip key={c.userId} color={data.team.accent} size="sm">{c.name}</Chip>
+                    ))}
+                  </dd>
+                </div>
+              )}
+            </dl>
+          </PainelCard>
 
-      <section className="rounded-xl border border-hairline bg-surface p-6">
-        <h2 className="text-base font-semibold">O que o time acompanha</h2>
-        <ul className="mt-3 space-y-2.5 text-[13px] text-muted">
-          <li className="flex gap-2.5"><Target size={15} className="mt-0.5 shrink-0 text-training" />
-            Sua frequência de estudo, treinos e evolução de nível.</li>
-          <li className="flex gap-2.5"><BookOpen size={15} className="mt-0.5 shrink-0 text-review" />
-            As mãos que <strong className="text-ink/85">você escolher</strong> compartilhar com seu coach — nenhuma outra.</li>
-          <li className="flex gap-2.5"><Flame size={15} className="mt-0.5 shrink-0 text-evolution" />
-            Volume de jogos e resultado, contados a partir da sua entrada no time.</li>
-        </ul>
-      </section>
-
-      <MetaDoFunil />
-      <EventosDoJogador />
+          <PainelCard titulo="O que o time enxerga" icone={<ShieldCheck size={15} />}>
+            <ul className="space-y-2.5 text-[13px] text-muted">
+              <li className="flex gap-2.5"><Target size={15} className="mt-0.5 shrink-0 text-training" />
+                Sua frequência de estudo, treinos e evolução de nível.</li>
+              <li className="flex gap-2.5"><BookOpen size={15} className="mt-0.5 shrink-0 text-review" />
+                As mãos que <strong className="text-ink/85">você escolher</strong> compartilhar com seu coach — nenhuma outra.</li>
+              <li className="flex gap-2.5"><Flame size={15} className="mt-0.5 shrink-0 text-evolution" />
+                Volume de jogos e o resultado total (ganhos menos buy-ins), contados a partir da sua entrada no time — nunca a sua banca pessoal.</li>
+              {rotinaVisivel !== undefined && (
+                <li className="flex gap-2.5"><SunMoon size={15} className="mt-0.5 shrink-0 text-[#d4af37]" />
+                  <span>
+                    Sua rotina de treino (experiência, turno, horas por dia e dias), se você deixar.
+                    <span className="mt-2 flex items-center justify-between gap-3 rounded-xl border border-white/5 bg-white/[0.04] px-3 py-2">
+                      <span className="text-[12.5px] text-ink">{rotinaVisivel ? "Visível para o time" : "Privada"}</span>
+                      <button
+                        type="button"
+                        role="switch"
+                        aria-checked={Boolean(rotinaVisivel)}
+                        aria-label="Mostrar minha rotina de treino ao time"
+                        disabled={salvandoRotina}
+                        onClick={() => escolherRotina(!rotinaVisivel)}
+                        className={`relative h-5 w-9 shrink-0 rounded-full transition-colors disabled:opacity-50 ${
+                          rotinaVisivel ? "bg-[#d4af37]" : "bg-white/15"
+                        }`}
+                      >
+                        <span
+                          className={`absolute top-0.5 size-4 rounded-full bg-white shadow transition-transform ${
+                            rotinaVisivel ? "translate-x-[18px]" : "translate-x-0.5"
+                          }`}
+                        />
+                      </button>
+                    </span>
+                  </span>
+                </li>
+              )}
+            </ul>
+            <p className="mt-3 border-t border-white/[0.06] pt-2.5 text-[11.5px] text-muted/80">
+              Data de nascimento e contato nunca aparecem para o time.
+            </p>
+          </PainelCard>
+        </div>
+      </div>
     </div>
+  );
+}
+
+// Aviso único pra quem já estava no time antes da rotina de treino
+// aparecer na ficha: explica o que é, pra que serve, e pede a escolha.
+// Enquanto não escolher, a rotina fica PRIVADA.
+function AvisoRotina({ salvando, onEscolher }: { salvando: boolean; onEscolher: (v: boolean) => void }) {
+  return (
+    <motion.div
+      initial={{ opacity: 0, y: 10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.5, ease: EASE, delay: 0.05 }}
+      className="painel-vidro flex flex-col gap-3 rounded-3xl border border-[#d4af37]/30 p-4 sm:flex-row sm:items-center sm:p-5"
+    >
+      <span className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#d4af37]/12 text-[#d4af37] ring-1 ring-[#d4af37]/30">
+        <ShieldCheck size={18} />
+      </span>
+      <div className="min-w-0 flex-1">
+        <p className="text-[14px] font-semibold tracking-tight">Mostrar sua rotina de treino ao coach?</p>
+        <p className="mt-0.5 text-[12.5px] leading-snug text-muted">
+          Experiência, turno preferido, horas por dia e dias de treino do seu perfil aparecem na sua ficha, para o
+          coach organizar a agenda com você. Nunca data de nascimento nem contato. Você muda isso quando quiser.
+        </p>
+      </div>
+      <div className="flex shrink-0 gap-2">
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => onEscolher(false)}
+          className="rounded-xl border border-white/10 px-3.5 py-2 text-[12.5px] font-medium text-muted transition-colors hover:border-white/25 hover:text-ink disabled:opacity-50"
+        >
+          Deixar privada
+        </button>
+        <button
+          type="button"
+          disabled={salvando}
+          onClick={() => onEscolher(true)}
+          className="rounded-xl bg-[#d4af37] px-3.5 py-2 text-[12.5px] font-semibold text-black transition-transform hover:scale-[1.02] disabled:opacity-50"
+        >
+          Mostrar ao coach
+        </button>
+      </div>
+    </motion.div>
   );
 }
 
@@ -191,7 +324,7 @@ function MetaDoFunil() {
       .catch(() => setTemDrillsTresBet(false));
   }, []);
 
-  if (!card || !card.statMetric) return null;
+  if (!card) return null;
 
   // "vs Open" nao tem correspondencia clara com PFR/VPIP (sao stats de
   // pre-flop puro, banco de drills so tem pos-flop). "3-Bet" so entra
@@ -202,27 +335,80 @@ function MetaDoFunil() {
   const posValida = piorPosicao && ["UTG", "CO", "BTN", "SB"].includes(piorPosicao) ? piorPosicao : null;
   const linkTreino = posValida ? `/treino?action=3-Bet&pos=${posValida}` : "/treino?action=3-Bet";
 
+  // Metas que o PRÓPRIO coach definiu na fase do funil (não é faixa
+  // inventada): treinos e revisões desde que o jogador entrou na fase.
+  const metas = [
+    { rotulo: "Treinos", feito: card.drillsDone, alvo: card.drillsTarget, href: "/treino" },
+    { rotulo: "Mãos revisadas", feito: card.reviewsDone, alvo: card.reviewsTarget, href: "/revisor" },
+  ].filter((m) => m.alvo > 0);
+
   return (
-    <section className="rounded-xl border border-hairline bg-surface p-6">
-      <h2 className="flex items-center gap-2 text-base font-semibold">
-        <Target size={16} />
-        Meta do seu coach
-      </h2>
-      <p className="mt-1 text-sm text-muted">
-        {STAT_METRIC_LABEL[card.statMetric]} atual: <strong className="text-ink/85">{card.statValue ?? "—"}%</strong>
-        {card.statTarget != null && <> · meta: {card.statTarget}%</>}
+    <PainelCard
+      titulo="Sua fase no time"
+      icone={<Route size={15} />}
+      acao={
+        <span
+          className="rounded-full border px-2.5 py-0.5 text-[11.5px] font-semibold"
+          style={{ color: card.phaseColor, borderColor: `${card.phaseColor}66`, background: `${card.phaseColor}14` }}
+        >
+          {card.phaseName}
+        </span>
+      }
+    >
+      <p className="text-[12px] text-muted">
+        Desde {new Date(card.movedAt).toLocaleDateString("pt-BR")} nesta fase. Metas definidas pelo seu coach:
       </p>
 
-      {temTreino ? (
-        <Link href={linkTreino}
-          className="mt-3 inline-flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02]">
-          <Dumbbell size={16} />
-          {posValida ? `Treinar 3-bet (${posValida})` : "Treinar 3-bet"}
-        </Link>
-      ) : (
-        <p className="mt-2 text-xs text-muted">Ainda não há drills específicos pra esse número na base atual — foco em revisar suas mãos por enquanto.</p>
+      {metas.length > 0 && (
+        <ul className="mt-3 space-y-3">
+          {metas.map((m, i) => {
+            const pct = Math.min(100, Math.round((m.feito / m.alvo) * 100));
+            const pronto = m.feito >= m.alvo;
+            return (
+              <li key={m.rotulo}>
+                <div className="mb-1.5 flex items-baseline justify-between gap-2">
+                  <Link href={m.href} className="text-[13px] font-medium text-ink hover:underline">{m.rotulo}</Link>
+                  <span className="text-[12px] tabular-nums text-muted">
+                    <b className="text-[15px] font-bold text-ink">{m.feito}</b> de {m.alvo}
+                    {pronto && <span className="ml-1.5 text-positive">✓ meta batida</span>}
+                  </span>
+                </div>
+                <span className="block h-2 overflow-hidden rounded-full bg-white/[0.06]">
+                  <motion.span
+                    className="block h-full rounded-full"
+                    style={{ background: pronto ? "#22c55e" : "#d4af37" }}
+                    initial={{ width: 0 }}
+                    animate={{ width: `${pct}%` }}
+                    transition={{ duration: 0.9, ease: EASE, delay: 0.2 + i * 0.1 }}
+                  />
+                </span>
+              </li>
+            );
+          })}
+        </ul>
       )}
-    </section>
+
+      {card.statMetric && (
+        <div className="mt-4 rounded-2xl border border-white/5 bg-white/[0.03] p-3">
+          <p className="flex items-center gap-1.5 text-[12px] text-muted">
+            <Target size={13} /> Meta de jogo do seu coach
+          </p>
+          <p className="mt-1 text-[13px]">
+            {STAT_METRIC_LABEL[card.statMetric]} atual: <strong className="text-[15px] text-ink">{card.statValue ?? "—"}%</strong>
+            {card.statTarget != null && <span className="text-muted"> · meta: {card.statTarget}%</span>}
+          </p>
+          {temTreino ? (
+            <Link href={linkTreino}
+              className="mt-3 inline-flex items-center gap-2 rounded-xl bg-[#d4af37] px-4 py-2 text-[13px] font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.98]">
+              <Dumbbell size={15} />
+              {posValida ? `Treinar 3-bet (${posValida})` : "Treinar 3-bet"}
+            </Link>
+          ) : (
+            <p className="mt-2 text-xs text-muted">Ainda não há drills específicos pra esse número na base atual — foco em revisar suas mãos por enquanto.</p>
+          )}
+        </div>
+      )}
+    </PainelCard>
   );
 }
 
@@ -270,19 +456,15 @@ function EventosDoJogador() {
   if (loading || eventos.length === 0) return null;
 
   return (
-    <section className="rounded-xl border border-hairline bg-surface p-6">
-      <h2 className="flex items-center gap-2 text-base font-semibold">
-        <CalendarDays size={17} />
-        Próximos eventos
-      </h2>
+    <PainelCard titulo="Próximos eventos" icone={<CalendarDays size={15} />}>
       {erro && <p className="mt-2 text-xs text-negative">{erro}</p>}
 
-      <ul className="mt-3 divide-y divide-hairline">
+      <ul className="divide-y divide-white/[0.06]">
         {eventos.map((ev) => {
           const meuStatus = ev.participants[0]?.status ?? "pendente";
           const destacado = ev.id === destaqueId;
           return (
-            <li key={ev.id} className={`py-3.5 ${destacado ? "rounded-lg bg-ink/5 px-2" : ""}`}>
+            <li key={ev.id} className={`py-3 ${destacado ? "rounded-xl bg-[#d4af37]/[0.06] px-2" : ""}`}>
               <p className="text-sm font-medium">{TIPO_LABEL[ev.eventType] ?? ev.eventType} · {ev.title}</p>
               <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
                 <Clock size={12} />
@@ -300,7 +482,7 @@ function EventosDoJogador() {
               {meuStatus === "pendente" ? (
                 <div className="mt-2 flex gap-2">
                   <button onClick={() => responder(ev.id, "confirmado")} disabled={processando === ev.id}
-                    className="flex items-center gap-1.5 rounded-lg bg-ink px-3 py-1.5 text-[12px] font-semibold text-void transition-transform hover:scale-[1.03] disabled:opacity-50">
+                    className="flex items-center gap-1.5 rounded-lg bg-[#d4af37] px-3 py-1.5 text-[12px] font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.98] disabled:opacity-50">
                     <Check size={13} /> Confirmar presença
                   </button>
                   <button onClick={() => responder(ev.id, "recusado")} disabled={processando === ev.id}
@@ -319,13 +501,13 @@ function EventosDoJogador() {
           );
         })}
       </ul>
-    </section>
+    </PainelCard>
   );
 }
 
 function SemPlanoCard() {
   return (
-    <section className="max-w-xl rounded-xl border border-hairline bg-surface p-6">
+    <section className="painel-vidro max-w-xl rounded-3xl border border-white/10 p-6">
       <div className="flex items-start gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
           <Lock size={18} />
@@ -362,7 +544,7 @@ function CriarTimeCard({ onCriado, onErro }: { onCriado: () => void; onErro: (s:
   }
 
   return (
-    <section className="max-w-xl rounded-xl border border-hairline bg-surface p-6">
+    <section className="painel-vidro max-w-xl rounded-3xl border border-white/10 p-6">
       <h2 className="text-base font-semibold">Criar seu time</h2>
       <p className="mt-1 text-sm text-muted">Depois você convida coaches e jogadores por link.</p>
 

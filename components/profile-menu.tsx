@@ -1,8 +1,8 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock3 } from "lucide-react";
+import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock3, ImagePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AVATARS } from "./avatar";
 import { ModalPortal } from "./modal-portal";
@@ -11,6 +11,10 @@ import {
   updateAvatarIcon,
   uploadAvatarPhoto,
   removeAvatarPhoto,
+  fetchMeuBanner,
+  uploadBannerPhoto,
+  removeBanner,
+  BANNER_DIMENSAO,
   updatePassword,
   updateProfileDetails,
   TEMPO_EXPERIENCIA_LABEL,
@@ -40,7 +44,41 @@ export function ProfileMenu({
   const [uploading, setUploading] = useState(false);
   const [salvandoDetalhes, setSalvandoDetalhes] = useState(false);
   const fileRef = useRef<HTMLInputElement>(null);
+  // Banner da ficha: undefined = banco ainda sem a coluna (bloco some).
+  const [banner, setBanner] = useState<string | null | undefined>(undefined);
+  const [enviandoBanner, setEnviandoBanner] = useState(false);
+  const bannerRef = useRef<HTMLInputElement>(null);
   useEscapeToClose(onClose);
+
+  useEffect(() => {
+    fetchMeuBanner()
+      .then(setBanner)
+      .catch(() => setBanner(undefined));
+  }, []);
+
+  async function handleBannerUpload(file: File) {
+    setEnviandoBanner(true);
+    setMsg({ type: "", text: "" });
+    try {
+      setBanner(await uploadBannerPhoto(file));
+      setMsg({ type: "ok", text: "Banner atualizado." });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao enviar o banner." });
+    } finally {
+      setEnviandoBanner(false);
+      if (bannerRef.current) bannerRef.current.value = "";
+    }
+  }
+
+  async function handleRemoveBanner() {
+    try {
+      await removeBanner();
+      setBanner(null);
+      setMsg({ type: "ok", text: "Banner removido." });
+    } catch (e) {
+      setMsg({ type: "err", text: e instanceof Error ? e.message : "Falha ao remover o banner." });
+    }
+  }
 
   async function salvarDetalhe(patch: Parameters<typeof updateProfileDetails>[0], atualiza: Partial<Profile>) {
     setSalvandoDetalhes(true);
@@ -186,6 +224,50 @@ export function ProfileMenu({
                   })}
                 </div>
               </div>
+
+              {banner !== undefined && (
+                <div className="border-b border-hairline p-4">
+                  <div className="mb-2.5 flex items-center justify-between">
+                    <span className="text-[11px] uppercase tracking-[0.08em] text-muted">Banner da ficha</span>
+                    {banner && (
+                      <button onClick={handleRemoveBanner} className="flex items-center gap-1 text-[11px] text-muted hover:text-ink">
+                        <X size={11} /> Remover banner
+                      </button>
+                    )}
+                  </div>
+                  {/* Prévia na mesma proporção da capa (5:1). */}
+                  <button
+                    type="button"
+                    onClick={() => bannerRef.current?.click()}
+                    disabled={enviandoBanner}
+                    className="group relative block aspect-[5/1] w-full overflow-hidden rounded-xl border border-dashed border-white/15 bg-white/[0.03] transition-colors hover:border-[#d4af37]/60"
+                  >
+                    {banner && (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={banner} alt="Seu banner" className="absolute inset-0 size-full object-cover" />
+                    )}
+                    <span
+                      className={`absolute inset-0 flex items-center justify-center gap-1.5 text-[12px] font-semibold transition-opacity ${
+                        banner ? "bg-black/55 text-ink opacity-0 group-hover:opacity-100" : "text-muted group-hover:text-ink"
+                      }`}
+                    >
+                      {enviandoBanner ? <Loader2 size={14} className="animate-spin" /> : <ImagePlus size={14} />}
+                      {enviandoBanner ? "Enviando…" : banner ? "Trocar banner" : "Incluir banner"}
+                    </span>
+                  </button>
+                  <p className="mt-1.5 text-[11px] leading-snug text-muted">
+                    Tamanho recomendado: <strong className="text-ink/85">{BANNER_DIMENSAO.largura} × {BANNER_DIMENSAO.altura} px</strong>{" "}
+                    (JPG, PNG ou WEBP, até 5 MB). Deixe o mais importante no centro: no celular as laterais são cortadas.
+                  </p>
+                  <input
+                    ref={bannerRef}
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp"
+                    className="hidden"
+                    onChange={(e) => e.target.files?.[0] && handleBannerUpload(e.target.files[0])}
+                  />
+                </div>
+              )}
 
               {/* Info opcional pra futura curadoria de comunidade — cada
                   campo salva sozinho ao trocar, sem precisar de um botao

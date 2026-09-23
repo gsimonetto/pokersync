@@ -2,25 +2,21 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, MessageCircle, MoreVertical, X } from "lucide-react";
-import { Avatar } from "@/components/avatar";
-import { RankChip } from "@/components/ui/rank-chip";
-import { ScoreRing } from "@/components/ui/score-ring";
+import { ExternalLink, IdCard, MessageCircle, MoreVertical, X } from "lucide-react";
+import { Esqueleto } from "@/components/painel/painel-card";
 import { PeriodSelector } from "@/components/period-selector";
 import { PlayerDetailBody } from "@/components/time/player-detail-body";
 import { ModalPortal } from "@/components/modal-portal";
 import { AcoesJogadorModal } from "@/components/time/acoes-jogador-modal";
 import {
-  calcularScore,
-  calcularTendencia,
-  diasSemAtividade,
   fetchPlayerActivity,
   fetchPlayerAlerts,
   fetchPlayerDetail,
   fetchPlayerEvolutionStats,
-  fetchPlayerLeaks,
   fetchPlayerScoreHistory,
   fetchPlayerSharedHands,
+  fetchPlayerTeamHistory,
+  fetchPlayerTeamProfile,
   traduzErroTime,
   type PlayerActivityDay,
   type PlayerEvolutionStats,
@@ -28,7 +24,8 @@ import {
   type TeamAlert,
   type PlayerDetail,
   type PlayerSharedHand,
-  type PlayerLeak,
+  type PlayerTeamHistoryItem,
+  type PlayerTeamProfile,
   type TeamDashboardRow,
   type TeamLabel,
 } from "@/lib/services/team-service";
@@ -77,32 +74,35 @@ export function PlayerDetailModal({
   const [acoesAbertas, setAcoesAbertas] = useState(false);
   const [p, setP] = useState<PlayerDetail | null>(null);
   const [atividade, setAtividade] = useState<PlayerActivityDay[]>([]);
-  const [leaks, setLeaks] = useState<PlayerLeak[]>([]);
   const [maos, setMaos] = useState<PlayerSharedHand[]>([]);
   const [alertas, setAlertas] = useState<TeamAlert[]>([]);
   const [historicoScore, setHistoricoScore] = useState<PlayerScoreHistoryPoint[]>([]);
   const [evolutionStats, setEvolutionStats] = useState<PlayerEvolutionStats | null>(null);
+  const [perfil, setPerfil] = useState<PlayerTeamProfile | null>(null);
+  const [historico, setHistorico] = useState<PlayerTeamHistoryItem[]>([]);
 
   const carregar = useCallback(async () => {
     setLoading(true);
     setErro(null);
     try {
-      const [d, a, l, m, al, hist, evo] = await Promise.all([
+      const [d, a, m, al, hist, evo, pf, hTimes] = await Promise.all([
         fetchPlayerDetail(playerId, dias),
         fetchPlayerActivity(playerId, dias),
-        fetchPlayerLeaks(playerId, dias),
         fetchPlayerSharedHands(playerId),
         fetchPlayerAlerts(playerId).catch(() => []),
         fetchPlayerScoreHistory(playerId, dias).catch(() => []),
         fetchPlayerEvolutionStats(playerId, dias).catch(() => null),
+        fetchPlayerTeamProfile(playerId),
+        fetchPlayerTeamHistory(playerId),
       ]);
       setP(d);
       setAtividade(a);
-      setLeaks(l);
       setMaos(m);
       setAlertas(al);
       setHistoricoScore(hist);
       setEvolutionStats(evo);
+      setPerfil(pf);
+      setHistorico(hTimes);
     } catch (e) {
       setErro(traduzErroTime(e));
     } finally {
@@ -114,31 +114,20 @@ export function PlayerDetailModal({
     carregar();
   }, [carregar]);
 
-  const semAtividade = p ? diasSemAtividade(p.lastActivityAt) : null;
-
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
         <div
-          className="flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-xl border border-hairline bg-surface"
+          className="perf flex max-h-[92vh] w-full max-w-5xl flex-col overflow-hidden rounded-3xl border border-white/10 bg-[#0b0b0b] shadow-2xl"
           onClick={(e) => e.stopPropagation()}
         >
-          <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-hairline px-5 py-4">
-            {p && <Avatar id={p.avatarId} url={p.avatarUrl} size={40} />}
-            <div className="min-w-0 flex-1">
-              <p className="flex items-center gap-2 truncate text-[15px] font-semibold">
-                {p?.nome ?? (loading ? "Carregando…" : "Jogador")}
-                {p?.level != null && <RankChip level={p.level} />}
-                {p && <ScoreRing valor={calcularScore(p).valor} risco={calcularScore(p).risco} tendencia={calcularTendencia(historicoScore)} />}
-              </p>
-              {p && (
-                <p className="truncate text-xs text-muted">
-                  {p.coachNome ? `coach: ${p.coachNome}` : "sem coach atribuído"}
-                  {" · "}
-                  {semAtividade === null ? "sem atividade registrada" : semAtividade === 0 ? "ativo hoje" : `última atividade há ${semAtividade}d`}
-                </p>
-              )}
-            </div>
+          {/* Nome, foto e score moram na capa da ficha (PlayerDetailBody);
+              aqui fica só a barra de ações. */}
+          <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] px-4 py-3 sm:px-5">
+            <p className="flex min-w-0 flex-1 items-center gap-2 text-[14px] font-semibold tracking-tight">
+              <IdCard size={16} className="shrink-0 text-[#d4af37]" />
+              <span className="truncate">Ficha do jogador</span>
+            </p>
             <div className="flex items-center gap-2">
               <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
               {podeConversar && onAbrirConversa && (
@@ -146,7 +135,7 @@ export function PlayerDetailModal({
                   onClick={onAbrirConversa}
                   title="Conversar"
                   aria-label="Conversar"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/10 text-muted transition-colors hover:border-white/25 hover:text-ink"
                 >
                   <MessageCircle size={14} />
                 </button>
@@ -156,7 +145,7 @@ export function PlayerDetailModal({
                   onClick={() => setAcoesAbertas(true)}
                   title="Ações do jogador"
                   aria-label="Ações do jogador"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                  className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/10 text-muted transition-colors hover:border-white/25 hover:text-ink"
                 >
                   <MoreVertical size={14} />
                 </button>
@@ -164,26 +153,26 @@ export function PlayerDetailModal({
               <Link
                 href={`/time/jogador/${playerId}`}
                 title="Abrir ficha completa em outra página"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/10 text-muted transition-colors hover:border-white/25 hover:text-ink"
               >
                 <ExternalLink size={14} />
               </Link>
               <button
                 onClick={onFechar}
                 aria-label="Fechar"
-                className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
+                className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/10 text-muted transition-colors hover:border-white/25 hover:text-ink"
               >
                 <X size={16} />
               </button>
             </div>
           </div>
 
-          <div className="overflow-y-auto p-5">
+          <div className="painel-scroll overflow-y-auto p-3 sm:p-5">
             {erro && (
               <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
             )}
             {loading ? (
-              <p className="text-sm text-muted">Carregando…</p>
+              <Esqueleto linhas={4} altura={96} />
             ) : !p ? (
               <p className="text-sm text-muted">Jogador não encontrado.</p>
             ) : (
@@ -191,11 +180,13 @@ export function PlayerDetailModal({
                 id={playerId}
                 p={p}
                 atividade={atividade}
-                leaks={leaks}
                 maos={maos}
                 alertas={alertas}
                 historicoScore={historicoScore}
                 evolutionStats={evolutionStats}
+                perfil={perfil}
+                historico={historico}
+                emModal
                 // Metas so' se criam/editam pelo card do jogador no Funil --
                 // aqui (ficha aberta pela aba Jogadores) e' so' leitura. Ver
                 // components/time/tab-kanban.tsx.

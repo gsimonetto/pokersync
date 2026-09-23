@@ -2,20 +2,23 @@
 
 import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import { Search, ArrowUpDown } from "lucide-react";
+import { motion } from "framer-motion";
+import { Search, ArrowUpDown, Flame, X } from "lucide-react";
+import { EASE } from "@/components/painel/painel-card";
 import { Avatar } from "@/components/avatar";
 import { PlayerDetailModal } from "@/components/time/player-detail-modal";
-import { calcularScore, type TeamDashboardRow, type TeamLabel } from "@/lib/services/team-service";
+import { calcularScore, diasSemAtividade, type TeamDashboardRow, type TeamLabel } from "@/lib/services/team-service";
 import { BRL } from "@/lib/format";
 
-// Lista de jogadores. Decisoes de UX:
-// - mesmo cartão "elenco de time" usado pros coaches/admin na aba
-//   Perfil (foto grande + nome embaixo) — so' identidade + dinheiro
-//   ganho/contribuído ao time; tudo mais (score, streak, etiqueta,
-//   coach, remover, conversar) mora na ficha completa, que abre ao
-//   clicar no nome/foto;
-// - filtro por etiqueta em cima, porque time grande se organiza por
-//   buy-in e o coach quase sempre olha um recorte, nao a lista toda.
+// Lista de jogadores, no visual da tela inicial/Performance. Decisoes de UX:
+// - cartão com o que o coach decide de relance: foto com o anel do score
+//   de evolução (escala própria do produto, 0-100), última atividade,
+//   sequência, e 3 números (treinos, acerto, resultado no time); o resto
+//   (etiqueta, coach, remover, conversar) mora na ficha, que abre ao
+//   clicar no cartão;
+// - filtro por etiqueta em etiquetas com "x" (mesmo padrão dos filtros da
+//   Performance), porque time grande se organiza por buy-in e o coach
+//   quase sempre olha um recorte, nao a lista toda.
 
 type Ordem = "nome" | "risco" | "xp" | "treinos" | "acerto" | "revisadas" | "resultado";
 
@@ -84,30 +87,32 @@ export function TabJogadores({
     return [...filtrada].sort(sorters[ordem]);
   }, [jogadores, filtroLabel, busca, ordem]);
 
+  const labelAtiva = labels.find((l) => l.id === filtroLabel);
+
   return (
     <div className="space-y-4">
       {/* O Assistente do coach e os "Leaks mais frequentes" do time (com o
           botão de enviar treino ao time) foram para o AI Coach da tela
           inicial -- único lugar com orientações automáticas. */}
 
-      <section className="rounded-xl border border-hairline bg-surface p-5">
-      <div className="flex flex-wrap items-center gap-3">
-        <h2 className="flex-1 text-[15px] font-semibold">
-          Jogadores <span className="ml-1 text-sm font-normal text-muted">{lista.length}</span>
+      <div className="flex flex-wrap items-center gap-2.5">
+        <h2 className="flex-1 text-[15px] font-semibold tracking-tight">
+          Jogadores <span className="ml-1 text-sm font-normal tabular-nums text-muted">{lista.length}</span>
         </h2>
 
-        <div className="flex items-center gap-1.5 print:hidden">
+        <label className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-1.5 print:hidden">
           <ArrowUpDown size={13} className="text-muted" />
           <select
             value={ordem}
             onChange={(e) => setOrdem(e.target.value as Ordem)}
-            className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[13px] text-ink outline-none"
+            className="bg-transparent text-[12.5px] text-ink outline-none"
+            aria-label="Ordenar jogadores"
           >
             {OPCOES_ORDEM.map((o) => (
-              <option key={o.key} value={o.key}>{o.label}</option>
+              <option key={o.key} value={o.key} className="bg-[#141414]">{o.label}</option>
             ))}
           </select>
-        </div>
+        </label>
 
         <div className="relative print:hidden">
           <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
@@ -115,52 +120,53 @@ export function TabJogadores({
             value={busca}
             onChange={(e) => setBusca(e.target.value)}
             placeholder="Buscar"
-            className="w-40 rounded-lg border border-hairline bg-elevated py-1.5 pl-8 pr-3 text-[13px] text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-ink/40"
+            className="w-40 rounded-xl border border-white/10 bg-white/[0.03] py-1.5 pl-8 pr-3 text-[12.5px] text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-white/25"
           />
         </div>
       </div>
 
       {labels.length > 0 && (
-        <div className="mt-3 flex flex-wrap gap-1.5 print:hidden">
-          <FiltroChip ativo={filtroLabel === "todas"} onClick={() => setFiltroLabel("todas")}>Todas</FiltroChip>
-          {labels.map((l) => (
-            <FiltroChip key={l.id} ativo={filtroLabel === l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
-              {l.name}
-            </FiltroChip>
-          ))}
-          <FiltroChip ativo={filtroLabel === "sem"} onClick={() => setFiltroLabel("sem")}>Sem etiqueta</FiltroChip>
+        <div className="flex flex-wrap items-center gap-1.5 print:hidden">
+          {/* Etiqueta ativa vira chip dourado com "x" (igual aos filtros da
+              Performance); as outras ficam discretas, com a cor da etiqueta. */}
+          {filtroLabel !== "todas" ? (
+            <button
+              onClick={() => setFiltroLabel("todas")}
+              className="flex items-center gap-1 rounded-full border border-[#d4af37]/50 bg-[#d4af37]/12 px-3 py-1 text-[11.5px] font-semibold text-[#e6c763]"
+            >
+              {filtroLabel === "sem" ? "Sem etiqueta" : labelAtiva?.name}
+              <X size={12} />
+            </button>
+          ) : (
+            <span className="px-1 text-[11.5px] text-muted">Filtrar por etiqueta:</span>
+          )}
+          {labels
+            .filter((l) => l.id !== filtroLabel)
+            .map((l) => (
+              <FiltroChip key={l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
+                {l.name}
+              </FiltroChip>
+            ))}
+          {filtroLabel !== "sem" && <FiltroChip onClick={() => setFiltroLabel("sem")}>Sem etiqueta</FiltroChip>}
         </div>
       )}
 
       {lista.length === 0 ? (
-        <p className="mt-6 text-sm text-muted">Nenhum jogador neste recorte.</p>
+        <p className="py-6 text-sm text-muted">Nenhum jogador neste recorte.</p>
       ) : (
-        // Cartela estilo "elenco de time" -- mesmo card usado pra
-        // coaches/admin na aba Perfil (foto grande, nome embaixo): so'
-        // identidade + dinheiro ganho/contribuído ao time. O resto
-        // (score, streak, treinos, etiqueta, ações de admin) mora na
-        // ficha completa, que abre ao clicar no nome.
-        <ul className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-6">
-          {lista.map((j) => (
-            <li key={j.userId} className="flex flex-col items-center gap-2.5 rounded-lg border border-hairline bg-elevated px-3 py-4 text-center transition-colors hover:border-white/15">
-              <button onClick={() => setFichaAberta(j.userId)} aria-label={`Ver ficha de ${j.nome}`}>
-                <Avatar id={j.avatarId} url={j.avatarUrl} size={72} />
-              </button>
-              <div className="min-w-0">
-                <button onClick={() => setFichaAberta(j.userId)} className="truncate text-sm font-semibold hover:underline">
-                  {j.nome}
-                </button>
-                <p className={`mt-1 text-[13px] font-medium tnum ${
-                  j.lucroNoTime > 0 ? "text-positive" : j.lucroNoTime < 0 ? "text-negative" : "text-muted"
-                }`}>
-                  {j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
-                </p>
-              </div>
-            </li>
+        <ul className="grid gap-2.5 sm:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4">
+          {lista.map((j, i) => (
+            <motion.li
+              key={j.userId}
+              initial={{ opacity: 0, y: 8 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ duration: 0.4, ease: EASE, delay: Math.min(i, 12) * 0.035 }}
+            >
+              <CartaoJogador j={j} onAbrir={() => setFichaAberta(j.userId)} />
+            </motion.li>
           ))}
         </ul>
       )}
-      </section>
 
       {fichaAberta && (
         <PlayerDetailModal
@@ -180,16 +186,113 @@ export function TabJogadores({
   );
 }
 
-function FiltroChip({ children, ativo, cor, onClick }: { children: React.ReactNode; ativo: boolean; cor?: string; onClick: () => void }) {
+function FiltroChip({ children, cor, onClick }: { children: React.ReactNode; cor?: string; onClick: () => void }) {
   return (
     <button
       onClick={onClick}
-      className={`rounded-full border px-3 py-1 text-[11px] font-semibold transition-all ${
-        ativo ? "border-transparent bg-ink text-void" : "border-hairline text-muted hover:text-ink"
-      }`}
-      style={!ativo && cor ? { color: cor, borderColor: `${cor}55` } : undefined}
+      className="rounded-full border border-white/10 px-3 py-1 text-[11.5px] font-medium text-muted transition-colors hover:border-white/25 hover:text-ink"
+      style={cor ? { color: cor, borderColor: `${cor}55` } : undefined}
     >
       {children}
     </button>
+  );
+}
+
+// Cor do anel: faixas do PRÓPRIO score de evolução (as mesmas do selo de
+// risco da ficha), não uma referência externa de jogo.
+function corDoScore(v: number) {
+  return v < 40 ? "#e0555a" : v < 70 ? "#f59e0b" : "#22c55e";
+}
+
+function ultimaAtividade(iso: string | null): string {
+  const d = diasSemAtividade(iso);
+  if (d == null) return "sem atividade ainda";
+  if (d === 0) return "ativo hoje";
+  if (d === 1) return "ativo ontem";
+  return `há ${d} dias sem atividade`;
+}
+
+function CartaoJogador({ j, onAbrir }: { j: TeamDashboardRow; onAbrir: () => void }) {
+  const score = calcularScore(j);
+  const cor = corDoScore(score.valor);
+  const parado = diasSemAtividade(j.lastActivityAt);
+  const acerto = j.treinos > 0 ? Math.round((j.acertosGto / j.treinos) * 100) : null;
+  // Anel: círculo de 64px em volta da foto de 52px.
+  const R = 30;
+  const C = 2 * Math.PI * R;
+  return (
+    <button
+      onClick={onAbrir}
+      aria-label={`Ver ficha de ${j.nome}`}
+      className="painel-bloco group flex w-full flex-col gap-3 rounded-2xl border border-white/5 p-3.5 text-left transition hover:border-white/15 active:scale-[0.99]"
+    >
+      <span className="flex items-center gap-3">
+        <span className="relative grid size-16 shrink-0 place-items-center" title={`Score de evolução ${score.valor}/100`}>
+          <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90" aria-hidden>
+            <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
+            <motion.circle
+              cx="32"
+              cy="32"
+              r={R}
+              fill="none"
+              stroke={cor}
+              strokeWidth="3"
+              strokeLinecap="round"
+              strokeDasharray={C}
+              initial={{ strokeDashoffset: C }}
+              animate={{ strokeDashoffset: C * (1 - score.valor / 100) }}
+              transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
+            />
+          </svg>
+          <Avatar id={j.avatarId} url={j.avatarUrl} size={52} />
+          <span
+            className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border-2 border-[#141414] px-1.5 text-[10px] font-bold leading-4 tabular-nums text-black"
+            style={{ background: cor }}
+          >
+            {score.valor}
+          </span>
+        </span>
+        <span className="min-w-0 flex-1">
+          <span className="block truncate text-[14px] font-semibold text-ink group-hover:underline">{j.nome}</span>
+          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
+            <span className={parado != null && parado >= 7 ? "text-[#f08a8e]" : "text-muted"}>{ultimaAtividade(j.lastActivityAt)}</span>
+            {(j.streakDays ?? 0) > 0 && (
+              <span className="flex items-center gap-0.5 text-[#f59e0b]" title="Dias seguidos com atividade">
+                <Flame size={11} />
+                {j.streakDays}
+              </span>
+            )}
+          </span>
+          {j.labelName && (
+            <span
+              className="mt-1 inline-block rounded-full border px-2 py-px text-[10.5px] font-medium"
+              style={{ color: j.labelColor ?? undefined, borderColor: `${j.labelColor ?? "#ffffff"}55` }}
+            >
+              {j.labelName}
+            </span>
+          )}
+        </span>
+      </span>
+      <span className="grid grid-cols-3 gap-1.5 border-t border-white/[0.06] pt-2.5 text-center">
+        <Mini rotulo="Treinos" valor={String(j.treinos)} />
+        <Mini rotulo="Acerto" valor={acerto == null ? "—" : `${acerto}%`} />
+        <Mini
+          rotulo="No time"
+          valor={j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
+          cor={j.jogosNoTime > 0 ? (j.lucroNoTime > 0 ? "#22c55e" : j.lucroNoTime < 0 ? "#e0555a" : undefined) : undefined}
+        />
+      </span>
+    </button>
+  );
+}
+
+function Mini({ rotulo, valor, cor }: { rotulo: string; valor: string; cor?: string }) {
+  return (
+    <span className="min-w-0">
+      <span className="block text-[10.5px] text-muted/70">{rotulo}</span>
+      <span className="block truncate text-[13px] font-bold tabular-nums" style={{ color: cor ?? "#ffffff" }}>
+        {valor}
+      </span>
+    </span>
   );
 }
