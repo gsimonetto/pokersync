@@ -8,7 +8,7 @@ import { Avatar } from "@/components/avatar";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
-import { fetchTournamentSessions } from "@/lib/services/analysis-service";
+import { computePreflopMetrics, fetchAnalysisHandRows, fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
 import { Modal } from "@/components/ui/modal";
@@ -49,6 +49,10 @@ export default function ModulosPage() {
   const [level, setLevel] = useState<number | null>(null);
   const [team, setTeam] = useState<{ name: string; accent: string } | null>(null);
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
+  // VPIP e 3-Bet com a MESMA conta da Performance (mãos importadas, 3-Bet
+  // sobre as chances de 3-bet) -- a view do banco divide o 3-Bet pelo
+  // total de mãos, e os dois lugares mostravam números diferentes.
+  const [freq, setFreq] = useState<{ vpip: number | null; tresBet: number | null } | null>(null);
   const [avgBuyin, setAvgBuyin] = useState<number | null>(null);
   const [totalGanhos, setTotalGanhos] = useState<number | null>(null);
   const [achievements, setAchievements] = useState<Achievement[]>([]);
@@ -111,7 +115,7 @@ export default function ModulosPage() {
       } catch {
         return;
       }
-      const [profileRes, userRes, progressRes, perfRes, tournSessionsRes, achievementsRes, payoutsRes] = await Promise.allSettled([
+      const [profileRes, userRes, progressRes, perfRes, tournSessionsRes, achievementsRes, payoutsRes, maosRes] = await Promise.allSettled([
         fetchProfile(),
         supabase.auth.getUser(),
         supabase.from("user_progress").select("level").maybeSingle(),
@@ -119,8 +123,13 @@ export default function ModulosPage() {
         fetchTournamentSessions(),
         fetchMyAchievements(),
         fetchTournamentPayouts(),
+        fetchAnalysisHandRows(),
       ]);
       if (!alive) return;
+      if (maosRes.status === "fulfilled") {
+        const m = computePreflopMetrics(maosRes.value);
+        setFreq({ vpip: m.vpip_pct, tresBet: m.three_bet_pct });
+      }
 
       if (profileRes.status === "fulfilled") setProfile(profileRes.value);
       if (progressRes.status === "fulfilled") setLevel(progressRes.value.data?.level ?? null);
@@ -232,13 +241,13 @@ export default function ModulosPage() {
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</span>
                   <MetricValue href="/performance" mono>
-                    {fmtPct(perf?.vpip_pct) ?? "—"}
+                    {fmtPct(freq?.vpip ?? null) ?? "—"}
                   </MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">
                   <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</span>
                   <MetricValue href="/performance" mono>
-                    {fmtPct(perf?.three_bet_pct) ?? "—"}
+                    {fmtPct(freq?.tresBet ?? null) ?? "—"}
                   </MetricValue>
                 </div>
                 <div className="flex justify-between border-b border-hairline/50 pb-2">

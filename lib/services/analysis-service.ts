@@ -13,7 +13,6 @@ import {
   type PreflopMetricsByPosition,
   type PostflopMetrics,
   type TournamentMetrics,
-  type ReferenceProfile,
   type BuyinBucket,
   type PosflopDaMao,
   type RespostaAposta,
@@ -22,123 +21,9 @@ import {
   PREFLOP_ACTION_TO_POT_TYPE,
 } from "@/types/analysis";
 
-// ============================================================
-// Faixas de referência (heurística de população, não output do motor
-// GTO) — duas mesas diferentes, dois perfis diferentes. MTT joga cheio
-// (8-9 handed) até encurtar nas fases finais, então frequências
-// preflop/postflop saudáveis são mais apertadas que num 6-max de cash
-// (menos jogadores atrás = menos gente pra 3-bet/roubar/vs. c-bet).
-//
-// Revisados com base em consenso comum de material de treino/HUD
-// (o mesmo tipo de "faixa saudável" que aparece em guias populares de
-// VPIP/PFR/3-bet etc.) — não é o motor GTO do produto nem um dataset de
-// população auditável por nós, então trate como referência de contexto,
-// não resposta resolvida. Onde não achamos consenso equivalente
-// (Check-Raise%, Aggression Freq.%) mantivemos a heurística anterior,
-// sinalizada abaixo, em vez de inventar uma faixa nova.
-// ============================================================
-export type MetricRange = { min: number; max: number };
-
-export const PREFLOP_REFERENCE: Record<
-  ReferenceProfile,
-  {
-    vpip: MetricRange;
-    pfr: MetricRange;
-    threeBet: MetricRange;
-    steal: MetricRange;
-    foldTo3bet: MetricRange;
-    // Mesmo número aplicado nos 3 recortes de matchup (SB vs BTN, BB vs
-    // BTN, BB vs SB) — a referência usada não distingue por matchup, só
-    // dá um "fold to steal" geral. Aproximação, não uma faixa específica
-    // pra cada situação.
-    foldToSteal: MetricRange;
-  }
-> = {
-  cash6max: {
-    vpip: { min: 22, max: 28 },
-    pfr: { min: 18, max: 24 }, // gap saudável entre VPIP e PFR de até ~8-10pp
-    threeBet: { min: 6, max: 9 },
-    steal: { min: 30, max: 40 },
-    foldTo3bet: { min: 50, max: 60 },
-    foldToSteal: { min: 65, max: 75 },
-  },
-  mtt8max: {
-    vpip: { min: 12, max: 18 },
-    pfr: { min: 9, max: 14 },
-    threeBet: { min: 3.5, max: 6.5 },
-    steal: { min: 25, max: 35 },
-    foldTo3bet: { min: 55, max: 65 }, // sem referência específica de mesa cheia — heurística deslocada da versão cash
-    foldToSteal: { min: 70, max: 80 },
-  },
-};
-
-// `cbetTurn`/`cbetRiver` e `wsd`/`wsdWon` (WTSD/W$SD) agora também têm
-// referência revisada. `donkBet` não tem faixa numérica exata com
-// consenso claro, só o achado qualitativo de que donk bet frequente
-// correlaciona com mais perda — mantido como heurística de "quanto
-// menor, melhor". `foldToCbetTurn`/`foldToCbetRiver` só têm MÉDIA de
-// população como referência (não uma faixa "ideal" com consenso) — a
-// faixa aqui usa essa média como centro, é menos confiável que as
-// outras. Check-Raise% e `aggFreq` continuam sem referência nova —
-// ficaram de fora do marcador (Check-Raise%) ou como heurística antiga
-// sem revisão (aggFreq).
-export const POSTFLOP_REFERENCE: Record<
-  ReferenceProfile,
-  {
-    cbetFlop: MetricRange;
-    foldToCbetFlop: MetricRange;
-    cbetTurn: MetricRange;
-    cbetRiver: MetricRange;
-    foldToCbetTurn: MetricRange;
-    foldToCbetRiver: MetricRange;
-    donkBet: MetricRange;
-    aggFactor: MetricRange;
-    aggFreq: MetricRange;
-    wsd: MetricRange;
-    wsdWon: MetricRange;
-  }
-> = {
-  cash6max: {
-    cbetFlop: { min: 55, max: 75 },
-    foldToCbetFlop: { min: 40, max: 55 }, // média de população em torno de 45%
-    cbetTurn: { min: 45, max: 65 },
-    cbetRiver: { min: 35, max: 50 },
-    foldToCbetTurn: { min: 24, max: 44 }, // média de população em torno de 34%, sem faixa "ideal" com consenso — banda construída em torno da média
-    foldToCbetRiver: { min: 27, max: 47 }, // média de população em torno de 37%, mesma ressalva acima
-    donkBet: { min: 2, max: 8 }, // sem faixa exata com consenso — só o achado de que doncar mais correlaciona com mais perda
-    aggFactor: { min: 2, max: 4 }, // ~3 é considerado o valor ótimo; abaixo de 1.5 é passivo demais
-    aggFreq: { min: 35, max: 50 }, // sem referência nova — heurística anterior mantida
-    wsd: { min: 25, max: 30 },
-    wsdWon: { min: 49, max: 54 },
-  },
-  mtt8max: {
-    cbetFlop: { min: 50, max: 70 }, // sem referência específica de mesa cheia — mesmo deslocamento proporcional já usado nos headliners
-    foldToCbetFlop: { min: 45, max: 60 },
-    cbetTurn: { min: 40, max: 60 },
-    cbetRiver: { min: 30, max: 45 },
-    foldToCbetTurn: { min: 24, max: 44 }, // mesma ressalva do cash — sem dado específico de mesa cheia
-    foldToCbetRiver: { min: 27, max: 47 },
-    donkBet: { min: 2, max: 8 },
-    aggFactor: { min: 1.5, max: 3.5 },
-    aggFreq: { min: 30, max: 45 },
-    wsd: { min: 25, max: 30 }, // sem distinção de mesa cheia na referência usada — aplicado igual
-    wsdWon: { min: 49, max: 54 },
-  },
-};
-
-// Perfil de referência a partir do formato predominante nas mãos já
-// filtradas — maioria "mtt" usa a faixa de torneio 8-max; qualquer
-// outra maioria (cash/spin/sng) ou base sem formato dominante fica no
-// perfil cash 6-max, que já era a única faixa que o produto tinha.
-export function computeReferenceProfile(rows: AnalysisHandRow[]): ReferenceProfile {
-  let mtt = 0;
-  let other = 0;
-  for (const r of rows) {
-    if (r.format === "mtt") mtt++;
-    else if (r.format !== null) other++;
-  }
-  return mtt > other ? "mtt8max" : "cash6max";
-}
+// Sem faixas de referência ("ideal") aqui de propósito: as que existiam
+// eram heurística sem fonte auditável, e o produto não mostra faixa que
+// não consiga validar. Os números aparecem com a amostra ("x de y").
 
 // ============================================================
 // Fonte crua: hand_tags (uma linha por mão, já classificada pelo trigger
@@ -159,14 +44,14 @@ function normalizeFormat(raw: string | null | undefined): GameFormat | null {
 }
 
 type AcaoParseada = { player: string; action: string };
-type ContextoPreflop = Pick<AnalysisHandRow, "openerPosition" | "rouboLimpo" | "squeezeOpportunity">;
+type ContextoPreflop = Pick<AnalysisHandRow, "openerPosition" | "rouboLimpo" | "squeezeOpportunity" | "threeBetOpportunity">;
 
 // Lê o preflop do histórico parseado (mesmas regras do hand-parser: o
 // "posts" do blind não é decisão). Sem histórico/herói -> tudo null, e a
 // mão simplesmente não entra nessas contas.
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function contextoPreflop(parsed: any): ContextoPreflop {
-  const vazio: ContextoPreflop = { openerPosition: null, rouboLimpo: null, squeezeOpportunity: null };
+  const vazio: ContextoPreflop = { openerPosition: null, rouboLimpo: null, squeezeOpportunity: null, threeBetOpportunity: null };
   const heroi: string | null = parsed?.heroName ?? null;
   const assentos: { playerName: string; position: string | null }[] = Array.isArray(parsed?.seats) ? parsed.seats : [];
   const rua = Array.isArray(parsed?.streets) ? parsed.streets.find((s: { name: string }) => s.name === "preflop") : null;
@@ -189,6 +74,7 @@ function contextoPreflop(parsed: any): ContextoPreflop {
     openerPosition,
     rouboLimpo: umRaiseDeOutro && semLimpAntesDoOpen && entreOpenEHeroi.every((a) => a.action === "folds"),
     squeezeOpportunity: umRaiseDeOutro && entreOpenEHeroi.some((a) => a.action === "calls"),
+    threeBetOpportunity: umRaiseDeOutro,
   };
 }
 
@@ -443,11 +329,15 @@ export function computePreflopMetrics(rows: AnalysisHandRow[]): PreflopMetrics {
   const stealVsBbBtn = rouboContra("BB", "BTN");
   const stealVsBbSb = rouboContra("BB", "SB");
   const squeezeOpp = rows.filter((r) => r.squeezeOpportunity === true);
+  // 3-Bet % = das vezes em que alguém abriu antes de você (1 raise na
+  // mesa na sua vez), quantas você re-aumentou -- convenção HM3/PT4.
+  // Antes dividia pelo total de mãos, o que achatava o número.
+  const threeBetOpp = rows.filter((r) => r.threeBetOpportunity === true);
   return {
     hands,
     vpip_pct: pct(countIf(rows, (r) => r.vpip), hands),
     pfr_pct: pct(countIf(rows, (r) => r.pfr), hands),
-    three_bet_pct: pct(countIf(rows, (r) => r.threeBet), hands),
+    three_bet_pct: pct(countIf(threeBetOpp, (r) => r.threeBet), threeBetOpp.length),
     fold_to_3bet_pct: pct(countIf(facedThreeBet, (r) => r.foldToThreeBet), facedThreeBet.length),
     // 4-Bet % = quantas vezes o herói 4-betou dado que enfrentou um 3-bet
     // (mesma base de fold_to_3bet/call_3bet, convenção HM3/PT4).
