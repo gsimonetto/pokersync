@@ -1,9 +1,9 @@
 "use client";
 
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
-import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { LayoutDashboard, UserRound, Mail, Settings2, CalendarDays, Kanban, ArrowUpRight, IdCard, BarChart3, Inbox } from "lucide-react";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
+import { UserRound, Settings2, CalendarDays, Kanban, IdCard, LayoutGrid, Inbox, Mail } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import {
   fetchFinancialSeries,
@@ -42,12 +42,18 @@ import { TabCalendario } from "@/components/time/tab-calendario";
 import { TabMaosRecebidas } from "@/components/time/tab-maos-recebidas";
 import { TeamPrintStyles } from "@/components/time/print-styles";
 import { useConfirm } from "@/components/confirm-dialog";
-import { MobileTabsMenu } from "@/components/ui/mobile-tabs-menu";
+import { PainelVisual } from "@/components/dashboard/kit";
+import { EASE } from "@/components/painel/painel-card";
+import { PerfEstilos } from "@/components/performance/perf-estilos";
+import { AbasAnimadas } from "@/components/performance/abas-animadas";
+import { FunilAba } from "@/components/time/funil-aba";
 
-// Painel do time: um so lugar, cinco abas (Funil tem pagina propria em
-// /time/painel/funil — precisa de mais espaco vertical que uma aba
-// permite). A aba fica na URL (?tab=) para que notificacao e link
-// externo abram direto no ponto certo.
+// Painel do time, no visual da tela inicial e da Performance (vidro,
+// menu animado no topo, atalhos 1-6). Seis abas: o dia a dia do coach na
+// frente (Visão geral, Jogadores, Funil, Calendário, Mãos recebidas) e as
+// ações raras juntas em "Gestão" (perfil do time, configurações e
+// convites). A aba fica na URL (?tab=) pra notificação e link externo
+// abrirem direto no ponto certo; os nomes antigos continuam valendo.
 
 const PERIODOS = [
   { label: "7d", days: 7 },
@@ -55,22 +61,31 @@ const PERIODOS = [
   { label: "90d", days: 90 },
 ];
 
-type Aba = "perfil" | "estatisticas" | "jogadores" | "maos" | "convites" | "calendario" | "time";
+type Aba = "geral" | "jogadores" | "funil" | "calendario" | "maos" | "gestao";
 
-// Convites por ultimo: e' a aba menos relevante no dia a dia (pedido
-// pendente/gerar link e' acao esporadica) -- o resto e' o que o coach
-// acompanha toda vez que abre o painel. "Maos recebidas" (pedido
-// explicito) so' faz sentido pra quem pode receber mao compartilhada de
-// aluno -- filtrada fora do array pra quem e' player (ver abasVisiveis).
-const ABAS: { key: Aba; label: string; icon: typeof LayoutDashboard; soCoach?: boolean }[] = [
-  { key: "perfil", label: "Perfil do time", icon: IdCard },
-  { key: "estatisticas", label: "Estatísticas", icon: BarChart3 },
-  { key: "jogadores", label: "Jogadores", icon: UserRound },
-  { key: "maos", label: "Mãos recebidas", icon: Inbox, soCoach: true },
-  { key: "calendario", label: "Calendário", icon: CalendarDays },
-  { key: "time", label: "Time", icon: Settings2 },
-  { key: "convites", label: "Convites", icon: Mail },
+const ABAS: { value: Aba; label: string; icon: typeof LayoutGrid; soCoach?: boolean }[] = [
+  { value: "geral", label: "Visão geral", icon: LayoutGrid },
+  { value: "jogadores", label: "Jogadores", icon: UserRound },
+  { value: "funil", label: "Funil", icon: Kanban },
+  { value: "calendario", label: "Calendário", icon: CalendarDays },
+  { value: "maos", label: "Mãos recebidas", icon: Inbox, soCoach: true },
+  { value: "gestao", label: "Gestão", icon: Settings2 },
 ];
+
+// Abas antigas -> novas (links de notificação e favoritos). A seção de
+// destino dentro de "Gestão" recebe foco por âncora.
+const ABA_ANTIGA: Record<string, { aba: Aba; secao?: string }> = {
+  estatisticas: { aba: "geral" },
+  perfil: { aba: "gestao", secao: "gestao-perfil" },
+  time: { aba: "gestao", secao: "gestao-time" },
+  convites: { aba: "gestao", secao: "gestao-convites" },
+};
+
+function lerAba(v: string | null): { aba: Aba; secao?: string } {
+  if (!v) return { aba: "geral" };
+  if (ABA_ANTIGA[v]) return ABA_ANTIGA[v];
+  return ABAS.some((a) => a.value === v) ? { aba: v as Aba } : { aba: "geral" };
+}
 
 export default function PainelPage() {
   return (
@@ -90,9 +105,10 @@ function PainelConteudo() {
   const confirm = useConfirm();
   const router = useRouter();
   const params = useSearchParams();
-  const abaUrl = (params.get("tab") as Aba) || "perfil";
-
-  const [aba, setAba] = useState<Aba>(ABAS.some((a) => a.key === abaUrl) ? abaUrl : "perfil");
+  const inicial = lerAba(params.get("tab"));
+  const [aba, setAba] = useState<Aba>(inicial.aba);
+  const [secaoAlvo, setSecaoAlvo] = useState<string | undefined>(inicial.secao);
+  const [direcao, setDirecao] = useState(1);
   const [dias, setDias] = useState(30);
   const [loading, setLoading] = useState(true);
   const [pronto, setPronto] = useState(false);
@@ -168,10 +184,21 @@ function PainelConteudo() {
   }, [params]);
 
   function trocarAba(nova: Aba) {
+    const de = ABAS.findIndex((a) => a.value === aba);
+    const para = ABAS.findIndex((a) => a.value === nova);
+    if (para !== de) setDirecao(para > de ? 1 : -1);
     setAba(nova);
-    const url = nova === "perfil" ? "/time/painel" : `/time/painel?tab=${nova}`;
+    setSecaoAlvo(undefined);
+    const url = nova === "geral" ? "/time/painel" : `/time/painel?tab=${nova}`;
     window.history.replaceState(null, "", url);
   }
+
+  // Link antigo pra Convites/Perfil/Time: abre Gestão e rola até a seção.
+  useEffect(() => {
+    if (!secaoAlvo || loading) return;
+    const t = setTimeout(() => document.getElementById(secaoAlvo)?.scrollIntoView({ behavior: "smooth", block: "start" }), 350);
+    return () => clearTimeout(t);
+  }, [secaoAlvo, loading]);
 
   async function enviarBanner(file: File) {
     if (!info) return;
@@ -207,122 +234,138 @@ function PainelConteudo() {
   );
   const isAdmin = time?.role === "admin";
   const podeEditarTime = time?.role !== "player";
-  const abasVisiveis = useMemo(() => ABAS.filter((a) => !a.soCoach || podeEditarTime), [podeEditarTime]);
+  const abasVisiveis = useMemo(
+    () => ABAS.filter((a) => !a.soCoach || podeEditarTime).map((a) => (a.value === "gestao" ? { ...a, badge: pendentes.length } : a)),
+    [podeEditarTime, pendentes.length],
+  );
 
   return (
     <AppShell>
-      <main className="w-full px-6 py-10 sm:px-8 text-ink print:p-0">
-        {erro && (
-          <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative print:hidden">
-            {erro}
-          </p>
-        )}
+      <PainelVisual value="vidro">
+        <MotionConfig reducedMotion="user">
+          <main className="perf w-full px-4 pb-12 pt-6 text-ink md:px-6 print:p-0">
+            <PerfEstilos />
 
-        {/* Container externo unico, igual ao Funil (TabKanban): nav de
-            abas + conteudo moram dentro da MESMA caixa, em vez da barra
-            de abas boiando solta acima de cards separados. No mobile,
-            6 abas + Funil lado a lado nao cabe -- viram um botao com a
-            aba atual + icone de menu (sanduiche), que abre a lista
-            completa (mesmo padrao do Construtor de Ranges). A partir de
-            sm a barra cabe inteira, entao continua igual sempre foi. */}
-        <div className="rounded-2xl border border-hairline bg-surface p-5 sm:p-6 print:border-0 print:bg-transparent print:p-0">
-          <nav className="relative mb-4 hidden justify-center gap-1 overflow-x-auto border-b border-hairline sm:flex print:hidden">
-            {abasVisiveis.map((a) => {
-              const Icon = a.icon;
-              const pend = a.key === "convites" ? pendentes.length : 0;
-              return (
-                <button key={a.key} onClick={() => trocarAba(a.key)}
-                  className={`-mb-px flex shrink-0 items-center gap-1.5 border-b-2 px-3 py-2.5 text-[13px] font-medium transition-colors ${
-                    aba === a.key ? "border-ink text-ink" : "border-transparent text-muted hover:text-ink"
-                  }`}>
-                  <Icon size={15} />
-                  {a.label}
-                  {pend > 0 && (
-                    <span className="rounded-full bg-evolution px-1.5 text-[10px] font-bold leading-4 text-void">{pend}</span>
-                  )}
-                </button>
-              );
-            })}
+            <header className="mb-4 flex flex-col gap-1 print:hidden">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">{info?.name ?? time?.team.name ?? "Meu time"}</h1>
+              <p className="text-[12.5px] text-muted">
+                Painel do time{time ? ` · ${time.role === "admin" ? "você é admin" : time.role === "coach" ? "você é coach" : "você é jogador"}` : ""}. Passe o mouse nos números pra saber o que são.
+              </p>
+            </header>
 
-            <Link href="/time/painel/funil"
-              className="-mb-px flex shrink-0 items-center gap-1.5 border-b-2 border-transparent px-3 py-2.5 text-[13px] font-medium text-muted transition-colors hover:text-ink">
-              <Kanban size={15} />
-              Funil
-              <ArrowUpRight size={12} className="text-muted/70" />
-            </Link>
-          </nav>
+            {/* Menu no topo, igual Performance: preso ao rolar, atalhos 1-6,
+                e no celular rola de lado em vez de virar menu sanduíche. */}
+            <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-white/[0.06] bg-black/70 px-4 pt-2 backdrop-blur-xl md:-mx-6 md:px-6 print:hidden">
+              <AbasAnimadas value={aba} onChange={trocarAba} options={abasVisiveis} rotulo="Seções do time" />
+            </div>
 
-          <div className="mb-4 sm:hidden print:hidden">
-            <MobileTabsMenu
-              title="Meu Time"
-              activeKey={aba}
-              items={[
-                ...abasVisiveis.map((a) => ({
-                  key: a.key,
-                  label: a.label,
-                  icon: a.icon,
-                  badge: a.key === "convites" ? pendentes.length : undefined,
-                  onSelect: () => trocarAba(a.key),
-                })),
-                { key: "funil", label: "Funil", icon: Kanban, href: "/time/painel/funil" },
-              ]}
-            />
-          </div>
+            {erro && (
+              <p className="mb-4 rounded-xl border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative print:hidden">{erro}</p>
+            )}
 
-          {loading ? (
-            <p className="text-sm text-muted">Carregando painel…</p>
-          ) : (
-            <>
-              {aba === "perfil" && info && (
-                <>
-                  <TabPerfil info={info} staff={staff} editable={podeEditarTime} uploading={enviandoBanner}
-                    onUploadClick={() => bannerRef.current?.click()} onRemoveClick={removerBanner} />
-                  {podeEditarTime && (
-                    <input
-                      ref={bannerRef}
-                      type="file"
-                      accept="image/png,image/jpeg,image/webp"
-                      className="hidden"
-                      onChange={(e) => {
-                        const f = e.target.files?.[0];
-                        if (f) enviarBanner(f);
-                        e.target.value = "";
-                      }}
-                    />
-                  )}
-                </>
-              )}
-              {aba === "estatisticas" && time && (
-                <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} historicoScoreTime={historicoScoreTime} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias} />
-              )}
-              {aba === "jogadores" && time && (
-                <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
-                  podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
-                  onChange={carregar} onErro={setErro} />
-              )}
-              {aba === "maos" && podeEditarTime && <TabMaosRecebidas />}
-              {aba === "convites" && time && (
-                <TabConvites pendentes={pendentes} invites={invites} isAdmin={Boolean(isAdmin)} meuPapel={time.role}
-                  onChange={carregar} onErro={setErro} />
-              )}
-              {aba === "calendario" && time && (
-                <TabCalendario eventos={eventos} jogadores={linhas} teamId={time.team.id}
-                  meuUserId={time.members.find((m) => m.isMe)?.userId ?? ""} meuPapel={time.role}
-                  podeCriar={time.role === "admin" || time.role === "coach"}
-                  prefillPlayerId={prefillEventoPlayerId}
-                  onPrefillConsumido={() => setPrefillEventoPlayerId(null)}
-                  onChange={carregar} onErro={setErro} />
-              )}
-              {aba === "time" && info && (
-                <TabTime info={info} staff={staff} labels={labels} jogadores={jogadores} podeEditar={time?.role !== "player"}
-                  onChange={carregar} onErro={setErro} />
-              )}
-            </>
-          )}
-        </div>
-      </main>
+            {loading ? (
+              <div className="grid gap-3.5">
+                <div className="painel-esqueleto h-[210px] rounded-3xl" />
+                <div className="grid gap-3.5 lg:grid-cols-2">
+                  <div className="painel-esqueleto h-[300px] rounded-3xl" />
+                  <div className="painel-esqueleto h-[300px] rounded-3xl" />
+                </div>
+              </div>
+            ) : (
+              <div className="overflow-x-clip">
+                <AnimatePresence mode="wait" initial={false}>
+                  <motion.div
+                    key={aba}
+                    initial={{ opacity: 0, x: 28 * direcao }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -28 * direcao }}
+                    transition={{ duration: 0.28, ease: EASE }}
+                  >
+                    {aba === "geral" && time && (
+                      <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} historicoScoreTime={historicoScoreTime} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias} />
+                    )}
+                    {aba === "jogadores" && time && (
+                      <Moldura>
+                        <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
+                          podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
+                          onChange={carregar} onErro={setErro} />
+                      </Moldura>
+                    )}
+                    {aba === "funil" && time && <FunilAba time={time} onErro={setErro} />}
+                    {aba === "calendario" && time && (
+                      <Moldura>
+                        <TabCalendario eventos={eventos} jogadores={linhas} teamId={time.team.id}
+                          meuUserId={time.members.find((m) => m.isMe)?.userId ?? ""} meuPapel={time.role}
+                          podeCriar={time.role === "admin" || time.role === "coach"}
+                          prefillPlayerId={prefillEventoPlayerId}
+                          onPrefillConsumido={() => setPrefillEventoPlayerId(null)}
+                          onChange={carregar} onErro={setErro} />
+                      </Moldura>
+                    )}
+                    {aba === "maos" && podeEditarTime && (
+                      <Moldura>
+                        <TabMaosRecebidas />
+                      </Moldura>
+                    )}
+                    {aba === "gestao" && time && (
+                      <div className="grid gap-3.5">
+                        {info && (
+                          <Moldura id="gestao-perfil" titulo="Perfil do time" icone={<IdCard size={15} />}>
+                            <TabPerfil info={info} staff={staff} editable={podeEditarTime} uploading={enviandoBanner}
+                              onUploadClick={() => bannerRef.current?.click()} onRemoveClick={removerBanner} />
+                            {podeEditarTime && (
+                              <input
+                                ref={bannerRef}
+                                type="file"
+                                accept="image/png,image/jpeg,image/webp"
+                                className="hidden"
+                                onChange={(e) => {
+                                  const f = e.target.files?.[0];
+                                  if (f) enviarBanner(f);
+                                  e.target.value = "";
+                                }}
+                              />
+                            )}
+                          </Moldura>
+                        )}
+                        {info && (
+                          <Moldura id="gestao-time" titulo="Configurações do time" icone={<Settings2 size={15} />}>
+                            <TabTime info={info} staff={staff} labels={labels} jogadores={jogadores} podeEditar={time?.role !== "player"}
+                              onChange={carregar} onErro={setErro} />
+                          </Moldura>
+                        )}
+                        <Moldura id="gestao-convites" titulo="Convites e pedidos" icone={<Mail size={15} />}>
+                          <TabConvites pendentes={pendentes} invites={invites} isAdmin={Boolean(isAdmin)} meuPapel={time.role}
+                            onChange={carregar} onErro={setErro} />
+                        </Moldura>
+                      </div>
+                    )}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+            )}
+          </main>
+        </MotionConfig>
+      </PainelVisual>
 
       <TeamPrintStyles />
     </AppShell>
+  );
+}
+
+// Caixa de vidro pras abas que ainda têm conteúdo "solto" (listas,
+// calendário, formulários): o fundo e a borda seguem o visual novo sem
+// mexer no miolo de cada aba. Com título, vira seção da aba Gestão.
+function Moldura({ children, id, titulo, icone }: { children: React.ReactNode; id?: string; titulo?: string; icone?: React.ReactNode }) {
+  return (
+    <section id={id} className="painel-vidro scroll-mt-24 rounded-3xl border border-white/10 p-4 sm:p-5">
+      {titulo && (
+        <h2 className="mb-4 flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
+          <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.06] text-muted">{icone}</span>
+          {titulo}
+        </h2>
+      )}
+      {children}
+    </section>
   );
 }
