@@ -104,7 +104,7 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
           </p>
         </div>
         <span className="flex items-baseline gap-1">
-          <span className="painel-numero tnum text-[26px] font-semibold leading-none tracking-[-0.03em] text-ink xl:[@media(max-height:819px)]:text-[22px]">
+          <span className="tnum text-[28px] font-bold leading-none tracking-[-0.02em] text-ink xl:[@media(max-height:819px)]:text-[22px]">
             {score == null ? "—" : <Numero valor={score} formatar={num} duracao={1200} />}
           </span>
           <span className="text-[11px] text-muted/70">/100</span>
@@ -184,7 +184,7 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
                 <span aria-hidden>{CURTO[p.key]}</span>
                 <span className="sr-only">{p.label}</span>
               </span>
-              <span className="painel-numero tnum block text-[11px] font-semibold text-ink/90">
+              <span className="tnum block text-[11.5px] font-bold text-ink/90">
                 {p.valor == null ? "—" : num(p.valor)}
               </span>
             </InfoHover>
@@ -198,11 +198,16 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
       {fraco && (
         <Link
           href={ACAO[fraco.key].href}
+          title={`Ponto fraco: ${fraco.label}`}
           className="mt-1 flex items-center gap-1.5 rounded-lg px-1 py-1 text-[11.5px] transition-colors hover:bg-white/[0.04]"
         >
           <TriangleAlert size={13} className="shrink-0 text-[#e0555a]" aria-hidden />
-          <span className="min-w-0 flex-1 truncate text-muted">
-            Ponto fraco: <span className="text-ink/90">{fraco.label}</span>
+          {/* "Ponto fraco:" só pra leitor de tela: no painel estreito o
+              texto cortava o nome do pilar. O ícone de alerta e o ponto
+              vermelho no pentágono já dizem isso a quem enxerga. */}
+          <span className="min-w-0 flex-1 truncate text-ink/90">
+            <span className="sr-only">Ponto fraco: </span>
+            {fraco.label}
           </span>
           <span className="flex shrink-0 items-center gap-1 font-semibold text-[#d4af37]">
             {ACAO[fraco.key].texto}

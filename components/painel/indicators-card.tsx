@@ -126,8 +126,8 @@ const semPct = (txt: string) => txt.replace(/%$/, "");
 // janela baixa tudo desce um degrau, pro card caber sem barra.
 function tamanhoValor(numero: string): string {
   const n = numero.length;
-  if (n <= 3) return "text-[30px] xl:[@media(max-height:819px)]:text-[24px]";
-  if (n <= 5) return "text-[27px] xl:[@media(max-height:819px)]:text-[22px]";
+  if (n <= 3) return "text-[32px] xl:[@media(max-height:819px)]:text-[25px]";
+  if (n <= 5) return "text-[28px] xl:[@media(max-height:819px)]:text-[22px]";
   if (n <= 7) return "text-[23px] xl:[@media(max-height:819px)]:text-[19px]";
   return "text-[19px] xl:[@media(max-height:819px)]:text-[16px]";
 }
@@ -216,7 +216,7 @@ export function IndicatorsCard({
                     ROI total
                   </span>
                   <span
-                    className="painel-numero tnum truncate text-[15px] font-semibold tracking-[-0.02em]"
+                    className="tnum truncate text-[15px] font-semibold tracking-[-0.02em]"
                     style={{ color: roi > 0 ? "#22c55e" : roi < 0 ? "#e0555a" : "#ffffff" }}
                   >
                     <Numero valor={roi} formatar={(n) => pct(n, { sinal: true, casas: casasRoi })} />
@@ -243,18 +243,22 @@ export function IndicatorsCard({
                       <span className="min-w-0 text-[12px] leading-tight text-muted/80">{rotulo}</span>
                       <Icone size={15} className="shrink-0" style={{ color: cor }} aria-hidden />
                     </span>
-                    {/* Número "presente": semibold, letras juntas e branco. A
-                        cor do indicador fica no ícone. A unidade vem menor e
-                        apagada, pra o olho pegar primeiro o valor. */}
-                    <p
-                      className={`painel-numero tnum mt-2 flex items-baseline truncate font-semibold leading-none tracking-[-0.03em] xl:[@media(max-height:819px)]:mt-1.5 ${tamanhoValor(formatar(alvo))}`}
-                      style={{ color: corValor ?? "#ffffff" }}
-                    >
-                      <Numero valor={alvo} formatar={formatar} />
-                      {sufixo && <span className="ml-0.5 text-[0.55em] font-medium tracking-normal text-muted/70">{sufixo}</span>}
-                    </p>
-                    {barra != null && <BarraProgresso className="mt-1.5 h-1" pct={barra} cor={cor} atraso={0.5} />}
-                    <p className="tnum mt-auto truncate pt-1.5 text-[11px] leading-tight text-muted/70">{detalhe}</p>
+                    {/* Número marcante: centralizado no quadro, em negrito
+                        (Space Grotesk, a fonte do produto) e na cor do
+                        indicador -- a mesma do ícone, pra o quadro ter uma
+                        identidade só. A unidade vem menor e apagada, pra o
+                        olho pegar primeiro o valor. */}
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center pt-1.5 text-center">
+                      <p
+                        className={`tnum flex max-w-full items-baseline justify-center truncate font-bold leading-none tracking-[-0.02em] ${tamanhoValor(formatar(alvo))}`}
+                        style={{ color: corValor ?? cor }}
+                      >
+                        <Numero valor={alvo} formatar={formatar} />
+                        {sufixo && <span className="ml-0.5 text-[0.55em] font-semibold tracking-normal text-muted/70">{sufixo}</span>}
+                      </p>
+                      {barra != null && <BarraProgresso className="mt-2 h-1 w-full max-w-[120px]" pct={barra} cor={cor} atraso={0.5} />}
+                      <p className="tnum mt-1.5 max-w-full truncate text-[11px] leading-tight text-muted/70">{detalhe}</p>
+                    </div>
                   </Linha>
                 </InfoHover>
               </motion.li>
