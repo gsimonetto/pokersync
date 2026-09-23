@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { AnimatePresence, motion } from "framer-motion";
 import {
   AlertTriangle,
   ArrowRight,
@@ -22,7 +23,7 @@ import { goalProgress } from "@/lib/bankroll/calc";
 import { TOURNEY_FORMATS } from "@/lib/bankroll/format";
 import { ALERTA_LABEL, assignTeamDrill, calcularScore, type TeamAlertKind } from "@/lib/services/team-service";
 import { progressoPronto } from "@/lib/services/team-funnel-service";
-import { Esqueleto, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
+import { EASE, Esqueleto, PainelCard, Selo, TileIcone } from "./painel-card";
 import { usePainelDados, type PainelDados } from "./painel-dados";
 import { num, pct } from "./formato";
 import { fracaoDaSemana, situacaoMeta, textoProgresso } from "./metas";
@@ -368,7 +369,15 @@ function montarDicas(d: PainelDados): Dica[] {
 // Assim que o jogador vê, ela é marcada como lida e dá lugar à próxima
 // (pedido do usuário), então a mesma frase não fica ocupando o card
 // todo dia.
-export function AiCoachCard({ style, className }: { style?: React.CSSProperties; className?: string }) {
+export function AiCoachCard({
+  style,
+  className,
+  ordem,
+}: {
+  style?: React.CSSProperties;
+  className?: string;
+  ordem?: number;
+}) {
   const dados = usePainelDados();
   const [fila, setFila] = useState<Dica[] | null>(null);
   const [indice, setIndice] = useState(0);
@@ -420,13 +429,25 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
       action={
         atual &&
         total > 1 && (
-          <span className="tnum text-[11px] text-muted">
-            {num(indice + 1)} de {num(total)}
+          <span className="tnum flex items-center gap-1 overflow-hidden text-[11px] text-muted">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={indice}
+                initial={{ y: 10, opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: -10, opacity: 0 }}
+                transition={{ duration: 0.25, ease: EASE }}
+              >
+                {num(indice + 1)}
+              </motion.span>
+            </AnimatePresence>
+            de {num(total)}
           </span>
         )
       }
       style={style}
       className={className}
+      ordem={ordem}
     >
       {carregando ? (
         <Esqueleto linhas={4} />
@@ -439,108 +460,126 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
           </p>
         </div>
       ) : (
-        <div className="flex flex-1 flex-col">
-          <div className="flex items-start gap-3.5">
-            <TileIcone cor={atual.cor} grande>
-              {(() => {
-                const Icone = ICONE_MODULO[atual.modulo] ?? Sparkles;
-                return <Icone size={17} />;
-              })()}
-            </TileIcone>
+        // Troca de dica: a atual sai pela esquerda e a próxima entra pela
+        // direita -- lê como "passar pra frente" na fila.
+        <AnimatePresence mode="wait" initial={false}>
+          <motion.div
+            key={atual.chave}
+            initial={{ opacity: 0, x: 24 }}
+            animate={{ opacity: 1, x: 0 }}
+            exit={{ opacity: 0, x: -24 }}
+            transition={{ duration: 0.3, ease: EASE }}
+            className="flex flex-1 flex-col"
+          >
+            <div className="flex items-start gap-3.5">
+              <TileIcone cor={atual.cor} grande>
+                {(() => {
+                  const Icone = ICONE_MODULO[atual.modulo] ?? Sparkles;
+                  return <Icone size={17} />;
+                })()}
+              </TileIcone>
 
-            <div className="min-w-0 flex-1">
-              <div className="flex flex-wrap items-center gap-2">
-                <span className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: atual.cor }}>
-                  {atual.modulo}
-                </span>
-                <Selo cor={URGENCIA[atual.nivel].cor}>
-                  {(() => {
-                    const Icone = URGENCIA[atual.nivel].icone;
-                    return <Icone size={10} />;
-                  })()}
-                  {URGENCIA[atual.nivel].texto}
-                </Selo>
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                  <span className="text-[11px] font-bold uppercase tracking-[0.12em]" style={{ color: atual.cor }}>
+                    {atual.modulo}
+                  </span>
+                  <Selo cor={URGENCIA[atual.nivel].cor}>
+                    {(() => {
+                      const Icone = URGENCIA[atual.nivel].icone;
+                      return <Icone size={10} />;
+                    })()}
+                    {URGENCIA[atual.nivel].texto}
+                  </Selo>
+                </div>
+                <h3 className={`mt-1.5 text-[17px] font-semibold leading-snug ${estilo.texto}`}>{atual.titulo}</h3>
+                <p className="mt-2 text-[13px] leading-relaxed text-muted">{atual.texto}</p>
               </div>
-              <h3 className={`mt-1.5 text-[17px] font-semibold leading-snug ${estilo.texto}`}>{atual.titulo}</h3>
-              <p className="mt-2 text-[13px] leading-relaxed text-muted">{atual.texto}</p>
             </div>
-          </div>
 
-          {/* O que vem depois — mostra que o Coach tem fila, e o jogador
-              já sabe o que o espera antes de clicar em "Já vi". */}
-          {/* A partir do tablet, "A seguir" e os botões começam na mesma
-              linha vertical do título (depois do ícone de 40px + vão de
-              14px), em vez de na borda do card -- antes o bloco de baixo
-              ficava "fora do eixo" do texto a que se refere. No celular
-              ocupam a largura toda, que é o que cabe. */}
-          {proximas.length > 0 && (
-            <div className="mt-5 sm:pl-[54px]">
-              <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">A seguir</p>
-              <ul className="mt-2 flex flex-col gap-1.5">
-                {proximas.map((d) => {
-                  const Icone = ICONE_MODULO[d.modulo] ?? Sparkles;
-                  return (
-                    <li key={d.chave}>
-                      <Linha className="px-3 py-2">
-                        <span className="flex items-center gap-2.5">
-                          <TileIcone cor={d.cor}>
-                            <Icone size={12} />
-                          </TileIcone>
-                          <span className="min-w-0 flex-1 truncate text-[12px] text-muted">{d.titulo}</span>
-                          <Selo cor={URGENCIA[d.nivel].cor}>{URGENCIA[d.nivel].texto}</Selo>
+            {/* O que vem depois — mostra que o Coach tem fila, e o jogador
+                já sabe o que o espera antes de clicar em "Já vi". */}
+            {/* A partir do tablet, "A seguir" e os botões começam na mesma
+                linha vertical do título (depois do ícone de 40px + vão de
+                14px), em vez de na borda do card -- antes o bloco de baixo
+                ficava "fora do eixo" do texto a que se refere. No celular
+                ocupam a largura toda, que é o que cabe. */}
+            {/* Linhas finas em vez de caixinhas: o "A seguir" é apoio, não
+                pode ter o mesmo peso da dica atual. Em janela baixa (menos
+                de 820px de altura, no computador) ele sai, pra dica e os
+                botões caberem sem barra de rolagem. */}
+            {proximas.length > 0 && (
+              <div className="mt-4 sm:pl-[54px] xl:[@media(max-height:819px)]:hidden">
+                <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">A seguir</p>
+                <ul className="mt-1.5 flex flex-col">
+                  {proximas.map((d, i) => {
+                    const Icone = ICONE_MODULO[d.modulo] ?? Sparkles;
+                    return (
+                      <motion.li
+                        key={d.chave}
+                        initial={{ opacity: 0, x: -8 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ duration: 0.3, ease: EASE, delay: 0.12 + i * 0.06 }}
+                      >
+                        <span className="flex items-center gap-2.5 border-t border-white/[0.06] py-2">
+                          <Icone size={14} className="shrink-0" style={{ color: d.cor }} aria-hidden />
+                          <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink/80">{d.titulo}</span>
+                          <Selo cor={URGENCIA[d.nivel].cor} pequeno>
+                            {URGENCIA[d.nivel].texto}
+                          </Selo>
                         </span>
-                      </Linha>
-                    </li>
-                  );
-                })}
-              </ul>
-            </div>
-          )}
+                      </motion.li>
+                    );
+                  })}
+                </ul>
+              </div>
+            )}
 
-          {/* Botões logo abaixo do conteúdo (não colados no rodapé do
-              card): com poucas dicas, ficavam longe do texto a que se
-              referem. */}
-          <div className="flex flex-wrap items-center gap-2 pt-5 sm:pl-[54px]">
-            {/* Dica com ação própria (leak do time): a ação é o botão
-                principal e o link vira secundário. Depois de rodar, o
-                botão dá lugar à frase de resultado. */}
-            {atual.acao &&
-              (resultado[atual.chave] ? (
-                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-positive">
-                  <Check size={13} />
-                  {resultado[atual.chave]}
-                </span>
-              ) : (
-                <button
-                  type="button"
-                  onClick={() => rodarAcao(atual)}
-                  disabled={executando === atual.chave}
-                  className="inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition-colors hover:bg-[#e2c35a] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
-                >
-                  <Send size={13} />
-                  {executando === atual.chave ? "Enviando…" : atual.acao.rotulo}
-                </button>
-              ))}
-            <Link
-              href={atual.href}
-              className={
-                atual.acao
-                  ? "inline-flex items-center gap-1.5 rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-[#d4af37]/50 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
-                  : "inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition-colors hover:bg-[#e2c35a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
-              }
-            >
-              {atual.cta}
-              <ArrowRight size={13} />
-            </Link>
-            <button
-              type="button"
-              onClick={() => setIndice((i) => i + 1)}
-              className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-[#d4af37]/50 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
-            >
-              {proximas.length > 0 ? "Já vi, próxima" : "Já vi"}
-            </button>
-          </div>
-        </div>
+            {/* Botões logo abaixo do conteúdo (não colados no rodapé do
+                card): com poucas dicas, ficavam longe do texto a que se
+                referem. */}
+            <div className="flex flex-wrap items-center gap-2 pt-4 sm:pl-[54px]">
+              {/* Dica com ação própria (leak do time): a ação é o botão
+                  principal e o link vira secundário. Depois de rodar, o
+                  botão dá lugar à frase de resultado. */}
+              {atual.acao &&
+                (resultado[atual.chave] ? (
+                  <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-positive">
+                    <Check size={13} />
+                    {resultado[atual.chave]}
+                  </span>
+                ) : (
+                  <button
+                    type="button"
+                    onClick={() => rodarAcao(atual)}
+                    disabled={executando === atual.chave}
+                    className="inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition hover:bg-[#e2c35a] active:scale-[0.97] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+                  >
+                    <Send size={13} />
+                    {executando === atual.chave ? "Enviando…" : atual.acao.rotulo}
+                  </button>
+                ))}
+              <Link
+                href={atual.href}
+                className={
+                  atual.acao
+                    ? "inline-flex items-center gap-1.5 rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition hover:border-[#d4af37]/50 hover:text-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+                    : "inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition hover:bg-[#e2c35a] active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+                }
+              >
+                {atual.cta}
+                <ArrowRight size={13} />
+              </Link>
+              <button
+                type="button"
+                onClick={() => setIndice((i) => i + 1)}
+                className="rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition hover:border-[#d4af37]/50 hover:text-ink active:scale-[0.97] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+              >
+                {proximas.length > 0 ? "Já vi, próxima" : "Já vi"}
+              </button>
+            </div>
+          </motion.div>
+        </AnimatePresence>
       )}
     </PainelCard>
   );
