@@ -1,17 +1,30 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { AnimatePresence, motion } from "framer-motion";
+import { AnimatePresence, MotionConfig, motion } from "framer-motion";
 import { Target, Flame, BarChart3, MapPin, Radar as RadarIcon, Lock } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
-import { TabNav } from "@/components/ui/tab-nav";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
-import { PreflopPanel, PositionPanel } from "@/components/analysis/PreflopMatrix";
+import { PreflopPanel } from "@/components/analysis/PreflopMatrix";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { StatisticsTab } from "@/components/analysis/StatisticsTab";
 import { RadarPanel } from "@/components/analysis/RadarPanel";
-import { EvolutionScoreCard } from "@/components/analysis/EvolutionScoreCard";
+import { PainelVisual } from "@/components/dashboard/kit";
+import { EASE } from "@/components/painel/painel-card";
+import { PerfEstilos } from "@/components/performance/perf-estilos";
+import { AbasAnimadas } from "@/components/performance/abas-animadas";
+import { FiltrosAtivos } from "@/components/performance/filtros-ativos";
+import { ResumoPerformance } from "@/components/performance/resumo";
+import { MatrizMaos } from "@/components/performance/graficos/matriz-maos";
+import { LinhaSemanal } from "@/components/performance/graficos/linha-semanal";
+import { BarrasPosicao } from "@/components/performance/graficos/barras-posicao";
+import { FunilRuas } from "@/components/performance/graficos/funil-ruas";
+import { CurvaLucro } from "@/components/performance/graficos/curva-lucro";
+import { Eliminacao } from "@/components/performance/graficos/eliminacao";
+import { RoiBuyin } from "@/components/performance/graficos/roi-buyin";
+import { fetchSessions } from "@/lib/services/bankroll-service";
+import type { Session } from "@/lib/bankroll/types";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
 import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
 import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
@@ -59,9 +72,21 @@ export default function PerformancePage() {
   const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
   const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
   const [perf, setPerf] = useState<PlayerPerformance | null>(null);
+  // Sessões da Gestão de Banca: curva de lucro e ROI por buy-in (mesma
+  // fonte do Lucro total/ROI da aba Estatísticas).
+  const [sessoesBanca, setSessoesBanca] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
-  const [tab, setTab] = useState<TabKey>("preflop");
+  const [tab, setTabState] = useState<TabKey>("preflop");
+  // Direção da troca de aba: o conteúdo novo entra pelo lado da aba
+  // clicada (à direita = vem da direita), que é o que o olho espera.
+  const [direcao, setDirecao] = useState(1);
+  function setTab(nova: TabKey) {
+    const de = TABS.findIndex((t) => t.value === tab);
+    const para = TABS.findIndex((t) => t.value === nova);
+    if (para !== de) setDirecao(para > de ? 1 : -1);
+    setTabState(nova);
+  }
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
   // Filtro de buy-in — só afeta a aba Estatísticas (Total Games/ROI/ITM/
   // Lucro total, que vêm de hand_sessions + tournament_payouts; cEV/ICM
@@ -99,13 +124,17 @@ export default function PerformancePage() {
   async function loadAll(since: string | null = radarSince) {
     setErro("");
     try {
-      const [r, tourn, sessions, po, p] = await Promise.all([
+      const [r, tourn, sessions, po, p, banca] = await Promise.all([
         fetchAnalysisHandRows(since),
         fetchTournamentMetrics(tournamentBuyinFilter),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
         fetchPlayerPerformance(),
+        // Sem sessão de banca a tela segue normal (só os gráficos de
+        // torneio ficam vazios).
+        fetchSessions().catch(() => [] as Session[]),
       ]);
+      setSessoesBanca(banca);
       setRows(r);
       setTournament(tourn);
       setTournamentSessions(sessions);
@@ -169,115 +198,168 @@ export default function PerformancePage() {
     [tournamentSessions]
   );
 
+  const filtrosModal = (
+    <AnalysisFilters
+      filters={filters}
+      onChange={setFilters}
+      availableStackDepths={availableStackDepths}
+      availablePositions={availablePositions}
+    />
+  );
+  const semMaos = rows.length === 0;
+
   return (
     <AppShell>
-      <main className="w-full px-6 pb-10 pt-6 text-ink">
-        {erro && <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>}
+      {/* Mesmo visual da tela inicial (vidro, números que contam, entrada
+          em sequência, explicação ao passar o mouse), sem a imagem de
+          fundo. PainelVisual="vidro" faz os painéis antigos das abas
+          (frequências, estatísticas...) usarem o mesmo card de vidro. */}
+      <PainelVisual value="vidro">
+        <MotionConfig reducedMotion="user">
+          <main className="perf w-full px-4 pb-12 pt-6 text-ink md:px-6">
+            <PerfEstilos />
 
-        {loading ? (
-          <p className="text-sm text-muted">Carregando sua análise…</p>
-        ) : (
-          <>
-          {/* Score de evolução consolidado (MAIN-011) — fica acima das abas
-              de proposito: resume os 5 componentes num numero so, entao vale
-              pra qualquer aba que o jogador esteja olhando, nao so uma. */}
-          <div className="mb-4">
-            <EvolutionScoreCard perf={perf} />
-          </div>
-          {/* Container único envolvendo filtros + abas + conteúdo — mesmo
-              padrão de toda ferramenta de tela única do produto (Treino,
-              Construtor de Ranges, Comparar, Equidade, Árvores), em vez de
-              caixas separadas competindo por hierarquia visual. */}
-          <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-            <TabNav
-              value={tab}
-              onChange={setTab}
-              options={TABS}
-              trailing={
-                <div className="flex items-center gap-2">
-                  <AnalysisFilters
-                    filters={filters}
-                    onChange={setFilters}
-                    availableStackDepths={availableStackDepths}
-                    availablePositions={availablePositions}
-                  />
-                  <RadarModuleMenu
-                    module="performance"
-                    moduleLabel="o Performance"
-                    onScopeChange={({ since }) => {
-                      setRadarSince(since);
-                      loadAll(since);
-                    }}
-                    onReset={async () => {
-                      await resetPerformanceStats();
-                      setRadarSince(null);
-                      await loadAll(null);
-                    }}
-                  />
-                </div>
-              }
-            />
-
-            <div className="mt-4">
-              {rows.length === 0 && tab !== "radar" ? (
-                <p className="rounded-xl border border-dashed border-hairline p-6 text-center text-sm text-muted">
-                  Sem mãos com hand history estruturada ainda. Aguarde a sincronização do agente desktop (Radar PokerSync) —
-                  as métricas aparecem aqui automaticamente assim que houver dado.
+            {/* Cabeçalho: título + filtros ativos à vista (chips com "x")
+                e os botões de filtro e de importação do Radar. */}
+            <header className="mb-4 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Performance</h1>
+                <p className="mt-1 text-[12.5px] text-muted">
+                  Suas estatísticas de jogo, mão a mão. Passe o mouse em qualquer número pra saber o que é.
                 </p>
-              ) : (
-                <AnimatePresence mode="wait">
-                  <motion.div
-                    key={tab}
-                    initial={{ opacity: 0, y: 6 }}
-                    animate={{ opacity: 1, y: 0 }}
-                    exit={{ opacity: 0, y: -6 }}
-                    transition={{ duration: 0.18, ease: "easeOut" }}
-                  >
-                    {tab === "preflop" && <PreflopPanel rows={filteredRows} metrics={preflop} referenceProfile={referenceProfile} />}
-                    {tab === "postflop" && <PostflopTab rows={filteredRows} metrics={postflop} referenceProfile={referenceProfile} />}
-                    {tab === "posicao" && <PositionPanel rows={filteredRows} byPosition={byPosition} referenceProfile={referenceProfile} />}
-                    {tab === "estatisticas" && tournament && (
-                      <StatisticsTab
-                        metrics={tournament}
-                        tournamentSessions={tournamentSessions}
-                        payouts={payouts}
-                        buyinFilter={tournamentBuyinFilter}
-                        onBuyinFilterChange={handleBuyinFilterChange}
-                        availableBuyinBuckets={availableBuyinBuckets}
-                        currency={currency}
-                        onCurrencyChange={setCurrency}
-                        formatUsd={formatUsd}
-                      />
-                    )}
-                    {tab === "radar" &&
-                      (radarUnlocked ? (
-                        <RadarPanel onReset={loadAll} />
+              </div>
+              <div className="flex flex-wrap items-center gap-2">
+                <FiltrosAtivos filters={filters} onChange={setFilters} />
+                {filtrosModal}
+                <RadarModuleMenu
+                  module="performance"
+                  moduleLabel="o Performance"
+                  onScopeChange={({ since }) => {
+                    setRadarSince(since);
+                    loadAll(since);
+                  }}
+                  onReset={async () => {
+                    await resetPerformanceStats();
+                    setRadarSince(null);
+                    await loadAll(null);
+                  }}
+                />
+              </div>
+            </header>
+
+            {erro && (
+              <p className="mb-4 rounded-xl border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
+            )}
+
+            {loading ? (
+              // Esqueleto no formato da tela: a página não "pula" quando os
+              // dados chegam.
+              <div className="grid gap-3.5">
+                <div className="painel-esqueleto h-[290px] rounded-3xl" />
+                <div className="painel-esqueleto h-12 rounded-2xl" />
+                <div className="grid gap-3.5 lg:grid-cols-2">
+                  <div className="painel-esqueleto h-[360px] rounded-3xl" />
+                  <div className="painel-esqueleto h-[360px] rounded-3xl" />
+                </div>
+              </div>
+            ) : (
+              <>
+                <ResumoPerformance perf={perf} preflop={preflop} referenceProfile={referenceProfile} tournament={tournament} ordem={0} />
+
+                <div className="sticky top-0 z-30 -mx-4 mt-4 border-b border-white/[0.06] bg-black/70 px-4 pt-2 backdrop-blur-xl md:-mx-6 md:px-6">
+                  <AbasAnimadas value={tab} onChange={setTab} options={TABS} />
+                </div>
+
+                <div className="mt-4 overflow-x-clip">
+                  <AnimatePresence mode="wait" custom={direcao} initial={false}>
+                    <motion.div
+                      key={tab}
+                      custom={direcao}
+                      initial={{ opacity: 0, x: 28 * direcao }}
+                      animate={{ opacity: 1, x: 0 }}
+                      exit={{ opacity: 0, x: -28 * direcao }}
+                      transition={{ duration: 0.28, ease: EASE }}
+                      className="grid gap-3.5"
+                    >
+                      {semMaos && tab !== "radar" && tab !== "estatisticas" ? (
+                        <p className="painel-vidro rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-muted">
+                          Sem mãos com hand history estruturada ainda. Aguarde a sincronização do agente desktop (Radar
+                          PokerSync) — as métricas aparecem aqui automaticamente assim que houver dado.
+                        </p>
                       ) : (
-                        <div className="mx-auto flex max-w-md flex-col items-center gap-3 rounded-xl border border-dashed border-hairline p-8 text-center">
-                          <div className="grid size-12 place-items-center rounded-xl border border-hairline bg-elevated text-muted">
-                            <Lock size={20} />
-                          </div>
-                          <p className="text-sm font-semibold text-ink">Radar PokerSync é um complemento avulso</p>
-                          <p className="text-xs text-muted">
-                            Sincronize suas mãos automaticamente direto do seu computador, sem colar hand history na
-                            mão.
-                          </p>
-                          <Link
-                            href="/planos"
-                            className="mt-1 inline-flex items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
-                          >
-                            Ver planos e complementos
-                          </Link>
-                        </div>
-                      ))}
-                  </motion.div>
-                </AnimatePresence>
-              )}
-            </div>
-          </div>
-          </>
-        )}
-      </main>
+                        <>
+                          {tab === "preflop" && (
+                            <>
+                              {/* Matriz com largura limitada (células de ~40px): mais
+                                  larga que isso ela só crescia pra baixo e desequilibrava
+                                  a linha com o gráfico semanal ao lado. */}
+                              <div className="grid gap-3.5 xl:grid-cols-[minmax(0,580px)_minmax(0,1fr)]">
+                                <MatrizMaos rows={filteredRows} ordem={1} />
+                                <LinhaSemanal rows={filteredRows} referenceProfile={referenceProfile} ordem={2} />
+                              </div>
+                              <PreflopPanel rows={filteredRows} metrics={preflop} referenceProfile={referenceProfile} />
+                            </>
+                          )}
+                          {tab === "postflop" && (
+                            <>
+                              <FunilRuas rows={filteredRows} metrics={postflop} ordem={1} />
+                              <PostflopTab rows={filteredRows} metrics={postflop} referenceProfile={referenceProfile} />
+                            </>
+                          )}
+                          {tab === "posicao" && <BarrasPosicao rows={filteredRows} byPosition={byPosition} ordem={1} />}
+                          {tab === "estatisticas" && (
+                            <>
+                              <CurvaLucro sessoes={sessoesBanca} ordem={1} />
+                              <div className="grid items-start gap-3.5 lg:grid-cols-2">
+                                <Eliminacao payouts={payouts} ordem={2} />
+                                <RoiBuyin sessoes={sessoesBanca} ordem={3} />
+                              </div>
+                              {tournament && (
+                                <StatisticsTab
+                                  metrics={tournament}
+                                  tournamentSessions={tournamentSessions}
+                                  payouts={payouts}
+                                  buyinFilter={tournamentBuyinFilter}
+                                  onBuyinFilterChange={handleBuyinFilterChange}
+                                  availableBuyinBuckets={availableBuyinBuckets}
+                                  currency={currency}
+                                  onCurrencyChange={setCurrency}
+                                  formatUsd={formatUsd}
+                                />
+                              )}
+                            </>
+                          )}
+                          {tab === "radar" &&
+                            (radarUnlocked ? (
+                              <RadarPanel onReset={loadAll} />
+                            ) : (
+                              <div className="painel-vidro mx-auto flex max-w-md flex-col items-center gap-3 rounded-3xl border border-dashed border-white/10 p-8 text-center">
+                                <div className="grid size-12 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-muted">
+                                  <Lock size={20} />
+                                </div>
+                                <p className="text-sm font-semibold text-ink">Radar PokerSync é um complemento avulso</p>
+                                <p className="text-xs text-muted">
+                                  Sincronize suas mãos automaticamente direto do seu computador, sem colar hand history na
+                                  mão.
+                                </p>
+                                <Link
+                                  href="/planos"
+                                  className="mt-1 inline-flex items-center gap-2 rounded-full bg-[#d4af37] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.97]"
+                                >
+                                  Ver planos e complementos
+                                </Link>
+                              </div>
+                            ))}
+                        </>
+                      )}
+                    </motion.div>
+                  </AnimatePresence>
+                </div>
+              </>
+            )}
+          </main>
+        </MotionConfig>
+      </PainelVisual>
     </AppShell>
   );
 }

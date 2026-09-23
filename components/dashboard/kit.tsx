@@ -1,6 +1,6 @@
 "use client";
 
-import { useId, useState } from "react";
+import { createContext, useContext, useId, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 
@@ -12,6 +12,15 @@ import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 // components/analysis/shared.tsx), pra qualquer módulo do produto usar
 // o mesmo acabamento visual em vez de cada tela reinventar o próprio
 // card/gráfico/glow do zero.
+// Visual do Painel: "padrao" (caixa chapada, o de sempre) ou "vidro" (o
+// card de vidro fosco da tela inicial, título em frase em vez de CAIXA
+// ALTA). Quem quer o vidro envolve a tela num <PainelVisual valor="vidro">
+// -- hoje a Performance --, e todo Painel lá dentro (inclusive os das
+// abas antigas) muda junto, sem prop em cada chamada. Fora do provider
+// nada muda (Diário de Ranges e o resto seguem como estavam).
+const PainelVisualCtx = createContext<"padrao" | "vidro">("padrao");
+export const PainelVisual = PainelVisualCtx.Provider;
+
 export function Painel({
   titulo,
   icone,
@@ -23,17 +32,30 @@ export function Painel({
   action?: React.ReactNode;
   children: React.ReactNode;
 }) {
+  const vidro = useContext(PainelVisualCtx) === "vidro";
   return (
     <motion.section
       initial={{ opacity: 0, y: 10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.35, ease: "easeOut" }}
-      className="rounded-xl border border-hairline bg-surface p-5"
+      className={
+        vidro
+          ? "painel-vidro rounded-3xl border border-white/10 p-4 sm:p-5"
+          : "rounded-xl border border-hairline bg-surface p-5"
+      }
     >
       <div className="mb-3 flex items-center justify-between gap-2">
         <div className="flex items-center gap-1.5">
           {icone}
-          <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted">{titulo}</h2>
+          <h2
+            className={
+              vidro
+                ? "text-[15px] font-semibold tracking-tight text-ink"
+                : "text-[10px] font-bold uppercase tracking-[0.14em] text-muted"
+            }
+          >
+            {titulo}
+          </h2>
         </div>
         {action}
       </div>
