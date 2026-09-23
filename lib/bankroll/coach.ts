@@ -16,6 +16,9 @@ export interface CoachTip {
   level: "info" | "good" | "warn" | "bad";
   title: string;
   text: string;
+  /** Formato do vazamento (só na dica "worst"): o AI Coach usa pra mandar
+   *  quem perde em torneio direto pro treino de stack curto. */
+  format?: string;
 }
 
 export function drawdownBuyIns(sessions: Session[], avgBuyIn: number) {
@@ -77,6 +80,7 @@ export function buildCoachTips(
     tips.push({
       id: "worst",
       level: "bad",
+      format: worst.key,
       title: `Vazamento em ${worst.key}`,
       text: `ROI de ${fmtPct(worst.roi)} em ${worst.n} sessoes. Reduza volume ou revise a estrategia.`,
     });

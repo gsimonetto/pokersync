@@ -1,23 +1,11 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
-import Link from "next/link";
-import { ChevronRight, ChevronDown, Info, Search, ArrowUpDown, Send, X } from "lucide-react";
+import { Search, ArrowUpDown } from "lucide-react";
 import { Avatar } from "@/components/avatar";
-import { Chip } from "@/components/chip";
-import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { PlayerDetailModal } from "@/components/time/player-detail-modal";
-import {
-  assignTeamDrill,
-  calcularScore,
-  fetchTeamLeakPlayers,
-  traduzErroTime,
-  type TeamDashboardRow,
-  type TeamLabel,
-  type TeamLeak,
-  type TeamLeakPlayer,
-} from "@/lib/services/team-service";
+import { calcularScore, type TeamDashboardRow, type TeamLabel } from "@/lib/services/team-service";
 import { BRL } from "@/lib/format";
 
 // Lista de jogadores. Decisoes de UX:
@@ -42,28 +30,20 @@ const OPCOES_ORDEM: { key: Ordem; label: string }[] = [
 ];
 
 export function TabJogadores({
-  teamId,
   jogadores,
   labels,
   isAdmin,
   podeConversar,
   coaches,
-  leaks,
-  dias,
-  onAtribuido,
   onChange,
   onErro,
 }: {
-  teamId: string;
   jogadores: TeamDashboardRow[];
   labels: TeamLabel[];
   isAdmin: boolean;
   /** Admin ou coach: quem pode abrir o menu de ações (ao menos pra conversar). */
   podeConversar: boolean;
   coaches: { userId: string; nome: string }[];
-  leaks: TeamLeak[];
-  dias: number;
-  onAtribuido: () => void;
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
@@ -106,8 +86,9 @@ export function TabJogadores({
 
   return (
     <div className="space-y-4">
-      <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} onAbrirFicha={setFichaAberta} />
-      <LeaksSection leaks={leaks} dias={dias} onAtribuido={onAtribuido} />
+      {/* O Assistente do coach e os "Leaks mais frequentes" do time (com o
+          botão de enviar treino ao time) foram para o AI Coach da tela
+          inicial -- único lugar com orientações automáticas. */}
 
       <section className="rounded-xl border border-hairline bg-surface p-5">
       <div className="flex flex-wrap items-center gap-3">
@@ -210,170 +191,5 @@ function FiltroChip({ children, ativo, cor, onClick }: { children: React.ReactNo
     >
       {children}
     </button>
-  );
-}
-
-// ------------------------------------------------------------
-// Leaks do time com atribuicao em massa — morava na Visao Geral, mas
-// faz mais sentido junto da lista de jogadores (o coach ja esta' olhando
-// pra quem precisa de treino). Recolhivel e fechado por padrao, igual
-// o Assistente do Kanban, pra nao competir com a lista logo abaixo.
-// ------------------------------------------------------------
-function severidade(indice: number, total: number): { label: string; cor: string } {
-  const pct = total <= 1 ? 0 : indice / (total - 1);
-  if (pct <= 0.33) return { label: "Alta", cor: "#F26D6D" };
-  if (pct <= 0.66) return { label: "Média", cor: "#F2B84C" };
-  return { label: "Baixa", cor: "#8b8b8b" };
-}
-
-function LeaksSection({ leaks, dias, onAtribuido }: { leaks: TeamLeak[]; dias: number; onAtribuido: () => void }) {
-  const [aberto, setAberto] = useState(false);
-  const [atribuindo, setAtribuindo] = useState<string | null>(null);
-  const [feedback, setFeedback] = useState<Record<string, string>>({});
-  const [leakVendo, setLeakVendo] = useState<TeamLeak | null>(null);
-
-  if (leaks.length === 0) return null;
-
-  async function atribuir(l: TeamLeak) {
-    if (!l.drillId) return;
-    const chave = `${l.reasonCode}:${l.street}`;
-    setAtribuindo(chave);
-    try {
-      const n = await assignTeamDrill(l.reasonCode, l.street, l.drillId, dias);
-      setFeedback((prev) => ({
-        ...prev,
-        [chave]: n > 0 ? `Enviado para ${n} jogador${n === 1 ? "" : "es"}` : "Já estavam com esse treino recente",
-      }));
-      onAtribuido();
-    } catch {
-      setFeedback((prev) => ({ ...prev, [chave]: "Não foi possível atribuir" }));
-    } finally {
-      setAtribuindo(null);
-    }
-  }
-
-  return (
-    <section className="rounded-xl border border-hairline bg-surface p-5">
-      <button onClick={() => setAberto((v) => !v)} className="flex w-full items-center gap-2 text-left text-[15px] font-semibold">
-        Leaks mais frequentes
-        <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{leaks.length}</span>
-        <span className="ml-auto flex items-center gap-1 text-xs font-normal text-muted" title="Baseado nas autoavaliações de rua feitas no Revisor de Mãos">
-          <Info size={12} />
-          avaliações de rua no Revisor
-        </span>
-        <ChevronDown size={16} className={`text-muted transition-transform ${aberto ? "rotate-180" : ""}`} />
-      </button>
-
-      {aberto && (
-        <ul className="mt-4 space-y-2">
-          {leaks.map((l, i) => {
-            const chave = `${l.reasonCode}:${l.street}`;
-            const msg = feedback[chave];
-            const sev = severidade(i, leaks.length);
-            return (
-              <li key={chave} className="flex items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-                <Chip color={sev.cor} size="sm" className="shrink-0">{sev.label}</Chip>
-
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-1.5">
-                    <span className="truncate text-[13px] font-medium">{l.label}</span>
-                    <span className="text-[10px] uppercase tracking-wider text-muted">{l.street}</span>
-                  </div>
-                  {l.drillTitle && !msg && (
-                    <p className="mt-0.5 text-[11px] text-muted">→ {l.drillTitle}</p>
-                  )}
-                  {msg && <p className="mt-0.5 text-[11px] text-training">{msg}</p>}
-                </div>
-
-                <button
-                  onClick={() => setLeakVendo(l)}
-                  className="shrink-0 text-xs text-muted tnum underline decoration-dotted underline-offset-2 hover:text-ink"
-                >
-                  {l.total}× · {l.jogadores} jogador(es)
-                </button>
-
-                {l.treinavel && (
-                  <button
-                    onClick={() => atribuir(l)}
-                    disabled={atribuindo === chave}
-                    title="Envia o drill correspondente a este leak para todos os jogadores afetados"
-                    className="flex shrink-0 items-center gap-1.5 rounded-lg border border-review/40 px-2.5 py-1.5 text-[11px] font-semibold text-review transition-colors hover:bg-review/10 disabled:opacity-50 print:hidden"
-                  >
-                    <Send size={12} />
-                    {atribuindo === chave ? "Enviando…" : "Enviar treino ao time"}
-                  </button>
-                )}
-              </li>
-            );
-          })}
-        </ul>
-      )}
-
-      {leakVendo && (
-        <ModalLeakJogadores leak={leakVendo} dias={dias} onFechar={() => setLeakVendo(null)} />
-      )}
-    </section>
-  );
-}
-
-// ------------------------------------------------------------
-// So mostra quais jogadores tem determinado leak quando o coach pede
-// (botao na linha) — a lista completa nao cabe na linha resumida, e
-// nem toda vez que se olha os leaks se precisa saber os nomes.
-// ------------------------------------------------------------
-function ModalLeakJogadores({ leak, dias, onFechar }: { leak: TeamLeak; dias: number; onFechar: () => void }) {
-  const [jogadores, setJogadores] = useState<TeamLeakPlayer[] | null>(null);
-  const [erro, setErro] = useState<string | null>(null);
-
-  useEffect(() => {
-    let ativo = true;
-    fetchTeamLeakPlayers(leak.reasonCode, leak.street, dias)
-      .then((r) => ativo && setJogadores(r))
-      .catch((e) => ativo && setErro(traduzErroTime(e)));
-    return () => {
-      ativo = false;
-    };
-  }, [leak, dias]);
-
-  return (
-    <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
-      <div className="max-h-[80vh] w-full max-w-sm overflow-y-auto rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
-        <div className="flex items-center justify-between">
-          <div className="min-w-0">
-            <p className="truncate text-sm font-semibold">{leak.label}</p>
-            <p className="text-xs text-muted">{leak.street} · {leak.total}× nos últimos {dias}d</p>
-          </div>
-          <button onClick={onFechar} className="grid h-7 w-7 shrink-0 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
-            <X size={16} />
-          </button>
-        </div>
-
-        <div className="mt-4">
-          {erro ? (
-            <p className="text-sm text-negative">{erro}</p>
-          ) : jogadores === null ? (
-            <p className="text-sm text-muted">Carregando…</p>
-          ) : jogadores.length === 0 ? (
-            <p className="text-sm text-muted">Nenhum jogador encontrado.</p>
-          ) : (
-            <ul className="space-y-1">
-              {jogadores.map((j) => (
-                <li key={j.userId}>
-                  <Link
-                    href={`/time/jogador/${j.userId}`}
-                    onClick={onFechar}
-                    className="flex items-center gap-2.5 rounded-lg px-2 py-1.5 transition-colors hover:bg-elevated"
-                  >
-                    <Avatar id={j.avatarId} url={j.avatarUrl} size={28} />
-                    <span className="min-w-0 flex-1 truncate text-sm">{j.nome}</span>
-                    <ChevronRight size={14} className="shrink-0 text-muted" />
-                  </Link>
-                </li>
-              ))}
-            </ul>
-          )}
-        </div>
-      </div>
-    </div>
   );
 }

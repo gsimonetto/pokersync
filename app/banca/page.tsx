@@ -2,10 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, X, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, TriangleAlert, Sparkles, AlertTriangle, CheckCircle2, Info, Skull, Coins, FileBarChart, Bot } from "lucide-react";
+import { Pencil, Trash2, TrendingUp, TrendingDown, PiggyBank, Wallet, BookOpen, ChevronDown, Plus, Gauge, Download, StickyNote, GitCompare, ShieldAlert, History, Landmark, LineChart, CalendarDays, Info, Skull, Coins, FileBarChart, Bot } from "lucide-react";
 import type { Session, Transaction, TransactionType, BrmThreshold, BrmFormat, Annotation } from "@/lib/bankroll/types";
 import { aggregate, evolutionSeries, filterSeriesByRange, filterSessionsByRange, net, netWorth, brmReading, thresholdFor, tiltImpact, riskOfRuin, compareMonths, hourlyRate, platformBalances, currenciesInUse, dailyActivity, type RangeOption, type SeriesPoint, type BrmStatus, type DayActivity } from "@/lib/bankroll/calc";
-import { buildCoachTips, drawdownBuyIns, type CoachTip } from "@/lib/bankroll/coach";
+import { drawdownBuyIns } from "@/lib/bankroll/coach";
 import { fmtMoneyIn, fmtSignedMoneyIn, fmtPct, FORMATS, CURRENCIES, todayISO, sessionsToCSV, downloadCSV } from "@/lib/bankroll/format";
 import { niceTicks } from "@/lib/format";
 import { PLATFORMS, OUTRO_PLATFORM } from "@/lib/bankroll/platforms";
@@ -430,19 +430,6 @@ export default function BankrollPage() {
     [platformSessions, isPlatformFiltered, base]
   );
   const filteredSeries = useMemo(() => filterSeriesByRange(series, range), [series, range]);
-  const tips = useMemo(
-    () => buildCoachTips(radarVisibleSessions, { bankroll: nw.playingBankroll, brmThresholds }),
-    [radarVisibleSessions, nw.playingBankroll, brmThresholds]
-  );
-  // Dica some sozinha 24h depois de aparecer pela 1a vez (ou na hora, se
-  // dispensada) -- mesma memoria do Assistente do coach (Time > Jogadores):
-  // sem isso a mesma dica ficaria fixa pra sempre, mesmo already vista.
-  const { registrarVistas: registrarVistasCoach, dispensar: dispensarCoachTip, visivel: coachTipVisivel } = useCoachTipMemoria();
-  useEffect(() => {
-    registrarVistasCoach(tips.map((t) => t.id));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [tips]);
-  const tipsVisiveis = tips.filter((t) => coachTipVisivel(t.id));
   const currentBrm = useMemo(
     () => brmReading(radarVisibleSessions, nw.playingBankroll, brmThresholds),
     [radarVisibleSessions, nw.playingBankroll, brmThresholds]
@@ -1023,7 +1010,9 @@ export default function BankrollPage() {
         </Painel>
       </div>
 
-      <div className="mt-6 grid grid-cols-1 items-start gap-4 lg:grid-cols-2">
+      {/* O "AI Coach" que dividia esta linha com o Risco foi para o AI
+          Coach da tela inicial (único lugar com orientações automáticas). */}
+      <div className="mt-6 grid grid-cols-1 items-start gap-4">
         <Painel
           titulo="Risco"
           icone={<ShieldAlert size={14} className="icon-glow text-negative" />}
@@ -1115,56 +1104,6 @@ export default function BankrollPage() {
               </div>
             </div>
           )}
-          </div>
-        </Painel>
-
-        <Painel
-          titulo="AI Coach"
-          icone={<Sparkles size={14} className="icon-glow text-evolution" />}
-          hint="Dicas automáticas geradas a partir das suas sessões — leaks, tendências e alertas."
-          className="flex h-[260px] flex-col"
-          acao={
-            tipsVisiveis.length > 0 ? (
-              <span className="rounded-full bg-elevated px-2 py-0.5 text-[11px] font-bold text-muted">{tipsVisiveis.length}</span>
-            ) : undefined
-          }
-        >
-          <div className="grid gap-3">
-            {tipsVisiveis.length === 0 ? (
-              <p className="text-sm text-muted">
-                Sem novidades por enquanto — volte amanhã ou registre mais sessões pra o coach analisar.
-              </p>
-            ) : (
-              COACH_LEVELS.map((level) => {
-                const items = tipsVisiveis.filter((t) => t.level === level);
-                if (items.length === 0) return null;
-                const meta = COACH_LEVEL_META[level];
-                return (
-                  <div key={level} className={`rounded-lg border p-3 ${toneClasses(level)}`}>
-                    <p className={`flex items-center gap-1.5 text-[12px] font-semibold ${meta.text}`}>
-                      <meta.Icon size={13} /> {meta.label}
-                    </p>
-                    <ul className="mt-2 space-y-2">
-                      {items.map((tip) => (
-                        <li key={tip.id} className="flex items-start justify-between gap-2 text-[13px]">
-                          <div className="min-w-0">
-                            <p className="font-medium text-ink">{tip.title}</p>
-                            <p className="text-[11.5px] leading-snug text-muted">{tip.text}</p>
-                          </div>
-                          <button
-                            onClick={() => dispensarCoachTip(tip.id)}
-                            aria-label="Dispensar"
-                            className="shrink-0 text-muted/60 transition-colors hover:text-muted"
-                          >
-                            <X size={12} />
-                          </button>
-                        </li>
-                      ))}
-                    </ul>
-                  </div>
-                );
-              })
-            )}
           </div>
         </Painel>
       </div>
@@ -1987,76 +1926,6 @@ function BrmThresholdRow({
   );
 }
 
-function toneClasses(level: CoachTip["level"]) {
-  if (level === "good") return "border-positive/35 bg-positive/10";
-  if (level === "bad") return "border-negative/35 bg-negative/10";
-  if (level === "warn") return "border-evolution/35 bg-evolution/10";
-  return "border-hairline bg-elevated";
-}
-
-// Mesma logica de agrupamento por severidade do Assistente do coach (Time
-// > Jogadores): cada nivel vira um bloco tingido com icone + lista, em vez
-// de uma unica dica "em destaque" que ficava girando sozinha.
-const COACH_LEVELS: CoachTip["level"][] = ["bad", "warn", "good", "info"];
-const COACH_LEVEL_META: Record<CoachTip["level"], { label: string; text: string; Icon: typeof AlertTriangle }> = {
-  bad: { label: "Precisa de atenção", text: "text-negative", Icon: AlertTriangle },
-  warn: { label: "Fique de olho", text: "text-evolution", Icon: TriangleAlert },
-  good: { label: "Indo bem", text: "text-positive", Icon: CheckCircle2 },
-  info: { label: "Pra saber", text: "text-muted", Icon: Info },
-};
-
-// Mesma memoria do Assistente do coach (Time > Jogadores): guardada no
-// navegador, nao no banco -- e' so' preferencia de leitura. Cada dica some
-// sozinha 24h depois de aparecer pela 1a vez, ou na hora se dispensada,
-// liberando espaco pra proxima leva de analise.
-const COACH_MEMORIA_KEY = "pokersync_banca_coach_memoria";
-const COACH_EXPIRA_MS = 24 * 60 * 60 * 1000;
-
-function useCoachTipMemoria() {
-  const [memoria, setMemoria] = useState<Record<string, { primeiraVezEm: number; dispensadoEm?: number }>>({});
-
-  useEffect(() => {
-    try {
-      setMemoria(JSON.parse(localStorage.getItem(COACH_MEMORIA_KEY) ?? "{}"));
-    } catch {
-      setMemoria({});
-    }
-  }, []);
-
-  function persistir(next: typeof memoria) {
-    setMemoria(next);
-    try {
-      localStorage.setItem(COACH_MEMORIA_KEY, JSON.stringify(next));
-    } catch {
-      // localStorage indisponivel (modo privado etc.) — degrada pra "sempre visivel", sem quebrar a tela.
-    }
-  }
-
-  function registrarVistas(chaves: string[]) {
-    let mudou = false;
-    const next = { ...memoria };
-    for (const k of chaves) {
-      if (!next[k]) {
-        next[k] = { primeiraVezEm: Date.now() };
-        mudou = true;
-      }
-    }
-    if (mudou) persistir(next);
-  }
-
-  function dispensar(chave: string) {
-    persistir({ ...memoria, [chave]: { primeiraVezEm: memoria[chave]?.primeiraVezEm ?? Date.now(), dispensadoEm: Date.now() } });
-  }
-
-  function visivel(chave: string): boolean {
-    const m = memoria[chave];
-    if (!m) return true;
-    if (m.dispensadoEm) return false;
-    return Date.now() - m.primeiraVezEm < COACH_EXPIRA_MS;
-  }
-
-  return { registrarVistas, dispensar, visivel };
-}
 
 
 const Y_TICKS = 4;

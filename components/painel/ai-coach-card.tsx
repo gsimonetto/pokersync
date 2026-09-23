@@ -7,23 +7,28 @@ import {
   ArrowRight,
   BookOpen,
   Check,
+  Crosshair,
   Info,
   LineChart,
+  Send,
   Sparkles,
   Target,
   ThumbsUp,
   TrendingUp,
+  Users,
 } from "lucide-react";
 import { buildCoachTips } from "@/lib/bankroll/coach";
 import { goalProgress } from "@/lib/bankroll/calc";
+import { TOURNEY_FORMATS } from "@/lib/bankroll/format";
+import { ALERTA_LABEL, assignTeamDrill, calcularScore, type TeamAlertKind } from "@/lib/services/team-service";
+import { progressoPronto } from "@/lib/services/team-funnel-service";
 import { Esqueleto, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
 import { usePainelDados, type PainelDados } from "./painel-dados";
 import { num, pct } from "./formato";
 import { fracaoDaSemana, situacaoMeta, textoProgresso } from "./metas";
 
 // Memória de "já vi isso", no navegador (não no banco: é preferência de
-// leitura, não precisa sincronizar entre aparelhos). Mesmo padrão já
-// usado pelo Assistente do coach em components/time/assistente-coach.tsx.
+// leitura, não precisa sincronizar entre aparelhos).
 // Uma dica vista volta a poder aparecer depois de 7 dias -- se o problema
 // continuar existindo daqui a uma semana, ele merece ser lembrado de novo.
 const MEMORIA_KEY = "psd:coach-vistos";
@@ -43,7 +48,26 @@ type Dica = {
   texto: string;
   href: string;
   cta: string;
+  /** Ação feita ali mesmo, sem sair da tela (hoje: enviar o drill de um
+   *  leak do time pra todos os jogadores afetados). Devolve a frase de
+   *  resultado que aparece no lugar do botão. */
+  acao?: { rotulo: string; executar: () => Promise<string> };
 };
+
+// Stack curto típico de late-stage de torneio -- o mesmo que o Treino
+// usava no aviso "seu maior leak na banca" (que agora mora aqui).
+const STACK_CURTO_BB = 15;
+
+// Alertas do time que não pedem decisão do coach: "lembrete_estudo" é só
+// o registro de que o sistema mandou um lembrete automático.
+const ALERTA_IRRELEVANTE: Set<TeamAlertKind> = new Set(["lembrete_estudo"]);
+
+// "Ana, Bruno e mais 2" -- nomes suficientes pra o coach saber de quem
+// se trata sem a dica virar uma lista.
+function nomes(lista: string[]): string {
+  if (lista.length <= 2) return lista.join(" e ");
+  return `${lista.slice(0, 2).join(", ")} e mais ${lista.length - 2}`;
+}
 
 const PESO: Record<Nivel, number> = { ruim: 0, atencao: 1, info: 2, bom: 3 };
 
@@ -55,6 +79,8 @@ const ICONE_MODULO: Record<string, typeof Target> = {
   Revisor: BookOpen,
   Metas: Target,
   Treino: Target,
+  "Leak Finder": Crosshair,
+  Time: Users,
 };
 
 // Selo de urgência, pra dizer em uma palavra o peso da dica (mesma ideia
@@ -93,11 +119,12 @@ function gravarMemoria(memoria: Record<string, number>) {
   }
 }
 
-// Junta num só lugar o que cada módulo tem a dizer hoje. Nada aqui é
-// texto inventado na hora: são as mesmas regras que a Gestão de Banca
-// (buildCoachTips), o Performance (get_player_insights + top_leaks), o
-// Revisor (fila), as Metas e o Treino já usam nas telas deles. Os dados
-// vêm do carregador único do Painel (painel-dados.tsx).
+// Único lugar do app com as orientações automáticas. Cada módulo tinha a
+// sua caixa (o "AI Coach" da Gestão de Banca, o Leak Finder do Revisor,
+// o aviso de leak do Treino, o Assistente do coach e os leaks do time no
+// modo Time) e tudo foi reunido aqui -- as regras são as mesmas de antes,
+// só mudaram de lugar. Os dados vêm do carregador único do Painel
+// (painel-dados.tsx).
 function montarDicas(d: PainelDados): Dica[] {
   const dicas: Dica[] = [];
 
@@ -112,6 +139,9 @@ function montarDicas(d: PainelDados): Dica[] {
     });
     for (const t of tips) {
       if (t.id === "empty") continue;
+      // Vazamento num formato de torneio: o passo prático é treinar stack
+      // curto (era o botão "Focar treino" do aviso que ficava no Treino).
+      const treinarStack = t.id === "worst" && t.format != null && TOURNEY_FORMATS.has(t.format);
       dicas.push({
         chave: `banca:${t.id}:${t.title}`,
         modulo: "Banca",
@@ -119,31 +149,34 @@ function montarDicas(d: PainelDados): Dica[] {
         nivel: t.level === "bad" ? "ruim" : t.level === "warn" ? "atencao" : t.level === "good" ? "bom" : "info",
         titulo: t.title,
         texto: t.text,
-        href: "/banca",
-        cta: "Abrir Gestão de Banca",
+        href: treinarStack ? `/treino?stack=${STACK_CURTO_BB}` : "/banca",
+        cta: treinarStack ? "Treinar stack curto" : "Abrir Gestão de Banca",
       });
     }
   }
 
-  // --- Performance ------------------------------------------------------
-  // Só entra vazamento com nome e contagem válidos. Veio do banco um item
-  // sem esses campos e o Coach mostrou "Vazamento recorrente: undefined"
-  // / "Apareceu NaN vezes" -- melhor não mostrar a dica do que mostrar lixo.
-  const leaks = (d.performance?.top_leaks ?? []).filter(
-    (l) => Boolean(l?.label?.trim() || l?.code?.trim()) && Number.isFinite(l?.ocorrencias) && l.ocorrencias > 0,
-  );
-  for (const leak of leaks.slice(0, 2)) {
+  // --- Leak Finder (mãos revisadas) -------------------------------------
+  // Era o card "Leaks recorrentes" do Revisor. Substitui a dica que lia
+  // top_leaks da view de performance: aquela fonte chegava sem nome nem
+  // contagem ("Vazamento recorrente: undefined / NaN vezes"), esta é a
+  // mesma que já alimentava o Revisor e o treino sugerido.
+  for (const l of d.leaksRecorrentes.slice(0, 3)) {
     dicas.push({
-      chave: `leak:${leak.code}:${leak.ocorrencias}`,
-      modulo: "Performance",
-      cor: "#22D3EE",
+      chave: `leakfinder:${l.motivo}:${l.rua}:${l.ocorrencias}`,
+      modulo: "Leak Finder",
+      cor: "#A855F7",
       nivel: "atencao",
-      titulo: `Vazamento recorrente: ${leak.label?.trim() || leak.code}`,
-      texto: `Apareceu ${num(leak.ocorrencias)} ${leak.ocorrencias === 1 ? "vez" : "vezes"} nas suas mãos revisadas. Treinar essa situação é o caminho mais curto de ganho agora.`,
-      href: "/treino",
-      cta: "Treinar essa situação",
+      titulo: `Leak recorrente: ${l.motivo}`,
+      texto:
+        `Apareceu ${num(l.ocorrencias)} ${l.ocorrencias === 1 ? "vez" : "vezes"}` +
+        `${l.rua ? ` no ${l.rua.toLowerCase()}` : ""} nas suas mãos revisadas dos últimos 30 dias.` +
+        (l.treinavel && l.drillTitulo ? ` Treino sugerido: ${l.drillTitulo}.` : ""),
+      href: l.treinavel && l.drillId ? `/treino?suggestionId=${l.drillId}` : "/revisor",
+      cta: l.treinavel ? "Treinar esse leak" : "Ver no Revisor",
     });
   }
+
+  // --- Performance ------------------------------------------------------
   for (const frase of d.insights.slice(0, 3)) {
     dicas.push({
       chave: `insight:${frase}`,
@@ -210,6 +243,124 @@ function montarDicas(d: PainelDados): Dica[] {
     });
   }
 
+  // --- Time (só coach/admin) --------------------------------------------
+  // Era o Assistente do coach (aba Jogadores/Visão geral) e os "Leaks mais
+  // frequentes" do time. Cada tipo de aviso vira UMA dica com os nomes,
+  // não uma dica por jogador -- senão o time inteiro engolia a fila.
+  const t = d.timeCoach;
+  if (t) {
+    const porId = new Map(t.jogadores.map((j) => [j.userId, j]));
+    const nome = (id: string) => porId.get(id)?.nome ?? "Jogador";
+    // Jogador pior no Score de evolução aparece primeiro na lista de nomes.
+    const risco = (id: string) => {
+      const j = porId.get(id);
+      return j ? calcularScore(j).valor : 100;
+    };
+    const ordenar = (ids: string[]) => [...new Set(ids)].sort((a, b) => risco(a) - risco(b));
+
+    const prontos = ordenar(t.cards.filter(progressoPronto).map((c) => c.playerId));
+    if (prontos.length > 0) {
+      dicas.push({
+        chave: `time:prontos:${prontos.join(",")}`,
+        modulo: "Time",
+        cor: "#6366F1",
+        nivel: "atencao",
+        titulo: `${num(prontos.length)} ${prontos.length === 1 ? "jogador pronto" : "jogadores prontos"} pra subir de fase`,
+        texto: `${nomes(prontos.map(nome))} ${prontos.length === 1 ? "bateu" : "bateram"} a meta de drills e revisões da fase atual no Funil.`,
+        href: "/time/painel/funil",
+        cta: "Abrir o Funil",
+      });
+    }
+
+    const limite = Date.now() - 14 * 24 * 60 * 60 * 1000;
+    const parados = ordenar(
+      t.cards
+        .filter(
+          (c) =>
+            !progressoPronto(c) &&
+            new Date(c.movedAt).getTime() < limite &&
+            c.drillsDone === 0 &&
+            c.reviewsDone === 0,
+        )
+        .map((c) => c.playerId),
+    );
+    if (parados.length > 0) {
+      dicas.push({
+        chave: `time:parados:${parados.join(",")}`,
+        modulo: "Time",
+        cor: "#6366F1",
+        nivel: "atencao",
+        titulo: `${num(parados.length)} ${parados.length === 1 ? "jogador parado" : "jogadores parados"} há mais de 14 dias`,
+        texto: `${nomes(parados.map(nome))} não ${parados.length === 1 ? "fez" : "fizeram"} nenhum drill nem revisão desde que ${parados.length === 1 ? "entrou" : "entraram"} na fase atual.`,
+        href: "/time/painel/funil",
+        cta: "Abrir o Funil",
+      });
+    }
+
+    const faltosos = ordenar(t.cards.filter((c) => c.eventosAusente >= 2).map((c) => c.playerId));
+    if (faltosos.length > 0) {
+      dicas.push({
+        chave: `time:faltas:${faltosos.join(",")}`,
+        modulo: "Time",
+        cor: "#6366F1",
+        nivel: "atencao",
+        titulo: `${num(faltosos.length)} ${faltosos.length === 1 ? "jogador faltando" : "jogadores faltando"} aos eventos`,
+        texto: `${nomes(faltosos.map(nome))} ${faltosos.length === 1 ? "faltou" : "faltaram"} a 2 ou mais eventos do time.`,
+        href: "/time/painel/funil",
+        cta: "Abrir o Funil",
+      });
+    }
+
+    // Alertas agrupados por tipo ("Inatividade: Ana e Bruno").
+    const porTipo = new Map<TeamAlertKind, string[]>();
+    for (const a of t.alertas) {
+      if (ALERTA_IRRELEVANTE.has(a.kind)) continue;
+      porTipo.set(a.kind, [...(porTipo.get(a.kind) ?? []), a.playerId]);
+    }
+    for (const [tipo, ids] of porTipo) {
+      const lista = ordenar(ids);
+      dicas.push({
+        chave: `time:alerta:${tipo}:${lista.join(",")}`,
+        modulo: "Time",
+        cor: "#6366F1",
+        nivel: tipo === "inatividade" || tipo === "faltas_consecutivas" ? "ruim" : "atencao",
+        titulo: `${ALERTA_LABEL[tipo]}: ${num(lista.length)} ${lista.length === 1 ? "jogador" : "jogadores"}`,
+        texto: `${nomes(lista.map(nome))}. Aviso gerado nos últimos 14 dias.`,
+        href: "/time/painel/funil",
+        cta: "Abrir o Funil",
+      });
+    }
+
+    // Leaks do time: o botão envia o drill pra todos os afetados ali mesmo.
+    for (const l of t.leaks.slice(0, 3)) {
+      const podeEnviar = l.treinavel && l.drillId != null;
+      dicas.push({
+        chave: `time:leak:${l.reasonCode}:${l.street}:${l.total}`,
+        modulo: "Time",
+        cor: "#6366F1",
+        nivel: "atencao",
+        titulo: `Leak do time: ${l.label}`,
+        texto:
+          `${num(l.total)} ${l.total === 1 ? "ocorrência" : "ocorrências"} em ${num(l.jogadores)} ` +
+          `${l.jogadores === 1 ? "jogador" : "jogadores"}${l.street ? ` no ${l.street.toLowerCase()}` : ""}, nos últimos 30 dias.` +
+          (podeEnviar && l.drillTitle ? ` Treino sugerido: ${l.drillTitle}.` : ""),
+        href: "/time/painel?tab=jogadores",
+        cta: "Ver jogadores",
+        acao: podeEnviar
+          ? {
+              rotulo: "Enviar treino ao time",
+              executar: async () => {
+                const n = await assignTeamDrill(l.reasonCode, l.street, l.drillId!, 30);
+                return n > 0
+                  ? `Treino enviado para ${num(n)} ${n === 1 ? "jogador" : "jogadores"}.`
+                  : "Os jogadores já estavam com esse treino recente.";
+              },
+            }
+          : undefined,
+      });
+    }
+  }
+
   return dicas.sort((a, b) => PESO[a.nivel] - PESO[b.nivel]);
 }
 
@@ -221,6 +372,23 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
   const dados = usePainelDados();
   const [fila, setFila] = useState<Dica[] | null>(null);
   const [indice, setIndice] = useState(0);
+  // Resultado da ação feita no próprio card (por chave da dica) e qual
+  // está rodando agora -- evita clique duplo mandando o treino duas vezes.
+  const [resultado, setResultado] = useState<Record<string, string>>({});
+  const [executando, setExecutando] = useState<string | null>(null);
+
+  async function rodarAcao(dica: Dica) {
+    if (!dica.acao || executando) return;
+    setExecutando(dica.chave);
+    try {
+      const msg = await dica.acao.executar();
+      setResultado((r) => ({ ...r, [dica.chave]: msg }));
+    } catch {
+      setResultado((r) => ({ ...r, [dica.chave]: "Não deu pra enviar agora. Tente de novo." }));
+    } finally {
+      setExecutando(null);
+    }
+  }
 
   // Fila = o que ainda não foi visto. Montada UMA vez, quando os dados
   // chegam: se o jogador remove uma mão da fila do Revisor ou cria uma
@@ -333,9 +501,33 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
               card): com poucas dicas, ficavam longe do texto a que se
               referem. */}
           <div className="flex flex-wrap items-center gap-2 pt-5 sm:pl-[54px]">
+            {/* Dica com ação própria (leak do time): a ação é o botão
+                principal e o link vira secundário. Depois de rodar, o
+                botão dá lugar à frase de resultado. */}
+            {atual.acao &&
+              (resultado[atual.chave] ? (
+                <span className="inline-flex items-center gap-1.5 text-xs font-semibold text-positive">
+                  <Check size={13} />
+                  {resultado[atual.chave]}
+                </span>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => rodarAcao(atual)}
+                  disabled={executando === atual.chave}
+                  className="inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition-colors hover:bg-[#e2c35a] disabled:opacity-60 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+                >
+                  <Send size={13} />
+                  {executando === atual.chave ? "Enviando…" : atual.acao.rotulo}
+                </button>
+              ))}
             <Link
               href={atual.href}
-              className="inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition-colors hover:bg-[#e2c35a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+              className={
+                atual.acao
+                  ? "inline-flex items-center gap-1.5 rounded-full border border-hairline px-4 py-2 text-xs font-semibold text-muted transition-colors hover:border-[#d4af37]/50 hover:text-ink focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+                  : "inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition-colors hover:bg-[#e2c35a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"
+              }
             >
               {atual.cta}
               <ArrowRight size={13} />

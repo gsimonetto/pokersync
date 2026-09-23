@@ -19,17 +19,31 @@ import {
   fetchPlayerPerformance,
   type PlayerPerformance,
 } from "@/lib/services/performance-service";
-import { fetchTodayTrainingCount } from "@/lib/services/drill-service";
+import { fetchDrillFacets, fetchTodayTrainingCount, suggestionHasDrills } from "@/lib/services/drill-service";
 import { fetchAnalysisHandRows } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow } from "@/types/analysis";
-import { listReviews, type ReviewListItem } from "@/lib/services/hand-review-service";
+import { fetchUserLeaksWithDrills, listReviews, type ReviewListItem } from "@/lib/services/hand-review-service";
 import {
   fetchTeamBirthdays,
   fetchTeamEvents,
   type TeamBirthday,
   type TeamEvent,
 } from "@/lib/services/team-calendar-service";
-import { fetchTeamDashboardCached } from "@/lib/services/team-service";
+import {
+  fetchMyTeamCached,
+  fetchTeamAlerts,
+  fetchTeamDashboardCached,
+  fetchTeamLeaks,
+  type TeamAlert,
+  type TeamDashboardRow,
+  type TeamLeak,
+} from "@/lib/services/team-service";
+import {
+  fetchFunnelPhases,
+  fetchPlayerCards,
+  type FunnelPhase,
+  type PlayerCard,
+} from "@/lib/services/team-funnel-service";
 import { fetchLiveTournaments, type LiveStreamChannel } from "@/lib/services/live-stream-service";
 import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
 
@@ -38,6 +52,29 @@ import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service
 // hoje 3 vezes, metas/estudo/performance/progresso/revisões 2 vezes cada
 // -- umas 11 consultas repetidas a cada abertura da tela. Agora a tela
 // busca tudo uma vez só, em paralelo, e os cards só leem daqui.
+
+/** Leak recorrente das próprias mãos revisadas (o antigo Leak Finder do
+ *  Revisor, RPC suggest_drills_for_user). */
+export interface LeakRecorrente {
+  motivo: string;
+  rua: string;
+  ocorrencias: number;
+  drillId: string | null;
+  drillTitulo: string | null;
+  /** Existe drill de verdade pra esse leak (não leva a uma tela vazia). */
+  treinavel: boolean;
+}
+
+/** O que o antigo Assistente do coach (aba Jogadores do Time) e os
+ *  "Leaks mais frequentes" do time usavam. Só existe pra admin/coach. */
+export interface TimeDoCoach {
+  teamId: string;
+  jogadores: TeamDashboardRow[];
+  fases: FunnelPhase[];
+  cards: PlayerCard[];
+  alertas: TeamAlert[];
+  leaks: TeamLeak[];
+}
 
 export interface PainelDados {
   carregando: boolean;
@@ -68,6 +105,10 @@ export interface PainelDados {
   eventos: TeamEvent[];
   aoVivo: LiveStreamChannel[];
   aniversarios: TeamBirthday[];
+  /** Leak Finder das mãos revisadas (vazio = sem amostra suficiente). */
+  leaksRecorrentes: LeakRecorrente[];
+  /** Visão de coach/admin do time; null pra jogador ou sem time. */
+  timeCoach: TimeDoCoach | null;
 }
 
 const Ctx = createContext<PainelDados | null>(null);
@@ -105,6 +146,8 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
   const [eventos, setEventos] = useState<TeamEvent[]>([]);
   const [aoVivo, setAoVivo] = useState<LiveStreamChannel[]>([]);
   const [aniversarios, setAniversarios] = useState<TeamBirthday[]>([]);
+  const [leaksRecorrentes, setLeaksRecorrentes] = useState<LeakRecorrente[]>([]);
+  const [timeCoach, setTimeCoach] = useState<TimeDoCoach | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -117,6 +160,43 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
         const { data } = await createClient().auth.getUser();
         if (!data.user) return [] as ReviewListItem[];
         return (await listReviews(data.user.id)).filter((r) => r.status !== "concluida");
+      })();
+
+      // Leak Finder: as facets dizem quais drills existem de verdade na
+      // base -- sem elas não dá pra saber se um leak é treinável (leak de
+      // preflop, por exemplo, não tem drill hoje).
+      const leakFinder = (async (): Promise<LeakRecorrente[]> => {
+        const [cru, facets] = await Promise.all([
+          fetchUserLeaksWithDrills(30, 3),
+          fetchDrillFacets().catch(() => []),
+        ]);
+        return cru
+          .filter((l) => l?.reason_label && Number(l.occurrences) > 0)
+          .map((l) => ({
+            motivo: String(l.reason_label),
+            rua: String(l.street ?? ""),
+            ocorrencias: Number(l.occurrences),
+            drillId: l.drill_id ?? null,
+            drillTitulo: l.drill_title ?? null,
+            treinavel: Boolean(l.drill_id) && suggestionHasDrills(l.filter_config, facets),
+          }));
+      })();
+
+      // Visão de coach: só pra admin/coach de um time (as RPCs recusam
+      // jogador). Entra no carregamento principal, e não depois, porque o
+      // Coach monta a fila UMA vez quando os dados chegam.
+      const doTime = (async (): Promise<TimeDoCoach | null> => {
+        const meu = await fetchMyTeamCached();
+        if (!meu || (meu.role !== "admin" && meu.role !== "coach")) return null;
+        const teamId = meu.team.id;
+        const [jogadores, fases, cards, alertas, leaks] = await Promise.all([
+          fetchTeamDashboardCached(30),
+          fetchFunnelPhases(teamId).catch(() => []),
+          fetchPlayerCards().catch(() => []),
+          fetchTeamAlerts(14).catch(() => []),
+          fetchTeamLeaks(30).catch(() => []),
+        ]);
+        return { teamId, jogadores, fases, cards, alertas, leaks };
       })();
 
       const [
@@ -137,6 +217,8 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
         rRevisoes,
         rEventos,
         rAoVivo,
+        rLeakFinder,
+        rTime,
       ] = await Promise.allSettled([
         fetchProfile(),
         fetchProgress(),
@@ -155,6 +237,8 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
         revisoesPendentes,
         fetchTeamEvents({ onlyUpcoming: false, limit: 200 }),
         fetchLiveTournaments(),
+        leakFinder,
+        doTime,
       ]);
       if (!vivo) return;
 
@@ -176,6 +260,8 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
       setPendentes(ok(rRevisoes) ?? []);
       setEventos(ok(rEventos) ?? []);
       setAoVivo(ok(rAoVivo) ?? []);
+      setLeaksRecorrentes(ok(rLeakFinder) ?? []);
+      setTimeCoach(ok(rTime));
       setCarregando(false);
 
       // Aniversários vêm depois: precisam da lista de membros do time, e
@@ -239,6 +325,8 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
     eventos,
     aoVivo,
     aniversarios,
+    leaksRecorrentes,
+    timeCoach,
   };
 
   return <Ctx.Provider value={valor}>{children}</Ctx.Provider>;

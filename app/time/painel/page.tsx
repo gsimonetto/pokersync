@@ -14,7 +14,6 @@ import {
   fetchTeamDashboard,
   fetchTeamInfo,
   fetchTeamLabels,
-  fetchTeamLeaks,
   fetchTeamScoreHistory,
   fetchTeamStaff,
   fetchInvites,
@@ -30,7 +29,6 @@ import {
   type TeamInfo,
   type TeamInvite,
   type TeamLabel,
-  type TeamLeak,
   type TeamScoreHistoryPoint,
   type TeamStaff,
 } from "@/lib/services/team-service";
@@ -107,7 +105,6 @@ function PainelConteudo() {
   const [staff, setStaff] = useState<TeamStaff[]>([]);
   const [labels, setLabels] = useState<TeamLabel[]>([]);
   const [linhas, setLinhas] = useState<TeamDashboardRow[]>([]);
-  const [leaks, setLeaks] = useState<TeamLeak[]>([]);
   const [historicoScoreTime, setHistoricoScoreTime] = useState<TeamScoreHistoryPoint[]>([]);
   const [atividade, setAtividade] = useState<TeamActivityDay[]>([]);
   const [financeiro, setFinanceiro] = useState<FinancialDay[]>([]);
@@ -130,9 +127,8 @@ function PainelConteudo() {
       setTime(t);
       setInfo(i);
 
-      const [rows, lk, at, fin, st, lb, pend, inv, comp, ev, histScore] = await Promise.all([
+      const [rows, at, fin, st, lb, pend, inv, comp, ev, histScore] = await Promise.all([
         fetchTeamDashboard(dias),
-        fetchTeamLeaks(dias),
         fetchTeamActivity(dias),
         fetchFinancialSeries(dias),
         fetchTeamStaff().catch(() => []),
@@ -145,7 +141,6 @@ function PainelConteudo() {
         fetchTeamScoreHistory(dias).catch(() => []),
       ]);
       setLinhas(rows);
-      setLeaks(lk);
       setAtividade(at);
       setFinanceiro(fin);
       setStaff(st);
@@ -298,14 +293,11 @@ function PainelConteudo() {
                 </>
               )}
               {aba === "estatisticas" && time && (
-                <TabVisaoGeral teamId={time.team.id} jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} historicoScoreTime={historicoScoreTime} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias}
-                  onAbrirFunil={() => router.push("/time/painel/funil")} onErro={setErro} />
+                <TabVisaoGeral jogadores={jogadores} atividade={atividade} financeiro={financeiro} comparacao={comparacao} eventos={eventos} historicoScoreTime={historicoScoreTime} pronto={pronto} dias={dias} periodos={PERIODOS} onDiasChange={setDias} />
               )}
               {aba === "jogadores" && time && (
-                <TabJogadores teamId={time.team.id} jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
+                <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
                   podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
-                  leaks={leaks} dias={dias}
-                  onAtribuido={carregar}
                   onChange={carregar} onErro={setErro} />
               )}
               {aba === "maos" && podeEditarTime && <TabMaosRecebidas />}
