@@ -3,7 +3,7 @@
 import { Activity, BookOpen, Flame, Percent, Target, Trophy } from "lucide-react";
 import { MAX_LEVEL, xpForNextLevel, type Progress } from "@/lib/services/xp-service";
 import type { PlayerPerformance } from "@/lib/services/performance-service";
-import { CardHint, Linha, PainelCard, TileIcone } from "./painel-card";
+import { CardHint, Linha, PainelCard } from "./painel-card";
 import { usePainelDados } from "./painel-dados";
 import { num, pct } from "./formato";
 
@@ -37,7 +37,7 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
       // "total" no rótulo: é o ROI de todo o histórico. Sem isso ele
       // parecia do mesmo período dos "30 dias" mostrados no cabeçalho.
       rotulo: "ROI total",
-      valor: pct(perf.roi_pct, { sinal: true }),
+      valor: pct(perf.roi_pct, { sinal: true, casas: Math.abs(perf.roi_pct) >= 100 ? 0 : 1 }),
       detalhe: `${num(perf.num_sessoes ?? 0)} sessões`,
       icone: Percent,
       cor: perf.roi_pct >= 0 ? "#22c55e" : "#e0555a",
@@ -90,6 +90,15 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
   return lista;
 }
 
+// Tamanho do número conforme o comprimento: o quadro tem largura fixa (3
+// por linha no computador) e um valor longo, como "+14.900%", passava
+// por cima do quadro vizinho. Número curto continua grande.
+function tamanhoValor(valor: string): string {
+  if (valor.length > 8) return "text-[16px]";
+  if (valor.length > 6) return "text-[19px]";
+  return "text-[22px]";
+}
+
 export function IndicatorsCard({ style, className }: { style?: React.CSSProperties; className?: string }) {
   const { carregando, performance, progresso } = usePainelDados();
   const itens = montar(performance, progresso);
@@ -110,17 +119,22 @@ export function IndicatorsCard({ style, className }: { style?: React.CSSProperti
         // cabia. No celular continua 2 colunas, que é o confortável.
         <ul className="grid grid-cols-2 gap-2 xl:grid-cols-3">
           {itens.map(({ rotulo, valor, detalhe, icone: Icone, cor, progresso: barra }) => (
-            <li key={rotulo}>
-              <Linha className="h-full !p-2.5">
-                <span className="flex items-center gap-2">
-                  <TileIcone cor={cor}>
-                    <Icone size={14} />
-                  </TileIcone>
-                  <span className="min-w-0 text-[11px] font-semibold uppercase leading-tight tracking-[0.05em] text-muted/80">
-                    {rotulo}
-                  </span>
+            <li key={rotulo} className="min-w-0">
+              {/* Quadro de número no padrão de painel: rótulo em cima à
+                  esquerda, ícone solto à direita e o valor grande embaixo.
+                  Antes o ícone ficava num quadradinho ao lado do rótulo em
+                  CAIXA ALTA -- no quadro estreito o rótulo quebrava em
+                  duas linhas e empurrava o número pra fora. */}
+              <Linha className="flex h-full min-w-0 flex-col !p-3">
+                <span className="flex items-start justify-between gap-2">
+                  <span className="min-w-0 text-[12px] leading-tight text-muted/80">{rotulo}</span>
+                  <Icone size={15} className="shrink-0" style={{ color: cor }} aria-hidden />
                 </span>
-                <p className="tnum mt-2 text-[22px] font-light leading-none" style={{ color: cor }}>
+                <p
+                  className={`tnum mt-2.5 truncate font-light leading-none ${tamanhoValor(valor)}`}
+                  style={{ color: cor }}
+                  title={valor}
+                >
                   {valor}
                 </p>
                 {barra != null && (
@@ -128,7 +142,7 @@ export function IndicatorsCard({ style, className }: { style?: React.CSSProperti
                     <div className="h-full rounded-full" style={{ width: `${barra}%`, background: cor }} />
                   </div>
                 )}
-                <p className="tnum mt-1 text-[11px] leading-tight text-muted/80">{detalhe}</p>
+                <p className="tnum mt-1.5 truncate text-[11px] leading-tight text-muted/70">{detalhe}</p>
               </Linha>
             </li>
           ))}

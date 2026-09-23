@@ -107,7 +107,7 @@ export function ReviewHandsCard({ style, className }: { style?: React.CSSPropert
                       disabled={salvando === r.id}
                       aria-label={r.saved ? "Tirar dos spots salvos" : "Salvar spot"}
                       aria-pressed={r.saved}
-                      className="shrink-0 text-muted/70 transition-colors hover:text-[#d4af37] disabled:opacity-40"
+                      className="-mr-1.5 grid h-8 w-8 shrink-0 place-items-center rounded-lg text-muted/70 transition-colors hover:text-[#d4af37] disabled:opacity-40"
                     >
                       <Star size={15} className={r.saved ? "fill-[#d4af37] text-[#d4af37]" : ""} />
                     </button>

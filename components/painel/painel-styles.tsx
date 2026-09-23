@@ -20,50 +20,44 @@ export function PainelStyles() {
         flex: 1 1 auto;
       }
 
-      /* Fundo: foto de ases e fichas em preto e dourado
-         (public/fundo-painel.jpg, escolhida pelo usuário). Substitui a
-         grade de pontos e as fichas desenhadas em vetor. Continua
-         existindo por um motivo prático: o vidro fosco dos cards borra o
-         que está ATRÁS deles, e sobre preto liso o efeito some.
+      /* Fundo: pilhas de fichas de poker em 3D (public/fundo-fichas.webp),
+         renderizadas com luz, sombra e desfoque de câmera reais. Substitui
+         a foto anterior. Continua existindo por um motivo prático: o vidro
+         fosco dos cards borra o que está ATRÁS deles, e sobre preto liso o
+         efeito some.
 
-         A foto é pequena e em pé (450x800). Esticada na largura de um
-         monitor ela ficaria quase 4x maior que o original, borrada. Por
-         isso, no celular (tela em pé, como a foto) ela cobre a tela
-         inteira, e no computador fica encostada à direita, na altura da
-         tela, com a borda esquerda sumindo no preto. As bordas da própria
-         foto já são pretas, então ela se funde com o fundo da página. */
+         A imagem é deitada (16:9) e as fichas ficam no lado direito, com a
+         esquerda quase preta -- é onde começa o texto do cabeçalho, então
+         a leitura não disputa com o fundo. No celular (tela em pé) ela é
+         recortada ancorada à direita, pra pilha continuar aparecendo. */
       .painel::before {
         content: "";
         position: absolute;
         top: 0;
         left: 0;
         right: 0;
-        /* No celular a página rola: a foto ocupa só a primeira tela e o
-           resto da página segue preto, em vez de esticar a foto pela
-           altura inteira do conteúdo. */
+        /* No celular a página rola: a imagem ocupa só a primeira tela e o
+           resto da página segue preto, em vez de esticar pela altura
+           inteira do conteúdo. */
         height: 100svh;
         z-index: -1;
         background-image:
-          linear-gradient(rgba(0, 0, 0, 0.35), rgba(0, 0, 0, 0.35)),
-          url("/fundo-painel.jpg");
+          linear-gradient(rgba(0, 0, 0, 0.25), rgba(0, 0, 0, 0.25)),
+          url("/fundo-fichas.webp");
         background-size: cover, cover;
-        background-position: center, center 65%;
+        background-position: center, 72% center;
         background-repeat: no-repeat;
-        /* Some aos poucos embaixo, sem corte seco entre foto e preto. */
+        /* Some aos poucos embaixo, sem corte seco entre imagem e preto. */
         -webkit-mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
         mask-image: linear-gradient(to bottom, #000 70%, transparent 100%);
         pointer-events: none;
       }
       @media (min-width: 1280px) {
-        /* No computador a foto cobre a área toda. Ela fica bem maior que
-           o original (450x800), mas quase tudo dela é visto ATRAVÉS do
-           vidro fosco dos cards, que já desfoca -- e o fundo da própria
-           foto é desfocado (profundidade de campo), então a ampliação
-           não aparece. Encostada à direita no tamanho original, ela
-           ficava escondida atrás da coluna da direita e quase não se via. */
+        /* No computador a imagem cobre a área toda, sem máscara: a tela
+           inteira cabe na janela, então não há "resto da página". */
         .painel::before {
           height: 100%;
-          background-position: center, center 62%;
+          background-position: center, right bottom;
           -webkit-mask-image: none;
           mask-image: none;
         }
@@ -77,11 +71,19 @@ export function PainelStyles() {
         height: 24rem;
         z-index: -1;
         border-radius: 9999px;
-        /* Brilho de canto em dourado, o mesmo tom da foto de fundo (a cor
-           de destaque do Painel passou de roxo pra dourado). */
+        /* Brilho de canto em dourado, o mesmo tom das fichas do fundo (a
+           cor de destaque do Painel passou de roxo pra dourado). */
         background: rgba(212, 175, 55, 0.10);
         filter: blur(140px);
         pointer-events: none;
+      }
+
+      /* Ícones em traço fino e do mesmo peso na tela toda (padrão do
+         produto: ícone minimalista, stroke fino). O lucide desenha com
+         traço 2 por padrão; CSS vence o atributo do SVG, então uma regra
+         só ajusta todos os ícones do Painel sem mexer em cada um. */
+      .painel svg.lucide {
+        stroke-width: 1.6;
       }
 
       /* Nome do jogador no cabeçalho, em degradê dourado. */
