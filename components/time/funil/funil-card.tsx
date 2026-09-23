@@ -169,7 +169,7 @@ export function FunilCard({
 
       {/* 4) Contexto */}
       <div className="mt-2 flex items-center gap-1.5 border-t border-white/[0.05] pt-2">
-        <span className="flex min-w-0 flex-1 items-center gap-1 overflow-hidden">
+        <span className="-my-1 -ml-1 flex min-w-0 flex-1 items-center gap-2 overflow-hidden py-1 pl-1">
           {labels.slice(0, 2).map((l) => (
             <Chip key={l.id} color={l.color} size="sm" className="max-w-[88px] truncate">
               {l.name}

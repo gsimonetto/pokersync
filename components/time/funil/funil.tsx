@@ -370,10 +370,10 @@ export function Funil({
           value={modo}
           onChange={setModo}
           options={[
-            { value: "quadro", label: <><Columns3 size={13} /> Quadro</> },
-            { value: "planilha", label: <><Table2 size={13} /> Planilha</> },
-            { value: "relatorios", label: <><BarChart3 size={13} /> Relatórios</> },
-            { value: "arquivados", label: <><ArchiveRestore size={13} /> Arquivados</> },
+            { value: "quadro", label: <><Columns3 size={13} /><span className="sr-only sm:not-sr-only">Quadro</span></> },
+            { value: "planilha", label: <><Table2 size={13} /><span className="sr-only sm:not-sr-only">Planilha</span></> },
+            { value: "relatorios", label: <><BarChart3 size={13} /><span className="sr-only sm:not-sr-only">Relatórios</span></> },
+            { value: "arquivados", label: <><ArchiveRestore size={13} /><span className="sr-only sm:not-sr-only">Arquivados</span></> },
           ]}
         />
 
@@ -458,7 +458,13 @@ export function Funil({
 
       {/* Barra de atenção: cada contador é um filtro de um clique. */}
       {comFiltros && (focosVisiveis.length > 0 || filtrosAtivos) && (
-        <div className="mb-3 flex flex-wrap items-center gap-1.5" role="toolbar" aria-label="Atalhos de atenção">
+        // Celular: uma linha só, deslizando de lado (em várias linhas
+        // comia metade da tela antes do quadro). sm+: quebra linha.
+        <div
+          className="-mx-4 mb-3 flex items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 [&::-webkit-scrollbar]:hidden"
+          role="toolbar"
+          aria-label="Atalhos de atenção"
+        >
           {focosVisiveis.map((f) => {
             const ativo = foco === f.chave;
             const Icone = f.icone;
@@ -468,7 +474,7 @@ export function Funil({
                 type="button"
                 aria-pressed={ativo}
                 onClick={() => setFoco(ativo ? null : f.chave)}
-                className={`flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${
+                className={`flex shrink-0 items-center gap-1.5 whitespace-nowrap rounded-full border px-3 py-1 text-[11.5px] font-semibold transition-colors ${
                   ativo ? "" : "border-hairline text-muted hover:border-white/20 hover:text-ink"
                 }`}
                 style={ativo ? { color: f.cor, borderColor: `${f.cor}66`, background: `${f.cor}14` } : undefined}
@@ -480,7 +486,7 @@ export function Funil({
             );
           })}
           {(foco || filtrosAtivos) && (
-            <span className="ml-1 text-[11.5px] tabular-nums text-muted">
+            <span className="ml-1 shrink-0 whitespace-nowrap text-[11.5px] tabular-nums text-muted">
               {filtrados.length} de {itens.length}
               <button type="button" onClick={limparFiltros} className="ml-2 font-semibold hover:text-ink">
                 Limpar

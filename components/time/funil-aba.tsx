@@ -6,10 +6,13 @@ import { ModalNovoEvento } from "@/components/time/tab-calendario";
 import { fetchTeamDashboardCached, traduzErroTime, type MyTeam, type TeamDashboardRow } from "@/lib/services/team-service";
 
 // Funil como ABA do painel (antes era página própria em
-// /time/painel/funil, que agora só redireciona pra cá). O quadro precisa
-// de altura pra respirar (colunas + arrastar), então a aba ocupa quase a
-// tela inteira abaixo do menu, e a barra de rolagem horizontal do quadro
-// fica colada no fim dessa área.
+// /time/painel/funil, que agora só redireciona pra cá). No computador o
+// quadro precisa de altura pra respirar (colunas + arrastar), então a aba
+// ocupa quase a tela inteira abaixo do menu, e a barra de rolagem
+// horizontal do quadro fica colada no fim dessa área. No celular não:
+// a barra de ferramentas quebra em várias linhas e a área visível do
+// navegador é menor que 100vh, então altura fixa fazia o quadro vazar
+// pra fora do painel -- lá a aba cresce com o conteúdo e a página rola.
 export function FunilAba({ time, onErro }: { time: MyTeam; onErro: (s: string) => void }) {
   const [linhas, setLinhas] = useState<TeamDashboardRow[] | null>(null);
   const [agendarPlayerId, setAgendarPlayerId] = useState<string | null>(null);
@@ -38,7 +41,7 @@ export function FunilAba({ time, onErro }: { time: MyTeam; onErro: (s: string) =
   if (linhas === null) return <div className="painel-esqueleto h-[480px] rounded-3xl" />;
 
   return (
-    <div className="flex h-[calc(100vh-15rem)] min-h-[520px] flex-col">
+    <div className="flex flex-col md:h-[calc(100vh-15rem)] md:min-h-[520px]">
       <Funil
         teamId={time.team.id}
         jogadores={jogadores}
