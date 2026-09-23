@@ -3,7 +3,7 @@
 import { Suspense, useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { UserRound, Settings2, CalendarDays, Kanban, IdCard, LayoutGrid, Inbox, Mail } from "lucide-react";
+import { AlertTriangle, UserRound, Settings2, CalendarDays, Kanban, IdCard, LayoutGrid, Inbox, Mail, ShieldCheck, Tag } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import {
   fetchFinancialSeries,
@@ -33,11 +33,10 @@ import {
   type TeamStaff,
 } from "@/lib/services/team-service";
 import { fetchTeamEvents, type TeamEvent } from "@/lib/services/team-calendar-service";
-import { TabPerfil } from "@/components/time/tab-perfil";
 import { TabVisaoGeral } from "@/components/time/tab-visao-geral";
 import { TabJogadores } from "@/components/time/tab-jogadores";
 import { TabConvites } from "@/components/time/tab-convites";
-import { TabTime } from "@/components/time/tab-time";
+import { EquipeTecnica, EtiquetasTime, ExcluirTime, PerfilDoTime } from "@/components/time/tab-time";
 import { TabCalendario } from "@/components/time/tab-calendario";
 import { TabMaosRecebidas } from "@/components/time/tab-maos-recebidas";
 import { TeamPrintStyles } from "@/components/time/print-styles";
@@ -77,7 +76,7 @@ const ABAS: { value: Aba; label: string; icon: typeof LayoutGrid; soCoach?: bool
 const ABA_ANTIGA: Record<string, { aba: Aba; secao?: string }> = {
   estatisticas: { aba: "geral" },
   perfil: { aba: "gestao", secao: "gestao-perfil" },
-  time: { aba: "gestao", secao: "gestao-time" },
+  time: { aba: "gestao", secao: "gestao-perfil" },
   convites: { aba: "gestao", secao: "gestao-convites" },
 };
 
@@ -292,15 +291,14 @@ function PainelConteudo() {
                       </Moldura>
                     )}
                     {aba === "funil" && time && <FunilAba time={time} onErro={setErro} />}
+                    {/* Calendário já vem no próprio cartão de vidro (mesmo do Início). */}
                     {aba === "calendario" && time && (
-                      <Moldura>
                         <TabCalendario eventos={eventos} jogadores={linhas} teamId={time.team.id}
                           meuUserId={time.members.find((m) => m.isMe)?.userId ?? ""} meuPapel={time.role}
                           podeCriar={time.role === "admin" || time.role === "coach"}
                           prefillPlayerId={prefillEventoPlayerId}
                           onPrefillConsumido={() => setPrefillEventoPlayerId(null)}
                           onChange={carregar} onErro={setErro} />
-                      </Moldura>
                     )}
                     {aba === "maos" && podeEditarTime && (
                       <Moldura>
@@ -308,11 +306,24 @@ function PainelConteudo() {
                       </Moldura>
                     )}
                     {aba === "gestao" && time && (
-                      <div className="grid gap-3.5">
+                      // Um bloco por assunto, sem repetir capa nem equipe
+                      // (antes Perfil + Configurações mostravam as duas
+                      // coisas duas vezes). Zona de perigo só pro dono.
+                      // grid-cols-1 = coluna minmax(0,1fr): sem isso, no
+                      // celular a coluna crescia até o texto mais comprido
+                      // e tudo ficava cortado na borda direita.
+                      <div className="grid grid-cols-1 gap-3.5">
                         {info && (
                           <Moldura id="gestao-perfil" titulo="Perfil do time" icone={<IdCard size={15} />}>
-                            <TabPerfil info={info} staff={staff} editable={podeEditarTime} uploading={enviandoBanner}
-                              onUploadClick={() => bannerRef.current?.click()} onRemoveClick={removerBanner} />
+                            <PerfilDoTime
+                              info={info}
+                              podeEditar={podeEditarTime}
+                              enviandoBanner={enviandoBanner}
+                              onUploadBanner={() => bannerRef.current?.click()}
+                              onRemoveBanner={removerBanner}
+                              onChange={carregar}
+                              onErro={setErro}
+                            />
                             {podeEditarTime && (
                               <input
                                 ref={bannerRef}
@@ -329,15 +340,24 @@ function PainelConteudo() {
                           </Moldura>
                         )}
                         {info && (
-                          <Moldura id="gestao-time" titulo="Configurações do time" icone={<Settings2 size={15} />}>
-                            <TabTime info={info} staff={staff} labels={labels} jogadores={jogadores} podeEditar={time?.role !== "player"}
-                              onChange={carregar} onErro={setErro} />
+                          <Moldura id="gestao-equipe" titulo="Equipe técnica" icone={<ShieldCheck size={15} />}>
+                            <EquipeTecnica info={info} staff={staff} jogadores={jogadores} />
+                          </Moldura>
+                        )}
+                        {info && (
+                          <Moldura id="gestao-etiquetas" titulo="Etiquetas" icone={<Tag size={15} />}>
+                            <EtiquetasTime info={info} labels={labels} podeEditar={podeEditarTime} onChange={carregar} onErro={setErro} />
                           </Moldura>
                         )}
                         <Moldura id="gestao-convites" titulo="Convites e pedidos" icone={<Mail size={15} />}>
                           <TabConvites pendentes={pendentes} invites={invites} isAdmin={Boolean(isAdmin)} meuPapel={time.role}
                             onChange={carregar} onErro={setErro} />
                         </Moldura>
+                        {info && info.ownerId === time.members.find((m) => m.isMe)?.userId && (
+                          <Moldura id="gestao-perigo" titulo="Zona de perigo" icone={<AlertTriangle size={15} className="text-negative" />}>
+                            <ExcluirTime info={info} onExcluido={() => router.replace("/time")} />
+                          </Moldura>
+                        )}
                       </div>
                     )}
                   </motion.div>
@@ -358,7 +378,7 @@ function PainelConteudo() {
 // mexer no miolo de cada aba. Com título, vira seção da aba Gestão.
 function Moldura({ children, id, titulo, icone }: { children: React.ReactNode; id?: string; titulo?: string; icone?: React.ReactNode }) {
   return (
-    <section id={id} className="painel-vidro scroll-mt-24 rounded-3xl border border-white/10 p-4 sm:p-5">
+    <section id={id} className="painel-vidro min-w-0 scroll-mt-24 rounded-3xl border border-white/10 p-4 sm:p-5">
       {titulo && (
         <h2 className="mb-4 flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
           <span className="grid h-7 w-7 place-items-center rounded-lg bg-white/[0.06] text-muted">{icone}</span>

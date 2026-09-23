@@ -122,6 +122,8 @@ const ERROS: Record<string, string> = {
   CONVITE_ESGOTADO: "Este convite já atingiu o limite de usos.",
   MENSAGEM_VAZIA: "Escreva uma mensagem.",
   NAO_E_DO_MESMO_TIME: "Esse jogador não está mais no seu time.",
+  CONFIRMACAO_INVALIDA: "O nome digitado não confere com o nome do time.",
+  TIME_INEXISTENTE: "Esse time não existe mais.",
 };
 
 export function traduzErroTime(err: unknown): string {
@@ -1034,6 +1036,18 @@ export async function uploadTeamBanner(teamId: string, file: File): Promise<stri
 
 export async function removeTeamBanner(): Promise<void> {
   await updateTeamInfo({ bannerUrl: null });
+}
+
+// Exclui o time de vez (só o dono). A função do banco confere o nome
+// digitado, avisa os membros, preserva o histórico de times de cada
+// jogador e descompartilha ranges/árvores antes de apagar -- ver
+// supabase/migrations/20260924150000_excluir_time.sql.
+export async function deleteTeam(teamId: string, nomeDigitado: string): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("delete_team", { p_team_id: teamId, p_confirmacao: nomeDigitado });
+  if (error) throw error;
+  myTeamCache = null;
+  dashboardCache.clear();
 }
 
 export async function fetchTeamLabels(teamId: string): Promise<TeamLabel[]> {

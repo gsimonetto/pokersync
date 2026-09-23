@@ -103,16 +103,24 @@ export function TeamBanner({
         </div>
       </div>
 
+      {/* A capa inteira continua clicável, mas o convite fica no canto
+          (como "Trocar banner"): no centro ele cobria o nome do time no
+          celular. */}
       {semBannerEditavel && (
         <button
           type="button"
           onClick={onUploadClick}
           disabled={uploading}
-          className="absolute inset-0 flex flex-col items-center justify-center gap-1.5 text-muted transition-colors hover:text-ink disabled:opacity-60"
+          aria-label="Adicionar banner do time"
+          title={`Recomendado: ${BANNER_DIMENSOES} (proporção 4:1)`}
+          className="group/banner absolute inset-0 disabled:opacity-60 print:hidden"
         >
-          <ImagePlus size={22} />
-          <span className="text-[13px] font-semibold">{uploading ? "Enviando…" : "Adicionar banner do time"}</span>
-          <span className="text-[11px] text-muted/80">Recomendado: {BANNER_DIMENSOES} (proporção 4:1)</span>
+          <span className="absolute right-2.5 top-2.5 flex items-center gap-1.5 rounded-lg border border-white/20 bg-void/60 p-2 text-[12px] font-medium text-white/90 backdrop-blur-sm transition-colors group-hover/banner:bg-void/80 sm:right-3 sm:top-3 sm:px-3 sm:py-1.5">
+            <ImagePlus size={13} />
+            {/* Celular: só o ícone -- a capa é baixa e o texto cobria o nome. */}
+            <span className="hidden sm:inline">{uploading ? "Enviando…" : "Adicionar banner"}</span>
+          </span>
+          <span className="absolute right-3 top-12 hidden text-[10.5px] text-white/55 sm:block">{BANNER_DIMENSOES} · 4:1</span>
         </button>
       )}
 
