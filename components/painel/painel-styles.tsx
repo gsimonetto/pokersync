@@ -86,6 +86,13 @@ export function PainelStyles() {
         stroke-width: 1.6;
       }
 
+      /* Números da tela inicial em Geist (components/painel/fonte-numeros.ts);
+         a variável só existe dentro do .painel, então nada vaza pro resto
+         do app. Space Grotesk fica de reserva se a Geist não carregar. */
+      .painel-numero {
+        font-family: var(--font-numeros), var(--font-sans), ui-sans-serif, sans-serif;
+      }
+
       /* Nome do jogador no cabeçalho, em degradê dourado. */
       .painel-ouro {
         background: linear-gradient(92deg, #f1d78a, #d4af37 55%, #b8932a);

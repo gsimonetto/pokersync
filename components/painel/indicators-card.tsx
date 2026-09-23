@@ -16,6 +16,11 @@ type Indicador = {
    *  até o valor na entrada. */
   alvo: number;
   formatar: (n: number) => string;
+  /** Unidade mostrada menor e apagada ao lado do número ("%"). */
+  sufixo?: string;
+  /** Cor do NÚMERO só quando ela significa algo (ROI positivo/negativo);
+   *  sem isso o número fica branco e a cor do indicador vai só no ícone. */
+  corValor?: string;
   detalhe: string;
   icone: typeof Flame;
   cor: string;
@@ -47,7 +52,9 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
       rotulo: "ROI total",
       valor: pct(perf.roi_pct, { sinal: true, casas: Math.abs(perf.roi_pct) >= 100 ? 0 : 1 }),
       alvo: perf.roi_pct,
-      formatar: (n) => pct(n, { sinal: true, casas: Math.abs(perf.roi_pct!) >= 100 ? 0 : 1 }),
+      formatar: (n) => semPct(pct(n, { sinal: true, casas: Math.abs(perf.roi_pct!) >= 100 ? 0 : 1 })),
+      sufixo: "%",
+      corValor: perf.roi_pct > 0 ? "#22c55e" : perf.roi_pct < 0 ? "#e0555a" : undefined,
       detalhe: `${num(perf.num_sessoes ?? 0)} sessões`,
       icone: Percent,
       cor: perf.roi_pct >= 0 ? "#22c55e" : "#e0555a",
@@ -84,7 +91,8 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
       rotulo: "Acerto no treino",
       valor: pct(perf.taxa_acerto_treino_pct, { casas: 0 }),
       alvo: perf.taxa_acerto_treino_pct,
-      formatar: (n) => pct(n, { casas: 0 }),
+      formatar: (n) => semPct(pct(n, { casas: 0 })),
+      sufixo: "%",
       // Antes: "0 drills hoje" ao lado de um acerto de TODO o histórico --
       // dois períodos no mesmo quadro. Os drills de hoje já aparecem em
       // "Sua semana", no card de metas.
@@ -108,13 +116,18 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
   return lista;
 }
 
-// Tamanho do número conforme o comprimento: o quadro tem largura fixa (3
-// por linha no computador) e um valor longo, como "+14.900%", passava
-// por cima do quadro vizinho. Número curto continua grande.
-function tamanhoValor(valor: string): string {
-  if (valor.length > 8) return "text-[16px]";
-  if (valor.length > 6) return "text-[19px]";
-  return "text-[22px]";
+const semPct = (txt: string) => txt.replace(/%$/, "");
+
+// Tamanho do número conforme o comprimento (sem a unidade): o quadro tem
+// largura fixa (3 por linha no computador) e um valor longo, como
+// "+14.900", passaria por cima do quadro vizinho. Número curto fica
+// grande. Em janela baixa tudo desce um degrau, pro card caber sem barra.
+function tamanhoValor(numero: string): string {
+  const n = numero.length;
+  if (n <= 3) return "text-[30px] xl:[@media(max-height:819px)]:text-[24px]";
+  if (n <= 5) return "text-[27px] xl:[@media(max-height:819px)]:text-[22px]";
+  if (n <= 7) return "text-[23px] xl:[@media(max-height:819px)]:text-[19px]";
+  return "text-[19px] xl:[@media(max-height:819px)]:text-[16px]";
 }
 
 export function IndicatorsCard({
@@ -144,7 +157,7 @@ export function IndicatorsCard({
         // inteira tem que caber sem rolagem, e 3x2 cabe onde 2x3 não
         // cabia. No celular continua 2 colunas, que é o confortável.
         <ul className="grid grid-cols-2 gap-2 xl:grid-cols-3">
-          {itens.map(({ rotulo, valor, alvo, formatar, detalhe, icone: Icone, cor, progresso: barra }, i) => (
+          {itens.map(({ rotulo, valor, alvo, formatar, sufixo, corValor, detalhe, icone: Icone, cor, progresso: barra }, i) => (
             <motion.li
               key={rotulo}
               className="min-w-0"
@@ -162,12 +175,17 @@ export function IndicatorsCard({
                   <span className="min-w-0 text-[12px] leading-tight text-muted/80">{rotulo}</span>
                   <Icone size={15} className="shrink-0" style={{ color: cor }} aria-hidden />
                 </span>
+                {/* Número "presente": semibold, letras juntas e branco. A cor
+                    do indicador fica no ícone; no número só entra cor com
+                    significado (ROI verde/vermelho). A unidade vem menor e
+                    apagada, pra o olho pegar primeiro o valor. */}
                 <p
-                  className={`tnum mt-2.5 truncate font-light leading-none xl:[@media(max-height:819px)]:mt-1.5 ${tamanhoValor(valor)}`}
-                  style={{ color: cor }}
+                  className={`painel-numero tnum mt-2 flex items-baseline truncate font-semibold leading-none tracking-[-0.03em] xl:[@media(max-height:819px)]:mt-1.5 ${tamanhoValor(formatar(alvo))}`}
+                  style={{ color: corValor ?? "#ffffff" }}
                   title={valor}
                 >
                   <Numero valor={alvo} formatar={formatar} />
+                  {sufixo && <span className="ml-0.5 text-[0.55em] font-medium tracking-normal text-muted/70">{sufixo}</span>}
                 </p>
                 {barra != null && <BarraProgresso className="mt-1.5 h-1" pct={barra} cor={cor} atraso={0.5} />}
                 <p className="tnum mt-1.5 truncate text-[11px] leading-tight text-muted/70">{detalhe}</p>
