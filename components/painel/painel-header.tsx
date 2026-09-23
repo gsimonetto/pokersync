@@ -1,9 +1,11 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Flame, Wallet } from "lucide-react";
 import { formatBRL } from "@/lib/format";
-import { Selo, TileIcone } from "./painel-card";
+import { Chip } from "@/components/chip";
+import { EASE, Numero, Selo, TileIcone } from "./painel-card";
 import { usePainelDados } from "./painel-dados";
 import { dataCurta, num } from "./formato";
 
@@ -53,12 +55,11 @@ export function PainelHeader() {
         <div className="mt-1.5 flex flex-wrap items-center gap-3">
           <p className="text-[12px] text-muted/80">Estude · Jogue · Revise · Evolua</p>
           {streak != null && streak > 0 && (
-            <p className="inline-flex items-center gap-1.5 rounded-full border border-evolution/25 bg-evolution/10 px-2.5 py-1">
-              <Flame size={12} className="text-evolution" />
-              <span className="text-[11px] font-semibold text-evolution">
-                {num(streak)} {streak === 1 ? "dia seguido" : "dias seguidos"}
-              </span>
-            </p>
+            // Mesmo Chip padrão (brilho na cor) dos outros módulos.
+            <Chip color="#f59e0b">
+              <Flame size={11} />
+              {num(streak)} {streak === 1 ? "dia seguido" : "dias seguidos"}
+            </Chip>
           )}
         </div>
       </div>
@@ -68,10 +69,22 @@ export function PainelHeader() {
             e sem ele a banca cabe inteira na largura da tela. */}
         <div className="hidden text-right sm:block">
           {/* 24h, sem AM/PM: formato usado no Brasil. */}
-          <p className="tnum text-2xl font-light leading-none text-ink/80 sm:text-[28px]">
-            {agora
-              ? `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
-              : "--:--"}
+          {/* A cada minuto o horário novo desce no lugar do antigo. */}
+          <p className="tnum relative overflow-hidden text-2xl font-light leading-none text-ink/80 sm:text-[28px]">
+            <AnimatePresence mode="popLayout" initial={false}>
+              <motion.span
+                key={agora ? `${agora.getHours()}:${agora.getMinutes()}` : "-"}
+                className="block"
+                initial={{ y: "-60%", opacity: 0 }}
+                animate={{ y: 0, opacity: 1 }}
+                exit={{ y: "60%", opacity: 0 }}
+                transition={{ duration: 0.35, ease: EASE }}
+              >
+                {agora
+                  ? `${String(agora.getHours()).padStart(2, "0")}:${String(agora.getMinutes()).padStart(2, "0")}`
+                  : "--:--"}
+              </motion.span>
+            </AnimatePresence>
           </p>
           <p className="mt-1 text-[11px] text-muted/80">{agora ? dataCurta(agora) : ""}</p>
         </div>
@@ -83,14 +96,14 @@ export function PainelHeader() {
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-[0.1em] text-muted/80">Banca total</p>
             <p className="tnum text-xl font-semibold leading-tight">
-              {bancaAtual == null ? "—" : formatBRL(bancaAtual)}
+              {bancaAtual == null ? "—" : <Numero valor={bancaAtual} formatar={formatBRL} duracao={1100} />}
             </p>
           </div>
           {resultado30d != null && (
             <div className="shrink-0 border-l border-hairline pl-3">
               <Selo cor={corResultado}>
                 {resultado30d > 0 ? "+" : ""}
-                {formatBRL(resultado30d)}
+                <Numero valor={resultado30d} formatar={formatBRL} duracao={1100} />
               </Selo>
               <p className="mt-1 text-[11px] text-muted/80">30 dias</p>
             </div>

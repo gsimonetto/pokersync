@@ -1,6 +1,13 @@
 "use client";
 
-import { useRef, useState, type ReactNode } from "react";
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from "react";
+import { motion, useReducedMotion } from "framer-motion";
+import { Chip } from "@/components/chip";
+
+// Curva de saída "com peso" (rápida no começo, assentando no fim) usada em
+// todas as animações do Painel -- uma só, pra tela inteira se mover com o
+// mesmo ritmo em vez de cada card ter o seu.
+export const EASE = [0.22, 1, 0.36, 1] as const;
 
 // Casca visual de todo card do Painel: preto (bg-surface), borda fina,
 // um fio de luz no topo e o MESMO facho da tela de login — brilho branco
@@ -13,6 +20,8 @@ export function PainelCard({
   children,
   className = "",
   style,
+  ordem = 0,
+  rolagem = true,
 }: {
   title: string;
   icon?: ReactNode;
@@ -20,19 +29,29 @@ export function PainelCard({
   children: ReactNode;
   className?: string;
   style?: React.CSSProperties;
+  /** Posição na entrada em sequência (0 = primeiro card a aparecer). */
+  ordem?: number;
+  /** false = o card nunca ganha barra de rolagem (ex.: Calendário, que
+   *  foi desenhado pra caber inteiro). */
+  rolagem?: boolean;
 }) {
   const ref = useRef<HTMLElement>(null);
   const [mouse, setMouse] = useState({ x: 0, y: 0 });
 
   return (
-    <section
+    // Entrada em sequência: cada card sobe um pouco e assenta, um depois
+    // do outro (70ms de intervalo), na ordem de leitura da tela.
+    <motion.section
       ref={ref}
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.6, ease: EASE, delay: 0.05 + ordem * 0.07 }}
       onMouseMove={(e) => {
         const r = ref.current?.getBoundingClientRect();
         if (!r) return;
         setMouse({ x: e.clientX - r.left, y: e.clientY - r.top });
       }}
-      className={`painel-vidro group fade-in-up relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-4 sm:p-5 ${className}`}
+      className={`painel-vidro group relative flex flex-col overflow-hidden rounded-3xl border border-white/10 p-4 sm:p-5 xl:p-4 ${className}`}
       style={style}
     >
       {/* -inset-px cobre a borda também, senão o brilho para 1px antes
@@ -62,10 +81,18 @@ export function PainelCard({
         </h2>
         {action}
       </header>
-      {/* O corpo é quem rola quando o card fica mais baixo que o
-          conteúdo -- assim a TELA nunca ganha barra de rolagem. */}
-      <div className="painel-scroll relative mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">{children}</div>
-    </section>
+      {/* As listas mostram no máximo 3 itens antes de rolar (ListaLimitada),
+          então o corpo do card normalmente cabe sem barra. A rolagem do
+          corpo fica só como rede de segurança pra janela muito baixa --
+          e some de vez nos cards com rolagem={false}. */}
+      <div
+        className={`painel-scroll relative mt-4 flex min-h-0 flex-1 flex-col overflow-x-hidden xl:mt-3 ${
+          rolagem ? "overflow-y-auto" : "overflow-y-hidden"
+        }`}
+      >
+        {children}
+      </div>
+    </motion.section>
   );
 }
 
@@ -89,16 +116,16 @@ export function TileIcone({ children, cor, grande = false }: { children: ReactNo
   );
 }
 
-// Selo pequeno (prioridade, categoria, data) — mesma ideia dos "High"/
-// "Medium" da referência visual.
-export function Selo({ children, cor }: { children: ReactNode; cor: string }) {
+// Selo pequeno (prioridade, situação da meta, resultado) — é o Chip
+// padrão do produto (components/chip.tsx: borda, fundo translúcido e
+// brilho na cor), o mesmo dos Módulos, do Time e do Marketplace. Antes o
+// Painel tinha um selo próprio, chapado e sem brilho, e destoava do resto.
+// A cor precisa ser hex de 6 dígitos (o Chip soma a transparência nela).
+export function Selo({ children, cor, pequeno = false }: { children: ReactNode; cor: string; pequeno?: boolean }) {
   return (
-    <span
-      className="inline-flex shrink-0 items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-bold uppercase tracking-[0.05em]"
-      style={{ background: `${cor}1f`, color: cor }}
-    >
+    <Chip color={cor} size={pequeno ? "sm" : "md"} className="shrink-0">
       {children}
-    </span>
+    </Chip>
   );
 }
 
@@ -108,7 +135,7 @@ export function Selo({ children, cor }: { children: ReactNode; cor: string }) {
 export function Linha({ children, className = "" }: { children: ReactNode; className?: string }) {
   return (
     <div
-      className={`painel-bloco rounded-2xl border border-white/5 p-3 transition-colors hover:border-white/15 ${className}`}
+      className={`painel-bloco rounded-2xl border border-white/5 p-3 transition hover:border-white/15 active:scale-[0.99] ${className}`}
     >
       {children}
     </div>
@@ -132,4 +159,140 @@ export function Esqueleto({ linhas = 3, altura = 44 }: { linhas?: number; altura
 // própria frase e o grid ficava desalinhado no primeiro carregamento.
 export function CardHint({ children }: { children: ReactNode }) {
   return <p className="text-sm text-muted">{children}</p>;
+}
+
+// Lista que mostra no máximo `visiveis` itens (padrão 3) e só a partir
+// daí ganha barra de rolagem -- pedido explícito: nada de barra em card
+// com pouca coisa. A altura é MEDIDA (fim do 3º item), não chutada, então
+// funciona com itens de alturas diferentes. Quando rola, a borda de baixo
+// esmaece pra avisar que tem mais conteúdo.
+export function ListaLimitada({
+  children,
+  visiveis = 3,
+  className = "",
+}: {
+  children: ReactNode;
+  visiveis?: number;
+  className?: string;
+}) {
+  const ref = useRef<HTMLUListElement>(null);
+  const [altura, setAltura] = useState<number | undefined>(undefined);
+
+  useLayoutEffect(() => {
+    const ul = ref.current;
+    if (!ul) return;
+    const medir = () => {
+      const itens = ul.children;
+      if (itens.length <= visiveis) {
+        setAltura(undefined);
+        return;
+      }
+      const ultimo = itens[visiveis - 1] as HTMLElement;
+      setAltura(ultimo.offsetTop + ultimo.offsetHeight);
+    };
+    medir();
+    const ro = new ResizeObserver(medir);
+    for (const filho of Array.from(ul.children)) ro.observe(filho);
+    return () => ro.disconnect();
+  }, [children, visiveis]);
+
+  const rola = altura != null;
+  return (
+    <ul
+      ref={ref}
+      className={`painel-scroll relative flex flex-col gap-2 ${rola ? "overflow-y-auto pr-1" : ""} ${className}`}
+      style={
+        rola
+          ? {
+              maxHeight: altura,
+              WebkitMaskImage: "linear-gradient(to bottom, #000 calc(100% - 18px), transparent)",
+              maskImage: "linear-gradient(to bottom, #000 calc(100% - 18px), transparent)",
+            }
+          : undefined
+      }
+    >
+      {children}
+    </ul>
+  );
+}
+
+// Item de lista que entra em sequência (um pouco depois do card).
+export function ItemAnimado({
+  children,
+  indice,
+  className = "",
+}: {
+  children: ReactNode;
+  indice: number;
+  className?: string;
+}) {
+  return (
+    <motion.li
+      initial={{ opacity: 0, x: -8 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.4, ease: EASE, delay: 0.35 + indice * 0.06 }}
+      className={className}
+    >
+      {children}
+    </motion.li>
+  );
+}
+
+// Número que conta do valor anterior até o novo (0 na primeira vez) --
+// dá leitura de "dado vivo" sem efeito gratuito. Quem pediu menos
+// movimento no sistema vê o valor final direto.
+export function Numero({ valor, formatar, duracao = 900 }: { valor: number; formatar: (n: number) => string; duracao?: number }) {
+  const reduzir = useReducedMotion();
+  const [mostrado, setMostrado] = useState(reduzir ? valor : 0);
+  const anterior = useRef(reduzir ? valor : 0);
+
+  useEffect(() => {
+    if (reduzir) {
+      setMostrado(valor);
+      anterior.current = valor;
+      return;
+    }
+    const de = anterior.current;
+    const inicio = performance.now();
+    let quadro = 0;
+    const passo = (agora: number) => {
+      const t = Math.min(1, (agora - inicio) / duracao);
+      const suave = 1 - Math.pow(1 - t, 3);
+      setMostrado(de + (valor - de) * suave);
+      if (t < 1) quadro = requestAnimationFrame(passo);
+      else anterior.current = valor;
+    };
+    quadro = requestAnimationFrame(passo);
+    return () => cancelAnimationFrame(quadro);
+  }, [valor, duracao, reduzir]);
+
+  return <>{formatar(mostrado)}</>;
+}
+
+// Barra de progresso que enche do zero até o valor ao aparecer.
+export function BarraProgresso({
+  pct,
+  cor,
+  fundo,
+  className = "h-1.5",
+  atraso = 0.3,
+}: {
+  pct: number;
+  cor: string;
+  /** Preenchimento (cor sólida ou degradê); padrão = a própria cor. */
+  fundo?: string;
+  className?: string;
+  atraso?: number;
+}) {
+  return (
+    <div className={`overflow-hidden rounded-full bg-white/10 ${className}`}>
+      <motion.div
+        className="h-full rounded-full"
+        initial={{ width: 0 }}
+        animate={{ width: `${Math.max(0, Math.min(100, pct))}%` }}
+        transition={{ duration: 0.9, ease: EASE, delay: atraso }}
+        style={{ background: fundo ?? cor }}
+      />
+    </div>
+  );
 }

@@ -5,7 +5,19 @@ import { BookOpen, Check, CheckCircle2, Flame, Plus, Target, Trash2, TrendingUp,
 import { addGoal, deleteGoal } from "@/lib/services/bankroll-service";
 import { goalProgress } from "@/lib/bankroll/calc";
 import type { GoalType } from "@/lib/bankroll/types";
-import { CardHint, Esqueleto, Linha, PainelCard, Selo, TileIcone } from "./painel-card";
+import { motion } from "framer-motion";
+import {
+  BarraProgresso,
+  CardHint,
+  EASE,
+  Esqueleto,
+  ItemAnimado,
+  Linha,
+  ListaLimitada,
+  PainelCard,
+  Selo,
+  TileIcone,
+} from "./painel-card";
 import { usePainelDados } from "./painel-dados";
 import { num } from "./formato";
 import { SITUACAO_VISUAL, situacaoMeta, textoProgresso } from "./metas";
@@ -55,7 +67,15 @@ function fimDaSemana(): string {
 // + goalProgress), então o que for criado aqui aparece lá e vice-versa.
 // Embaixo, "Sua semana": dias ativos (xp_events) e volume de mãos
 // importadas por dia, com o total da semana anterior pra comparar.
-export function HabitsCard({ style, className }: { style?: React.CSSProperties; className?: string }) {
+export function HabitsCard({
+  style,
+  className,
+  ordem,
+}: {
+  style?: React.CSSProperties;
+  className?: string;
+  ordem?: number;
+}) {
   const { carregando, metas, setMetas, todasSessoes, logsEstudo, diasAtivos7, drillsHoje, maos14d } = usePainelDados();
 
   const [criando, setCriando] = useState(false);
@@ -170,6 +190,7 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
       }
       style={style}
       className={className}
+      ordem={ordem}
     >
       {criando && (
         <form onSubmit={salvarMeta} className="mb-3 rounded-2xl border border-white/5 bg-white/[0.03] p-3">
@@ -222,141 +243,154 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
         <Esqueleto linhas={3} altura={58} />
       ) : (
         <>
-          {semanais.length === 0 ? (
-            <CardHint>
-              Nenhuma meta ativa. Use <span className="font-semibold text-ink">Nova meta</span> para definir quanto você
-              quer jogar ou estudar nesta semana.
-            </CardHint>
-          ) : (
-            <ul className="flex flex-col gap-2.5">
-              {semanais.map((g) => {
-                const p = goalProgress(g, todasSessoes, logsEstudo);
-                const feito = Math.min(100, Math.round(p.pct));
-                const situacao = SITUACAO_VISUAL[situacaoMeta(p.pct)];
-                const { icone: Icone, cor } = VISUAL[g.type];
-                return (
-                  <li key={g.id} className="group/meta">
-                    <Linha>
-                      {/* Três andares: nome e ritmo em cima, barra no
-                          meio, "1 de 20 sessões" embaixo. Antes nome,
-                          progresso, selo e lixeira dividiam UMA linha e,
-                          no card estreito, o texto era espremido. */}
-                      <div className="flex items-center gap-3">
-                        <TileIcone cor={cor}>
-                          <Icone size={14} />
-                        </TileIcone>
-                        <div className="min-w-0 flex-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <span className="truncate text-sm font-medium">{ROTULO[g.type]}</span>
-                            <span className="flex shrink-0 items-center gap-1.5">
-                              {/* Selo com o RITMO da meta (em dia / atrasada /
-                                  concluída) no lugar do percentual, que só
-                                  repetia o "2 de 20" logo abaixo. */}
-                              <Selo cor={situacao.cor}>{situacao.texto}</Selo>
-                              <button
-                                type="button"
-                                onClick={() => removerMeta(g.id)}
-                                aria-label={`Apagar meta de ${ROTULO[g.type]}`}
-                                className="grid h-6 w-6 place-items-center rounded-md text-transparent transition-colors hover:text-negative focus:text-negative group-hover/meta:text-muted/60"
-                              >
-                                <Trash2 size={13} />
-                              </button>
-                            </span>
-                          </div>
-                          <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
-                            <div
-                              className="h-full rounded-full transition-[width] duration-700"
-                              style={{
-                                width: `${feito}%`,
-                                background: `linear-gradient(90deg, ${cor}, ${cor}66)`,
-                              }}
-                            />
-                          </div>
-                          <span className="tnum mt-1.5 block truncate text-[11px] text-muted">
-                            {textoProgresso(g, p.current)}
+          {/* Uma lista só, com no máximo 3 itens à vista: "Sua semana" é
+              sempre o primeiro (resumo que todo jogador tem) e as metas
+              vêm depois. Antes eram dois blocos empilhados e, com 3 metas,
+              o card estourava a altura. */}
+          <ListaLimitada>
+            {diasAtivos7 && (
+              <ItemAnimado indice={0}>
+                <Linha className="!p-2.5">
+                  <div className="flex items-center gap-3">
+                    <TileIcone cor="#F59E0B">
+                      <Flame size={14} />
+                    </TileIcone>
+                    <span className="min-w-0 flex-1">
+                      <span className="block text-sm font-medium">Sua semana</span>
+                      <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted/80">
+                        {volume ? (
+                          <span className="tnum">
+                            <span className="font-semibold text-ink/90">{num(volume.semana)}</span> mãos
+                            {volume.anterior > 0 && <> · {num(volume.anterior)} na anterior</>}
                           </span>
-                        </div>
-                      </div>
-                    </Linha>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-
-          {diasAtivos7 && (
-            <div className="mt-4">
-              <Linha>
-                <div className="flex items-center gap-3">
-                  <TileIcone cor="#F59E0B">
-                    <Flame size={14} />
-                  </TileIcone>
-                  <span className="min-w-0 flex-1">
-                    <span className="block text-sm font-medium">Sua semana</span>
-                    <span className="flex flex-wrap items-center gap-x-1.5 text-[11px] text-muted/80">
-                      {volume ? (
-                        <span className="tnum">
-                          <span className="font-semibold text-ink/90">{num(volume.semana)}</span> mãos
-                          {volume.anterior > 0 && <> · {num(volume.anterior)} na anterior</>}
-                        </span>
-                      ) : (
-                        <span>dias ativos</span>
-                      )}
-                      {drillsHoje != null && (
-                        <>
-                          <span aria-hidden>·</span>
-                          <span className="tnum inline-flex items-center gap-1 text-training">
-                            <CheckCircle2 size={11} />
-                            {num(drillsHoje)} drill{drillsHoje === 1 ? "" : "s"} hoje
-                          </span>
-                        </>
-                      )}
-                    </span>
-                  </span>
-                  <Selo cor={diasAtivos7.filter(Boolean).length >= 5 ? "#22c55e" : "#c4c7c8"}>
-                    {diasAtivos7.filter(Boolean).length} de 7 dias
-                  </Selo>
-                </div>
-                {/* Cada coluna é um dia: número de mãos, barrinha (altura
-                    relativa ao dia mais cheio) e bolinha de dia ativo. O
-                    número fica sempre à vista -- antes só aparecia
-                    passando o mouse, e no celular não dava pra ver. */}
-                <div className="mt-3 flex items-end justify-between">
-                  {diasAtivos7.map((ativo, i) => {
-                    const qtd = volume?.contagens[i] ?? 0;
-                    const temMaos = volume != null && volume.semana > 0;
-                    return (
-                      <span key={i} className="flex min-w-[26px] flex-col items-center gap-1">
-                        {temMaos && (
+                        ) : (
+                          <span>dias ativos</span>
+                        )}
+                        {drillsHoje != null && (
                           <>
-                            <span className="tnum h-3.5 text-[11px] leading-none text-muted/80">
-                              {qtd > 0 ? num(qtd) : ""}
-                            </span>
-                            <span className="flex h-5 items-end">
-                              <span
-                                className="w-1.5 rounded-full"
-                                style={{
-                                  height: qtd > 0 ? `${Math.max(3, Math.round((qtd / volume.maximo) * 20))}px` : "2px",
-                                  background: qtd > 0 ? OURO : "rgba(255,255,255,0.12)",
-                                }}
-                              />
+                            <span aria-hidden>·</span>
+                            <span className="tnum inline-flex items-center gap-1 text-training">
+                              <CheckCircle2 size={11} />
+                              {num(drillsHoje)} drill{drillsHoje === 1 ? "" : "s"} hoje
                             </span>
                           </>
                         )}
-                        <span className="text-[11px] text-muted/70">{letras[i] ?? ""}</span>
-                        <span
-                          aria-label={ativo ? "dia ativo" : "dia sem atividade"}
-                          className={`grid h-6 w-6 place-items-center rounded-full ${
-                            ativo ? "bg-[#d4af37] text-black" : "border border-hairline text-transparent"
-                          }`}
-                        >
-                          <Check size={12} aria-hidden />
-                        </span>
                       </span>
-                    );
-                  })}
-                </div>
-              </Linha>
+                    </span>
+                    <Selo cor={diasAtivos7.filter(Boolean).length >= 5 ? "#22c55e" : "#c4c7c8"} pequeno>
+                      {diasAtivos7.filter(Boolean).length} de 7 dias
+                    </Selo>
+                  </div>
+                  {/* Cada coluna é um dia: número de mãos, barrinha (altura
+                      relativa ao dia mais cheio) e bolinha de dia ativo. O
+                      número fica sempre à vista -- antes só aparecia
+                      passando o mouse, e no celular não dava pra ver. */}
+                  <div className="mt-2 flex items-end justify-between">
+                    {diasAtivos7.map((ativo, i) => {
+                      const qtd = volume?.contagens[i] ?? 0;
+                      const temMaos = volume != null && volume.semana > 0;
+                      return (
+                        <span key={i} className="flex min-w-[26px] flex-col items-center gap-1">
+                          {temMaos && (
+                            <>
+                              <span className="tnum h-3.5 text-[11px] leading-none text-muted/80">
+                                {qtd > 0 ? num(qtd) : ""}
+                              </span>
+                              <span className="flex h-5 items-end">
+                                <motion.span
+                                  className="w-1.5 rounded-full"
+                                  initial={{ height: 2 }}
+                                  animate={{
+                                    height: qtd > 0 ? Math.max(3, Math.round((qtd / volume.maximo) * 20)) : 2,
+                                  }}
+                                  transition={{ duration: 0.6, ease: EASE, delay: 0.5 + i * 0.05 }}
+                                  style={{ background: qtd > 0 ? OURO : "rgba(255,255,255,0.12)" }}
+                                />
+                              </span>
+                            </>
+                          )}
+                          <span className="text-[11px] text-muted/70">{letras[i] ?? ""}</span>
+                          {/* Dia ativo "carimba" (cresce com mola), um de cada
+                              vez, da esquerda pra direita. */}
+                          <motion.span
+                            aria-label={ativo ? "dia ativo" : "dia sem atividade"}
+                            initial={ativo ? { scale: 0.4, opacity: 0 } : false}
+                            animate={{ scale: 1, opacity: 1 }}
+                            transition={{ type: "spring", stiffness: 500, damping: 18, delay: 0.55 + i * 0.06 }}
+                            className={`grid h-5 w-5 place-items-center rounded-full ${
+                              ativo ? "bg-[#d4af37] text-black" : "border border-hairline text-transparent"
+                            }`}
+                          >
+                            <Check size={11} aria-hidden />
+                          </motion.span>
+                        </span>
+                      );
+                    })}
+                  </div>
+                </Linha>
+              </ItemAnimado>
+            )}
+                {semanais.map((g, i) => {
+                  const p = goalProgress(g, todasSessoes, logsEstudo);
+                  const feito = Math.min(100, Math.round(p.pct));
+                  const situacao = SITUACAO_VISUAL[situacaoMeta(p.pct)];
+                  const { icone: Icone, cor } = VISUAL[g.type];
+                  return (
+                    <ItemAnimado key={g.id} indice={i + 1} className="group/meta">
+                      <Linha className="!p-2.5">
+                        {/* Dois andares: nome + "5 de 20 sessões" + ritmo em
+                            cima, barra embaixo. Compacto pra 3 itens caberem
+                            no card sem barra de rolagem; o progresso fica ao
+                            lado do nome e corta com reticências se faltar
+                            espaço, sem empurrar o selo. */}
+                        <div className="flex items-center gap-3">
+                          <TileIcone cor={cor}>
+                            <Icone size={14} />
+                          </TileIcone>
+                          <div className="min-w-0 flex-1">
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="min-w-0 truncate text-sm">
+                                <span className="font-medium">{ROTULO[g.type]}</span>
+                                <span className="tnum text-[11px] text-muted"> · {textoProgresso(g, p.current)}</span>
+                              </span>
+                              <span className="flex shrink-0 items-center gap-1.5">
+                                {/* Selo com o RITMO da meta (em dia / atrasada /
+                                    concluída) no lugar do percentual, que só
+                                    repetia o "2 de 20" logo abaixo. */}
+                                <Selo cor={situacao.cor} pequeno>
+                                  {situacao.texto}
+                                </Selo>
+                                <button
+                                  type="button"
+                                  onClick={() => removerMeta(g.id)}
+                                  aria-label={`Apagar meta de ${ROTULO[g.type]}`}
+                                  className="grid h-6 w-6 place-items-center rounded-md text-transparent transition-colors hover:text-negative focus:text-negative group-hover/meta:text-muted/60"
+                                >
+                                  <Trash2 size={13} />
+                                </button>
+                              </span>
+                            </div>
+                            <BarraProgresso
+                              className="mt-2 h-1.5"
+                              pct={feito}
+                              cor={cor}
+                              fundo={`linear-gradient(90deg, ${cor}, ${cor}66)`}
+                              atraso={0.45 + i * 0.06}
+                            />
+                          </div>
+                        </div>
+                      </Linha>
+                    </ItemAnimado>
+                  );
+                })}
+          </ListaLimitada>
+
+          {semanais.length === 0 && (
+            <div className="mt-3">
+              <CardHint>
+                Nenhuma meta ativa. Use <span className="font-semibold text-ink">Nova meta</span> para definir quanto você
+                quer jogar ou estudar nesta semana.
+              </CardHint>
             </div>
           )}
         </>
