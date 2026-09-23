@@ -2,11 +2,10 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { Target, Flame, BarChart3, MapPin, Radar as RadarIcon, Lock } from "lucide-react";
+import { Target, Flame, BarChart3, MapPin, Radar as RadarIcon, Lock, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
-import { PreflopPanel } from "@/components/analysis/PreflopMatrix";
 import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { StatisticsTab } from "@/components/analysis/StatisticsTab";
 import { RadarPanel } from "@/components/analysis/RadarPanel";
@@ -18,6 +17,7 @@ import { FiltrosAtivos } from "@/components/performance/filtros-ativos";
 import { ResumoPerformance } from "@/components/performance/resumo";
 import { MatrizMaos } from "@/components/performance/graficos/matriz-maos";
 import { LinhaSemanal } from "@/components/performance/graficos/linha-semanal";
+import { Decisoes } from "@/components/performance/graficos/decisoes";
 import { BarrasPosicao } from "@/components/performance/graficos/barras-posicao";
 import { FunilRuas } from "@/components/performance/graficos/funil-ruas";
 import { CurvaLucro } from "@/components/performance/graficos/curva-lucro";
@@ -27,7 +27,6 @@ import { fetchSessions } from "@/lib/services/bankroll-service";
 import type { Session } from "@/lib/bankroll/types";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
 import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
-import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
 import { isAddonUnlockedFor } from "@/lib/plans/plans-data";
 import { useCurrencyPreference } from "@/lib/hooks/use-currency-preference";
 import { RadarModuleMenu } from "@/components/radar/radar-module-menu";
@@ -56,9 +55,10 @@ import {
   type BuyinBucket,
 } from "@/types/analysis";
 
-type TabKey = "preflop" | "postflop" | "estatisticas" | "posicao" | "radar";
+type TabKey = "geral" | "preflop" | "postflop" | "estatisticas" | "posicao" | "radar";
 
 const TABS: { value: TabKey; label: string; icon: typeof Target }[] = [
+  { value: "geral", label: "Visão geral", icon: LayoutGrid },
   { value: "preflop", label: "Preflop", icon: Target },
   { value: "postflop", label: "Postflop", icon: Flame },
   { value: "estatisticas", label: "Estatísticas", icon: BarChart3 },
@@ -71,13 +71,12 @@ export default function PerformancePage() {
   const [tournament, setTournament] = useState<TournamentMetrics | null>(null);
   const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
   const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
-  const [perf, setPerf] = useState<PlayerPerformance | null>(null);
   // Sessões da Gestão de Banca: curva de lucro e ROI por buy-in (mesma
   // fonte do Lucro total/ROI da aba Estatísticas).
   const [sessoesBanca, setSessoesBanca] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
-  const [tab, setTabState] = useState<TabKey>("preflop");
+  const [tab, setTabState] = useState<TabKey>("geral");
   // Direção da troca de aba: o conteúdo novo entra pelo lado da aba
   // clicada (à direita = vem da direita), que é o que o olho espera.
   const [direcao, setDirecao] = useState(1);
@@ -124,12 +123,11 @@ export default function PerformancePage() {
   async function loadAll(since: string | null = radarSince) {
     setErro("");
     try {
-      const [r, tourn, sessions, po, p, banca] = await Promise.all([
+      const [r, tourn, sessions, po, banca] = await Promise.all([
         fetchAnalysisHandRows(since),
         fetchTournamentMetrics(tournamentBuyinFilter),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
-        fetchPlayerPerformance(),
         // Sem sessão de banca a tela segue normal (só os gráficos de
         // torneio ficam vazios).
         fetchSessions().catch(() => [] as Session[]),
@@ -139,7 +137,6 @@ export default function PerformancePage() {
       setTournament(tourn);
       setTournamentSessions(sessions);
       setPayouts(po);
-      setPerf(p);
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar a análise.");
     } finally {
@@ -247,6 +244,12 @@ export default function PerformancePage() {
               </div>
             </header>
 
+            {/* Abas logo abaixo do título, como nos outros módulos; ficam
+                presas no topo ao rolar. */}
+            <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-white/[0.06] bg-black/70 px-4 pt-2 backdrop-blur-xl md:-mx-6 md:px-6">
+              <AbasAnimadas value={tab} onChange={setTab} options={TABS} />
+            </div>
+
             {erro && (
               <p className="mb-4 rounded-xl border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
             )}
@@ -256,7 +259,6 @@ export default function PerformancePage() {
               // dados chegam.
               <div className="grid gap-3.5">
                 <div className="painel-esqueleto h-[290px] rounded-3xl" />
-                <div className="painel-esqueleto h-12 rounded-2xl" />
                 <div className="grid gap-3.5 lg:grid-cols-2">
                   <div className="painel-esqueleto h-[360px] rounded-3xl" />
                   <div className="painel-esqueleto h-[360px] rounded-3xl" />
@@ -264,13 +266,7 @@ export default function PerformancePage() {
               </div>
             ) : (
               <>
-                <ResumoPerformance perf={perf} preflop={preflop} referenceProfile={referenceProfile} tournament={tournament} ordem={0} />
-
-                <div className="sticky top-0 z-30 -mx-4 mt-4 border-b border-white/[0.06] bg-black/70 px-4 pt-2 backdrop-blur-xl md:-mx-6 md:px-6">
-                  <AbasAnimadas value={tab} onChange={setTab} options={TABS} />
-                </div>
-
-                <div className="mt-4 overflow-x-clip">
+                <div className="overflow-x-clip">
                   <AnimatePresence mode="wait" custom={direcao} initial={false}>
                     <motion.div
                       key={tab}
@@ -281,23 +277,35 @@ export default function PerformancePage() {
                       transition={{ duration: 0.28, ease: EASE }}
                       className="grid gap-3.5"
                     >
-                      {semMaos && tab !== "radar" && tab !== "estatisticas" ? (
+                      {semMaos && tab !== "radar" && tab !== "estatisticas" && tab !== "geral" ? (
                         <p className="painel-vidro rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-muted">
                           Sem mãos com hand history estruturada ainda. Aguarde a sincronização do agente desktop (Radar
                           PokerSync) — as métricas aparecem aqui automaticamente assim que houver dado.
                         </p>
                       ) : (
                         <>
+                          {tab === "geral" && (
+                            <>
+                              <ResumoPerformance
+                                rows={filteredRows}
+                                preflop={preflop}
+                                referenceProfile={referenceProfile}
+                                tournament={tournament}
+                                ordem={0}
+                              />
+                              <LinhaSemanal rows={filteredRows} referenceProfile={referenceProfile} ordem={1} />
+                            </>
+                          )}
                           {tab === "preflop" && (
                             <>
-                              {/* Matriz com largura limitada (células de ~40px): mais
-                                  larga que isso ela só crescia pra baixo e desequilibrava
-                                  a linha com o gráfico semanal ao lado. */}
+                              {/* Matriz com largura limitada (células de ~40px) e, ao
+                                  lado, o que você faz em cada situação -- no lugar do
+                                  antigo "Frequências pré-flop", que repetia o resumo e
+                                  usava faixas sem fonte confiável. */}
                               <div className="grid gap-3.5 xl:grid-cols-[minmax(0,580px)_minmax(0,1fr)]">
                                 <MatrizMaos rows={filteredRows} ordem={1} />
-                                <LinhaSemanal rows={filteredRows} referenceProfile={referenceProfile} ordem={2} />
+                                <Decisoes rows={filteredRows} ordem={2} />
                               </div>
-                              <PreflopPanel rows={filteredRows} metrics={preflop} referenceProfile={referenceProfile} />
                             </>
                           )}
                           {tab === "postflop" && (

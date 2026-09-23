@@ -5,15 +5,14 @@ import { Percent, Repeat, Target, TrendingUp, type LucideIcon } from "lucide-rea
 import { toneFromRange, type Tone } from "@/components/dashboard/kit";
 import { EASE, Linha, Numero, PainelCard } from "@/components/painel/painel-card";
 import { InfoHover, type Explicacao } from "@/components/painel/info-hover";
-import { PentagonoScore } from "@/components/painel/pentagono-score";
-import { explicacaoScore } from "@/components/painel/indicators-card";
 import { PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
-import type { PlayerPerformance } from "@/lib/services/performance-service";
-import type { PreflopMetrics, ReferenceProfile, TournamentMetrics } from "@/types/analysis";
+import type { AnalysisHandRow, PreflopMetrics, ReferenceProfile, TournamentMetrics } from "@/types/analysis";
+import { PerfilJogo } from "./perfil-jogo";
 import { AMOSTRA_MINIMA_MAOS, COR_NEGATIVO, COR_POSITIVO, SeloAmostra } from "./graficos/base";
 
 // Resumo no topo da Performance, no MESMO padrão do card "Seus
-// indicadores" da tela inicial: pentágono do Score à esquerda e os
+// indicadores" da tela inicial: pentágono do Perfil de jogo à esquerda
+// (o Score fica só na tela inicial) e os
 // números que um grinder olha primeiro à direita -- VPIP, PFR, 3-Bet
 // (das mãos, respeitando os filtros) e ROI de torneio. Número grande,
 // negrito, centralizado; cor pelo que ele SIGNIFICA (dentro da faixa
@@ -39,13 +38,13 @@ type Kpi = {
 const pct1 = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
 
 export function ResumoPerformance({
-  perf,
+  rows,
   preflop,
   referenceProfile,
   tournament,
   ordem = 0,
 }: {
-  perf: PlayerPerformance | null;
+  rows: AnalysisHandRow[];
   preflop: PreflopMetrics;
   referenceProfile: ReferenceProfile;
   tournament: TournamentMetrics | null;
@@ -106,7 +105,7 @@ export function ResumoPerformance({
         titulo: "3-Bet",
         oQueE: `Quantas vezes você re-aumentou quando alguém já tinha aberto o pote. Referência de ${perfil}: ${ref.threeBet.min}–${ref.threeBet.max}%.`,
         origem: "Performance · suas mãos importadas",
-        comoCalcula: "Re-raises ÷ vezes em que você teve a chance de dar 3-bet. Respeita os filtros ativos.",
+        comoCalcula: "Mãos em que você deu 3-bet ÷ mãos jogadas. Respeita os filtros ativos.",
       },
     },
     {
@@ -131,7 +130,7 @@ export function ResumoPerformance({
     <PainelCard title="Seu resumo" icon={<Target size={15} />} ordem={ordem} rolagem={false}>
       <div className="grid gap-2 md:grid-cols-[minmax(0,1.05fr)_minmax(0,1.95fr)]">
         <Linha className="flex min-h-[250px] !p-2.5 md:min-h-[270px]">
-          <PentagonoScore perf={perf} explicacao={explicacaoScore(perf)} />
+          <PerfilJogo rows={rows} preflop={preflop} />
         </Linha>
         <ul className="grid auto-rows-fr grid-cols-2 gap-2 lg:grid-cols-4">
           {kpis.map((k, i) => {

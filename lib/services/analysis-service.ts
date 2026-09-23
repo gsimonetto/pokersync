@@ -155,6 +155,40 @@ function normalizeFormat(raw: string | null | undefined): GameFormat | null {
   return null;
 }
 
+type AcaoParseada = { player: string; action: string };
+type ContextoPreflop = Pick<AnalysisHandRow, "openerPosition" | "rouboLimpo" | "squeezeOpportunity">;
+
+// Lê o preflop do histórico parseado (mesmas regras do hand-parser: o
+// "posts" do blind não é decisão). Sem histórico/herói -> tudo null, e a
+// mão simplesmente não entra nessas contas.
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function contextoPreflop(parsed: any): ContextoPreflop {
+  const vazio: ContextoPreflop = { openerPosition: null, rouboLimpo: null, squeezeOpportunity: null };
+  const heroi: string | null = parsed?.heroName ?? null;
+  const assentos: { playerName: string; position: string | null }[] = Array.isArray(parsed?.seats) ? parsed.seats : [];
+  const rua = Array.isArray(parsed?.streets) ? parsed.streets.find((s: { name: string }) => s.name === "preflop") : null;
+  const acoes: AcaoParseada[] = Array.isArray(rua?.actions) ? rua.actions : [];
+  if (!heroi || acoes.length === 0) return vazio;
+
+  const posicao = (jogador: string) => assentos.find((a) => a.playerName === jogador)?.position ?? null;
+  const iRaise = acoes.findIndex((a) => a.action === "raises");
+  const iHeroi = acoes.findIndex((a) => a.player === heroi && a.action !== "posts");
+  const openerPosition = iRaise >= 0 ? posicao(acoes[iRaise].player) : null;
+  if (iHeroi < 0) return { ...vazio, openerPosition };
+
+  const antes = acoes.slice(0, iHeroi);
+  const raisesAntes = antes.filter((a) => a.action === "raises");
+  const umRaiseDeOutro = raisesAntes.length === 1 && iRaise >= 0 && iRaise < iHeroi && acoes[iRaise].player !== heroi;
+  const entreOpenEHeroi = umRaiseDeOutro ? acoes.slice(iRaise + 1, iHeroi) : [];
+  const semLimpAntesDoOpen = iRaise >= 0 && !acoes.slice(0, iRaise).some((a) => a.action === "calls");
+
+  return {
+    openerPosition,
+    rouboLimpo: umRaiseDeOutro && semLimpAntesDoOpen && entreOpenEHeroi.every((a) => a.action === "folds"),
+    squeezeOpportunity: umRaiseDeOutro && entreOpenEHeroi.some((a) => a.action === "calls"),
+  };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToAnalysisHand(r: any): AnalysisHandRow {
   const hr = r.hand_reviews;
@@ -209,6 +243,7 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
     blindDefended: r.blind_defended,
     reSteal: r.re_steal,
     squeeze: r.squeeze,
+    ...contextoPreflop(parsed),
   };
 }
 
@@ -301,12 +336,23 @@ export function computePreflopMetrics(rows: AnalysisHandRow[]): PreflopMetrics {
   const stealAttempts = countIf(rows, (r) => r.stealAttempt);
   const facedThreeBet = rows.filter((r) => r.facedThreeBet === true);
   const facedFourBet = rows.filter((r) => r.facedFourBet === true);
-  // matchup só vem preenchido em pots heads-up até o flop ("SB_vs_BTN"),
-  // então dá pra isolar o vilão real do steal em vez de aproximar por
-  // blind_defense_opportunity genérico (que não distingue quem abriu).
-  const stealVsSbBtn = rows.filter((r) => r.heroPosition === "SB" && r.matchup === "SB_vs_BTN" && r.blindDefenseOpportunity === true);
-  const stealVsBbBtn = rows.filter((r) => r.heroPosition === "BB" && r.matchup === "BB_vs_BTN" && r.blindDefenseOpportunity === true);
-  const stealVsBbSb = rows.filter((r) => r.heroPosition === "BB" && r.matchup === "BB_vs_SB" && r.blindDefenseOpportunity === true);
+  // Fold to steal: o herói no blind, o roubo veio da posição certa e
+  // chegou limpo nele (só folds no meio). A posição de quem abriu vem do
+  // histórico da mão -- antes usava `matchup`, que só existe quando a mão
+  // chega heads-up ao flop, então as vezes em que o herói DESISTIU nunca
+  // entravam e o número saía sempre 0%.
+  const rouboContra = (heroi: string, ladrao: string) =>
+    rows.filter(
+      (r) =>
+        r.heroPosition === heroi &&
+        r.openerPosition === ladrao &&
+        r.rouboLimpo === true &&
+        r.blindDefenseOpportunity === true,
+    );
+  const stealVsSbBtn = rouboContra("SB", "BTN");
+  const stealVsBbBtn = rouboContra("BB", "BTN");
+  const stealVsBbSb = rouboContra("BB", "SB");
+  const squeezeOpp = rows.filter((r) => r.squeezeOpportunity === true);
   return {
     hands,
     vpip_pct: pct(countIf(rows, (r) => r.vpip), hands),
@@ -324,7 +370,9 @@ export function computePreflopMetrics(rows: AnalysisHandRow[]): PreflopMetrics {
     fold_to_steal_sb_vs_btn_pct: pct(stealVsSbBtn.length - countIf(stealVsSbBtn, (r) => r.blindDefended), stealVsSbBtn.length),
     fold_to_steal_bb_vs_btn_pct: pct(stealVsBbBtn.length - countIf(stealVsBbBtn, (r) => r.blindDefended), stealVsBbBtn.length),
     fold_to_steal_bb_vs_sb_pct: pct(stealVsBbSb.length - countIf(stealVsBbSb, (r) => r.blindDefended), stealVsBbSb.length),
-    squeeze_pct: pct(countIf(rows, (r) => r.squeeze), hands),
+    // Squeeze % = das vezes em que teve open + call(s) antes de você,
+    // quantas você aumentou (antes dividia pelo total de mãos).
+    squeeze_pct: pct(countIf(squeezeOpp, (r) => r.squeeze), squeezeOpp.length),
     limp_fold_pct: null, // hand_tags não marca fold pós-limp isoladamente
     open_push_pct: null, // depende de profundidade all-in no open — não classificado no parser ainda
   };
