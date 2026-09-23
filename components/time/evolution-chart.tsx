@@ -3,6 +3,7 @@
 import { useState } from "react";
 import type { FinancialDay } from "@/lib/services/team-service";
 import { BRL, BRL_CURTO, niceTicks } from "@/lib/format";
+import { usePainelVidro } from "@/components/dashboard/kit";
 
 // Mesmo grafico de evolucao do Gestor de Banca (linha com area em
 // degrade, glow no ponto atual, tooltip ao passar o mouse) -- porta pra
@@ -25,12 +26,13 @@ export function EvolutionChart({
   titulo?: string;
   acao?: React.ReactNode;
 }) {
+  const vidro = usePainelVidro();
   const [hoverIdx, setHoverIdx] = useState<number | null>(null);
   const acumFinal = dados.length ? dados[dados.length - 1].acumulado : 0;
 
   return (
     <div
-      className={`rounded-xl border border-hairline bg-surface p-5 transition-all duration-500 print:break-inside-avoid ${
+      className={`${vidro ? "painel-vidro rounded-3xl border border-white/10 p-4 sm:p-5" : "rounded-xl border border-hairline bg-surface p-5"} transition-all duration-500 print:break-inside-avoid ${
         pronto ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
       }`}
     >

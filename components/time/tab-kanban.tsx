@@ -60,6 +60,7 @@ import { ACCENT } from "@/lib/modules-data";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
+import { usePainelVidro } from "@/components/dashboard/kit";
 
 // Kanban estilo Trello: arrastar o card entre colunas move de fase (drag
 // nativo HTML5, sem lib extra); o card tambem pode ser aberto pra editar
@@ -90,6 +91,7 @@ export function TabKanban({
   onErro: (s: string) => void;
   onAgendarConversa: (playerId: string) => void;
 }) {
+  const vidro = usePainelVidro();
   const [fases, setFases] = useState<FunnelPhase[]>([]);
   const [cards, setCards] = useState<PlayerCard[]>([]);
   const [labelsDoTime, setLabelsDoTime] = useState<TeamLabel[]>([]);
@@ -304,7 +306,7 @@ export function TabKanban({
   }
 
   return (
-    <div className="flex min-h-0 flex-1 flex-col rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
+    <div className={`flex min-h-0 flex-1 flex-col p-4 sm:p-5 ${vidro ? "painel-vidro rounded-3xl border border-white/10" : "rounded-2xl border border-hairline bg-surface"}`}>
       <div className="mb-4 flex flex-wrap items-center gap-2">
         {backHref && (
           <Link

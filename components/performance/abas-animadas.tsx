@@ -13,10 +13,13 @@ export function AbasAnimadas<T extends string>({
   value,
   onChange,
   options,
+  rotulo = "Seções da Performance",
 }: {
   value: T;
   onChange: (v: T) => void;
-  options: { value: T; label: string; icon: LucideIcon }[];
+  /** badge: contador opcional ao lado do nome (ex.: convites pendentes). */
+  options: { value: T; label: string; icon: LucideIcon; badge?: number }[];
+  rotulo?: string;
 }) {
   // Atalho: teclas 1..N trocam de aba (menos quando o foco está num campo
   // de texto, pra não atrapalhar quem está digitando).
@@ -35,7 +38,7 @@ export function AbasAnimadas<T extends string>({
   return (
     <div
       role="tablist"
-      aria-label="Seções da Performance"
+      aria-label={rotulo}
       className="painel-scroll -mx-1 flex snap-x items-center gap-1 overflow-x-auto px-1 pb-1"
     >
       {options.map((o, i) => {
@@ -61,6 +64,9 @@ export function AbasAnimadas<T extends string>({
             )}
             <Icone size={15} className={`relative transition-colors ${ativo ? "text-[#d4af37]" : ""}`} />
             <span className="relative">{o.label}</span>
+            {!!o.badge && (
+              <span className="relative rounded-full bg-[#d4af37] px-1.5 text-[10px] font-bold leading-4 text-black">{o.badge}</span>
+            )}
             <kbd
               className={`relative hidden rounded border px-1 text-[10px] leading-4 transition-opacity sm:inline ${
                 ativo ? "border-white/15 text-muted" : "border-white/10 text-muted/60 opacity-0 group-hover:opacity-100"

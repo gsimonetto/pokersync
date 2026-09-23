@@ -1,3 +1,4 @@
+import { usePainelVidro } from "@/components/dashboard/kit";
 import { Minus, TrendingDown, TrendingUp } from "lucide-react";
 import type { ComponentType } from "react";
 
@@ -27,6 +28,7 @@ export function Kpi({
   tendencia?: number | null;
   tendenciaSufixo?: string;
 }) {
+  const vidro = usePainelVidro();
   const cor = tom === "positivo" ? "text-positive" : tom === "negativo" ? "text-negative" : "text-ink";
   const TendIcon =
     tendencia === null || tendencia === undefined || tendencia === 0 ? Minus : tendencia > 0 ? TrendingUp : TrendingDown;
@@ -38,8 +40,10 @@ export function Kpi({
       : "text-negative";
   return (
     <div
-      className={`rounded-xl border bg-surface p-4 transition-all ease-out print:break-inside-avoid ${
-        destaque ? "border-ink/20" : "border-hairline"
+      className={`transition-all ease-out print:break-inside-avoid ${
+        vidro
+          ? `painel-bloco rounded-2xl border p-3.5 ${destaque ? "border-white/20" : "border-white/5"}`
+          : `rounded-xl border bg-surface p-4 ${destaque ? "border-ink/20" : "border-hairline"}`
       }`}
       style={{
         opacity: pronto ? 1 : 0,
@@ -52,7 +56,7 @@ export function Kpi({
         <Icon size={13} className={tom === "negativo" ? "text-negative" : ""} />
         {label}
       </div>
-      <p className={`mt-1.5 text-2xl font-semibold tnum ${cor}`}>{value}</p>
+      <p className={`mt-1.5 tnum ${vidro ? "text-[26px] font-bold tracking-[-0.02em]" : "text-2xl font-semibold"} ${cor}`}>{value}</p>
       {hint && <p className="mt-0.5 text-xs text-muted">{hint}</p>}
       {tendencia !== undefined && (
         <p className={`mt-1 flex items-center gap-1 text-[11px] font-medium tnum ${tendCor}`}>

@@ -20,6 +20,11 @@ import { ChevronDown, Lock, type LucideIcon } from "lucide-react";
 // nada muda (Diário de Ranges e o resto seguem como estavam).
 const PainelVisualCtx = createContext<"padrao" | "vidro">("padrao");
 export const PainelVisual = PainelVisualCtx.Provider;
+/** true dentro de <PainelVisual value="vidro"> -- pros cards próprios de
+ *  cada módulo (ex.: Time) seguirem o mesmo visual de vidro. */
+export function usePainelVidro(): boolean {
+  return useContext(PainelVisualCtx) === "vidro";
+}
 
 export function Painel({
   titulo,
