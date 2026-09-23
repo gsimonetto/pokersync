@@ -31,10 +31,13 @@ export function InfoHover({
   explicacao,
   children,
   className = "",
+  style,
 }: {
   explicacao: Explicacao;
   children: ReactNode;
   className?: string;
+  /** Posição do gatilho (ex.: rótulos do pentágono, em % do quadro). */
+  style?: React.CSSProperties;
 }) {
   const ref = useRef<HTMLDivElement>(null);
   const id = useId();
@@ -95,6 +98,7 @@ export function InfoHover({
       onFocus={abrir}
       onBlur={fechar}
       className={`cursor-help rounded-2xl outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60 ${className}`}
+      style={style}
     >
       {children}
       {montado &&
