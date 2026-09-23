@@ -6,20 +6,38 @@ import { LineChart } from "lucide-react";
 import { PainelCard } from "@/components/painel/painel-card";
 import { PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
 import type { AnalysisHandRow, ReferenceProfile } from "@/types/analysis";
-import { COR_PFR, COR_VPIP, DicaGrafico, Legenda } from "./base";
+import { COR_PFR, COR_UNICA, COR_VPIP, DicaGrafico, Legenda } from "./base";
 import { useLargura, useTamanho } from "./usar-largura";
 
-// VPIP e PFR semana a semana, com a faixa ideal de cada um sombreada atrás
-// -- responde "estou corrigindo o leak ou piorando?". Semana com menos de
-// MIN_SEMANA mãos fica de fora (um ponto com 5 mãos só faria a linha
-// pular sem motivo). Últimas 12 semanas com dado.
+// Tendência semana a semana -- responde "estou corrigindo o leak ou
+// piorando?". Dá pra trocar a métrica (VPIP e PFR juntos, 3-Bet, roubo
+// de blinds, c-bet). Em VPIP e PFR, a faixa entre as duas linhas fica
+// sombreada: é o quanto você entra só pagando. Embaixo, uma faixinha de
+// barras com as mãos de cada semana (gráfico separado, mesmo eixo de
+// datas -- nunca um segundo eixo Y no mesmo gráfico).
+//
+// Semana com menos de MIN_SEMANA mãos fica de fora (um ponto com 5 mãos só
+// faria a linha pular sem motivo). Nas métricas que dependem de uma
+// situação (roubo, c-bet), a semana com menos de MIN_SITUACAO chances fica
+// sem ponto. Últimas 12 semanas com dado.
 
 const MIN_SEMANA = 20;
-// Altura mínima; no desktop o gráfico estica até a altura da matriz ao lado.
+const MIN_SITUACAO = 5;
+// Altura mínima (estica se o card ao lado for mais alto).
 const ALTURA_MIN = 280;
+const ALTURA_VOLUME = 34;
 const M = { t: 12, r: 44, b: 26, l: 34 };
 
-type Semana = { inicio: Date; n: number; vpip: number; pfr: number };
+type Metrica = "vpfr" | "3bet" | "roubo" | "cbet";
+const METRICAS: { valor: Metrica; rotulo: string }[] = [
+  { valor: "vpfr", rotulo: "VPIP e PFR" },
+  { valor: "3bet", rotulo: "3-Bet" },
+  { valor: "roubo", rotulo: "Roubo" },
+  { valor: "cbet", rotulo: "C-bet" },
+];
+
+type Conta = { sim: number; base: number };
+type Semana = { inicio: Date; n: number; vpip: Conta; pfr: Conta; tresBet: Conta; roubo: Conta; cbet: Conta };
 
 function inicioDaSemana(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -28,42 +46,106 @@ function inicioDaSemana(d: Date): Date {
   return x;
 }
 
+const nova = (inicio: Date): Semana => ({
+  inicio,
+  n: 0,
+  vpip: { sim: 0, base: 0 },
+  pfr: { sim: 0, base: 0 },
+  tresBet: { sim: 0, base: 0 },
+  roubo: { sim: 0, base: 0 },
+  cbet: { sim: 0, base: 0 },
+});
+
 function porSemana(rows: AnalysisHandRow[]): Semana[] {
-  const mapa = new Map<number, { inicio: Date; n: number; v: number; p: number }>();
+  const mapa = new Map<number, Semana>();
   for (const r of rows) {
     const ini = inicioDaSemana(new Date(r.playedAt));
-    const k = ini.getTime();
-    const s = mapa.get(k) ?? { inicio: ini, n: 0, v: 0, p: 0 };
+    const s = mapa.get(ini.getTime()) ?? nova(ini);
     s.n += 1;
-    if (r.vpip) s.v += 1;
-    if (r.pfr) s.p += 1;
-    mapa.set(k, s);
+    s.vpip.base += 1;
+    s.pfr.base += 1;
+    s.tresBet.base += 1;
+    if (r.vpip) s.vpip.sim += 1;
+    if (r.pfr) s.pfr.sim += 1;
+    if (r.threeBet) s.tresBet.sim += 1;
+    if (r.stealOpportunity === true) {
+      s.roubo.base += 1;
+      if (r.stealAttempt) s.roubo.sim += 1;
+    }
+    if (r.isPreflopAggressor === true && r.cbetFlop !== null) {
+      s.cbet.base += 1;
+      if (r.cbetFlop) s.cbet.sim += 1;
+    }
+    mapa.set(ini.getTime(), s);
   }
   return [...mapa.values()]
     .filter((s) => s.n >= MIN_SEMANA)
     .sort((a, b) => a.inicio.getTime() - b.inicio.getTime())
-    .slice(-12)
-    .map((s) => ({ inicio: s.inicio, n: s.n, vpip: (s.v / s.n) * 100, pfr: (s.p / s.n) * 100 }));
+    .slice(-12);
 }
 
+const taxa = (c: Conta, minimo = 1) => (c.base >= minimo ? (c.sim / c.base) * 100 : null);
 const dataCurta = (d: Date) => d.toLocaleDateString("pt-BR", { day: "2-digit", month: "2-digit" });
+
+type Serie = { chave: string; rotulo: string; cor: string; valores: (number | null)[]; contas: Conta[] };
+
+function series(semanas: Semana[], m: Metrica): Serie[] {
+  const s = (chave: string, rotulo: string, cor: string, pega: (x: Semana) => Conta, minimo = 1): Serie => ({
+    chave,
+    rotulo,
+    cor,
+    contas: semanas.map(pega),
+    valores: semanas.map((x) => taxa(pega(x), minimo)),
+  });
+  if (m === "vpfr") return [s("vpip", "VPIP", COR_VPIP, (x) => x.vpip), s("pfr", "PFR", COR_PFR, (x) => x.pfr)];
+  if (m === "3bet") return [s("3bet", "3-Bet", COR_UNICA, (x) => x.tresBet)];
+  if (m === "roubo") return [s("roubo", "Roubo", COR_UNICA, (x) => x.roubo, MIN_SITUACAO)];
+  return [s("cbet", "C-bet no flop", COR_UNICA, (x) => x.cbet, MIN_SITUACAO)];
+}
 
 export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: AnalysisHandRow[]; referenceProfile: ReferenceProfile; ordem?: number }) {
   const caixa = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLDivElement>(null);
   const largura = useLargura(caixa);
   const [foco, setFoco] = useState<number | null>(null);
+  const [metrica, setMetrica] = useState<Metrica>("vpfr");
   const semanas = useMemo(() => porSemana(rows), [rows]);
-  const ALTURA = Math.max(ALTURA_MIN, useTamanho(area, semanas.length >= 2).altura);
+  const lista = useMemo(() => series(semanas, metrica), [semanas, metrica]);
+  const alturaArea = useTamanho(area, semanas.length >= 2).altura;
+  const ALTURA = Math.max(ALTURA_MIN, alturaArea) - ALTURA_VOLUME;
   const ref = PREFLOP_REFERENCE[referenceProfile];
+  const duas = metrica === "vpfr";
 
-  const maxY = Math.max(ref.vpip.max + 8, ...semanas.map((s) => s.vpip + 5), 20);
+  const todos = lista.flatMap((l) => l.valores).filter((v): v is number => v != null);
+  const topo = Math.max(duas ? ref.vpip.max + 8 : 0, ...todos.map((v) => v + 5), metrica === "3bet" ? 10 : 20);
+  const maxY = Math.min(100, Math.ceil(topo / 4) * 4);
   const w = Math.max(0, largura - M.l - M.r);
   const h = ALTURA - M.t - M.b;
   const x = (i: number) => M.l + (semanas.length <= 1 ? w / 2 : (i / (semanas.length - 1)) * w);
   const y = (v: number) => M.t + h - (v / maxY) * h;
-  const caminho = (k: "vpip" | "pfr") => semanas.map((s, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(s[k]).toFixed(1)}`).join(" ");
+  // Linha com buraco onde a semana não tem ponto (poucas chances).
+  const caminho = (vs: (number | null)[]) =>
+    vs.map((v, i) => (v == null ? "" : `${i === 0 || vs[i - 1] == null ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`)).join(" ");
   const grade = [0, 0.25, 0.5, 0.75, 1].map((f) => Math.round(maxY * f));
+  const maiorSemana = Math.max(1, ...semanas.map((s) => s.n));
+
+  // Faixa entre VPIP e PFR = o quanto você entra só pagando.
+  const vaoVpipPfr = (() => {
+    if (!duas || lista.length < 2) return "";
+    const [a, b] = lista;
+    const idx = semanas.map((_, i) => i).filter((i) => a.valores[i] != null && b.valores[i] != null);
+    if (idx.length < 2) return "";
+    const ida = idx.map((i, k) => `${k ? "L" : "M"}${x(i).toFixed(1)},${y(a.valores[i]!).toFixed(1)}`).join(" ");
+    const volta = [...idx].reverse().map((i) => `L${x(i).toFixed(1)},${y(b.valores[i]!).toFixed(1)}`).join(" ");
+    return `${ida} ${volta} Z`;
+  })();
+
+  // Última semana x a anterior, pra dar a direção de cara.
+  const principal = lista[0];
+  const ultimos = principal ? principal.valores.filter((v): v is number => v != null) : [];
+  const atual = ultimos.length ? ultimos[ultimos.length - 1] : null;
+  const anterior = ultimos.length > 1 ? ultimos[ultimos.length - 2] : null;
+  const delta = atual != null && anterior != null ? atual - anterior : null;
 
   function mover(e: React.MouseEvent<SVGSVGElement>) {
     if (semanas.length === 0) return;
@@ -75,99 +157,200 @@ export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: Anal
   }
 
   const s = foco != null ? semanas[foco] : null;
+  const valoresFoco = foco != null ? lista.map((l) => l.valores[foco]).filter((v): v is number => v != null) : [];
 
   return (
-    <PainelCard title="VPIP e PFR por semana" icon={<LineChart size={15} />} ordem={ordem} rolagem={false}>
+    <PainelCard title="Sua tendência por semana" icon={<LineChart size={15} />} ordem={ordem} rolagem={false}>
       {/* Contêiner medido sempre existe (mesmo sem dado), pra largura já
           estar certa quando um filtro fizer o gráfico aparecer. */}
       <div ref={caixa} className="relative flex w-full flex-1 flex-col" onMouseLeave={() => setFoco(null)}>
-      {semanas.length < 2 ? (
-        <p className="text-sm text-muted">
-          Precisa de pelo menos 2 semanas com {MIN_SEMANA}+ mãos pra desenhar a tendência. Continue importando.
-        </p>
-      ) : (
-        <>
-          <div className="mb-2 flex flex-wrap items-center justify-between gap-2">
-            <Legenda itens={[{ rotulo: "VPIP", cor: COR_VPIP }, { rotulo: "PFR", cor: COR_PFR }]} />
-            <span className="text-[11px] text-muted/70">Faixas sombreadas = faixa ideal</span>
-          </div>
-          {/* O SVG fica por cima (absoluto) da área medida, pra altura dele
-              não empurrar a medida de volta. */}
-          <div ref={area} className="relative w-full flex-1" style={{ minHeight: ALTURA_MIN }}>
-            {largura > 0 && (
-              <svg width={largura} height={ALTURA} className="absolute inset-x-0 top-0" onMouseMove={mover} role="img" aria-label="VPIP e PFR por semana">
-                {/* faixas ideais */}
-                <rect x={M.l} width={w} y={y(ref.vpip.max)} height={y(ref.vpip.min) - y(ref.vpip.max)} fill={COR_VPIP} opacity={0.09} />
-                <rect x={M.l} width={w} y={y(ref.pfr.max)} height={y(ref.pfr.min) - y(ref.pfr.max)} fill={COR_PFR} opacity={0.1} />
-                {/* grade recessiva */}
-                {grade.map((g) => (
-                  <g key={g}>
-                    <line x1={M.l} x2={M.l + w} y1={y(g)} y2={y(g)} stroke="rgba(255,255,255,0.06)" />
-                    <text x={M.l - 8} y={y(g)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="rgba(255,255,255,0.4)">
-                      {g}%
-                    </text>
-                  </g>
-                ))}
-                {semanas.map((sm, i) =>
-                  semanas.length <= 6 || i % Math.ceil(semanas.length / 6) === 0 || i === semanas.length - 1 ? (
-                    <text key={i} x={x(i)} y={ALTURA - 8} textAnchor="middle" fontSize={10} fill="rgba(255,255,255,0.4)">
-                      {dataCurta(sm.inicio)}
-                    </text>
-                  ) : null,
-                )}
-                {/* linhas desenhando da esquerda pra direita */}
-                {(["vpip", "pfr"] as const).map((k) => (
-                  <motion.path
-                    key={k}
-                    d={caminho(k)}
-                    fill="none"
-                    stroke={k === "vpip" ? COR_VPIP : COR_PFR}
-                    strokeWidth={2}
-                    strokeLinejoin="round"
-                    strokeLinecap="round"
-                    initial={{ pathLength: 0 }}
-                    animate={{ pathLength: 1 }}
-                    transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.3 }}
-                  />
-                ))}
-                {/* rótulo direto no fim de cada linha */}
-                {(["vpip", "pfr"] as const).map((k) => {
-                  const ult = semanas[semanas.length - 1];
+        {semanas.length < 2 ? (
+          <p className="text-sm text-muted">
+            Precisa de pelo menos 2 semanas com {MIN_SEMANA}+ mãos pra desenhar a tendência. Continue importando.
+          </p>
+        ) : (
+          <>
+            <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+              <div role="tablist" aria-label="Métrica" className="flex rounded-full border border-white/10 bg-white/[0.03] p-0.5">
+                {METRICAS.map((m) => {
+                  const ativo = m.valor === metrica;
                   return (
-                    <text key={k} x={x(semanas.length - 1) + 8} y={y(ult[k])} dominantBaseline="middle" fontSize={11} fontWeight={600} fill="rgba(255,255,255,0.85)">
-                      {Math.round(ult[k])}%
-                    </text>
+                    <button
+                      key={m.valor}
+                      type="button"
+                      role="tab"
+                      aria-selected={ativo}
+                      onClick={() => setMetrica(m.valor)}
+                      className={`relative rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors ${ativo ? "text-black" : "text-muted hover:text-ink"}`}
+                    >
+                      {ativo && (
+                        <motion.span layoutId="semana-metrica" className="absolute inset-0 rounded-full bg-[#d4af37]" transition={{ type: "spring", stiffness: 420, damping: 34 }} />
+                      )}
+                      <span className="relative">{m.rotulo}</span>
+                    </button>
                   );
                 })}
-                {/* mira + marcadores da semana em foco */}
-                {s && foco != null && (
-                  <g>
-                    <line x1={x(foco)} x2={x(foco)} y1={M.t} y2={M.t + h} stroke="rgba(255,255,255,0.25)" strokeDasharray="3 3" />
-                    {(["vpip", "pfr"] as const).map((k) => (
-                      <circle key={k} cx={x(foco)} cy={y(s[k])} r={4.5} fill={k === "vpip" ? COR_VPIP : COR_PFR} stroke="#141414" strokeWidth={2} />
-                    ))}
-                  </g>
-                )}
-              </svg>
-            )}
-            <DicaGrafico aberta={!!s} x={foco != null ? x(foco) : 0} y={s ? y(Math.max(s.vpip, s.pfr)) : 0} largura={largura}>
-              {s && (
-                <>
-                  <p className="font-semibold text-ink">Semana de {dataCurta(s.inicio)}</p>
-                  <p className="tabular-nums text-ink/90">
-                    <span style={{ color: COR_VPIP }}>●</span> VPIP {s.vpip.toFixed(1)}%
-                  </p>
-                  <p className="tabular-nums text-ink/90">
-                    <span style={{ color: COR_PFR }}>●</span> PFR {s.pfr.toFixed(1)}%
-                  </p>
-                  <p className="mt-1 text-muted">{s.n} mãos</p>
-                </>
+              </div>
+              {atual != null && (
+                <span className="flex items-baseline gap-2 text-[11px] text-muted">
+                  última semana
+                  <b className="text-[15px] font-bold tabular-nums text-ink">{Math.round(atual)}%</b>
+                  {delta != null && Math.round(delta) !== 0 && (
+                    <span className="tabular-nums text-ink/80">
+                      {delta > 0 ? "↑" : "↓"} {Math.abs(Math.round(delta))} pts
+                    </span>
+                  )}
+                </span>
               )}
-            </DicaGrafico>
-          </div>
-        </>
-      )}
+            </div>
+            <div className="mb-1 flex flex-wrap items-center justify-between gap-2">
+              {duas ? (
+                <Legenda itens={lista.map((l) => ({ rotulo: l.rotulo, cor: l.cor }))} />
+              ) : (
+                <span className="text-[11px] text-muted/70">{principal?.rotulo}</span>
+              )}
+              <span className="text-[11px] text-muted/70">
+                {duas ? "Faixas = faixa ideal · entre as linhas = entradas só pagando" : "Semana sem ponto = poucas chances"}
+              </span>
+            </div>
+            {/* O SVG fica por cima (absoluto) da área medida, pra altura dele
+                não empurrar a medida de volta. */}
+            <div ref={area} className="relative w-full flex-1" style={{ minHeight: ALTURA_MIN }}>
+              {largura > 0 && (
+                <svg
+                  width={largura}
+                  height={ALTURA + ALTURA_VOLUME}
+                  className="absolute inset-x-0 top-0"
+                  onMouseMove={mover}
+                  role="img"
+                  aria-label={`${principal?.rotulo ?? ""} por semana`}
+                >
+                  {duas && (
+                    <>
+                      <rect x={M.l} width={w} y={y(ref.vpip.max)} height={y(ref.vpip.min) - y(ref.vpip.max)} fill={COR_VPIP} opacity={0.09} />
+                      <rect x={M.l} width={w} y={y(ref.pfr.max)} height={y(ref.pfr.min) - y(ref.pfr.max)} fill={COR_PFR} opacity={0.1} />
+                    </>
+                  )}
+                  {grade.map((g) => (
+                    <g key={g}>
+                      <line x1={M.l} x2={M.l + w} y1={y(g)} y2={y(g)} stroke="rgba(255,255,255,0.06)" />
+                      <text x={M.l - 8} y={y(g)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="rgba(255,255,255,0.4)">
+                        {g}%
+                      </text>
+                    </g>
+                  ))}
+                  {semanas.map((sm, i) =>
+                    semanas.length <= 6 || i % Math.ceil(semanas.length / 6) === 0 || i === semanas.length - 1 ? (
+                      <text key={i} x={x(i)} y={ALTURA - 8} textAnchor="middle" fontSize={10} fill="rgba(255,255,255,0.4)">
+                        {dataCurta(sm.inicio)}
+                      </text>
+                    ) : null,
+                  )}
+                  {vaoVpipPfr && (
+                    <motion.path key={`vao-${metrica}`} d={vaoVpipPfr} fill={COR_VPIP} initial={{ opacity: 0 }} animate={{ opacity: 0.12 }} transition={{ duration: 0.6, delay: 0.8 }} />
+                  )}
+                  {lista.map((l) => (
+                    <g key={`${metrica}-${l.chave}`}>
+                      <motion.path
+                        d={caminho(l.valores)}
+                        fill="none"
+                        stroke={l.cor}
+                        strokeWidth={2}
+                        strokeLinejoin="round"
+                        strokeLinecap="round"
+                        initial={{ pathLength: 0 }}
+                        animate={{ pathLength: 1 }}
+                        transition={{ duration: 1, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+                      />
+                      {l.valores.map((v, i) =>
+                        v == null ? null : (
+                          <motion.circle
+                            key={i}
+                            cx={x(i)}
+                            cy={y(v)}
+                            r={3}
+                            fill={l.cor}
+                            stroke="#141414"
+                            strokeWidth={1.5}
+                            initial={{ opacity: 0 }}
+                            animate={{ opacity: 1 }}
+                            transition={{ delay: 0.3 + i * 0.05 }}
+                          />
+                        ),
+                      )}
+                    </g>
+                  ))}
+                  {/* rótulo direto no fim de cada linha */}
+                  {lista.map((l) => {
+                    const i = l.valores.map((v, k) => (v == null ? -1 : k)).filter((k) => k >= 0).pop();
+                    if (i == null) return null;
+                    return (
+                      <text key={l.chave} x={x(i) + 8} y={y(l.valores[i]!)} dominantBaseline="middle" fontSize={11} fontWeight={600} fill="rgba(255,255,255,0.85)">
+                        {Math.round(l.valores[i]!)}%
+                      </text>
+                    );
+                  })}
+                  {/* volume: mãos por semana, barras pequenas embaixo */}
+                  {semanas.map((sm, i) => {
+                    const alt = Math.max(2, (sm.n / maiorSemana) * (ALTURA_VOLUME - 12));
+                    const larg = Math.max(4, Math.min(18, (w / Math.max(1, semanas.length)) * 0.5));
+                    return (
+                      <rect
+                        key={i}
+                        x={x(i) - larg / 2}
+                        y={ALTURA + ALTURA_VOLUME - alt - 2}
+                        width={larg}
+                        height={alt}
+                        rx={2}
+                        fill={foco === i ? "rgba(255,255,255,0.45)" : "rgba(255,255,255,0.14)"}
+                      />
+                    );
+                  })}
+                  <text x={M.l - 14} y={ALTURA + ALTURA_VOLUME - 4} textAnchor="end" fontSize={9} fill="rgba(255,255,255,0.35)">
+                    mãos
+                  </text>
+                  {/* mira + marcadores da semana em foco */}
+                  {s && foco != null && (
+                    <g>
+                      <line x1={x(foco)} x2={x(foco)} y1={M.t} y2={M.t + h} stroke="rgba(255,255,255,0.25)" strokeDasharray="3 3" />
+                      {lista.map((l) =>
+                        l.valores[foco] == null ? null : (
+                          <circle key={l.chave} cx={x(foco)} cy={y(l.valores[foco]!)} r={4.5} fill={l.cor} stroke="#141414" strokeWidth={2} />
+                        ),
+                      )}
+                    </g>
+                  )}
+                </svg>
+              )}
+              <DicaGrafico aberta={!!s} x={foco != null ? x(foco) : 0} y={valoresFoco.length ? y(Math.max(...valoresFoco)) : M.t + h / 2} largura={largura}>
+                {s && foco != null && (
+                  <>
+                    <p className="font-semibold text-ink">Semana de {dataCurta(s.inicio)}</p>
+                    {lista.map((l) => (
+                      <p key={l.chave} className="tabular-nums text-ink/90">
+                        <span style={{ color: l.cor }}>●</span> {l.rotulo}{" "}
+                        {l.valores[foco] == null ? "—" : `${l.valores[foco]!.toFixed(1)}%`}
+                        {!duas && <span className="text-muted"> ({l.contas[foco].sim} de {l.contas[foco].base})</span>}
+                      </p>
+                    ))}
+                    {duas && linhaSoPagando(lista, foco)}
+                    <p className="mt-1 text-muted">{s.n} mãos</p>
+                  </>
+                )}
+              </DicaGrafico>
+            </div>
+          </>
+        )}
       </div>
     </PainelCard>
   );
+}
+
+// Na dica de VPIP/PFR: quanto das entradas foi só pagando.
+function linhaSoPagando(lista: Serie[], i: number) {
+  const [a, b] = lista;
+  const va = a?.valores[i];
+  const vb = b?.valores[i];
+  if (va == null || vb == null) return null;
+  return <p className="tabular-nums text-muted">Só pagando: {(va - vb).toFixed(1)} pts</p>;
 }

@@ -308,4 +308,13 @@ export interface AnalysisHandRow {
   blindDefended: boolean | null;
   reSteal: boolean | null;
   squeeze: boolean | null;
+  // Derivados do histórico da mão (parsed_data) no cliente, porque
+  // hand_tags não guarda: posição de quem deu o 1º raise (pra saber de
+  // quem veio o roubo, mesmo quando o herói desiste antes do flop -- o
+  // `matchup` só existe em pot heads-up até o flop), se o roubo chegou
+  // limpo no herói (só folds entre o open e ele) e se o herói teve
+  // chance de squeeze (open + pelo menos 1 call antes dele).
+  openerPosition: string | null;
+  rouboLimpo: boolean | null;
+  squeezeOpportunity: boolean | null;
 }

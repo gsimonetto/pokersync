@@ -76,9 +76,9 @@ export function DicaGrafico({
 }
 
 // Linha da legenda (≥ 2 séries sempre têm legenda -- regra da skill).
-export function Legenda({ itens }: { itens: { rotulo: string; cor: string }[] }) {
+export function Legenda({ itens, className = "flex" }: { itens: { rotulo: string; cor: string }[]; className?: string }) {
   return (
-    <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
+    <div className={`${className} flex-wrap items-center gap-x-3 gap-y-1`}>
       {itens.map((i) => (
         <span key={i.rotulo} className="flex items-center gap-1.5 text-[11px] text-muted">
           <span className="h-2 w-2 rounded-sm" style={{ background: i.cor }} />
