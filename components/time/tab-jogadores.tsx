@@ -5,15 +5,14 @@ import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Search, ArrowUpDown, Flame, X } from "lucide-react";
 import { EASE } from "@/components/painel/painel-card";
-import { Avatar } from "@/components/avatar";
 import { PlayerDetailModal } from "@/components/time/player-detail-modal";
+import { PlayerBadge, crachaDoTime } from "@/components/time/player-badge";
 import { calcularScore, diasSemAtividade, type TeamDashboardRow, type TeamLabel } from "@/lib/services/team-service";
-import { BRL } from "@/lib/format";
 
 // Lista de jogadores, no visual da tela inicial/Performance. Decisoes de UX:
-// - cartão com o que o coach decide de relance: foto com o anel do score
-//   de evolução (escala própria do produto, 0-100), última atividade,
-//   sequência, e 3 números (treinos, acerto, resultado no time); o resto
+// - cartão = crachá do jogador: foto com o anel do score de evolução
+//   (escala própria do produto, 0-100), última atividade, sequência, e os
+//   3 blocos do crachá (resultado, buy-in, acerto GTO); o resto
 //   (etiqueta, coach, remover, conversar) mora na ficha, que abre ao
 //   clicar no cartão;
 // - filtro por etiqueta em etiquetas com "x" (mesmo padrão dos filtros da
@@ -198,12 +197,6 @@ function FiltroChip({ children, cor, onClick }: { children: React.ReactNode; cor
   );
 }
 
-// Cor do anel: faixas do PRÓPRIO score de evolução (as mesmas do selo de
-// risco da ficha), não uma referência externa de jogo.
-function corDoScore(v: number) {
-  return v < 40 ? "#e0555a" : v < 70 ? "#f59e0b" : "#22c55e";
-}
-
 function ultimaAtividade(iso: string | null): string {
   const d = diasSemAtividade(iso);
   if (d == null) return "sem atividade ainda";
@@ -212,87 +205,28 @@ function ultimaAtividade(iso: string | null): string {
   return `há ${d} dias sem atividade`;
 }
 
+// O cartão da lista É o crachá do jogador (components/time/player-badge)
+// -- o mesmo que aparece no funil e nas vagas; aqui só entra a linha de
+// atividade/sequência, que é o que o coach decide de relance nesta aba.
 function CartaoJogador({ j, onAbrir }: { j: TeamDashboardRow; onAbrir: () => void }) {
-  const score = calcularScore(j);
-  const cor = corDoScore(score.valor);
   const parado = diasSemAtividade(j.lastActivityAt);
-  const acerto = j.treinos > 0 ? Math.round((j.acertosGto / j.treinos) * 100) : null;
-  // Anel: círculo de 64px em volta da foto de 52px.
-  const R = 30;
-  const C = 2 * Math.PI * R;
   return (
-    <button
+    <PlayerBadge
+      dados={crachaDoTime(j)}
+      variante="cartao"
       onClick={onAbrir}
-      aria-label={`Ver ficha de ${j.nome}`}
-      className="painel-bloco group flex w-full flex-col gap-3 rounded-2xl border border-white/5 p-3.5 text-left transition hover:border-white/15 active:scale-[0.99]"
-    >
-      <span className="flex items-center gap-3">
-        <span className="relative grid size-16 shrink-0 place-items-center" title={`Score de evolução ${score.valor}/100`}>
-          <svg viewBox="0 0 64 64" className="absolute inset-0 -rotate-90" aria-hidden>
-            <circle cx="32" cy="32" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3" />
-            <motion.circle
-              cx="32"
-              cy="32"
-              r={R}
-              fill="none"
-              stroke={cor}
-              strokeWidth="3"
-              strokeLinecap="round"
-              strokeDasharray={C}
-              initial={{ strokeDashoffset: C }}
-              animate={{ strokeDashoffset: C * (1 - score.valor / 100) }}
-              transition={{ duration: 0.9, ease: EASE, delay: 0.2 }}
-            />
-          </svg>
-          <Avatar id={j.avatarId} url={j.avatarUrl} size={52} />
-          <span
-            className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full border-2 border-[#141414] px-1.5 text-[10px] font-bold leading-4 tabular-nums text-black"
-            style={{ background: cor }}
-          >
-            {score.valor}
-          </span>
-        </span>
-        <span className="min-w-0 flex-1">
-          <span className="block truncate text-[14px] font-semibold text-ink group-hover:underline">{j.nome}</span>
-          <span className="mt-0.5 flex flex-wrap items-center gap-x-2 gap-y-0.5 text-[11.5px]">
-            <span className={parado != null && parado >= 7 ? "text-[#f08a8e]" : "text-muted"}>{ultimaAtividade(j.lastActivityAt)}</span>
-            {(j.streakDays ?? 0) > 0 && (
-              <span className="flex items-center gap-0.5 text-[#f59e0b]" title="Dias seguidos com atividade">
-                <Flame size={11} />
-                {j.streakDays}
-              </span>
-            )}
-          </span>
-          {j.labelName && (
-            <span
-              className="mt-1 inline-block rounded-full border px-2 py-px text-[10.5px] font-medium"
-              style={{ color: j.labelColor ?? undefined, borderColor: `${j.labelColor ?? "#ffffff"}55` }}
-            >
-              {j.labelName}
+      ariaLabel={`Ver ficha de ${j.nome}`}
+      subtitulo={
+        <span className="flex flex-wrap items-center gap-x-2 gap-y-0.5">
+          <span className={parado != null && parado >= 7 ? "text-[#f08a8e]" : "text-muted"}>{ultimaAtividade(j.lastActivityAt)}</span>
+          {(j.streakDays ?? 0) > 0 && (
+            <span className="flex items-center gap-0.5 text-[#f59e0b]" title="Dias seguidos com atividade">
+              <Flame size={11} />
+              {j.streakDays}
             </span>
           )}
         </span>
-      </span>
-      <span className="grid grid-cols-3 gap-1.5 border-t border-white/[0.06] pt-2.5 text-center">
-        <Mini rotulo="Treinos" valor={String(j.treinos)} />
-        <Mini rotulo="Acerto" valor={acerto == null ? "—" : `${acerto}%`} />
-        <Mini
-          rotulo="No time"
-          valor={j.jogosNoTime > 0 ? BRL.format(j.lucroNoTime) : "—"}
-          cor={j.jogosNoTime > 0 ? (j.lucroNoTime > 0 ? "#22c55e" : j.lucroNoTime < 0 ? "#e0555a" : undefined) : undefined}
-        />
-      </span>
-    </button>
-  );
-}
-
-function Mini({ rotulo, valor, cor }: { rotulo: string; valor: string; cor?: string }) {
-  return (
-    <span className="min-w-0">
-      <span className="block text-[10.5px] text-muted/70">{rotulo}</span>
-      <span className="block truncate text-[13px] font-bold tabular-nums" style={{ color: cor ?? "#ffffff" }}>
-        {valor}
-      </span>
-    </span>
+      }
+    />
   );
 }

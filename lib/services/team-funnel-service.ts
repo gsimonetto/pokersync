@@ -28,7 +28,34 @@ export interface FunnelPhase {
   defaultReviewsTarget: number;
   defaultStatMetric: StatMetric | null;
   defaultStatTarget: number | null;
+  // Campos da migração funil_crm_avancado -- todos opcionais (null =
+  // não usa). Sem a migração no banco, chegam sempre null e o funil
+  // funciona como antes.
+  descricao: string | null;
+  buyinMin: number | null;
+  buyinMax: number | null;
+  /** Capacidade da fase (quantos jogadores cabem). */
+  wipLimit: number | null;
+  /** Dias parado até o cartão "esfriar" -- null usa SLA_PADRAO_DIAS. */
+  slaDias: number | null;
+  reqSessoes: number | null;
+  reqRoiPct: number | null;
+  reqScore: number | null;
+  reqPresencaPct: number | null;
+  /** Itens de checklist criados sozinhos quando o jogador entra na fase. */
+  playbook: string[];
 }
+
+/** Padrão de fábrica; o time pode trocar em Configurações do funil. */
+export const SLA_PADRAO_DIAS = 14;
+
+export type Prioridade = "alta" | "normal" | "baixa";
+
+export const PRIORIDADE_LABEL: Record<Prioridade, string> = {
+  alta: "Alta",
+  normal: "Normal",
+  baixa: "Baixa",
+};
 
 export interface PlayerCard {
   cardId: string;
@@ -49,17 +76,75 @@ export interface PlayerCard {
   eventosTotal: number;
   eventosPresente: number;
   eventosAusente: number;
+  // Migração funil_crm_avancado (null/"normal" sem ela)
+  deadline: string | null;
+  nextStep: string | null;
+  nextStepAt: string | null;
+  prioridade: Prioridade;
+  /** Sessões registradas na Banca desde que entrou na fase. */
+  sessoesFase: number | null;
+  /** Resultado (R$) desde que entrou na fase. */
+  lucroFase: number | null;
+  /** ROI de carreira (mesma fonte das vagas do Marketplace). */
+  roiPct: number | null;
+  abiTorneio: number | null;
 }
+
+const PHASE_COLS_BASE =
+  "id, team_id, name, sort_order, color, default_drills_target, default_reviews_target, default_stat_metric, default_stat_target";
+const PHASE_COLS_CRM =
+  "descricao, buyin_min, buyin_max, wip_limit, sla_dias, req_sessoes, req_roi_pct, req_score, req_presenca_pct, playbook";
+
+// Coluna inexistente (42703/PGRST204) = banco ainda sem a migração
+// funil_crm_avancado.
+function semMigracaoCrm(err: unknown): boolean {
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const e = err as any;
+  const code = String(e?.code ?? "");
+  const msg = String(e?.message ?? "");
+  return code === "42703" || code === "PGRST204" || /column .* does not exist/i.test(msg);
+}
+
+// Lembrado por sessão: sem a migração, não tenta de novo a cada
+// carregamento (e o app esconde os controles novos).
+let crmDisponivel: boolean | null = null;
+
+/** false = banco sem a migração funil_crm_avancado. */
+export function funilCrmDisponivel(): boolean {
+  return crmDisponivel !== false;
+}
+
+const numOuNull = (v: unknown) => (v === null || v === undefined || v === "" ? null : Number(v));
 
 export async function fetchFunnelPhases(teamId: string): Promise<FunnelPhase[]> {
   const supabase = createClient();
-  const { data, error } = await supabase
-    .from("team_funnel_phases")
-    .select("id, team_id, name, sort_order, color, default_drills_target, default_reviews_target, default_stat_metric, default_stat_target")
-    .eq("team_id", teamId)
-    .order("sort_order", { ascending: true });
-  if (error) throw error;
-  return (data ?? []).map((r) => ({
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let rows: any[] | null = null;
+  if (crmDisponivel !== false) {
+    const { data, error } = await supabase
+      .from("team_funnel_phases")
+      .select(`${PHASE_COLS_BASE}, ${PHASE_COLS_CRM}`)
+      .eq("team_id", teamId)
+      .order("sort_order", { ascending: true });
+    if (!error) {
+      crmDisponivel = true;
+      rows = data;
+    } else if (semMigracaoCrm(error)) {
+      crmDisponivel = false;
+    } else {
+      throw error;
+    }
+  }
+  if (rows === null) {
+    const { data, error } = await supabase
+      .from("team_funnel_phases")
+      .select(PHASE_COLS_BASE)
+      .eq("team_id", teamId)
+      .order("sort_order", { ascending: true });
+    if (error) throw error;
+    rows = data;
+  }
+  return (rows ?? []).map((r) => ({
     id: r.id,
     teamId: r.team_id,
     name: r.name,
@@ -69,7 +154,37 @@ export async function fetchFunnelPhases(teamId: string): Promise<FunnelPhase[]> 
     defaultReviewsTarget: r.default_reviews_target,
     defaultStatMetric: r.default_stat_metric as StatMetric | null,
     defaultStatTarget: r.default_stat_target,
+    descricao: r.descricao ?? null,
+    buyinMin: numOuNull(r.buyin_min),
+    buyinMax: numOuNull(r.buyin_max),
+    wipLimit: numOuNull(r.wip_limit),
+    slaDias: numOuNull(r.sla_dias),
+    reqSessoes: numOuNull(r.req_sessoes),
+    reqRoiPct: numOuNull(r.req_roi_pct),
+    reqScore: numOuNull(r.req_score),
+    reqPresencaPct: numOuNull(r.req_presenca_pct),
+    playbook: Array.isArray(r.playbook) ? r.playbook : [],
   }));
+}
+
+// Prazo padrão do funil (teams.funil_sla_dias) -- vale para as fases sem
+// prazo próprio. Sem a migração no banco, volta o padrão de fábrica.
+export async function fetchFunilSlaPadrao(teamId: string): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("teams").select("funil_sla_dias").eq("id", teamId).maybeSingle();
+  if (error) {
+    if (semMigracaoCrm(error)) return SLA_PADRAO_DIAS;
+    throw error;
+  }
+  const v = numOuNull(data?.funil_sla_dias);
+  return v != null && v > 0 ? v : SLA_PADRAO_DIAS;
+}
+
+export async function updateFunilSlaPadrao(teamId: string, dias: number) {
+  const supabase = createClient();
+  const valor = Math.min(365, Math.max(1, Math.round(dias)));
+  const { error } = await supabase.from("teams").update({ funil_sla_dias: valor }).eq("id", teamId);
+  if (error) throw error;
 }
 
 export async function seedDefaultPhases(teamId: string) {
@@ -102,6 +217,14 @@ export async function fetchPlayerCards(): Promise<PlayerCard[]> {
     eventosTotal: r.eventos_total,
     eventosPresente: r.eventos_presente,
     eventosAusente: r.eventos_ausente,
+    deadline: r.deadline ?? null,
+    nextStep: r.next_step ?? null,
+    nextStepAt: r.next_step_at ?? null,
+    prioridade: (r.prioridade as Prioridade) ?? "normal",
+    sessoesFase: r.sessoes_fase ?? null,
+    lucroFase: numOuNull(r.lucro_fase),
+    roiPct: numOuNull(r.roi_pct),
+    abiTorneio: numOuNull(r.abi_torneio),
   }));
 }
 
@@ -119,6 +242,10 @@ export async function updateCardDetails(
     reviewsTargetOverride?: number | null;
     statMetricOverride?: StatMetric | null;
     statTargetOverride?: number | null;
+    nextStep?: string | null;
+    nextStepAt?: string | null;
+    deadline?: string | null;
+    prioridade?: Prioridade;
   }
 ) {
   const supabase = createClient();
@@ -128,6 +255,14 @@ export async function updateCardDetails(
   if (patch.reviewsTargetOverride !== undefined) row.reviews_target_override = patch.reviewsTargetOverride;
   if (patch.statMetricOverride !== undefined) row.stat_metric_override = patch.statMetricOverride;
   if (patch.statTargetOverride !== undefined) row.stat_target_override = patch.statTargetOverride;
+  // deadline já existia na tabela; os outros três são da migração nova.
+  if (patch.deadline !== undefined) row.deadline = patch.deadline;
+  if (funilCrmDisponivel()) {
+    if (patch.nextStep !== undefined) row.next_step = patch.nextStep?.trim() || null;
+    if (patch.nextStepAt !== undefined) row.next_step_at = patch.nextStepAt;
+    if (patch.prioridade !== undefined) row.prioridade = patch.prioridade;
+  }
+  if (Object.keys(row).length === 0) return;
 
   const { error } = await supabase.from("team_player_cards").update(row).eq("player_id", playerId);
   if (error) throw error;
@@ -144,21 +279,45 @@ export async function createPhase(teamId: string, name: string, color: string, s
   if (error) throw error;
 }
 
-export async function updatePhase(
-  phaseId: string,
-  patch: {
-    name?: string;
-    color?: string;
-    defaultDrillsTarget?: number;
-    defaultReviewsTarget?: number;
-  }
-) {
+export interface PhasePatch {
+  name?: string;
+  color?: string;
+  defaultDrillsTarget?: number;
+  defaultReviewsTarget?: number;
+  descricao?: string | null;
+  buyinMin?: number | null;
+  buyinMax?: number | null;
+  wipLimit?: number | null;
+  slaDias?: number | null;
+  reqSessoes?: number | null;
+  reqRoiPct?: number | null;
+  reqScore?: number | null;
+  reqPresencaPct?: number | null;
+  playbook?: string[];
+}
+
+export async function updatePhase(phaseId: string, patch: PhasePatch) {
   const supabase = createClient();
   const row: Record<string, unknown> = {};
   if (patch.name !== undefined) row.name = patch.name.trim();
   if (patch.color !== undefined) row.color = patch.color;
   if (patch.defaultDrillsTarget !== undefined) row.default_drills_target = patch.defaultDrillsTarget;
   if (patch.defaultReviewsTarget !== undefined) row.default_reviews_target = patch.defaultReviewsTarget;
+  if (funilCrmDisponivel()) {
+    if (patch.descricao !== undefined) row.descricao = patch.descricao?.trim() || null;
+    if (patch.buyinMin !== undefined) row.buyin_min = patch.buyinMin;
+    if (patch.buyinMax !== undefined) row.buyin_max = patch.buyinMax;
+    if (patch.wipLimit !== undefined) row.wip_limit = patch.wipLimit;
+    if (patch.slaDias !== undefined) row.sla_dias = patch.slaDias;
+    if (patch.reqSessoes !== undefined) row.req_sessoes = patch.reqSessoes;
+    if (patch.reqRoiPct !== undefined) row.req_roi_pct = patch.reqRoiPct;
+    if (patch.reqScore !== undefined) row.req_score = patch.reqScore;
+    if (patch.reqPresencaPct !== undefined) row.req_presenca_pct = patch.reqPresencaPct;
+    if (patch.playbook !== undefined) {
+      const itens = patch.playbook.map((t) => t.trim()).filter(Boolean);
+      row.playbook = itens.length ? itens : null;
+    }
+  }
   const { error } = await supabase.from("team_funnel_phases").update(row).eq("id", phaseId);
   if (error) throw error;
 }
@@ -534,8 +693,52 @@ export async function fetchPlayerAchievements(playerId: string, limit = 30): Pro
   }));
 }
 
+// ============================================================
+// Fluxo por fase (relatório) -- team_funnel_flow, calculado a partir do
+// histórico de fases que já existe. null = banco sem a migração.
+// ============================================================
+
+export interface FunnelFlowRow {
+  phaseId: string;
+  phaseName: string;
+  phaseColor: string;
+  sortOrder: number;
+  ativos: number;
+  entradas: number;
+  promovidos: number;
+  regressos: number;
+  sairam: number;
+  tempoMedioDias: number | null;
+}
+
+export async function fetchFunnelFlow(days = 90): Promise<FunnelFlowRow[] | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_funnel_flow", { p_days: days });
+  if (error) {
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const code = String((error as any).code ?? "");
+    if (code === "PGRST202" || code === "42883") return null;
+    throw error;
+  }
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    phaseId: r.phase_id,
+    phaseName: r.phase_name,
+    phaseColor: r.phase_color,
+    sortOrder: r.sort_order,
+    ativos: r.ativos ?? 0,
+    entradas: r.entradas ?? 0,
+    promovidos: r.promovidos ?? 0,
+    regressos: r.regressos ?? 0,
+    sairam: r.sairam ?? 0,
+    tempoMedioDias: numOuNull(r.tempo_medio_dias),
+  }));
+}
+
 export function traduzErroFunil(err: unknown): string {
-  const msg = err instanceof Error ? err.message : String(err);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const msg = err instanceof Error ? err.message : String((err as any)?.message ?? err);
+  if (semMigracaoCrm(err)) return "Esse recurso precisa da atualização do banco do funil (migração pendente).";
   if (msg.includes("SEM_PERMISSAO")) return "Você não tem permissão para essa ação.";
   if (msg.includes("SEM_TIME")) return "Você precisa estar em um time ativo.";
   if (msg.includes("excede 8MB")) return msg;

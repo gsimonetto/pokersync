@@ -6,6 +6,8 @@ import { ExternalLink, IdCard, MessageCircle, MoreVertical, X } from "lucide-rea
 import { Esqueleto } from "@/components/painel/painel-card";
 import { PeriodSelector } from "@/components/period-selector";
 import { PlayerDetailBody } from "@/components/time/player-detail-body";
+import { PlayerBadge, crachaDaFicha } from "@/components/time/player-badge";
+import { SegmentedControl } from "@/components/ui/segmented-control";
 import { ModalPortal } from "@/components/modal-portal";
 import { AcoesJogadorModal } from "@/components/time/acoes-jogador-modal";
 import {
@@ -29,6 +31,8 @@ import {
   type TeamDashboardRow,
   type TeamLabel,
 } from "@/lib/services/team-service";
+
+const PAPEL: Record<string, string> = { admin: "Administrador", coach: "Coach", player: "Jogador" };
 
 const PERIODOS = [
   { label: "7 dias", days: 7 },
@@ -72,6 +76,9 @@ export function PlayerDetailModal({
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
   const [acoesAbertas, setAcoesAbertas] = useState(false);
+  // A mesma ficha, em dois tamanhos: completa ou como crachá (o mesmo
+  // crachá da lista do time, do funil e das vagas).
+  const [modo, setModo] = useState<"ficha" | "cracha">("ficha");
   const [p, setP] = useState<PlayerDetail | null>(null);
   const [atividade, setAtividade] = useState<PlayerActivityDay[]>([]);
   const [maos, setMaos] = useState<PlayerSharedHand[]>([]);
@@ -124,10 +131,16 @@ export function PlayerDetailModal({
           {/* Nome, foto e score moram na capa da ficha (PlayerDetailBody);
               aqui fica só a barra de ações. */}
           <div className="flex shrink-0 flex-wrap items-center gap-3 border-b border-white/[0.06] px-4 py-3 sm:px-5">
-            <p className="flex min-w-0 flex-1 items-center gap-2 text-[14px] font-semibold tracking-tight">
-              <IdCard size={16} className="shrink-0 text-[#d4af37]" />
-              <span className="truncate">Ficha do jogador</span>
-            </p>
+            <div className="flex min-w-0 flex-1 items-center">
+              <SegmentedControl
+                value={modo}
+                onChange={setModo}
+                options={[
+                  { value: "ficha", label: "Ficha" },
+                  { value: "cracha", label: <><IdCard size={13} className={modo === "cracha" ? "" : "text-[#d4af37]"} /> Crachá</> },
+                ]}
+              />
+            </div>
             <div className="flex items-center gap-2">
               <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
               {podeConversar && onAbrirConversa && (
@@ -175,6 +188,23 @@ export function PlayerDetailModal({
               <Esqueleto linhas={4} altura={96} />
             ) : !p ? (
               <p className="text-sm text-muted">Jogador não encontrado.</p>
+            ) : modo === "cracha" ? (
+              <div className="flex flex-col items-center gap-4 py-4 sm:py-8">
+                <PlayerBadge
+                  dados={crachaDaFicha(p, jogador)}
+                  variante="cracha"
+                  subtitulo={
+                    <>
+                      {PAPEL[p.role]}
+                      {p.coachNome && <span className="text-muted/70"> · coach {p.coachNome}</span>}
+                    </>
+                  }
+                  rodape={`PokerSync · no time desde ${new Date(p.joinedAt).toLocaleDateString("pt-BR", { month: "short", year: "numeric" })}`}
+                />
+                <p className="max-w-xs text-center text-[11.5px] text-muted/70">
+                  É o mesmo crachá que aparece na lista do time, no funil e nas vagas. Passe o mouse num número para ver de onde ele vem.
+                </p>
+              </div>
             ) : (
               <PlayerDetailBody
                 id={playerId}
@@ -189,7 +219,7 @@ export function PlayerDetailModal({
                 emModal
                 // Metas so' se criam/editam pelo card do jogador no Funil --
                 // aqui (ficha aberta pela aba Jogadores) e' so' leitura. Ver
-                // components/time/tab-kanban.tsx.
+                // components/time/funil/funil-modal-card.tsx.
                 podeGerenciarMetas={false}
                 hrefMaoCompartilhada={(reviewId) => `/revisor?shared=${reviewId}`}
               />

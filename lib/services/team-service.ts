@@ -422,6 +422,12 @@ export interface TeamDashboardRow {
   labelId: string | null;
   labelName: string | null;
   labelColor: string | null;
+  // Carreira (player_performance_snapshot) -- alimentam o crachá do
+  // jogador. null enquanto o banco não tiver a migração
+  // funil_crm_avancado ou o jogador não tiver sessão registrada.
+  abiTorneio: number | null;
+  roiPct: number | null;
+  numSessoes: number | null;
 }
 
 export interface TeamActivityDay {
@@ -469,6 +475,9 @@ export async function fetchTeamDashboard(days = 30): Promise<TeamDashboardRow[]>
     labelId: r.label_id ?? null,
     labelName: r.label_name ?? null,
     labelColor: r.label_color ?? null,
+    abiTorneio: r.abi_torneio == null ? null : Number(r.abi_torneio),
+    roiPct: r.roi_pct == null ? null : Number(r.roi_pct),
+    numSessoes: r.num_sessoes ?? null,
   }));
 }
 
