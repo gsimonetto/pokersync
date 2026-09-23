@@ -131,7 +131,7 @@ export default function JogadorPage({ params }: { params: Promise<{ id: string }
                 evolutionStats={evolutionStats}
                 // Metas so' se criam/editam pelo card do jogador no Funil (controle
                 // centralizado num unico lugar) -- aqui e' so' leitura, mesmo pra
-                // quem e' admin/coach do jogador. Ver components/time/tab-kanban.tsx.
+                // quem e' admin/coach do jogador. Ver components/time/funil/funil-modal-card.tsx.
                 podeGerenciarMetas={false}
               />
             )}

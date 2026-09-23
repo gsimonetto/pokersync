@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useState } from "react";
-import { TabKanban } from "@/components/time/tab-kanban";
+import { Funil } from "@/components/time/funil/funil";
 import { ModalNovoEvento } from "@/components/time/tab-calendario";
 import { fetchTeamDashboardCached, traduzErroTime, type MyTeam, type TeamDashboardRow } from "@/lib/services/team-service";
 
@@ -16,9 +16,11 @@ export function FunilAba({ time, onErro }: { time: MyTeam; onErro: (s: string) =
 
   const carregar = useCallback(async () => {
     try {
-      // 365 dias: o funil olha a trajetória inteira do jogador no time,
-      // não o período escolhido na Visão geral.
-      setLinhas(await fetchTeamDashboardCached(365));
+      // 30 dias, o mesmo padrão do painel: o crachá do cartão (score,
+      // acerto, treinos) mostra os mesmos números da aba Jogadores. O que
+      // é da trajetória na fase (drills, reviews, sessões, resultado)
+      // vem do próprio cartão, contado desde que entrou na fase.
+      setLinhas(await fetchTeamDashboardCached(30));
     } catch (e) {
       onErro(traduzErroTime(e));
       setLinhas([]);
@@ -37,7 +39,7 @@ export function FunilAba({ time, onErro }: { time: MyTeam; onErro: (s: string) =
 
   return (
     <div className="flex h-[calc(100vh-15rem)] min-h-[520px] flex-col">
-      <TabKanban
+      <Funil
         teamId={time.team.id}
         jogadores={jogadores}
         coaches={coaches}

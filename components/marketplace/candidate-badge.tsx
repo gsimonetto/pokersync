@@ -7,6 +7,7 @@ import { Avatar } from "@/components/avatar";
 import { Modal } from "@/components/ui/modal";
 import { SpeedGauge } from "@/components/dashboard/kit";
 import { Chip } from "@/components/chip";
+import { PlayerBadge, crachaDoCandidato } from "@/components/time/player-badge";
 import { BRL } from "@/lib/format";
 import {
   fetchCandidateSnapshot,
@@ -28,8 +29,10 @@ function fmtPct(v: number | null): string {
   return v === null ? "—" : `${v >= 0 ? "" : ""}${v}%`;
 }
 
-// Cracha compacto na lista de candidatos -- so' o essencial pra decidir
-// se vale abrir (nome, ganhos, buy-in, partidas jogadas). O detalhe
+// Cracha na lista de candidatos -- o mesmo crachá do jogador do time
+// (components/time/player-badge), pra o time comparar candidato e elenco
+// na mesma régua: score, resultado/ROI, buy-in/volume, acerto/treinos,
+// mais o match com a vaga. O detalhe
 // completo (Player Evolution, disponibilidade, historico, aceitar/
 // recusar) mora no modal, aberto so' quando o time clica -- evita uma
 // parede de cards grandes quando a vaga tem varios candidatos.
@@ -69,42 +72,28 @@ export function CandidateBadge({
 
   return (
     <>
-      <button
-        type="button"
+      <PlayerBadge
+        dados={crachaDoCandidato(snap)}
+        variante="linha"
         onClick={() => setAberto(true)}
-        className="flex w-full items-center gap-3 rounded-lg border border-hairline bg-elevated p-3.5 text-left transition-colors hover:border-white/15"
-      >
-        <Avatar id={snap.avatarId} url={snap.avatarUrl} size={40} />
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate text-sm font-semibold text-ink">{snap.apelido || snap.nome}</p>
-            <Chip color={APPLICATION_STATUS_COLOR[snap.status]} size="sm">
-              {APPLICATION_STATUS_LABEL[snap.status]}
-            </Chip>
-          </div>
-          <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-[12px] text-muted">
-            <span>
-              Ganhos{" "}
-              <b className={snap.lucroAcumulado === null ? "text-muted" : snap.lucroAcumulado >= 0 ? "text-positive" : "text-negative"}>
-                {snap.lucroAcumulado !== null ? BRL.format(snap.lucroAcumulado) : "—"}
-              </b>
+        ariaLabel={`Ver candidatura de ${snap.apelido || snap.nome}`}
+        subtitulo={
+          <Chip color={APPLICATION_STATUS_COLOR[snap.status]} size="sm">
+            {APPLICATION_STATUS_LABEL[snap.status]}
+          </Chip>
+        }
+        lateral={
+          <span className="flex shrink-0 items-center gap-2">
+            <span className="text-right">
+              <span className={`block text-base font-bold tabular-nums ${snap.matchScore >= idealMin ? "text-positive" : "text-negative"}`}>
+                {snap.matchScore}
+              </span>
+              <span className="block text-[9px] uppercase tracking-wider text-muted/60">match</span>
             </span>
-            <span>
-              Buy-in <b className="text-ink">{snap.abiTorneio !== null ? BRL.format(snap.abiTorneio) : "—"}</b>
-            </span>
-            <span>
-              Partidas <b className="text-ink">{snap.numSessoes ?? 0}</b>
-            </span>
-          </div>
-        </div>
-        <div className="shrink-0 text-right">
-          <p className={`text-base font-bold tabular-nums ${snap.matchScore >= idealMin ? "text-positive" : "text-negative"}`}>
-            {snap.matchScore}
-          </p>
-          <p className="text-[9px] uppercase tracking-wider text-muted/60">match</p>
-        </div>
-        <ChevronRight size={16} className="shrink-0 text-muted" />
-      </button>
+            <ChevronRight size={16} className="text-muted" />
+          </span>
+        }
+      />
 
       <Modal open={aberto} onClose={() => setAberto(false)} title={snap.apelido || snap.nome} wide>
         <CandidateDetail

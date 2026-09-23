@@ -348,6 +348,9 @@ export interface CandidateSnapshot {
   message: string | null;
   appliedAt: string;
   historicoTimes: TeamHistoryEntry[];
+  /** Estudo (carreira) -- null antes da migração funil_crm_avancado. */
+  numDrills: number | null;
+  taxaAcertoTreinoPct: number | null;
 }
 
 // Uma passagem por outro time — so' papel e duracao, nunca resultado
@@ -398,6 +401,8 @@ export async function fetchCandidateSnapshot(applicationId: string): Promise<Can
       months: h.months as number,
       endedMonthsAgo: h.endedMonthsAgo as number,
     })),
+    numDrills: r.num_drills ?? null,
+    taxaAcertoTreinoPct: r.taxa_acerto_treino_pct == null ? null : Number(r.taxa_acerto_treino_pct),
   };
 }
 
