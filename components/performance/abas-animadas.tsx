@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useId } from "react";
 import { motion } from "framer-motion";
 import type { LucideIcon } from "lucide-react";
 
@@ -14,16 +14,24 @@ export function AbasAnimadas<T extends string>({
   onChange,
   options,
   rotulo = "Seções da Performance",
+  atalhos = true,
 }: {
   value: T;
   onChange: (v: T) => void;
   /** badge: contador opcional ao lado do nome (ex.: convites pendentes). */
   options: { value: T; label: string; icon: LucideIcon; badge?: number }[];
   rotulo?: string;
+  /** false = sem atalho 1..N (ex.: abas dentro de um modal, pra não trocar
+   *  também as abas da tela que está por trás). */
+  atalhos?: boolean;
 }) {
+  // Id próprio por barra: com duas barras na tela (página + modal), o
+  // sublinhado de uma não pode "voar" para a outra.
+  const id = useId();
   // Atalho: teclas 1..N trocam de aba (menos quando o foco está num campo
   // de texto, pra não atrapalhar quem está digitando).
   useEffect(() => {
+    if (!atalhos) return;
     function tecla(e: KeyboardEvent) {
       if (e.metaKey || e.ctrlKey || e.altKey) return;
       const alvo = e.target as HTMLElement | null;
@@ -33,7 +41,7 @@ export function AbasAnimadas<T extends string>({
     }
     window.addEventListener("keydown", tecla);
     return () => window.removeEventListener("keydown", tecla);
-  }, [options, onChange]);
+  }, [options, onChange, atalhos]);
 
   return (
     <div
@@ -57,7 +65,7 @@ export function AbasAnimadas<T extends string>({
           >
             {ativo && (
               <motion.span
-                layoutId="perf-aba-fundo"
+                layoutId={`${id}-fundo`}
                 className="absolute inset-0 rounded-xl bg-white/[0.06]"
                 transition={{ type: "spring", stiffness: 480, damping: 38 }}
               />
@@ -70,13 +78,13 @@ export function AbasAnimadas<T extends string>({
             <kbd
               className={`relative hidden rounded border px-1 text-[10px] leading-4 transition-opacity sm:inline ${
                 ativo ? "border-white/15 text-muted" : "border-white/10 text-muted/60 opacity-0 group-hover:opacity-100"
-              }`}
+              } ${atalhos ? "" : "!hidden"}`}
             >
               {i + 1}
             </kbd>
             {ativo && (
               <motion.span
-                layoutId="perf-aba-linha"
+                layoutId={`${id}-linha`}
                 className="absolute inset-x-3 -bottom-px h-[2px] rounded-full bg-[#d4af37]"
                 transition={{ type: "spring", stiffness: 480, damping: 38 }}
               />

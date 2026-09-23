@@ -114,6 +114,9 @@ export async function updateAvatarIcon(avatarId: number) {
 }
 
 const BUCKET = "avatars";
+/** Tamanho recomendado do banner do perfil (proporção 5:1). Mostrado no
+ *  botão "Incluir banner" e usado na capa da ficha do jogador. */
+export const BANNER_DIMENSAO = { largura: 1500, altura: 300 };
 const MAX_SIZE = 5 * 1024 * 1024;
 const ALLOWED = ["image/jpeg", "image/png", "image/webp"];
 
@@ -175,5 +178,48 @@ export async function updatePassword(newPassword: string) {
   }
   const supabase = createClient();
   const { error } = await supabase.auth.updateUser({ password: newPassword });
+  if (error) throw error;
+}
+
+// Banner do perfil (capa da ficha do jogador). Mesmo bucket e mesma regra
+// da foto (pasta do próprio usuário). Lido à parte do perfil: se o banco
+// ainda não tiver a coluna, o menu só não mostra o bloco.
+export async function fetchMeuBanner(): Promise<string | null | undefined> {
+  const supabase = createClient();
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return undefined;
+  const { data, error } = await supabase.from("profiles").select("banner_url").eq("id", u.user.id).maybeSingle();
+  if (error || !data) return undefined;
+  return (data as { banner_url: string | null }).banner_url;
+}
+
+export async function uploadBannerPhoto(file: File): Promise<string> {
+  if (!ALLOWED.includes(file.type)) throw new Error("Formato inválido (use JPG, PNG ou WEBP).");
+  if (file.size > MAX_SIZE) throw new Error("Arquivo excede 5MB.");
+
+  const supabase = createClient();
+  const user = await getUser();
+  const ext = file.type === "image/png" ? "png" : file.type === "image/webp" ? "webp" : "jpg";
+  const path = `${user.id}/banner.${ext}`;
+
+  const { error: eUp } = await supabase.storage.from(BUCKET).upload(path, file, {
+    upsert: true,
+    cacheControl: "3600",
+    contentType: file.type,
+  });
+  if (eUp) throw eUp;
+
+  const { data: pub } = supabase.storage.from(BUCKET).getPublicUrl(path);
+  const url = `${pub.publicUrl}?t=${Date.now()}`;
+
+  const { error: eProf } = await supabase.from("profiles").update({ banner_url: url }).eq("id", user.id);
+  if (eProf) throw eProf;
+  return url;
+}
+
+export async function removeBanner(): Promise<void> {
+  const supabase = createClient();
+  const user = await getUser();
+  const { error } = await supabase.from("profiles").update({ banner_url: null }).eq("id", user.id);
   if (error) throw error;
 }

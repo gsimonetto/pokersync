@@ -2,6 +2,7 @@ import { createClient } from "@/lib/supabase/client";
 import { isModuleUnlocked, toPlanId } from "@/lib/plans/plans-data";
 import { fetchMyPlanId } from "@/lib/services/plan-service";
 import type { ProfileCard } from "@/lib/services/profile-card-type";
+import type { DiaSemana, HorarioTreino, TempoExperiencia } from "@/lib/services/profile-service";
 
 // ============================================================
 // Modo Team — base (time, papeis, convites por token)
@@ -1423,4 +1424,84 @@ export async function fetchPlayerEvolutionStats(playerId: string, days = 30): Pr
     wsdPct: r?.wsd_pct ?? null,
     wsdWonPct: r?.wsd_won_pct ?? null,
   };
+}
+
+// ============================================================
+// Ficha do jogador: perfil de treino visível ao coach (LGPD).
+// O jogador escolhe se mostra experiência, turno, horas/dia e dias de
+// treino ao coach/admin do time (profiles.perfil_visivel_time; null =
+// ainda não viu o aviso, tratado como oculto). Nunca data de nascimento
+// nem contato. As funções toleram o banco ainda sem essa migração:
+// devolvem null e a tela simplesmente não mostra o bloco.
+// ============================================================
+export interface PlayerTeamProfile {
+  apelido: string | null;
+  visivel: boolean;
+  tempoExperiencia: TempoExperiencia | null;
+  horarioTreino: HorarioTreino | null;
+  horasTreinoDia: number | null;
+  diasTreinoSemana: DiaSemana[] | null;
+  /** Banner que o jogador escolheu no menu de perfil (capa da ficha). */
+  bannerUrl: string | null;
+}
+
+export async function fetchPlayerTeamProfile(playerId: string): Promise<PlayerTeamProfile | null> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_player_profile", { p_player: playerId });
+  if (error) return null;
+  const r = Array.isArray(data) ? data[0] : data;
+  if (!r) return null;
+  return {
+    apelido: r.apelido ?? null,
+    visivel: Boolean(r.visivel),
+    tempoExperiencia: r.tempo_experiencia ?? null,
+    horarioTreino: r.horario_treino ?? null,
+    horasTreinoDia: r.horas_treino_dia ?? null,
+    diasTreinoSemana: r.dias_treino_semana ?? null,
+    bannerUrl: r.banner_url ?? null,
+  };
+}
+
+/** Escolha do próprio jogador: true/false, null = ainda não decidiu,
+ *  undefined = banco ainda sem a coluna (não mostra aviso nem chave). */
+export async function fetchMeuPerfilVisivelTime(): Promise<boolean | null | undefined> {
+  const supabase = createClient();
+  const { data: u } = await supabase.auth.getUser();
+  if (!u.user) return undefined;
+  const { data, error } = await supabase.from("profiles").select("perfil_visivel_time").eq("id", u.user.id).maybeSingle();
+  if (error || !data) return undefined;
+  return (data as { perfil_visivel_time: boolean | null }).perfil_visivel_time;
+}
+
+export async function setPerfilVisivelTime(visivel: boolean): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("set_perfil_visivel_time", { p_visivel: visivel });
+  if (error) throw error;
+}
+
+// Times por onde o jogador passou no PokerSync (team_member_history,
+// registrado por gatilho no banco). Só time, função e período -- sem
+// resultado de times antigos. [] se o banco ainda não tiver a função.
+export interface PlayerTeamHistoryItem {
+  teamName: string;
+  teamAccent: string | null;
+  teamLogoUrl: string | null;
+  role: TeamRole;
+  joinedAt: string;
+  leftAt: string | null;
+}
+
+export async function fetchPlayerTeamHistory(playerId: string): Promise<PlayerTeamHistoryItem[]> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("team_player_history", { p_player: playerId });
+  if (error) return [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return ((data ?? []) as any[]).map((r) => ({
+    teamName: r.team_name,
+    teamAccent: r.team_accent ?? null,
+    teamLogoUrl: r.team_logo_url ?? null,
+    role: r.role as TeamRole,
+    joinedAt: r.joined_at,
+    leftAt: r.left_at ?? null,
+  }));
 }

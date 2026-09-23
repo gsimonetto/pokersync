@@ -8,6 +8,7 @@ import { createClient } from "@/lib/supabase/client";
 import {
   acceptInvite,
   getInviteInfo,
+  setPerfilVisivelTime,
   traduzErroTime,
   type InviteInfo,
   type TeamRole,
@@ -41,6 +42,9 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
   const [info, setInfo] = useState<InviteInfo | null>(null);
   const [erro, setErro] = useState<string | null>(null);
   const [entrando, setEntrando] = useState(false);
+  // LGPD: aviso claro + escolha na entrada. Marcado por padrão (decisão
+  // de produto), mas o jogador desmarca aqui ou muda depois na tela do Time.
+  const [mostrarRotina, setMostrarRotina] = useState(true);
 
   useEffect(() => {
     (async () => {
@@ -62,6 +66,9 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
     setErro(null);
     try {
       await acceptInvite(token);
+      // Se o banco ainda não tiver a função, a entrada no time não pode
+      // falhar por causa disso -- a escolha volta a ser pedida na tela do Time.
+      await setPerfilVisivelTime(mostrarRotina).catch(() => {});
       router.push("/time");
     } catch (e) {
       setErro(traduzErroTime(e));
@@ -110,11 +117,28 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
               </p>
             )}
 
+            {logado && (
+              <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-xl border border-hairline bg-elevated p-3 text-left">
+                <input
+                  type="checkbox"
+                  checked={mostrarRotina}
+                  onChange={(e) => setMostrarRotina(e.target.checked)}
+                  className="mt-0.5 size-4 shrink-0 accent-[#d4af37]"
+                />
+                <span className="text-[12.5px] leading-snug text-muted">
+                  <strong className="text-ink">Mostrar minha rotina de treino ao time</strong>
+                  <br />
+                  Experiência, turno preferido, horas por dia e dias de treino do seu perfil, para o coach organizar
+                  a agenda com você. Nunca data de nascimento nem contato. Dá para ocultar quando quiser.
+                </span>
+              </label>
+            )}
+
             {logado ? (
               <button
                 onClick={entrar}
                 disabled={entrando}
-                className="mt-5 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02] disabled:opacity-50"
+                className="mt-4 w-full rounded-xl px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02] disabled:opacity-50"
                 style={{ backgroundColor: accent }}
               >
                 {entrando ? "Entrando…" : "Entrar no time"}
