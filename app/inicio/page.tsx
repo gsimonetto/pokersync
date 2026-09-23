@@ -10,6 +10,7 @@ import { IndicatorsCard } from "@/components/painel/indicators-card";
 import { HabitsCard } from "@/components/painel/habits-card";
 import { ReviewHandsCard } from "@/components/painel/review-hands-card";
 import { PainelDadosProvider } from "@/components/painel/painel-dados";
+import { fonteNumeros } from "@/components/painel/fonte-numeros";
 
 // Painel — tela de início do jogador. Substitui o "diário" anterior
 // (lista vertical de cards de reflexão/agenda/metas/insights): a mesma
@@ -36,7 +37,7 @@ export default function InicioPage() {
         {/* reducedMotion="user": quem pediu menos movimento no sistema
             operacional vê a tela sem as animações de entrada e troca. */}
         <MotionConfig reducedMotion="user">
-          <main className="painel w-full px-4 py-6 md:px-6 xl:flex xl:h-full xl:flex-col xl:overflow-hidden xl:py-4">
+          <main className={`painel ${fonteNumeros.variable} w-full px-4 py-6 md:px-6 xl:flex xl:h-full xl:flex-col xl:overflow-hidden xl:py-4`}>
             <PainelStyles />
             <PainelHeader />
 

@@ -70,7 +70,7 @@ export function PainelHeader() {
         <div className="hidden text-right sm:block">
           {/* 24h, sem AM/PM: formato usado no Brasil. */}
           {/* A cada minuto o horário novo desce no lugar do antigo. */}
-          <p className="tnum relative overflow-hidden text-2xl font-light leading-none text-ink/80 sm:text-[28px]">
+          <p className="painel-numero tnum relative overflow-hidden text-2xl font-light leading-none text-ink/80 sm:text-[28px]">
             <AnimatePresence mode="popLayout" initial={false}>
               <motion.span
                 key={agora ? `${agora.getHours()}:${agora.getMinutes()}` : "-"}
@@ -95,7 +95,7 @@ export function PainelHeader() {
           </TileIcone>
           <div className="min-w-0 flex-1">
             <p className="text-[11px] uppercase tracking-[0.1em] text-muted/80">Banca total</p>
-            <p className="tnum text-xl font-semibold leading-tight">
+            <p className="painel-numero tnum text-xl font-semibold leading-tight">
               {bancaAtual == null ? "—" : <Numero valor={bancaAtual} formatar={formatBRL} duracao={1100} />}
             </p>
           </div>
