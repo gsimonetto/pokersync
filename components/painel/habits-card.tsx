@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, CheckCircle2, Flame, Plus, Target, Trash2, TrendingUp, X } from "lucide-react";
+import { BookOpen, Check, CheckCircle2, Flame, Plus, Target, Trash2, TrendingUp, X } from "lucide-react";
 import { addGoal, deleteGoal } from "@/lib/services/bankroll-service";
 import { goalProgress } from "@/lib/bankroll/calc";
 import type { GoalType } from "@/lib/bankroll/types";
@@ -237,14 +237,31 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
                 return (
                   <li key={g.id} className="group/meta">
                     <Linha>
+                      {/* Três andares: nome e ritmo em cima, barra no
+                          meio, "1 de 20 sessões" embaixo. Antes nome,
+                          progresso, selo e lixeira dividiam UMA linha e,
+                          no card estreito, o texto era espremido. */}
                       <div className="flex items-center gap-3">
                         <TileIcone cor={cor}>
                           <Icone size={14} />
                         </TileIcone>
                         <div className="min-w-0 flex-1">
-                          <div className="flex items-baseline justify-between gap-2">
-                            <span className="text-sm font-medium">{ROTULO[g.type]}</span>
-                            <span className="tnum text-xs text-muted">{textoProgresso(g, p.current)}</span>
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="truncate text-sm font-medium">{ROTULO[g.type]}</span>
+                            <span className="flex shrink-0 items-center gap-1.5">
+                              {/* Selo com o RITMO da meta (em dia / atrasada /
+                                  concluída) no lugar do percentual, que só
+                                  repetia o "2 de 20" logo abaixo. */}
+                              <Selo cor={situacao.cor}>{situacao.texto}</Selo>
+                              <button
+                                type="button"
+                                onClick={() => removerMeta(g.id)}
+                                aria-label={`Apagar meta de ${ROTULO[g.type]}`}
+                                className="grid h-6 w-6 place-items-center rounded-md text-transparent transition-colors hover:text-negative focus:text-negative group-hover/meta:text-muted/60"
+                              >
+                                <Trash2 size={13} />
+                              </button>
+                            </span>
                           </div>
                           <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-white/10">
                             <div
@@ -255,19 +272,10 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
                               }}
                             />
                           </div>
+                          <span className="tnum mt-1.5 block truncate text-[11px] text-muted">
+                            {textoProgresso(g, p.current)}
+                          </span>
                         </div>
-                        {/* Selo com o RITMO da meta (em dia / atrasada /
-                            concluída) no lugar do percentual, que só
-                            repetia o "2 de 20" ao lado. */}
-                        <Selo cor={situacao.cor}>{situacao.texto}</Selo>
-                        <button
-                          type="button"
-                          onClick={() => removerMeta(g.id)}
-                          aria-label={`Apagar meta de ${ROTULO[g.type]}`}
-                          className="shrink-0 text-transparent transition-colors hover:text-negative focus:text-negative group-hover/meta:text-muted/60"
-                        >
-                          <Trash2 size={13} />
-                        </button>
                       </div>
                     </Linha>
                   </li>
@@ -338,11 +346,11 @@ export function HabitsCard({ style, className }: { style?: React.CSSProperties; 
                         <span className="text-[11px] text-muted/70">{letras[i] ?? ""}</span>
                         <span
                           aria-label={ativo ? "dia ativo" : "dia sem atividade"}
-                          className={`grid h-6 w-6 place-items-center rounded-full text-[11px] ${
+                          className={`grid h-6 w-6 place-items-center rounded-full ${
                             ativo ? "bg-[#d4af37] text-black" : "border border-hairline text-transparent"
                           }`}
                         >
-                          ✓
+                          <Check size={12} aria-hidden />
                         </span>
                       </span>
                     );

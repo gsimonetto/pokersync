@@ -203,53 +203,65 @@ export function AgendaCard({ style, className }: { style?: React.CSSProperties; 
       style={style}
       className={className}
     >
-      <div className="grid grid-cols-7 gap-y-1 text-center">
-        {SEMANA.map((l, i) => (
-          <span key={i} className="pb-1 text-[11px] font-semibold text-muted/70">
-            {l}
-          </span>
-        ))}
-        {dias.map((dia, i) => {
-          if (dia == null) return <span key={`v${i}`} />;
-          const chave = CHAVE(new Date(mesRef!.getFullYear(), mesRef!.getMonth(), dia));
-          const itens = porDia.get(chave) ?? [];
-          const ehHoje = hoje != null && chave === CHAVE(hoje);
-          const escolhido = chave === diaEscolhido;
-          // Até 3 bolinhas, uma por TIPO presente no dia (não uma por
-          // item): dia com cinco sessões não vira uma fileira de pontos.
-          const cores = [...new Set(itens.map((it) => it.cor))].slice(0, 3);
-          return (
-            <button
-              key={dia}
-              type="button"
-              onClick={() => setDiaEscolhido(chave)}
-              aria-label={`${dia} — ${itens.length} ${itens.length === 1 ? "item" : "itens"}`}
-              aria-pressed={escolhido}
-              className={`relative mx-auto grid h-9 w-9 place-items-center rounded-xl text-[12px] transition-colors ${
-                escolhido
-                  ? "bg-[#d4af37] font-semibold text-black shadow-lg shadow-[#d4af37]/25"
-                  : ehHoje
-                    ? "bg-white/[0.08] font-semibold text-[#f1d78a] ring-1 ring-inset ring-[#d4af37]/60"
-                    : itens.length > 0
-                      ? "text-ink hover:bg-white/[0.06]"
-                      : "text-muted/70 hover:bg-white/[0.04]"
-              } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60`}
-            >
-              <span className="tnum leading-none">{dia}</span>
-              {cores.length > 0 && (
-                <span className="absolute bottom-1 flex gap-[3px]">
-                  {cores.map((c) => (
-                    <span
-                      key={c}
-                      className="h-1 w-1 rounded-full"
-                      style={{ background: escolhido ? "#000000b3" : c }}
-                    />
-                  ))}
-                </span>
-              )}
-            </button>
-          );
-        })}
+      {/* Grade com linhas finas entre os dias, como uma tabela: sem elas
+          os números ficavam soltos no card e o olho não sabia a que
+          semana/coluna cada um pertencia. Linhas a 5-6% de branco -- dão
+          estrutura sem competir com o dia marcado ou as bolinhas. */}
+      <div className="shrink-0 overflow-hidden rounded-2xl border border-white/[0.06]">
+        <div className="grid grid-cols-7 border-b border-white/[0.06] bg-white/[0.02] text-center">
+          {SEMANA.map((l, i) => (
+            <span key={i} className="py-1.5 text-[11px] font-semibold text-muted/70">
+              {l}
+            </span>
+          ))}
+        </div>
+        <div className="grid grid-cols-7 text-center">
+          {/* Completa a última semana com casas vazias: sem isso as linhas
+              paravam no meio da fileira. */}
+          {[...dias, ...Array.from({ length: (7 - (dias.length % 7)) % 7 }, () => null)].map((dia, i) => {
+            const linhas = `${i % 7 > 0 ? "border-l" : ""} ${i >= 7 ? "border-t" : ""} border-white/[0.05]`;
+            if (dia == null) return <span key={`v${i}`} className={linhas} />;
+            const chave = CHAVE(new Date(mesRef!.getFullYear(), mesRef!.getMonth(), dia));
+            const itens = porDia.get(chave) ?? [];
+            const ehHoje = hoje != null && chave === CHAVE(hoje);
+            const escolhido = chave === diaEscolhido;
+            // Até 3 bolinhas, uma por TIPO presente no dia (não uma por
+            // item): dia com cinco sessões não vira uma fileira de pontos.
+            const cores = [...new Set(itens.map((it) => it.cor))].slice(0, 3);
+            return (
+              <span key={dia} className={`flex items-center justify-center py-0.5 ${linhas}`}>
+                <button
+                  type="button"
+                  onClick={() => setDiaEscolhido(chave)}
+                  aria-label={`${dia} — ${itens.length} ${itens.length === 1 ? "item" : "itens"}`}
+                  aria-pressed={escolhido}
+                  className={`relative mx-auto grid h-9 w-9 place-items-center rounded-xl text-[12px] transition-colors ${
+                    escolhido
+                      ? "bg-[#d4af37] font-semibold text-black shadow-lg shadow-[#d4af37]/25"
+                      : ehHoje
+                        ? "bg-white/[0.08] font-semibold text-[#f1d78a] ring-1 ring-inset ring-[#d4af37]/60"
+                        : itens.length > 0
+                          ? "text-ink hover:bg-white/[0.06]"
+                          : "text-muted/70 hover:bg-white/[0.04]"
+                  } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60`}
+                >
+                  <span className="tnum leading-none">{dia}</span>
+                  {cores.length > 0 && (
+                    <span className="absolute bottom-1 flex gap-[3px]">
+                      {cores.map((c) => (
+                        <span
+                          key={c}
+                          className="h-1 w-1 rounded-full"
+                          style={{ background: escolhido ? "#000000b3" : c }}
+                        />
+                      ))}
+                    </span>
+                  )}
+                </button>
+              </span>
+            );
+          })}
+        </div>
       </div>
 
       {tiposNoMes.size > 0 && (

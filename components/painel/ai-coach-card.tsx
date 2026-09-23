@@ -126,13 +126,19 @@ function montarDicas(d: PainelDados): Dica[] {
   }
 
   // --- Performance ------------------------------------------------------
-  for (const leak of (d.performance?.top_leaks ?? []).slice(0, 2)) {
+  // Só entra vazamento com nome e contagem válidos. Veio do banco um item
+  // sem esses campos e o Coach mostrou "Vazamento recorrente: undefined"
+  // / "Apareceu NaN vezes" -- melhor não mostrar a dica do que mostrar lixo.
+  const leaks = (d.performance?.top_leaks ?? []).filter(
+    (l) => Boolean(l?.label?.trim() || l?.code?.trim()) && Number.isFinite(l?.ocorrencias) && l.ocorrencias > 0,
+  );
+  for (const leak of leaks.slice(0, 2)) {
     dicas.push({
       chave: `leak:${leak.code}:${leak.ocorrencias}`,
       modulo: "Performance",
       cor: "#22D3EE",
       nivel: "atencao",
-      titulo: `Vazamento recorrente: ${leak.label ?? leak.code}`,
+      titulo: `Vazamento recorrente: ${leak.label?.trim() || leak.code}`,
       texto: `Apareceu ${num(leak.ocorrencias)} ${leak.ocorrencias === 1 ? "vez" : "vezes"} nas suas mãos revisadas. Treinar essa situação é o caminho mais curto de ganho agora.`,
       href: "/treino",
       cta: "Treinar essa situação",
@@ -294,8 +300,13 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
 
           {/* O que vem depois — mostra que o Coach tem fila, e o jogador
               já sabe o que o espera antes de clicar em "Já vi". */}
+          {/* A partir do tablet, "A seguir" e os botões começam na mesma
+              linha vertical do título (depois do ícone de 40px + vão de
+              14px), em vez de na borda do card -- antes o bloco de baixo
+              ficava "fora do eixo" do texto a que se refere. No celular
+              ocupam a largura toda, que é o que cabe. */}
           {proximas.length > 0 && (
-            <div className="mt-5">
+            <div className="mt-5 sm:pl-[54px]">
               <p className="text-[11px] font-bold uppercase tracking-[0.12em] text-muted">A seguir</p>
               <ul className="mt-2 flex flex-col gap-1.5">
                 {proximas.map((d) => {
@@ -321,7 +332,7 @@ export function AiCoachCard({ style, className }: { style?: React.CSSProperties;
           {/* Botões logo abaixo do conteúdo (não colados no rodapé do
               card): com poucas dicas, ficavam longe do texto a que se
               referem. */}
-          <div className="flex flex-wrap items-center gap-2 pt-5">
+          <div className="flex flex-wrap items-center gap-2 pt-5 sm:pl-[54px]">
             <Link
               href={atual.href}
               className="inline-flex items-center gap-1.5 rounded-full bg-[#d4af37] px-4 py-2 text-xs font-semibold text-black shadow-lg shadow-[#d4af37]/20 transition-colors hover:bg-[#e2c35a] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60"

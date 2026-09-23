@@ -48,7 +48,7 @@ export function PainelHeader() {
       <div className="min-w-0">
         <h1 className="text-2xl font-semibold leading-tight sm:text-3xl">
           <span className="text-muted">{agora ? saudacao(agora.getHours()) : "Olá"},</span>{" "}
-          <span className="painel-ouro">{nome}</span> 👋
+          <span className="painel-ouro">{nome}</span>
         </h1>
         <div className="mt-1.5 flex flex-wrap items-center gap-3">
           <p className="text-[12px] text-muted/80">Estude · Jogue · Revise · Evolua</p>
@@ -76,7 +76,7 @@ export function PainelHeader() {
           <p className="mt-1 text-[11px] text-muted/80">{agora ? dataCurta(agora) : ""}</p>
         </div>
 
-        <div className="flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-[#d4af37]/25 bg-surface px-4 py-2.5 sm:flex-none">
+        <div className="painel-vidro flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-white/10 px-4 py-2.5 sm:flex-none">
           <TileIcone cor="#d4af37" grande>
             <Wallet size={17} />
           </TileIcone>

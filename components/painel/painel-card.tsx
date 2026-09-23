@@ -52,35 +52,36 @@ export function PainelCard({
       />
 
       <header className="relative flex items-center justify-between gap-3">
-        <h2 className="flex items-center gap-2.5 text-[15px] font-semibold tracking-tight">
+        <h2 className="flex min-w-0 items-center gap-2.5 text-[15px] font-semibold tracking-tight">
           {icon && (
             <span className="grid h-7 w-7 shrink-0 place-items-center rounded-lg bg-white/[0.06] text-muted">
               {icon}
             </span>
           )}
-          {title}
+          <span className="truncate">{title}</span>
         </h2>
         {action}
       </header>
       {/* O corpo é quem rola quando o card fica mais baixo que o
           conteúdo -- assim a TELA nunca ganha barra de rolagem. */}
-      <div className="painel-scroll relative mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto">{children}</div>
+      <div className="painel-scroll relative mt-4 flex min-h-0 flex-1 flex-col overflow-y-auto overflow-x-hidden">{children}</div>
     </section>
   );
 }
 
-// Quadradinho de ícone colorido — o detalhe que dá acabamento às listas
-// (cada item ganha identidade visual sem precisar de texto extra). A cor
-// vem em hex de 6 dígitos; os sufixos montam fundo e contorno translúcidos
-// a partir dela, então basta passar o accent do módulo.
+// Quadradinho de ícone — o detalhe que dá acabamento às listas (cada
+// item ganha identidade visual sem precisar de texto extra). O fundo é
+// neutro (vidro claro) e só o traço do ícone leva a cor do módulo: com
+// fundo colorido em todo item a tela virava um arco-íris de quadrados, e
+// a cor deixava de chamar atenção onde importa (valores e alertas).
 export function TileIcone({ children, cor, grande = false }: { children: ReactNode; cor: string; grande?: boolean }) {
   return (
     <span
       className={`grid shrink-0 place-items-center rounded-xl ${grande ? "h-10 w-10" : "h-8 w-8"}`}
       style={{
-        background: `${cor}1f`,
+        background: "rgba(255, 255, 255, 0.04)",
         color: cor,
-        boxShadow: `inset 0 0 0 1px ${cor}33`,
+        boxShadow: "inset 0 0 0 1px rgba(255, 255, 255, 0.08)",
       }}
     >
       {children}
