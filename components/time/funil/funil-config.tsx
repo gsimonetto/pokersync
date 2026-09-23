@@ -14,9 +14,9 @@ import {
   movePlayerCard,
   swapPhaseOrder,
   traduzErroFunil,
+  updateFunilSlaPadrao,
   updatePhase,
   ARCHIVE_REASON_LABEL,
-  SLA_PADRAO_DIAS,
   type ArchivedCard,
   type FunnelPhase,
   type PhasePatch,
@@ -97,15 +97,17 @@ function resumoFase(f: FunnelPhase): string {
   const faixa = faixaBuyin(f);
   if (faixa) partes.push(faixa);
   if (f.wipLimit != null) partes.push(`cap. ${f.wipLimit}`);
+  if (f.slaDias != null) partes.push(`esfria em ${f.slaDias}d`);
   const reqs = [f.defaultDrillsTarget > 0, f.defaultReviewsTarget > 0, f.reqSessoes, f.reqRoiPct != null, f.reqScore, f.reqPresencaPct].filter(Boolean).length;
   if (reqs > 0) partes.push(`${reqs} requisito${reqs === 1 ? "" : "s"}`);
   if (f.playbook.length > 0) partes.push(`playbook ${f.playbook.length}`);
   return partes.join(" · ");
 }
 
-function EditorFase({ fase, crmDisponivel, onCancelar, onSalvar }: {
+function EditorFase({ fase, crmDisponivel, slaPadrao, onCancelar, onSalvar }: {
   fase: FunnelPhase;
   crmDisponivel: boolean;
+  slaPadrao: number;
   onCancelar: () => void;
   onSalvar: (patch: PhasePatch) => Promise<void>;
 }) {
@@ -185,7 +187,7 @@ function EditorFase({ fase, crmDisponivel, onCancelar, onSalvar }: {
             <NumOpcional label="Buy-in mín." valor={d.buyinMin} onChange={(v) => set("buyinMin", v)} sufixo="R$" />
             <NumOpcional label="Buy-in máx." valor={d.buyinMax} onChange={(v) => set("buyinMax", v)} sufixo="R$" />
             <NumOpcional label="Capacidade" valor={d.wipLimit} onChange={(v) => set("wipLimit", v)} min={1} ajuda="Quantos jogadores cabem nesta fase" />
-            <NumOpcional label="Esfria em" valor={d.slaDias} onChange={(v) => set("slaDias", v)} min={1} sufixo="dias" ajuda={`Dias parado até o cartão esfriar (vazio = ${SLA_PADRAO_DIAS})`} />
+            <NumOpcional label="Esfria em" valor={d.slaDias} onChange={(v) => set("slaDias", v)} min={1} sufixo="dias" ajuda={`Dias parado até o cartão esfriar (vazio = padrão do funil, ${slaPadrao} dias)`} />
           </div>
           {faixaInvalida && <p className="text-[11.5px] text-negative">O buy-in mínimo está maior que o máximo.</p>}
         </div>
@@ -228,10 +230,12 @@ function EditorFase({ fase, crmDisponivel, onCancelar, onSalvar }: {
   );
 }
 
-export function ModalConfigFunil({ teamId, fases, crmDisponivel, onFechar, onChange, onErro }: {
+export function ModalConfigFunil({ teamId, fases, crmDisponivel, slaPadrao, onFechar, onChange, onErro }: {
   teamId: string;
   fases: FunnelPhase[];
   crmDisponivel: boolean;
+  /** Prazo padrão do funil (teams.funil_sla_dias). */
+  slaPadrao: number;
   onFechar: () => void;
   onChange: () => Promise<void> | void;
   onErro: (s: string) => void;
@@ -240,6 +244,22 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, onFechar, onCha
   const [editandoId, setEditandoId] = useState<string | null>(null);
   const [novaFase, setNovaFase] = useState("");
   const [criando, setCriando] = useState(false);
+  const [sla, setSla] = useState<number | null>(slaPadrao);
+  const [salvandoSla, setSalvandoSla] = useState(false);
+  const slaValido = sla != null && sla >= 1 && sla <= 365;
+
+  async function salvarSla() {
+    if (!slaValido || sla === slaPadrao) return;
+    setSalvandoSla(true);
+    try {
+      await updateFunilSlaPadrao(teamId, sla);
+      await onChange();
+    } catch (e) {
+      onErro(traduzErroFunil(e));
+    } finally {
+      setSalvandoSla(false);
+    }
+  }
 
   async function mover(f: FunnelPhase, direcao: -1 | 1) {
     const idx = fases.findIndex((x) => x.id === f.id);
@@ -289,6 +309,39 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, onFechar, onCha
         </p>
       )}
 
+      {crmDisponivel && (
+        <section className="mt-4 rounded-xl border border-hairline bg-elevated p-3">
+          <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted/70">Padrão do funil</p>
+          <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-ink/90">
+            <label htmlFor="funil-sla-padrao">Cartão esfria depois de</label>
+            <input
+              id="funil-sla-padrao"
+              type="number"
+              min={1}
+              max={365}
+              value={sla ?? ""}
+              onChange={(e) => setSla(e.target.value === "" ? null : Number(e.target.value))}
+              onKeyDown={(e) => e.key === "Enter" && salvarSla()}
+              className="w-20 rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-sm tabular-nums text-ink outline-none focus:border-white/25"
+            />
+            <span>dias parado na fase</span>
+            <button
+              type="button"
+              onClick={salvarSla}
+              disabled={salvandoSla || !slaValido || sla === slaPadrao}
+              className="ml-auto rounded-lg bg-ink px-3 py-1.5 text-[12.5px] font-semibold text-void disabled:opacity-30"
+            >
+              {salvandoSla ? "Salvando…" : "Salvar"}
+            </button>
+          </div>
+          <p className="mt-1.5 text-[11px] text-muted/70">
+            {slaValido
+              ? `Vale para as fases sem prazo próprio. Com o dobro (${(sla as number) * 2} dias), o cartão passa de “esfriando” para “parado”.`
+              : "Use um número entre 1 e 365."}
+          </p>
+        </section>
+      )}
+
       <ul className="mt-4 space-y-2">
         {fases.map((f, idx) => (
           <li key={f.id} className="rounded-xl border border-hairline bg-elevated p-3">
@@ -296,6 +349,7 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, onFechar, onCha
               <EditorFase
                 fase={f}
                 crmDisponivel={crmDisponivel}
+                slaPadrao={slaPadrao}
                 onCancelar={() => setEditandoId(null)}
                 onSalvar={async (patch) => {
                   try {

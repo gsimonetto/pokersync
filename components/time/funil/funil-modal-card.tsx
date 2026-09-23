@@ -92,6 +92,7 @@ export function FunilModalCard({
   labelsDoTime,
   podeGerenciarMetas,
   crmDisponivel,
+  slaPadrao,
   onFechar,
   onChange,
   onErro,
@@ -105,6 +106,8 @@ export function FunilModalCard({
   podeGerenciarMetas: boolean;
   /** false = banco sem a migração: esconde próximo passo e prioridade. */
   crmDisponivel: boolean;
+  /** Prazo padrão do funil (fases sem prazo próprio). */
+  slaPadrao: number;
   onFechar: () => void;
   onChange: () => void;
   onErro: (s: string) => void;
@@ -287,7 +290,7 @@ export function FunilModalCard({
               <span
                 className="rounded-full border px-2.5 py-1 text-[11.5px] font-medium tabular-nums"
                 style={{ color: TEMPERATURA_COR[item.temperatura], borderColor: `${TEMPERATURA_COR[item.temperatura]}55` }}
-                title={`Esfria com ${slaDaFase(faseAtual)} dias parado nesta fase`}
+                title={`Esfria com ${slaDaFase(faseAtual, slaPadrao)} dias parado nesta fase`}
               >
                 {TEMPERATURA_LABEL[item.temperatura]} · {item.diasNaFase}d
               </span>

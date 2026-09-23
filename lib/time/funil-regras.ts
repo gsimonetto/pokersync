@@ -138,13 +138,19 @@ export const TEMPERATURA_COR: Record<Temperatura, string> = {
   parado: "#e0555a",
 };
 
-export function slaDaFase(fase: FunnelPhase | undefined): number {
-  return fase?.slaDias ?? SLA_PADRAO_DIAS;
+/** Prazo da fase; sem prazo próprio, vale o padrão do funil (configurável pelo admin). */
+export function slaDaFase(fase: FunnelPhase | undefined, padrao = SLA_PADRAO_DIAS): number {
+  return fase?.slaDias ?? padrao;
 }
 
-export function temperatura(card: PlayerCard, fase: FunnelPhase | undefined, agora = Date.now()): Temperatura {
+export function temperatura(
+  card: PlayerCard,
+  fase: FunnelPhase | undefined,
+  agora = Date.now(),
+  padrao = SLA_PADRAO_DIAS
+): Temperatura {
   const dias = diasNaFase(card, agora);
-  const sla = slaDaFase(fase);
+  const sla = slaDaFase(fase, padrao);
   if (dias >= sla * 2) return "parado";
   if (dias >= sla) return "esfriando";
   return "em_dia";

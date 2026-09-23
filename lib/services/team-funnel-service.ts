@@ -46,6 +46,7 @@ export interface FunnelPhase {
   playbook: string[];
 }
 
+/** Padrão de fábrica; o time pode trocar em Configurações do funil. */
 export const SLA_PADRAO_DIAS = 14;
 
 export type Prioridade = "alta" | "normal" | "baixa";
@@ -164,6 +165,26 @@ export async function fetchFunnelPhases(teamId: string): Promise<FunnelPhase[]> 
     reqPresencaPct: numOuNull(r.req_presenca_pct),
     playbook: Array.isArray(r.playbook) ? r.playbook : [],
   }));
+}
+
+// Prazo padrão do funil (teams.funil_sla_dias) -- vale para as fases sem
+// prazo próprio. Sem a migração no banco, volta o padrão de fábrica.
+export async function fetchFunilSlaPadrao(teamId: string): Promise<number> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("teams").select("funil_sla_dias").eq("id", teamId).maybeSingle();
+  if (error) {
+    if (semMigracaoCrm(error)) return SLA_PADRAO_DIAS;
+    throw error;
+  }
+  const v = numOuNull(data?.funil_sla_dias);
+  return v != null && v > 0 ? v : SLA_PADRAO_DIAS;
+}
+
+export async function updateFunilSlaPadrao(teamId: string, dias: number) {
+  const supabase = createClient();
+  const valor = Math.min(365, Math.max(1, Math.round(dias)));
+  const { error } = await supabase.from("teams").update({ funil_sla_dias: valor }).eq("id", teamId);
+  if (error) throw error;
 }
 
 export async function seedDefaultPhases(teamId: string) {

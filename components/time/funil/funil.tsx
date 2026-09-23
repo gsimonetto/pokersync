@@ -33,6 +33,7 @@ import {
   fetchArchivedCards,
   fetchCardLabelsForCards,
   fetchChecklistProgressForCards,
+  fetchFunilSlaPadrao,
   fetchFunnelPhases,
   fetchPlayerCards,
   funilCrmDisponivel,
@@ -40,6 +41,7 @@ import {
   seedDefaultPhases,
   traduzErroFunil,
   PRIORIDADE_LABEL,
+  SLA_PADRAO_DIAS,
   type ArchivedCard,
   type CardLabel,
   type FunnelPhase,
@@ -120,6 +122,7 @@ export function Funil({
   const [labelsPorCard, setLabelsPorCard] = useState<Map<string, CardLabel[]>>(new Map());
   const [checklistPorCard, setChecklistPorCard] = useState<Map<string, { done: number; total: number }>>(new Map());
   const [crm, setCrm] = useState(true);
+  const [slaPadrao, setSlaPadrao] = useState(SLA_PADRAO_DIAS);
   const [loading, setLoading] = useState(true);
   const [criandoFases, setCriandoFases] = useState(false);
 
@@ -143,12 +146,14 @@ export function Funil({
     async (silencioso = false) => {
       if (!silencioso) setLoading(true);
       try {
-        const [f, c, tl] = await Promise.all([
+        const [f, c, tl, sla] = await Promise.all([
           fetchFunnelPhases(teamId),
           fetchPlayerCards(),
           fetchTeamLabels(teamId).catch(() => []),
+          fetchFunilSlaPadrao(teamId).catch(() => SLA_PADRAO_DIAS),
         ]);
         setFases(f);
+        setSlaPadrao(sla);
         setCards(c);
         setLabelsDoTime(tl);
         setCrm(funilCrmDisponivel());
@@ -206,14 +211,14 @@ export function Funil({
         score,
         requisitos,
         prontidao: prontidao(requisitos),
-        temperatura: temperatura(card, fase, agora),
+        temperatura: temperatura(card, fase, agora, slaPadrao),
         diasNaFase: diasNaFase(card, agora),
         passo: crm ? estadoPasso(card, agora) : null,
         labels: labelsPorCard.get(card.cardId) ?? [],
         checklist: checklistPorCard.get(card.cardId) ?? null,
       };
     });
-  }, [cards, porJogador, porFase, labelsPorCard, checklistPorCard, crm]);
+  }, [cards, porJogador, porFase, labelsPorCard, checklistPorCard, crm, slaPadrao]);
 
   const totalPorFase = useMemo(() => {
     const m = new Map<string, number>();
@@ -524,6 +529,7 @@ export function Funil({
           fases={fases}
           labelsDoTime={labelsDoTime}
           crmDisponivel={crm}
+          slaPadrao={slaPadrao}
           podeGerenciarMetas={isAdmin || (Boolean(meuUserId) && itemAberto.jogador?.coachId === meuUserId)}
           onFechar={() => setAbertoId(null)}
           onChange={async () => {
@@ -559,6 +565,7 @@ export function Funil({
           teamId={teamId}
           fases={fases}
           crmDisponivel={crm}
+          slaPadrao={slaPadrao}
           onFechar={() => setModalConfig(false)}
           onChange={() => carregar(true)}
           onErro={onErro}

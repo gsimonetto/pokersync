@@ -42,6 +42,10 @@
 -- 7) marketplace_candidate_snapshot(): ganha num_drills e
 --    taxa_acerto_treino_pct no FIM, para o crachá do candidato nas vagas
 --    mostrar o bloco de estudo igual ao crachá de quem já é do time.
+--
+-- 8) teams.funil_sla_dias: prazo padrão (em dias) até o cartão esfriar,
+--    usado quando a fase não define o próprio. Configurável pelo admin
+--    em Configurações do funil (mesma regra de edição do time).
 
 -- ---------------------------------------------------------------------
 -- 1) e 2) Colunas novas
@@ -436,3 +440,13 @@ $function$;
 
 revoke all on function public.marketplace_candidate_snapshot(uuid) from public, anon;
 grant execute on function public.marketplace_candidate_snapshot(uuid) to authenticated, service_role;
+
+-- ---------------------------------------------------------------------
+-- 8) Prazo padrão do funil
+-- ---------------------------------------------------------------------
+alter table public.teams
+  add column if not exists funil_sla_dias integer not null default 14;
+
+alter table public.teams
+  drop constraint if exists teams_funil_sla_dias_chk,
+  add constraint teams_funil_sla_dias_chk check (funil_sla_dias between 1 and 365);
