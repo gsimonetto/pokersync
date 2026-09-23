@@ -128,7 +128,7 @@ export function FunilQuadro({
   }
 
   return (
-    <div className={`painel-scroll min-h-[420px] flex-1 overflow-auto pb-2 ${umaRaia ? "flex flex-col" : ""}`}>
+    <div className={`painel-scroll flex-1 overflow-auto pb-2 [@media(min-width:768px)_and_(min-height:600px)]:min-h-[420px] ${umaRaia ? "flex flex-col" : ""}`}>
       <div className={`inline-flex min-w-full flex-col ${umaRaia ? "min-h-0 flex-1" : ""}`}>
         {/* Cabeçalho das fases -- fixo no topo quando há raias. */}
         <div className={`sticky top-0 z-10 flex gap-3 pb-2 ${umaRaia ? "" : "bg-[#0d0d0d]/95 backdrop-blur-sm"}`}>
@@ -147,12 +147,13 @@ export function FunilQuadro({
                   type="button"
                   onClick={() => alternarRecolhida(fase.id)}
                   title={`Expandir ${fase.name}`}
-                  className={`${largura(fase.id)} flex shrink-0 flex-col items-center gap-2 rounded-xl border border-hairline bg-elevated/60 py-2.5 text-muted transition-colors hover:text-ink`}
+                  aria-label={`Expandir ${fase.name}`}
+                  // self-start: cabeçalho recolhido baixinho, sem esticar os
+                  // cabeçalhos vizinhos (o nome vertical fica no corpo).
+                  className={`${largura(fase.id)} flex shrink-0 flex-col items-center gap-1.5 self-start rounded-xl border border-hairline bg-elevated/60 py-2.5 text-muted transition-colors hover:text-ink`}
                 >
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: fase.color }} />
                   <span className="text-[11px] font-bold tabular-nums">{ocupacao}</span>
-                  <span className="text-[12px] font-semibold [writing-mode:vertical-rl]">{fase.name}</span>
-                  <ChevronsLeftRight size={13} />
                 </button>
               );
             }
@@ -247,7 +248,15 @@ export function FunilQuadro({
                     } ${umaRaia ? "min-h-0" : "min-h-[72px]"}`}
                   >
                     {recolhida ? (
-                      <span className="mt-1 text-center text-[11px] tabular-nums text-muted">{lista.length || ""}</span>
+                      <button
+                        type="button"
+                        onClick={() => alternarRecolhida(fase.id)}
+                        title={`Expandir ${fase.name}`}
+                        className="flex flex-col items-center gap-2 py-1 text-muted transition-colors hover:text-ink"
+                      >
+                        <ChevronsLeftRight size={13} />
+                        <span className="text-[12px] font-semibold [writing-mode:vertical-rl]">{fase.name}</span>
+                      </button>
                     ) : (
                       <div className={`space-y-2 ${umaRaia ? "painel-scroll min-h-0 flex-1 overflow-y-auto pr-0.5" : ""}`}>
                         {lista.length === 0 ? (

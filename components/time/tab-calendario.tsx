@@ -1,9 +1,9 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import { AnimatePresence, motion } from "framer-motion";
 import { Cake, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, ExternalLink, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
 import { Avatar } from "@/components/avatar";
-import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
 import {
   cancelEventSeries,
@@ -20,18 +20,37 @@ import {
 } from "@/lib/services/team-calendar-service";
 import type { TeamDashboardRow, TeamRole } from "@/lib/services/team-service";
 import { useConfirm } from "@/components/confirm-dialog";
+import { CardHint, EASE, PainelCard } from "@/components/painel/painel-card";
+import { dataLonga, mesAno } from "@/components/painel/formato";
 
-// Lista simples dos proximos eventos (sem grade de mes/semana).
-// Criacao restrita a admin/coach — RLS ja bloqueia no banco, aqui so
-// escondemos o botao pra nao criar expectativa de quem nao pode.
+// Calendário do time no MESMO formato do Calendário da tela de Início
+// (components/painel/agenda-card.tsx): grade do mês com bolinhas por tipo
+// no dia, legenda, e o dia escolhido ao lado (no celular, embaixo) com o
+// que acontece nele. Aqui o dia traz o que é do time: aulas, reuniões,
+// outros eventos (com presença, link, Google Agenda e cancelar pra quem
+// gerencia) e aniversários dos colegas. Criação restrita a admin/coach --
+// a RLS já bloqueia no banco; aqui só escondemos o botão.
 
 const TIPO_LABEL: Record<EventType, string> = { aula: "Aula", reuniao: "Reunião", outro: "Outro" };
-const TIPO_COR: Record<EventType, string> = { aula: "#5AA6E0", reuniao: "#E0559E", outro: "#8A94A3" };
+// Mesmas cores da tela de Início: aniversário rosa, eventos do time em
+// azul/índigo; "outro" neutro.
+const TIPO_COR: Record<EventType, string> = { aula: "#5AA6E0", reuniao: "#6366F1", outro: "#8A94A3" };
+const COR_ANIVERSARIO = "#E0559E";
 
-function fmtData(iso: string) {
-  const d = new Date(iso);
-  return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
+const SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
+
+const CHAVE = (d: Date) =>
+  `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, "0")}-${String(d.getDate()).padStart(2, "0")}`;
+
+function gradeDoMes(ref: Date): (number | null)[] {
+  const primeiro = new Date(ref.getFullYear(), ref.getMonth(), 1);
+  const totalDias = new Date(ref.getFullYear(), ref.getMonth() + 1, 0).getDate();
+  return [
+    ...Array.from({ length: primeiro.getDay() }, () => null),
+    ...Array.from({ length: totalDias }, (_, i) => i + 1),
+  ];
 }
+
 function fmtHora(iso: string) {
   return new Date(iso).toLocaleTimeString("pt-BR", { hour: "2-digit", minute: "2-digit" });
 }
@@ -59,183 +78,88 @@ export function TabCalendario({
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
+  const confirm = useConfirm();
   const [modalAberto, setModalAberto] = useState(false);
-  // Calendario completo (lista + grade) virou modal — antes ocupava a
-  // aba inteira, empurrando tudo mais pra baixo. Compacto por padrao,
-  // com so' os proximos eventos + um botao pra abrir o resto.
-  const [calendarioAberto, setCalendarioAberto] = useState(false);
+  const [hoje] = useState(() => new Date());
+  const [mesRef, setMesRef] = useState(() => new Date(hoje.getFullYear(), hoje.getMonth(), 1));
+  const [diaEscolhido, setDiaEscolhido] = useState(() => CHAVE(hoje));
+  // Mês novo entra pelo lado da seta clicada (próximo = da direita).
+  const [direcao, setDirecao] = useState(1);
+  const [aniversarios, setAniversarios] = useState<TeamBirthday[]>([]);
 
   useEffect(() => {
     if (prefillPlayerId) setModalAberto(true);
   }, [prefillPlayerId]);
 
-  const proximosEventos = useMemo(() => eventos.slice(0, 3), [eventos]);
-
-  return (
-    <div className="space-y-5">
-      <section className="rounded-xl border border-hairline bg-surface p-5">
-        <div className="flex flex-wrap items-center justify-between gap-3">
-          <div>
-            <h2 className="flex items-center gap-2 text-[15px] font-semibold">
-              <CalendarDays size={16} />
-              Próximos eventos
-            </h2>
-            <p className="mt-0.5 text-sm text-muted">Aulas e reuniões agendadas com o time.</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <button
-              onClick={() => setCalendarioAberto(true)}
-              className="flex items-center gap-2 rounded-xl border border-hairline bg-elevated px-4 py-2.5 text-sm font-medium text-ink transition-colors hover:border-ink/40"
-            >
-              <CalendarDays size={16} />
-              Ver calendário completo
-            </button>
-            {podeCriar && (
-              <button
-                onClick={() => setModalAberto(true)}
-                className="flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02]"
-              >
-                <CalendarPlus size={16} strokeWidth={2.5} />
-                Agendar
-              </button>
-            )}
-          </div>
-        </div>
-
-        {proximosEventos.length === 0 ? (
-          <p className="mt-5 text-sm text-muted">Nenhum evento agendado.</p>
-        ) : (
-          <ul className="mt-4 divide-y divide-hairline">
-            {proximosEventos.map((ev) => (
-              <li key={ev.id} className="flex flex-wrap items-center gap-3 py-3">
-                <div className="grid h-11 w-14 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-center">
-                  <span className="text-[11px] font-semibold uppercase leading-tight text-muted">{fmtData(ev.startsAt)}</span>
-                </div>
-                <div className="min-w-0 flex-1">
-                  <div className="flex flex-wrap items-center gap-2">
-                    <Chip color={TIPO_COR[ev.eventType]} size="sm">{TIPO_LABEL[ev.eventType]}</Chip>
-                    <p className="truncate text-sm font-medium">{ev.title}</p>
-                  </div>
-                  <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                    <Clock size={12} />
-                    {fmtHora(ev.startsAt)}
-                    {ev.endsAt ? ` – ${fmtHora(ev.endsAt)}` : ""}
-                  </p>
-                </div>
-                <a
-                  href={googleCalendarUrl(ev)}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label="Adicionar ao Google Agenda"
-                  title="Adicionar ao Google Agenda"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
-                >
-                  <ExternalLink size={15} />
-                </a>
-              </li>
-            ))}
-          </ul>
-        )}
-        {eventos.length > proximosEventos.length && (
-          <button onClick={() => setCalendarioAberto(true)} className="mt-3 text-xs text-muted underline hover:text-ink">
-            +{eventos.length - proximosEventos.length} outros agendamentos
-          </button>
-        )}
-      </section>
-
-      {calendarioAberto && (
-        <ModalCalendarioCompleto
-          eventos={eventos}
-          jogadores={jogadores}
-          podeCriar={podeCriar}
-          onFechar={() => setCalendarioAberto(false)}
-          onAbrirAgendar={() => setModalAberto(true)}
-          onChange={onChange}
-          onErro={onErro}
-        />
-      )}
-
-      {modalAberto && (
-        <ModalNovoEvento
-          teamId={teamId}
-          jogadores={jogadores}
-          meuUserId={meuUserId}
-          meuPapel={meuPapel}
-          prefillPlayerId={prefillPlayerId}
-          onFechar={() => {
-            setModalAberto(false);
-            onPrefillConsumido?.();
-          }}
-          onCriado={() => {
-            setModalAberto(false);
-            onPrefillConsumido?.();
-            onChange();
-          }}
-          onErro={onErro}
-        />
-      )}
-    </div>
-  );
-}
-
-// Modal com lista completa de agendamentos (topo/esquerda, prioridade)
-// e a grade do mes ao lado (direita) — cabe tudo numa tela so', sem
-// precisar abrir a aba inteira nem rolar a pagina toda. Filtro de
-// aniversario mora aqui tambem: aniversariantes do mes em exibicao,
-// vindo de profiles.data_nascimento dos membros do time.
-function ModalCalendarioCompleto({
-  eventos,
-  jogadores,
-  podeCriar,
-  onFechar,
-  onAbrirAgendar,
-  onChange,
-  onErro,
-}: {
-  eventos: TeamEvent[];
-  jogadores: TeamDashboardRow[];
-  podeCriar: boolean;
-  onFechar: () => void;
-  onAbrirAgendar: () => void;
-  onChange: () => void;
-  onErro: (s: string) => void;
-}) {
-  const confirm = useConfirm();
-  const [diaSelecionado, setDiaSelecionado] = useState<string | null>(null);
-  const [mostrarAniversarios, setMostrarAniversarios] = useState(false);
-  const [aniversarios, setAniversarios] = useState<TeamBirthday[] | null>(null);
-  const [mesRef, setMesRef] = useState(() => {
-    const d = new Date();
-    d.setDate(1);
-    return d;
-  });
-
-  const porNome = useMemo(() => {
-    const m = new Map<string, TeamDashboardRow>();
-    jogadores.forEach((j) => m.set(j.userId, j));
-    return m;
-  }, [jogadores]);
-
-  const eventosDoDia = useMemo(
-    () => (diaSelecionado ? eventos.filter((e) => new Date(e.startsAt).toDateString() === diaSelecionado) : eventos),
-    [eventos, diaSelecionado]
-  );
-
+  // Aniversários entram direto na grade (como no Início). Quem não
+  // preencheu a data ou não liberou simplesmente não aparece -- sem erro
+  // na tela por isso.
+  const idsMembros = useMemo(() => jogadores.map((j) => j.userId).sort().join(","), [jogadores]);
   useEffect(() => {
-    if (!mostrarAniversarios || aniversarios !== null) return;
-    fetchTeamBirthdays(jogadores.map((j) => j.userId))
-      .then(setAniversarios)
-      .catch((e) => onErro(traduzErroCalendario(e)));
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [mostrarAniversarios]);
+    let vivo = true;
+    const ids = idsMembros ? idsMembros.split(",") : [];
+    if (ids.length === 0) return;
+    fetchTeamBirthdays(ids)
+      .then((a) => vivo && setAniversarios(a))
+      .catch(() => vivo && setAniversarios([]));
+    return () => {
+      vivo = false;
+    };
+  }, [idsMembros]);
 
-  const aniversariantesDoMes = useMemo(() => {
-    if (!aniversarios) return [];
-    const mes = mesRef.getMonth();
-    return aniversarios
-      .filter((a) => new Date(`${a.dataNascimento}T00:00:00`).getMonth() === mes)
-      .sort((a, b) => new Date(`${a.dataNascimento}T00:00:00`).getDate() - new Date(`${b.dataNascimento}T00:00:00`).getDate());
+  const porNome = useMemo(() => new Map(jogadores.map((j) => [j.userId, j])), [jogadores]);
+
+  const eventosPorDia = useMemo(() => {
+    const m = new Map<string, TeamEvent[]>();
+    for (const e of eventos) {
+      const k = CHAVE(new Date(e.startsAt));
+      m.set(k, [...(m.get(k) ?? []), e]);
+    }
+    for (const lista of m.values()) lista.sort((a, b) => a.startsAt.localeCompare(b.startsAt));
+    return m;
+  }, [eventos]);
+
+  // Aniversário se repete todo ano: entra pelo dia/mês no ano em exibição.
+  const aniversariosPorDia = useMemo(() => {
+    const m = new Map<string, TeamBirthday[]>();
+    for (const a of aniversarios) {
+      const nasc = new Date(`${a.dataNascimento}T00:00:00`);
+      const k = CHAVE(new Date(mesRef.getFullYear(), nasc.getMonth(), nasc.getDate()));
+      m.set(k, [...(m.get(k) ?? []), a]);
+    }
+    return m;
   }, [aniversarios, mesRef]);
+
+  const dias = useMemo(() => gradeDoMes(mesRef), [mesRef]);
+  const prefixoMes = CHAVE(mesRef).slice(0, 7);
+
+  const tiposNoMes = useMemo(() => {
+    const t = new Set<string>();
+    for (const [k, lista] of eventosPorDia) if (k.startsWith(prefixoMes)) lista.forEach((e) => t.add(e.eventType));
+    for (const k of aniversariosPorDia.keys()) if (k.startsWith(prefixoMes)) t.add("aniversario");
+    return t;
+  }, [eventosPorDia, aniversariosPorDia, prefixoMes]);
+
+  const eventosDoDia = eventosPorDia.get(diaEscolhido) ?? [];
+  const aniversariosDoDia = aniversariosPorDia.get(diaEscolhido) ?? [];
+  const dataEscolhida = new Date(`${diaEscolhido}T12:00:00`);
+  const proximo = useMemo(() => {
+    const agora = Date.now();
+    return eventos.find((e) => new Date(e.startsAt).getTime() >= agora) ?? null;
+  }, [eventos]);
+
+  function mudarMes(passo: number) {
+    setDirecao(passo);
+    setMesRef((m) => new Date(m.getFullYear(), m.getMonth() + passo, 1));
+  }
+
+  function irPara(iso: string) {
+    const d = new Date(iso);
+    const alvo = new Date(d.getFullYear(), d.getMonth(), 1);
+    setDirecao(alvo > mesRef ? 1 : -1);
+    setMesRef(alvo);
+    setDiaEscolhido(CHAVE(d));
+  }
 
   async function cancelar(ev: TeamEvent) {
     const ehSerie = Boolean(ev.recurrenceGroupId);
@@ -252,320 +176,332 @@ function ModalCalendarioCompleto({
     }
   }
 
+  const legenda = [
+    ...(["aula", "reuniao", "outro"] as EventType[]).map((t) => ({ chave: t, texto: TIPO_LABEL[t] === "Outro" ? "Outros" : `${TIPO_LABEL[t]}s`, cor: TIPO_COR[t] })),
+    { chave: "aniversario", texto: "Aniversários", cor: COR_ANIVERSARIO },
+  ].filter((l) => tiposNoMes.has(l.chave));
+
   return (
-    <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-black/70 p-4 pt-8" onClick={onFechar}>
-      <div
-        className="w-full max-w-6xl rounded-2xl border border-hairline bg-surface p-5"
-        onClick={(e) => e.stopPropagation()}
-      >
-        <div className="mb-4 flex items-center justify-between">
-          <h2 className="flex items-center gap-2 text-base font-semibold">
-            <CalendarDays size={18} />
-            Calendário do time
-          </h2>
-          <div className="flex items-center gap-2">
+    <>
+      <PainelCard
+        title="Calendário"
+        icon={<CalendarDays size={15} />}
+        rolagem={false}
+        action={
+          <span className="flex items-center gap-1">
+            <button
+              type="button"
+              onClick={() => mudarMes(-1)}
+              aria-label="Mês anterior"
+              className="grid h-7 w-7 place-items-center rounded-lg text-muted transition hover:bg-white/[0.06] hover:text-ink active:scale-90"
+            >
+              <ChevronLeft size={15} />
+            </button>
+            <span className="relative min-w-[108px] overflow-hidden whitespace-nowrap text-center text-[12px] text-muted">
+              <AnimatePresence mode="popLayout" initial={false} custom={direcao}>
+                <motion.span
+                  key={prefixoMes}
+                  className="block"
+                  initial={{ y: 10 * direcao, opacity: 0 }}
+                  animate={{ y: 0, opacity: 1 }}
+                  exit={{ y: -10 * direcao, opacity: 0 }}
+                  transition={{ duration: 0.25, ease: EASE }}
+                >
+                  {mesAno(mesRef)}
+                </motion.span>
+              </AnimatePresence>
+            </span>
+            <button
+              type="button"
+              onClick={() => mudarMes(1)}
+              aria-label="Próximo mês"
+              className="grid h-7 w-7 place-items-center rounded-lg text-muted transition hover:bg-white/[0.06] hover:text-ink active:scale-90"
+            >
+              <ChevronRight size={15} />
+            </button>
             {podeCriar && (
               <button
-                onClick={onAbrirAgendar}
-                className="flex items-center gap-2 rounded-xl bg-ink px-3 py-2 text-[13px] font-semibold text-void transition-transform hover:scale-[1.02]"
+                type="button"
+                onClick={() => setModalAberto(true)}
+                className="ml-1 hidden items-center gap-1.5 rounded-lg bg-ink px-2.5 py-1.5 text-[12px] font-semibold text-void transition-transform hover:scale-[1.03] sm:flex"
               >
-                <CalendarPlus size={15} strokeWidth={2.5} />
+                <CalendarPlus size={13} strokeWidth={2.5} />
                 Agendar
               </button>
             )}
-            <button onClick={onFechar} className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:text-ink" aria-label="Fechar">
-              <X size={18} />
-            </button>
-          </div>
-        </div>
-
-        {/* Lista em cima/a esquerda (prioridade pedida); grade do mes ao
-            lado — em telas estreitas empilha, em telas largas divide. */}
-        <div className="grid gap-4 lg:grid-cols-[1fr_320px] lg:items-start">
-          <section className="max-h-[70vh] overflow-y-auto rounded-xl border border-hairline bg-elevated/40 p-4">
-            <div className="mb-2 flex items-center justify-between gap-2">
-              <h3 className="text-[13px] font-semibold">
-                {diaSelecionado
-                  ? new Date(diaSelecionado).toLocaleDateString("pt-BR", { weekday: "long", day: "2-digit", month: "long" })
-                  : "Todos os agendamentos"}
-              </h3>
-              {diaSelecionado && (
-                <button onClick={() => setDiaSelecionado(null)} className="text-xs text-muted underline hover:text-ink">
-                  ver todos
-                </button>
+          </span>
+        }
+      >
+        <div className="@container">
+          <div className="flex flex-col gap-4 @2xl:flex-row">
+            {/* Grade com linhas finas entre os dias, igual à do Início. */}
+            <div className="flex shrink-0 flex-col overflow-hidden rounded-2xl border border-white/[0.06] @2xl:w-[52%]">
+              <div className="grid grid-cols-7 border-b border-white/[0.06] bg-white/[0.02] text-center">
+                {SEMANA.map((l, i) => (
+                  <span key={i} className="py-1.5 text-[11px] font-semibold text-muted/70">
+                    {l}
+                  </span>
+                ))}
+              </div>
+              <div className="relative">
+                <AnimatePresence mode="popLayout" initial={false} custom={direcao}>
+                  <motion.div
+                    key={prefixoMes}
+                    initial={{ x: 28 * direcao, opacity: 0 }}
+                    animate={{ x: 0, opacity: 1 }}
+                    exit={{ x: -28 * direcao, opacity: 0 }}
+                    transition={{ duration: 0.32, ease: EASE }}
+                    className="grid grid-cols-7 text-center"
+                  >
+                    {[...dias, ...Array.from({ length: (7 - (dias.length % 7)) % 7 }, () => null)].map((dia, i) => {
+                      const linhas = `${i % 7 > 0 ? "border-l" : ""} ${i >= 7 ? "border-t" : ""} border-white/[0.05]`;
+                      if (dia == null) return <span key={`v${i}`} className={linhas} />;
+                      const chave = CHAVE(new Date(mesRef.getFullYear(), mesRef.getMonth(), dia));
+                      const evs = eventosPorDia.get(chave) ?? [];
+                      const nivers = aniversariosPorDia.get(chave) ?? [];
+                      const total = evs.length + nivers.length;
+                      const ehHoje = chave === CHAVE(hoje);
+                      const escolhido = chave === diaEscolhido;
+                      // Até 3 bolinhas, uma por TIPO presente no dia.
+                      const cores = [
+                        ...new Set([...evs.map((e) => TIPO_COR[e.eventType]), ...(nivers.length ? [COR_ANIVERSARIO] : [])]),
+                      ].slice(0, 3);
+                      return (
+                        <span key={dia} className={`flex items-center justify-center p-0.5 sm:p-1 ${linhas}`}>
+                          <button
+                            type="button"
+                            onClick={() => setDiaEscolhido(chave)}
+                            aria-label={`${dia} — ${total} ${total === 1 ? "item" : "itens"}`}
+                            aria-pressed={escolhido}
+                            className={`relative grid h-10 w-10 place-items-center rounded-xl text-[12.5px] transition active:scale-90 sm:h-11 sm:w-11 ${
+                              escolhido
+                                ? "font-semibold text-black"
+                                : ehHoje
+                                  ? "bg-white/[0.08] font-semibold text-[#f1d78a] ring-1 ring-inset ring-[#d4af37]/60"
+                                  : total > 0
+                                    ? "text-ink hover:bg-white/[0.06]"
+                                    : "text-muted/70 hover:bg-white/[0.04]"
+                            } focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[#d4af37]/60`}
+                          >
+                            {escolhido && (
+                              <motion.span
+                                layoutId="time-dia-escolhido"
+                                className="absolute inset-0 rounded-xl bg-[#d4af37] shadow-lg shadow-[#d4af37]/25"
+                                transition={{ type: "spring", stiffness: 520, damping: 38 }}
+                              />
+                            )}
+                            <span className="tnum relative leading-none">{dia}</span>
+                            {cores.length > 0 && (
+                              <span className="absolute bottom-1 flex gap-[3px]">
+                                {cores.map((c) => (
+                                  <span key={c} className="h-1 w-1 rounded-full" style={{ background: escolhido ? "#000000b3" : c }} />
+                                ))}
+                              </span>
+                            )}
+                          </button>
+                        </span>
+                      );
+                    })}
+                  </motion.div>
+                </AnimatePresence>
+              </div>
+              {legenda.length > 0 && (
+                <div className="flex flex-wrap gap-x-3.5 gap-y-1 border-t border-white/[0.06] px-3 py-1.5">
+                  {legenda.map((l) => (
+                    <span key={l.chave} className="flex items-center gap-1.5 text-[11px] text-muted">
+                      <span className="h-1.5 w-1.5 rounded-full" style={{ background: l.cor }} />
+                      {l.texto}
+                    </span>
+                  ))}
+                </div>
               )}
             </div>
 
-            {eventosDoDia.length === 0 ? (
-              <p className="text-sm text-muted">{diaSelecionado ? "Nenhum evento neste dia." : "Nenhum evento agendado."}</p>
-            ) : (
-              <ul className="divide-y divide-hairline">
-                {eventosDoDia.map((ev) => (
-                  <li key={ev.id} className="flex flex-wrap items-start gap-3 py-3.5">
-                    <div className="grid h-11 w-14 shrink-0 place-items-center rounded-lg border border-hairline bg-surface text-center">
-                      <span className="text-[11px] font-semibold uppercase leading-tight text-muted">{fmtData(ev.startsAt)}</span>
-                    </div>
+            {/* Dia escolhido */}
+            <div className="min-w-0 flex-1">
+              <AnimatePresence mode="wait" initial={false}>
+                <motion.div
+                  key={diaEscolhido}
+                  initial={{ opacity: 0, y: 6 }}
+                  animate={{ opacity: 1, y: 0 }}
+                  exit={{ opacity: 0, y: -6 }}
+                  transition={{ duration: 0.2, ease: EASE }}
+                >
+                  <p className="text-[12px] font-semibold text-muted">{dataLonga(dataEscolhida)}</p>
 
-                    <div className="min-w-0 flex-1">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <Chip color={TIPO_COR[ev.eventType]} size="sm">{TIPO_LABEL[ev.eventType]}</Chip>
-                        {ev.recurrenceGroupId && (
-                          <span className="flex items-center gap-1 rounded-full border border-hairline px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider text-muted">
-                            <Repeat size={10} /> semanal
-                          </span>
-                        )}
-                        <p className="truncate text-sm font-medium">{ev.title}</p>
-                      </div>
-
-                      <p className="mt-1 flex items-center gap-1.5 text-xs text-muted">
-                        <Clock size={12} />
-                        {fmtHora(ev.startsAt)}
-                        {ev.endsAt ? ` – ${fmtHora(ev.endsAt)}` : ""}
-                        {ev.locationUrl && (
-                          <>
-                            <span className="text-hairline">·</span>
-                            <a href={ev.locationUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-ink/80 hover:underline">
-                              <Video size={12} /> link
-                            </a>
-                          </>
-                        )}
-                      </p>
-
-                      {ev.description && <p className="mt-1 text-[13px] text-muted">{ev.description}</p>}
-
-                      {ev.participants.length > 0 && (
-                        <div className="mt-2 space-y-1">
-                          <div className="flex items-center gap-1.5 text-[11px] text-muted">
-                            <Users size={12} />
-                            Participantes
-                            {podeCriar && <span className="text-muted/70">· presença fica visível só pra você</span>}
-                          </div>
-                          <div className="flex flex-wrap items-center gap-1.5">
-                            {ev.participants.map((p) => {
-                              const j = porNome.get(p.playerId);
-                              return (
-                                <span
-                                  key={p.playerId}
-                                  className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
-                                    p.status === "confirmado"
-                                      ? "border-positive/40 text-positive"
-                                      : p.status === "recusado"
-                                      ? "border-negative/40 text-negative"
-                                      : "border-hairline text-muted"
-                                  }`}
-                                >
-                                  {j?.nome ?? "Jogador"}
-                                  {podeCriar && (
-                                    <span className="ml-1 flex items-center gap-0.5 border-l border-hairline pl-1">
-                                      <button
-                                        onClick={() => markAttendance(ev.id, p.playerId, p.attended === true ? null : true).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
-                                        title="Marcar presente"
-                                        className={`grid h-4 w-4 place-items-center rounded-full transition-colors ${
-                                          p.attended === true ? "text-positive" : "text-muted/50 hover:text-positive"
-                                        }`}
-                                      >
-                                        <CheckCircle2 size={12} />
-                                      </button>
-                                      <button
-                                        onClick={() => markAttendance(ev.id, p.playerId, p.attended === false ? null : false).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
-                                        title="Marcar ausente"
-                                        className={`grid h-4 w-4 place-items-center rounded-full transition-colors ${
-                                          p.attended === false ? "text-negative" : "text-muted/50 hover:text-negative"
-                                        }`}
-                                      >
-                                        <XCircle size={12} />
-                                      </button>
-                                    </span>
-                                  )}
-                                </span>
-                              );
-                            })}
-                          </div>
-                        </div>
+                  {eventosDoDia.length === 0 && aniversariosDoDia.length === 0 ? (
+                    <div className="mt-3 space-y-2.5">
+                      <CardHint>Nada neste dia.</CardHint>
+                      {proximo && CHAVE(new Date(proximo.startsAt)) !== diaEscolhido && (
+                        <button
+                          type="button"
+                          onClick={() => irPara(proximo.startsAt)}
+                          className="block text-left text-[12.5px] text-muted transition-colors hover:text-ink"
+                        >
+                          Próximo: <span className="font-semibold text-ink">{proximo.title}</span> ·{" "}
+                          {new Date(proximo.startsAt).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })} às {fmtHora(proximo.startsAt)}
+                        </button>
                       )}
-                    </div>
-
-                    <div className="flex shrink-0 items-center gap-1.5">
-                      <a
-                        href={googleCalendarUrl(ev)}
-                        target="_blank"
-                        rel="noreferrer"
-                        aria-label="Adicionar ao Google Agenda"
-                        title="Adicionar ao Google Agenda"
-                        className="grid h-8 w-8 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
-                      >
-                        <ExternalLink size={15} />
-                      </a>
                       {podeCriar && (
                         <button
-                          onClick={() => cancelar(ev)}
-                          aria-label="Cancelar evento"
-                          className="grid h-8 w-8 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-negative/50 hover:text-negative"
+                          type="button"
+                          onClick={() => setModalAberto(true)}
+                          className="hidden items-center gap-1.5 text-[12.5px] font-semibold text-[#d4af37] transition-colors hover:text-[#f1d78a] sm:flex"
                         >
-                          <Trash2 size={15} />
+                          <CalendarPlus size={13} /> Agendar neste dia
                         </button>
                       )}
                     </div>
-                  </li>
-                ))}
-              </ul>
-            )}
-          </section>
-
-          <div className="space-y-3">
-            <CalendarioMensal
-              eventos={eventos}
-              diaSelecionado={diaSelecionado}
-              onSelecionarDia={setDiaSelecionado}
-              mesRef={mesRef}
-              onMesRefChange={setMesRef}
-            />
-
-            <section className="rounded-xl border border-hairline bg-elevated/40 p-3.5">
-              <button
-                onClick={() => setMostrarAniversarios((v) => !v)}
-                className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-[12.5px] font-semibold transition-colors ${
-                  mostrarAniversarios ? "bg-training/10 text-training" : "text-muted hover:text-ink"
-                }`}
-              >
-                <Cake size={14} />
-                Aniversariantes do mês
-              </button>
-
-              {mostrarAniversarios && (
-                <div className="mt-2">
-                  {aniversarios === null ? (
-                    <p className="px-2 text-xs text-muted">Carregando…</p>
-                  ) : aniversariantesDoMes.length === 0 ? (
-                    <p className="px-2 text-xs text-muted">Ninguém faz aniversário neste mês (ou ainda não preencheu a data no perfil).</p>
                   ) : (
-                    <ul className="space-y-1">
-                      {aniversariantesDoMes.map((a) => (
-                        <li key={a.userId} className="flex items-center gap-2 rounded-lg px-2 py-1.5 text-[13px]">
-                          <Avatar id={a.avatarId} url={a.avatarUrl} size={24} />
-                          <span className="min-w-0 flex-1 truncate">{a.nome}</span>
-                          <span className="shrink-0 text-xs text-muted tnum">
-                            {new Date(`${a.dataNascimento}T00:00:00`).toLocaleDateString("pt-BR", { day: "2-digit", month: "short" })}
-                          </span>
+                    <ul className="mt-2 flex flex-col">
+                      {aniversariosDoDia.map((a) => (
+                        <li key={`niver-${a.userId}`} className="flex items-center gap-2.5 border-t border-white/[0.06] px-1 py-2.5">
+                          <Cake size={15} className="shrink-0" style={{ color: COR_ANIVERSARIO }} aria-hidden />
+                          <Avatar id={a.avatarId} url={a.avatarUrl} size={22} />
+                          <span className="min-w-0 flex-1 truncate text-[13px]">Aniversário de {a.nome}</span>
+                        </li>
+                      ))}
+                      {eventosDoDia.map((ev) => (
+                        <li key={ev.id} className="border-t border-white/[0.06] px-1 py-2.5">
+                          <div className="flex items-start gap-2.5">
+                            <span className="mt-1 h-2 w-2 shrink-0 rounded-full" style={{ background: TIPO_COR[ev.eventType] }} aria-hidden />
+                            <div className="min-w-0 flex-1">
+                              <p className="text-[13px] font-medium leading-tight">{ev.title}</p>
+                              <p className="mt-0.5 flex flex-wrap items-center gap-x-1.5 text-[11.5px] text-muted">
+                                <span>{TIPO_LABEL[ev.eventType]}</span>
+                                <span className="text-muted/40">·</span>
+                                <span className="flex items-center gap-1 tabular-nums">
+                                  <Clock size={11} />
+                                  {fmtHora(ev.startsAt)}
+                                  {ev.endsAt ? `–${fmtHora(ev.endsAt)}` : ""}
+                                </span>
+                                {ev.recurrenceGroupId && (
+                                  <>
+                                    <span className="text-muted/40">·</span>
+                                    <span className="flex items-center gap-1"><Repeat size={10} /> semanal</span>
+                                  </>
+                                )}
+                                {ev.locationUrl && (
+                                  <>
+                                    <span className="text-muted/40">·</span>
+                                    <a href={ev.locationUrl} target="_blank" rel="noreferrer" className="flex items-center gap-1 text-ink/80 hover:underline">
+                                      <Video size={11} /> link
+                                    </a>
+                                  </>
+                                )}
+                              </p>
+                              {ev.description && <p className="mt-1 text-[12.5px] text-muted">{ev.description}</p>}
+
+                              {ev.participants.length > 0 && (
+                                <div className="mt-2 flex flex-wrap items-center gap-1.5">
+                                  <Users size={12} className="text-muted" aria-label="Participantes" />
+                                  {ev.participants.map((pt) => {
+                                    const j = porNome.get(pt.playerId);
+                                    return (
+                                      <span
+                                        key={pt.playerId}
+                                        className={`flex items-center gap-1 rounded-full border px-2 py-0.5 text-[11px] ${
+                                          pt.status === "confirmado"
+                                            ? "border-positive/40 text-positive"
+                                            : pt.status === "recusado"
+                                              ? "border-negative/40 text-negative"
+                                              : "border-hairline text-muted"
+                                        }`}
+                                      >
+                                        {j?.nome ?? "Jogador"}
+                                        {podeCriar && (
+                                          <span className="ml-1 flex items-center gap-0.5 border-l border-hairline pl-1">
+                                            <button
+                                              onClick={() => markAttendance(ev.id, pt.playerId, pt.attended === true ? null : true).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
+                                              title="Marcar presente"
+                                              aria-label={`Marcar ${j?.nome ?? "jogador"} presente`}
+                                              className={`grid h-5 w-5 place-items-center rounded-full transition-colors ${pt.attended === true ? "text-positive" : "text-muted/50 hover:text-positive"}`}
+                                            >
+                                              <CheckCircle2 size={12} />
+                                            </button>
+                                            <button
+                                              onClick={() => markAttendance(ev.id, pt.playerId, pt.attended === false ? null : false).then(onChange).catch((e) => onErro(traduzErroCalendario(e)))}
+                                              title="Marcar ausente"
+                                              aria-label={`Marcar ${j?.nome ?? "jogador"} ausente`}
+                                              className={`grid h-5 w-5 place-items-center rounded-full transition-colors ${pt.attended === false ? "text-negative" : "text-muted/50 hover:text-negative"}`}
+                                            >
+                                              <XCircle size={12} />
+                                            </button>
+                                          </span>
+                                        )}
+                                      </span>
+                                    );
+                                  })}
+                                </div>
+                              )}
+                            </div>
+                            <div className="flex shrink-0 items-center gap-1">
+                              <a
+                                href={googleCalendarUrl(ev)}
+                                target="_blank"
+                                rel="noreferrer"
+                                aria-label="Adicionar ao Google Agenda"
+                                title="Adicionar ao Google Agenda"
+                                className="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-ink"
+                              >
+                                <ExternalLink size={14} />
+                              </a>
+                              {podeCriar && (
+                                <button
+                                  onClick={() => cancelar(ev)}
+                                  aria-label="Cancelar evento"
+                                  title="Cancelar evento"
+                                  className="grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-negative/10 hover:text-negative"
+                                >
+                                  <Trash2 size={14} />
+                                </button>
+                              )}
+                            </div>
+                          </div>
                         </li>
                       ))}
                     </ul>
                   )}
-                </div>
+                </motion.div>
+              </AnimatePresence>
+
+              {/* Celular: o Agendar sai do cabeçalho (não cabia) e vem aqui. */}
+              {podeCriar && (
+                <button
+                  type="button"
+                  onClick={() => setModalAberto(true)}
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void sm:hidden"
+                >
+                  <CalendarPlus size={15} strokeWidth={2.5} />
+                  Agendar evento
+                </button>
               )}
-            </section>
+            </div>
           </div>
         </div>
-      </div>
-    </div>
-  );
-}
+      </PainelCard>
 
-// Grade de mes de verdade (dias da semana + numeros), em vez de so' uma
-// lista dos proximos eventos. Clicar num dia filtra a lista abaixo;
-// clicar de novo (ou "ver todos") volta a mostrar tudo.
-const DIAS_SEMANA = ["D", "S", "T", "Q", "Q", "S", "S"];
-
-function CalendarioMensal({
-  eventos,
-  diaSelecionado,
-  onSelecionarDia,
-  mesRef,
-  onMesRefChange,
-}: {
-  eventos: TeamEvent[];
-  diaSelecionado: string | null;
-  onSelecionarDia: (dia: string | null) => void;
-  mesRef: Date;
-  onMesRefChange: (d: Date) => void;
-}) {
-  const eventosPorDia = useMemo(() => {
-    const m = new Map<string, number>();
-    eventos.forEach((ev) => {
-      const key = new Date(ev.startsAt).toDateString();
-      m.set(key, (m.get(key) ?? 0) + 1);
-    });
-    return m;
-  }, [eventos]);
-
-  const celulas = useMemo(() => {
-    const ano = mesRef.getFullYear();
-    const mes = mesRef.getMonth();
-    const offset = new Date(ano, mes, 1).getDay();
-    const totalDias = new Date(ano, mes + 1, 0).getDate();
-    const arr: (Date | null)[] = Array(offset).fill(null);
-    for (let d = 1; d <= totalDias; d++) arr.push(new Date(ano, mes, d));
-    return arr;
-  }, [mesRef]);
-
-  const hojeStr = new Date().toDateString();
-
-  return (
-    <section className="rounded-xl border border-hairline bg-surface p-5">
-      <div className="flex items-center justify-between">
-        <h2 className="text-[15px] font-semibold capitalize">
-          {mesRef.toLocaleDateString("pt-BR", { month: "long", year: "numeric" })}
-        </h2>
-        <div className="flex gap-1">
-          <button
-            onClick={() => onMesRefChange(new Date(mesRef.getFullYear(), mesRef.getMonth() - 1, 1))}
-            aria-label="Mês anterior"
-            className="grid h-7 w-7 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
-          >
-            <ChevronLeft size={14} />
-          </button>
-          <button
-            onClick={() => onMesRefChange(new Date(mesRef.getFullYear(), mesRef.getMonth() + 1, 1))}
-            aria-label="Próximo mês"
-            className="grid h-7 w-7 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink"
-          >
-            <ChevronRight size={14} />
-          </button>
-        </div>
-      </div>
-
-      <div className="mt-3 grid grid-cols-7 gap-1 text-center text-[10px] font-semibold uppercase tracking-wide text-muted">
-        {DIAS_SEMANA.map((d, i) => (
-          <span key={i}>{d}</span>
-        ))}
-      </div>
-
-      <div className="mt-1 grid grid-cols-7 gap-1.5">
-        {celulas.map((d, i) => {
-          if (!d) return <div key={i} />;
-          const key = d.toDateString();
-          const n = eventosPorDia.get(key) ?? 0;
-          const selecionado = diaSelecionado === key;
-          const hoje = key === hojeStr;
-          return (
-            <button
-              key={i}
-              onClick={() => onSelecionarDia(selecionado ? null : key)}
-              className={`relative flex h-11 items-center justify-center rounded-lg border text-[12px] transition-colors sm:h-14 ${
-                selecionado
-                  ? "border-ink bg-ink text-void"
-                  : hoje
-                  ? "border-ink/50 text-ink"
-                  : n > 0
-                  ? "border-hairline text-ink hover:border-ink/40 hover:bg-elevated"
-                  : "border-hairline/40 text-muted hover:border-hairline hover:bg-elevated"
-              }`}
-            >
-              <span className="tnum">{d.getDate()}</span>
-              {n > 0 && (
-                <span
-                  className={`absolute -top-1.5 -right-1.5 grid h-4 min-w-4 place-items-center rounded-full px-1 text-[9px] font-bold ${
-                    selecionado ? "bg-void text-ink" : "bg-training text-void"
-                  }`}
-                >
-                  {n}
-                </span>
-              )}
-            </button>
-          );
-        })}
-      </div>
-    </section>
+      {modalAberto && (
+        <ModalNovoEvento
+          teamId={teamId}
+          jogadores={jogadores}
+          meuUserId={meuUserId}
+          meuPapel={meuPapel}
+          prefillPlayerId={prefillPlayerId}
+          prefillData={diaEscolhido >= CHAVE(hoje) ? diaEscolhido : undefined}
+          onFechar={() => {
+            setModalAberto(false);
+            onPrefillConsumido?.();
+          }}
+          onCriado={() => {
+            setModalAberto(false);
+            onPrefillConsumido?.();
+            onChange();
+          }}
+          onErro={onErro}
+        />
+      )}
+    </>
   );
 }
 
@@ -575,6 +511,7 @@ export function ModalNovoEvento({
   meuUserId,
   meuPapel,
   prefillPlayerId,
+  prefillData,
   onFechar,
   onCriado,
   onErro,
@@ -584,13 +521,15 @@ export function ModalNovoEvento({
   meuUserId: string;
   meuPapel: TeamRole;
   prefillPlayerId?: string | null;
+  /** "AAAA-MM-DD" -- dia escolhido no calendário. */
+  prefillData?: string;
   onFechar: () => void;
   onCriado: () => void;
   onErro: (s: string) => void;
 }) {
   const [titulo, setTitulo] = useState(prefillPlayerId ? "Conversa individual" : "");
   const [tipo, setTipo] = useState<EventType>(prefillPlayerId ? "reuniao" : "aula");
-  const [data, setData] = useState("");
+  const [data, setData] = useState(prefillData ?? "");
   const [hora, setHora] = useState("");
   const [duracaoMin, setDuracaoMin] = useState(60);
   const [link, setLink] = useState("");

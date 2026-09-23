@@ -23,8 +23,8 @@ type Ordem = "nome" | "risco" | "xp" | "treinos" | "acerto" | "revisadas" | "res
 
 const OPCOES_ORDEM: { key: Ordem; label: string }[] = [
   { key: "nome", label: "Nome" },
-  { key: "risco", label: "Prioridade (Score de evolução)" },
-  { key: "xp", label: "Ranking (XP no período)" },
+  { key: "risco", label: "Prioridade (score)" },
+  { key: "xp", label: "Ranking de XP" },
   { key: "treinos", label: "Mais treinos" },
   { key: "acerto", label: "Melhor acerto GTO" },
   { key: "revisadas", label: "Mais revisões" },
@@ -86,67 +86,70 @@ export function TabJogadores({
     return [...filtrada].sort(sorters[ordem]);
   }, [jogadores, filtroLabel, busca, ordem]);
 
-  const labelAtiva = labels.find((l) => l.id === filtroLabel);
-
   return (
     <div className="space-y-4">
       {/* O Assistente do coach e os "Leaks mais frequentes" do time (com o
           botão de enviar treino ao time) foram para o AI Coach da tela
           inicial -- único lugar com orientações automáticas. */}
 
-      <div className="flex flex-wrap items-center gap-2.5">
-        <h2 className="flex-1 text-[15px] font-semibold tracking-tight">
-          Jogadores <span className="ml-1 text-sm font-normal tabular-nums text-muted">{lista.length}</span>
+      {/* Celular: título numa linha; busca + ordenação lado a lado; as
+          etiquetas numa faixa que desliza de lado (antes tudo quebrava em
+          várias linhas e o título partia no meio). */}
+      <div className="flex flex-col gap-2.5 sm:flex-row sm:items-center">
+        <h2 className="flex items-baseline gap-1.5 whitespace-nowrap text-[15px] font-semibold tracking-tight sm:flex-1">
+          Jogadores <span className="text-sm font-normal tabular-nums text-muted">{lista.length}</span>
         </h2>
 
-        <label className="flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-2.5 py-1.5 print:hidden">
-          <ArrowUpDown size={13} className="text-muted" />
-          <select
-            value={ordem}
-            onChange={(e) => setOrdem(e.target.value as Ordem)}
-            className="bg-transparent text-[12.5px] text-ink outline-none"
-            aria-label="Ordenar jogadores"
-          >
-            {OPCOES_ORDEM.map((o) => (
-              <option key={o.key} value={o.key} className="bg-[#141414]">{o.label}</option>
-            ))}
-          </select>
-        </label>
+        <div className="flex gap-2 print:hidden">
+          <div className="relative min-w-0 flex-1 sm:flex-none">
+            <Search size={14} className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
+            <input
+              value={busca}
+              onChange={(e) => setBusca(e.target.value)}
+              placeholder="Buscar jogador"
+              aria-label="Buscar jogador"
+              className="w-full rounded-xl border border-white/10 bg-white/[0.03] py-2 pl-8 pr-3 text-[12.5px] text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-white/25 sm:w-48"
+            />
+          </div>
 
-        <div className="relative print:hidden">
-          <Search size={14} className="absolute left-2.5 top-1/2 -translate-y-1/2 text-muted" />
-          <input
-            value={busca}
-            onChange={(e) => setBusca(e.target.value)}
-            placeholder="Buscar"
-            className="w-40 rounded-xl border border-white/10 bg-white/[0.03] py-1.5 pl-8 pr-3 text-[12.5px] text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-white/25"
-          />
+          <label className="flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.03] px-2.5">
+            <ArrowUpDown size={13} className="shrink-0 text-muted" />
+            <select
+              value={ordem}
+              onChange={(e) => setOrdem(e.target.value as Ordem)}
+              className="max-w-[128px] bg-transparent py-2 text-[12.5px] text-ink outline-none sm:max-w-none"
+              aria-label="Ordenar jogadores"
+            >
+              {OPCOES_ORDEM.map((o) => (
+                <option key={o.key} value={o.key} className="bg-[#141414]">{o.label}</option>
+              ))}
+            </select>
+          </label>
         </div>
       </div>
 
       {labels.length > 0 && (
-        <div className="flex flex-wrap items-center gap-1.5 print:hidden">
-          {/* Etiqueta ativa vira chip dourado com "x" (igual aos filtros da
-              Performance); as outras ficam discretas, com a cor da etiqueta. */}
-          {filtroLabel !== "todas" ? (
-            <button
-              onClick={() => setFiltroLabel("todas")}
-              className="flex items-center gap-1 rounded-full border border-[#d4af37]/50 bg-[#d4af37]/12 px-3 py-1 text-[11.5px] font-semibold text-[#e6c763]"
+        <div
+          className="-mx-4 flex items-center gap-1.5 overflow-x-auto px-4 [scrollbar-width:none] sm:mx-0 sm:flex-wrap sm:overflow-visible sm:px-0 print:hidden [&::-webkit-scrollbar]:hidden"
+          role="group"
+          aria-label="Filtrar por etiqueta"
+        >
+          <FiltroChip ativo={filtroLabel === "todas"} cor="#d4af37" onClick={() => setFiltroLabel("todas")}>
+            Todas
+          </FiltroChip>
+          {labels.map((l) => (
+            <FiltroChip
+              key={l.id}
+              ativo={filtroLabel === l.id}
+              cor={l.color}
+              onClick={() => setFiltroLabel(filtroLabel === l.id ? "todas" : l.id)}
             >
-              {filtroLabel === "sem" ? "Sem etiqueta" : labelAtiva?.name}
-              <X size={12} />
-            </button>
-          ) : (
-            <span className="px-1 text-[11.5px] text-muted">Filtrar por etiqueta:</span>
-          )}
-          {labels
-            .filter((l) => l.id !== filtroLabel)
-            .map((l) => (
-              <FiltroChip key={l.id} cor={l.color} onClick={() => setFiltroLabel(l.id)}>
-                {l.name}
-              </FiltroChip>
-            ))}
-          {filtroLabel !== "sem" && <FiltroChip onClick={() => setFiltroLabel("sem")}>Sem etiqueta</FiltroChip>}
+              {l.name}
+            </FiltroChip>
+          ))}
+          <FiltroChip ativo={filtroLabel === "sem"} onClick={() => setFiltroLabel(filtroLabel === "sem" ? "todas" : "sem")}>
+            Sem etiqueta
+          </FiltroChip>
         </div>
       )}
 
@@ -185,14 +188,26 @@ export function TabJogadores({
   );
 }
 
-function FiltroChip({ children, cor, onClick }: { children: React.ReactNode; cor?: string; onClick: () => void }) {
+// Filtro de etiqueta: a escolhida acende na própria cor (fundo + borda
+// cheia); as outras ficam só com o contorno. Tocar na acesa desmarca.
+function FiltroChip({ children, cor, ativo, onClick }: { children: React.ReactNode; cor?: string; ativo: boolean; onClick: () => void }) {
+  const c = cor ?? "#c4c7c8";
   return (
     <button
+      type="button"
       onClick={onClick}
-      className="rounded-full border border-white/10 px-3 py-1 text-[11.5px] font-medium text-muted transition-colors hover:border-white/25 hover:text-ink"
-      style={cor ? { color: cor, borderColor: `${cor}55` } : undefined}
+      aria-pressed={ativo}
+      className={`flex shrink-0 items-center gap-1 whitespace-nowrap rounded-full border px-3 py-1 text-[11.5px] transition-colors ${
+        ativo ? "font-semibold" : "font-medium opacity-80 hover:opacity-100"
+      }`}
+      style={
+        ativo
+          ? { color: c, borderColor: c, background: `${c}22` }
+          : { color: cor ?? undefined, borderColor: cor ? `${cor}55` : "rgba(255,255,255,0.1)" }
+      }
     >
       {children}
+      {ativo && cor !== "#d4af37" && <X size={11} aria-hidden />}
     </button>
   );
 }
@@ -200,7 +215,9 @@ function FiltroChip({ children, cor, onClick }: { children: React.ReactNode; cor
 function ultimaAtividade(iso: string | null): string {
   const d = diasSemAtividade(iso);
   if (d == null) return "sem atividade ainda";
-  if (d === 0) return "ativo hoje";
+  // <= 0: horário da última atividade um pouco à frente do relógio do
+  // aparelho não vira "há -1 dias".
+  if (d <= 0) return "ativo hoje";
   if (d === 1) return "ativo ontem";
   return `há ${d} dias sem atividade`;
 }

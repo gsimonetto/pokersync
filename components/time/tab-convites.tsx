@@ -92,10 +92,10 @@ export function TabConvites({
   }
 
   return (
-    <div className="space-y-5">
+    <div className="space-y-3.5">
       <section
-        className={`rounded-xl border bg-surface p-5 ${
-          pendentes.length > 0 ? "border-evolution/40" : "border-hairline"
+        className={`rounded-2xl border p-3.5 sm:p-4 ${
+          pendentes.length > 0 ? "border-evolution/40 bg-evolution/[0.04]" : "border-white/[0.06] bg-white/[0.02]"
         }`}
       >
         <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -117,17 +117,17 @@ export function TabConvites({
             {pendentes.map((p) => (
               <li key={p.userId} className="flex flex-wrap items-center gap-3 py-3">
                 <Avatar id={p.avatarId} url={p.avatarUrl} size={36} />
-                <div className="min-w-0 flex-1">
+                <div className="min-w-[170px] flex-1">
                   <p className="truncate text-sm font-medium">{p.nome}</p>
-                  <p className="flex items-center gap-1 text-xs text-muted">
-                    <Clock size={11} />
+                  <p className="flex items-start gap-1 text-xs text-muted">
+                    <Clock size={11} className="mt-0.5 shrink-0" />
                     Pediu em {new Date(p.requestedAt).toLocaleDateString("pt-BR")} · entraria como{" "}
                     {PAPEL[p.role].toLowerCase()}
                   </p>
                 </div>
 
                 {isAdmin ? (
-                  <div className="flex gap-2">
+                  <div className="ml-auto flex gap-2">
                     <button
                       onClick={() => decidir(p.userId, true, p.nome)}
                       disabled={processando === p.userId}
@@ -154,16 +154,18 @@ export function TabConvites({
         )}
       </section>
 
-      <section className="rounded-xl border border-hairline bg-surface p-5">
+      <section className="rounded-2xl border border-white/[0.06] bg-white/[0.02] p-3.5 sm:p-4">
         <h2 className="text-[15px] font-semibold">Gerar convite</h2>
         <p className="mt-1 text-sm text-muted">
           Envie o link por WhatsApp, Discord ou onde preferir. Quem abrir entra na fila de aprovação acima.
         </p>
 
-        <div className="mt-4 flex flex-wrap items-end gap-3">
+        {/* Celular: 2 colunas (3 lado a lado cortavam o texto dos
+            seletores), com o botão na quarta posição. */}
+        <div className="mt-4 grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap sm:gap-3">
           <Campo label="Entra como">
             <select value={papel} onChange={(e) => setPapel(e.target.value as TeamRole)}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none">
+              className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
               <option value="player">Jogador</option>
               <option value="coach">Coach</option>
               {meuPapel === "admin" && <option value="admin">Administrador</option>}
@@ -172,14 +174,14 @@ export function TabConvites({
 
           <Campo label="Validade">
             <select value={horas} onChange={(e) => setHoras(Number(e.target.value))}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none">
+              className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
               {VALIDADES.map((v) => <option key={v.hours} value={v.hours}>{v.label}</option>)}
             </select>
           </Campo>
 
           <Campo label="Usos">
             <select value={usos} onChange={(e) => setUsos(Number(e.target.value))}
-              className="rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none">
+              className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
               <option value={1}>1 pessoa</option>
               <option value={5}>Até 5</option>
               <option value={25}>Até 25</option>
@@ -187,7 +189,7 @@ export function TabConvites({
           </Campo>
 
           <button onClick={gerar} disabled={gerando}
-            className="flex items-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02] disabled:opacity-50">
+            className="flex items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2 text-sm font-semibold text-void transition-transform hover:scale-[1.02] disabled:opacity-50 sm:py-2.5">
             <Link2 size={16} strokeWidth={2.5} />
             {gerando ? "Gerando…" : "Gerar link"}
           </button>
