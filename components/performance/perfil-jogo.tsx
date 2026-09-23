@@ -48,6 +48,7 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
   const cbet = agressor.filter((r) => r.posflop!.cbet.flop === true);
   const chegouTurn = rows.filter((r) => r.posflop?.cbet.turn != null);
   const segundo = chegouTurn.filter((r) => r.posflop!.cbet.turn === true);
+  const chances3bet = rows.filter((r) => r.threeBetOpportunity === true);
   const vpipN = rows.filter((r) => r.vpip).length;
   const pfrN = rows.filter((r) => r.pfr).length;
   return [
@@ -75,11 +76,11 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
       chave: "3bet",
       curto: "3-Bet",
       titulo: "3-Bet",
-      oQueE: "Quantas vezes você re-aumenta antes do flop.",
-      comoCalcula: "Mãos com 3-bet ÷ mãos jogadas (mesma conta do número 3-Bet ao lado).",
-      teto: 15,
+      oQueE: "Das vezes em que alguém abriu o pote antes de você, quantas você re-aumentou.",
+      comoCalcula: "Re-aumentos ÷ vezes com exatamente 1 raise na mesa na sua vez (mesma conta do número 3-Bet ao lado).",
+      teto: 25,
       valor: preflop.three_bet_pct,
-      vezes: `${rows.filter((r) => r.threeBet).length} de ${rows.length} mãos`,
+      vezes: `${chances3bet.filter((r) => r.threeBet).length} de ${chances3bet.length} chances`,
     },
     {
       chave: "cbet",

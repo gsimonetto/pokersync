@@ -39,7 +39,6 @@ import {
   computePreflopMetrics,
   computePreflopByPosition,
   computePostflopMetrics,
-  computeReferenceProfile,
   buyinBucketOf,
   fetchTournamentMetrics,
   fetchTournamentSessions,
@@ -175,10 +174,6 @@ export default function PerformancePage() {
   const preflop = useMemo(() => computePreflopMetrics(filteredRows), [filteredRows]);
   const byPosition = useMemo(() => computePreflopByPosition(filteredRows), [filteredRows]);
   const postflop = useMemo(() => computePostflopMetrics(filteredRows), [filteredRows]);
-  // Cash joga 6-max, MTT joga cheio (8-9 handed) — a faixa "saudável" de
-  // cada métrica muda com isso, então o perfil de referência segue o
-  // formato predominante nas mãos já filtradas (ver computeReferenceProfile).
-  const referenceProfile = useMemo(() => computeReferenceProfile(filteredRows), [filteredRows]);
 
   const availableStackDepths = useMemo(
     () => new Set(rows.map((r) => r.stackDepthBucket).filter((s): s is StackDepthBucket => s !== null)),
@@ -288,14 +283,8 @@ export default function PerformancePage() {
                         <>
                           {tab === "geral" && (
                             <>
-                              <ResumoPerformance
-                                rows={filteredRows}
-                                preflop={preflop}
-                                referenceProfile={referenceProfile}
-                                tournament={tournament}
-                                ordem={0}
-                              />
-                              <LinhaSemanal rows={filteredRows} referenceProfile={referenceProfile} ordem={1} />
+                              <ResumoPerformance rows={filteredRows} preflop={preflop} tournament={tournament} sessoes={sessoesBanca} ordem={0} />
+                              <LinhaSemanal rows={filteredRows} ordem={1} />
                             </>
                           )}
                           {tab === "preflop" && (

@@ -4,8 +4,7 @@ import { useMemo, useRef, useState } from "react";
 import { motion } from "framer-motion";
 import { LineChart } from "lucide-react";
 import { PainelCard } from "@/components/painel/painel-card";
-import { PREFLOP_REFERENCE } from "@/lib/services/analysis-service";
-import type { AnalysisHandRow, ReferenceProfile } from "@/types/analysis";
+import type { AnalysisHandRow } from "@/types/analysis";
 import { COR_PFR, COR_UNICA, COR_VPIP, DicaGrafico, Legenda } from "./base";
 import { useLargura, useTamanho } from "./usar-largura";
 
@@ -18,7 +17,7 @@ import { useLargura, useTamanho } from "./usar-largura";
 //
 // Semana com menos de MIN_SEMANA mãos fica de fora (um ponto com 5 mãos só
 // faria a linha pular sem motivo). Nas métricas que dependem de uma
-// situação (roubo, c-bet, fold to c-bet, showdown), a semana com menos de MIN_SITUACAO chances fica
+// situação (3-bet, roubo, c-bet, fold to c-bet, showdown), a semana com menos de MIN_SITUACAO chances fica
 // sem ponto. Últimas 12 semanas com dado.
 
 const MIN_SEMANA = 20;
@@ -68,10 +67,13 @@ function porSemana(rows: AnalysisHandRow[]): Semana[] {
     s.n += 1;
     s.vpip.base += 1;
     s.pfr.base += 1;
-    s.tresBet.base += 1;
     if (r.vpip) s.vpip.sim += 1;
     if (r.pfr) s.pfr.sim += 1;
-    if (r.threeBet) s.tresBet.sim += 1;
+    // 3-Bet: base = as vezes em que alguém abriu antes de você.
+    if (r.threeBetOpportunity === true) {
+      s.tresBet.base += 1;
+      if (r.threeBet) s.tresBet.sim += 1;
+    }
     if (r.stealOpportunity === true) {
       s.roubo.base += 1;
       if (r.stealAttempt) s.roubo.sim += 1;
@@ -112,14 +114,14 @@ function series(semanas: Semana[], m: Metrica): Serie[] {
     valores: semanas.map((x) => taxa(pega(x), minimo)),
   });
   if (m === "vpfr") return [s("vpip", "VPIP", COR_VPIP, (x) => x.vpip), s("pfr", "PFR", COR_PFR, (x) => x.pfr)];
-  if (m === "3bet") return [s("3bet", "3-Bet", COR_UNICA, (x) => x.tresBet)];
+  if (m === "3bet") return [s("3bet", "3-Bet", COR_UNICA, (x) => x.tresBet, MIN_SITUACAO)];
   if (m === "roubo") return [s("roubo", "Roubo", COR_UNICA, (x) => x.roubo, MIN_SITUACAO)];
   if (m === "cbet") return [s("cbet", "C-bet no flop", COR_UNICA, (x) => x.cbet, MIN_SITUACAO)];
   if (m === "foldcbet") return [s("foldcbet", "Fold to c-bet no flop", COR_UNICA, (x) => x.foldCbet, MIN_SITUACAO)];
   return [s("sd", "Vai ao showdown (dos flops vistos)", COR_UNICA, (x) => x.sd, MIN_SITUACAO)];
 }
 
-export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: AnalysisHandRow[]; referenceProfile: ReferenceProfile; ordem?: number }) {
+export function LinhaSemanal({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ordem?: number }) {
   const caixa = useRef<HTMLDivElement>(null);
   const area = useRef<HTMLDivElement>(null);
   const largura = useLargura(caixa);
@@ -129,11 +131,10 @@ export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: Anal
   const lista = useMemo(() => series(semanas, metrica), [semanas, metrica]);
   const alturaArea = useTamanho(area, semanas.length >= 2).altura;
   const ALTURA = Math.max(ALTURA_MIN, alturaArea) - ALTURA_VOLUME;
-  const ref = PREFLOP_REFERENCE[referenceProfile];
   const duas = metrica === "vpfr";
 
   const todos = lista.flatMap((l) => l.valores).filter((v): v is number => v != null);
-  const topo = Math.max(duas ? ref.vpip.max + 8 : 0, ...todos.map((v) => v + 5), metrica === "3bet" ? 10 : 20);
+  const topo = Math.max(...todos.map((v) => v + 5), 20);
   const maxY = Math.min(100, Math.ceil(topo / 4) * 4);
   const w = Math.max(0, largura - M.l - M.r);
   const h = ALTURA - M.t - M.b;
@@ -226,7 +227,7 @@ export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: Anal
                 <span className="text-[11px] text-muted/70">{principal?.rotulo}</span>
               )}
               <span className="text-[11px] text-muted/70">
-                {duas ? "Faixas = faixa ideal · entre as linhas = entradas só pagando" : "Semana sem ponto = poucas chances"}
+                {duas ? "Entre as linhas = entradas só pagando" : "Semana sem ponto = poucas chances"}
               </span>
             </div>
             {/* O SVG fica por cima (absoluto) da área medida, pra altura dele
@@ -241,12 +242,6 @@ export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: Anal
                   role="img"
                   aria-label={`${principal?.rotulo ?? ""} por semana`}
                 >
-                  {duas && (
-                    <>
-                      <rect x={M.l} width={w} y={y(ref.vpip.max)} height={y(ref.vpip.min) - y(ref.vpip.max)} fill={COR_VPIP} opacity={0.09} />
-                      <rect x={M.l} width={w} y={y(ref.pfr.max)} height={y(ref.pfr.min) - y(ref.pfr.max)} fill={COR_PFR} opacity={0.1} />
-                    </>
-                  )}
                   {grade.map((g) => (
                     <g key={g}>
                       <line x1={M.l} x2={M.l + w} y1={y(g)} y2={y(g)} stroke="rgba(255,255,255,0.06)" />

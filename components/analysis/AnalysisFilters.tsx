@@ -36,10 +36,9 @@ type ModalityValue = "all" | "mtt" | "cash";
 // Preflop/Postflop/Torneios/Leak Finder, ver TabNav) -- todo o resto
 // (Modalidade incluida) e' filtro secundario, atras de UM icone so'
 // (SlidersHorizontal), pedido explicito pra nao competir com as abas.
-// Modalidade decide qual "regua" de referencia
-// (PREFLOP_REFERENCE/POSTFLOP_REFERENCE) as outras abas usam (ver
-// computeReferenceProfile) -- por isso mora no topo do modal, antes dos
-// outros 4 grupos, mas dentro do mesmo painel, nao num icone separado
+// Modalidade e' o recorte mais usado -- por isso mora no topo do
+// modal, antes dos outros 4 grupos, mas dentro do mesmo painel, nao num
+// icone separado
 // (era um SegmentedControl solto na barra antes, de altura diferente
 // dos botoes de icone ao lado -- causa do desalinhamento reportado).
 export function AnalysisFilters({
