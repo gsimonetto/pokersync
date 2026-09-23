@@ -2,6 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
+import type { ReactNode } from "react";
 import { ArrowUpRight, GitFork } from "lucide-react";
 import { revisorHandsHref } from "@/components/dashboard/kit";
 import { EASE, PainelCard } from "@/components/painel/painel-card";
@@ -19,14 +20,14 @@ import { COR_PFR, COR_VPIP, Legenda } from "./base";
 // par azul/dourado já validado pro VPIP/PFR (call = entrar pagando,
 // raise = entrar aumentando -- mesma leitura).
 
-const COR_FOLD = "rgba(255,255,255,0.22)";
+export const COR_FOLD = "rgba(255,255,255,0.22)";
 const POUCAS_VEZES = 20;
 
-type Fatia = { rotulo: string; n: number; cor: string };
-type Situacao = { nome: string; detalhe: string; base: AnalysisHandRow[]; fatias: Fatia[] };
-type Grupo = { titulo: string; situacoes: Situacao[] };
+export type Fatia = { rotulo: string; n: number; cor: string };
+export type Situacao = { nome: string; detalhe: string; base: AnalysisHandRow[]; fatias: Fatia[] };
+export type Grupo = { titulo: string; situacoes: Situacao[] };
 
-const quantas = (rows: AnalysisHandRow[], f: (r: AnalysisHandRow) => boolean | null | undefined) => rows.filter((r) => f(r)).length;
+export const quantas = (rows: AnalysisHandRow[], f: (r: AnalysisHandRow) => boolean | null | undefined) => rows.filter((r) => f(r)).length;
 
 function montar(rows: AnalysisHandRow[]): Grupo[] {
   const levou3bet = rows.filter((r) => r.facedThreeBet === true);
@@ -106,14 +107,39 @@ function montar(rows: AnalysisHandRow[]): Grupo[] {
 }
 
 export function Decisoes({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ordem?: number }) {
+  return <CartaoDecisoes title="O que você faz em cada situação" icon={<GitFork size={15} />} grupos={montar(rows)} ordem={ordem} />;
+}
+
+// Classes escritas por extenso (o Tailwind só gera o que acha no código).
+const COLUNAS: Record<string, string> = {
+  "1100-3": "[@container(min-width:1100px)]:grid-cols-3",
+  "1100-2": "[@container(min-width:1100px)]:grid-cols-2",
+  "760-3": "[@container(min-width:760px)]:grid-cols-3",
+  "760-2": "[@container(min-width:760px)]:grid-cols-2",
+};
+
+// O card em si, reaproveitado no pós-flop (mesma leitura, outras situações).
+export function CartaoDecisoes({
+  title,
+  icon,
+  grupos,
+  ordem = 0,
+  larguraColunas = 1100,
+}: {
+  title: string;
+  icon: ReactNode;
+  grupos: Grupo[];
+  ordem?: number;
+  /** Largura do card (px) a partir da qual os grupos ficam lado a lado. */
+  larguraColunas?: 1100 | 760;
+}) {
   const router = useRouter();
-  const grupos = montar(rows);
   let k = 0;
 
   return (
     <PainelCard
-      title="O que você faz em cada situação"
-      icon={<GitFork size={15} />}
+      title={title}
+      icon={icon}
       ordem={ordem}
       rolagem={false}
       // No celular a legenda sai (o título precisa do espaço); cada barra já
@@ -132,7 +158,7 @@ export function Decisoes({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ordem?:
       {/* Ao lado da matriz (estreito): grupos empilhados. Largo (tablet,
           ou sozinho na linha): três colunas. Mede o contêiner de fora. */}
       <div className="@container">
-      <div className="grid gap-x-6 gap-y-4 [@container(min-width:1100px)]:grid-cols-3">
+      <div className={`grid gap-x-6 gap-y-4 ${COLUNAS[`${larguraColunas}-${Math.min(3, grupos.length)}`] ?? ""}`}>
         {grupos.map((g) => (
           <section key={g.titulo} className="min-w-0">
             <h3 className="mb-1.5 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted/70">{g.titulo}</h3>

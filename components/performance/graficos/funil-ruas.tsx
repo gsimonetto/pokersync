@@ -6,7 +6,7 @@ import { motion } from "framer-motion";
 import { Filter } from "lucide-react";
 import { revisorHandsHref } from "@/components/dashboard/kit";
 import { EASE, PainelCard } from "@/components/painel/painel-card";
-import type { AnalysisHandRow, PostflopMetrics } from "@/types/analysis";
+import type { AnalysisHandRow, RuaPosflop } from "@/types/analysis";
 import { COR_UNICA, SeloAmostra } from "./base";
 
 // Funil da agressão por rua: das mãos em que você foi o agressor pré-flop
@@ -18,35 +18,35 @@ import { COR_UNICA, SeloAmostra } from "./base";
 // começo do funil (afina a cada rua); o % escrito é a conversão DA ETAPA
 // ("de quem deu c-bet no flop, X% deu o 2º tiro"). Clique abre as mãos.
 //
-// Embaixo, o outro lado: quando você LEVA c-bet, quanto desiste por rua.
+// O outro lado (quando você LEVA c-bet) fica no card "O que você faz
+// depois do flop".
 
 type Etapa = { nome: string; detalhe: string; feitas: string[]; base: number };
 
 function montar(rows: AnalysisHandRow[]): { inicio: number; etapas: Etapa[] } {
-  const viuFlopComoAgressor = rows.filter((r) => r.isPreflopAggressor === true && r.cbetFlop !== null);
-  const cbet = viuFlopComoAgressor.filter((r) => r.cbetFlop === true);
-  const chegouTurn = cbet.filter((r) => r.doubleBarrel !== null);
-  const segundo = chegouTurn.filter((r) => r.doubleBarrel === true);
-  const chegouRiver = segundo.filter((r) => r.tripleBarrel !== null);
-  const terceiro = chegouRiver.filter((r) => r.tripleBarrel === true);
+  // Base de cada etapa = as vezes em que você TEVE a chance naquela rua
+  // (lido do histórico da mão): viu o flop como agressor; deu c-bet e
+  // chegou ao turn na sua vez; deu 2 tiros e chegou ao river na sua vez.
+  const etapa = (rua: RuaPosflop) => {
+    const base = rows.filter((r) => r.posflop?.cbet[rua] != null);
+    return { base: base.length, feitas: base.filter((r) => r.posflop!.cbet[rua] === true).map((r) => r.handReviewId) };
+  };
+  const flop = etapa("flop");
+  const turn = etapa("turn");
+  const river = etapa("river");
   return {
-    inicio: viuFlopComoAgressor.length,
+    inicio: flop.base,
     etapas: [
-      { nome: "C-bet no flop", detalhe: "das vezes que viu o flop como agressor", feitas: cbet.map((r) => r.handReviewId), base: viuFlopComoAgressor.length },
-      { nome: "2º tiro no turn", detalhe: "de quem deu c-bet e chegou ao turn", feitas: segundo.map((r) => r.handReviewId), base: chegouTurn.length },
-      { nome: "3º tiro no river", detalhe: "de quem deu 2 tiros e chegou ao river", feitas: terceiro.map((r) => r.handReviewId), base: chegouRiver.length },
+      { nome: "C-bet no flop", detalhe: "das vezes que viu o flop como agressor", ...flop },
+      { nome: "2º tiro no turn", detalhe: "de quem deu c-bet e chegou ao turn", ...turn },
+      { nome: "3º tiro no river", detalhe: "de quem deu 2 tiros e chegou ao river", ...river },
     ],
   };
 }
 
-export function FunilRuas({ rows, metrics, ordem = 0 }: { rows: AnalysisHandRow[]; metrics: PostflopMetrics; ordem?: number }) {
+export function FunilRuas({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ordem?: number }) {
   const router = useRouter();
   const { inicio, etapas } = useMemo(() => montar(rows), [rows]);
-  const defesa = [
-    { rua: "Flop", v: metrics.fold_to_cbet_flop_pct },
-    { rua: "Turn", v: metrics.fold_to_cbet_turn_pct },
-    { rua: "River", v: metrics.fold_to_cbet_river_pct },
-  ];
 
   return (
     <PainelCard
@@ -107,26 +107,6 @@ export function FunilRuas({ rows, metrics, ordem = 0 }: { rows: AnalysisHandRow[
         </div>
       )}
 
-      <div className="mt-4 border-t border-white/[0.06] pt-3">
-        <p className="mb-2 text-[12px] font-medium text-ink/90">Quando você leva c-bet, desiste…</p>
-        <div className="grid grid-cols-3 gap-2">
-          {defesa.map((d, i) => (
-            <div key={d.rua} className="rounded-xl bg-white/[0.03] p-2.5 text-center">
-              <p className="text-[11px] text-muted">{d.rua}</p>
-              <p className="mt-1 text-[20px] font-bold leading-none tabular-nums text-ink">{d.v == null ? "—" : `${Math.round(d.v)}%`}</p>
-              <span className="mt-2 block h-1 overflow-hidden rounded-full bg-white/[0.06]">
-                <motion.span
-                  className="block h-full rounded-full"
-                  style={{ background: COR_UNICA }}
-                  initial={{ width: 0 }}
-                  animate={{ width: `${d.v ?? 0}%` }}
-                  transition={{ duration: 0.8, ease: EASE, delay: 0.5 + i * 0.1 }}
-                />
-              </span>
-            </div>
-          ))}
-        </div>
-      </div>
     </PainelCard>
   );
 }

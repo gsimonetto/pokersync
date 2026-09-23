@@ -317,4 +317,31 @@ export interface AnalysisHandRow {
   openerPosition: string | null;
   rouboLimpo: boolean | null;
   squeezeOpportunity: boolean | null;
+  // Pós-flop lido do histórico da mão (null = sem histórico parseado).
+  // hand_tags grava false (e não null) quando a situação nem aconteceu --
+  // ex.: cbet_flop=false numa mão em que ninguém viu o flop --, então as
+  // contas de pós-flop usam isto aqui pra saber a BASE certa de cada %.
+  posflop: PosflopDaMao | null;
+}
+
+export type RuaPosflop = "flop" | "turn" | "river";
+export type RespostaAposta = "fold" | "call" | "raise";
+
+export interface PosflopDaMao {
+  /** O herói ainda estava na mão quando a rua abriu. */
+  viu: Record<RuaPosflop, boolean>;
+  /** Herói foi o último a aumentar no pré-flop. */
+  heroiAgressor: boolean;
+  /** Como agressor: null = não teve a chance (linha já quebrada, alguém
+   *  apostou antes, não chegou na rua); true/false = apostou ou não. */
+  cbet: Record<RuaPosflop, boolean | null>;
+  /** Contra o agressor pré-flop apostando (c-bet e tiros seguintes): a
+   *  resposta do herói, ou null se não enfrentou. */
+  respostaCbet: Record<RuaPosflop, RespostaAposta | null>;
+  /** Sem a iniciativa, agindo antes do agressor no flop: apostou primeiro? */
+  donk: boolean | null;
+  /** Deu check e depois enfrentou aposta na mesma rua: aumentou? */
+  checkRaise: Record<RuaPosflop, boolean | null>;
+  /** As 3 cartas do flop (ex.: ["Ah","7d","2c"]). */
+  flop: string[] | null;
 }

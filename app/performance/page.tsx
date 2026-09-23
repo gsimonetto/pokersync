@@ -6,7 +6,6 @@ import { Target, Flame, BarChart3, MapPin, Radar as RadarIcon, Lock, LayoutGrid 
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
-import { PostflopTab } from "@/components/analysis/PostflopStats";
 import { StatisticsTab } from "@/components/analysis/StatisticsTab";
 import { RadarPanel } from "@/components/analysis/RadarPanel";
 import { PainelVisual } from "@/components/dashboard/kit";
@@ -18,6 +17,9 @@ import { ResumoPerformance } from "@/components/performance/resumo";
 import { MatrizMaos } from "@/components/performance/graficos/matriz-maos";
 import { LinhaSemanal } from "@/components/performance/graficos/linha-semanal";
 import { Decisoes } from "@/components/performance/graficos/decisoes";
+import { DecisoesPosflop } from "@/components/performance/graficos/decisoes-posflop";
+import { CbetTextura } from "@/components/performance/graficos/cbet-textura";
+import { ShowdownAgressao } from "@/components/performance/graficos/showdown-agressao";
 import { BarrasPosicao } from "@/components/performance/graficos/barras-posicao";
 import { FunilRuas } from "@/components/performance/graficos/funil-ruas";
 import { CurvaLucro } from "@/components/performance/graficos/curva-lucro";
@@ -310,8 +312,17 @@ export default function PerformancePage() {
                           )}
                           {tab === "postflop" && (
                             <>
-                              <FunilRuas rows={filteredRows} metrics={postflop} ordem={1} />
-                              <PostflopTab rows={filteredRows} metrics={postflop} referenceProfile={referenceProfile} />
+                              {/* Mesma leitura do pré-flop: funil (quando você
+                                  aposta), o que você faz quando apostam em você,
+                                  c-bet por tipo de flop e showdown/agressão. Sai o
+                                  painel antigo "Tendências pós-flop" (repetia o
+                                  funil e usava faixas sem fonte confiável). */}
+                              <FunilRuas rows={filteredRows} ordem={1} />
+                              <DecisoesPosflop rows={filteredRows} ordem={2} />
+                              <div className="grid gap-3.5 lg:grid-cols-2">
+                                <CbetTextura rows={filteredRows} ordem={3} />
+                                <ShowdownAgressao rows={filteredRows} metrics={postflop} ordem={4} />
+                              </div>
                             </>
                           )}
                           {tab === "posicao" && <BarrasPosicao rows={filteredRows} byPosition={byPosition} ordem={1} />}
