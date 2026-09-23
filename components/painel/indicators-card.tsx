@@ -2,10 +2,10 @@
 
 import { Activity, BookOpen, Flame, Percent, Target, Trophy } from "lucide-react";
 import { MAX_LEVEL, xpForNextLevel, type Progress } from "@/lib/services/xp-service";
-import { nivelDoScore, type PlayerPerformance } from "@/lib/services/performance-service";
+import type { PlayerPerformance } from "@/lib/services/performance-service";
 import { motion } from "framer-motion";
 import { BarraProgresso, CardHint, EASE, Linha, Numero, PainelCard } from "./painel-card";
-import { ContaGiros, corDoScore } from "./conta-giros";
+import { PentagonoScore } from "./pentagono-score";
 import { InfoHover, type Explicacao } from "./info-hover";
 import { usePainelDados } from "./painel-dados";
 import { num, pct } from "./formato";
@@ -121,7 +121,7 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
 const semPct = (txt: string) => txt.replace(/%$/, "");
 
 // Tamanho do número conforme o comprimento (sem a unidade): o quadro tem
-// largura fixa (2 por linha, ao lado do conta-giros) e um valor longo
+// largura fixa (2 por linha, ao lado do pentágono) e um valor longo
 // passaria por cima do quadro vizinho. Número curto fica grande. Em
 // janela baixa tudo desce um degrau, pro card caber sem barra.
 function tamanhoValor(numero: string): string {
@@ -190,8 +190,8 @@ export function IndicatorsCard({
       ) : score == null && itens.length === 0 ? (
         <CardHint>Os indicadores aparecem assim que você registrar sessões, drills ou mãos.</CardHint>
       ) : (
-        // Conta-giros do Score à esquerda (o número que resume tudo ganha
-        // o maior peso visual) e os outros indicadores 2x2 à direita. No
+        // Pentágono do Score à esquerda (o número que resume tudo ganha o
+        // maior peso visual) e os outros indicadores 2x2 à direita. No
         // celular, um embaixo do outro.
         <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
           <motion.div
@@ -200,27 +200,16 @@ export function IndicatorsCard({
             animate={{ opacity: 1, scale: 1 }}
             transition={{ duration: 0.5, ease: EASE, delay: 0.25 }}
           >
-            <InfoHover explicacao={explicacaoScore(performance)} className="flex min-h-0 flex-1">
-              <Linha className="relative flex min-h-0 w-full flex-1 flex-col items-center justify-center !p-2">
-                <span className="absolute left-3 top-2.5 text-[12px] leading-tight text-muted/80">Score geral</span>
-                <ContaGiros valor={score} />
-                {/* Leitura digital no vão de baixo do arco, como no painel
-                    de um carro: valor grande + nível por extenso. */}
-                <div className="-mt-10 flex flex-col items-center">
-                  <p className="painel-numero tnum text-[30px] font-semibold leading-none tracking-[-0.03em] text-ink xl:[@media(max-height:819px)]:text-[24px]">
-                    {score == null ? "—" : <Numero valor={score} formatar={num} duracao={1500} />}
-                  </p>
-                  <p
-                    className="mt-1 text-[10.5px] font-semibold uppercase tracking-[0.12em]"
-                    style={{ color: score == null ? "#c4c7c8" : corDoScore(score) }}
-                  >
-                    {nivelDoScore(score)}
-                  </p>
-                </div>
-              </Linha>
-            </InfoHover>
+            {/* Pentágono dos 5 pilares do Score: mostra POR QUE o número é
+                esse e aponta o pilar mais fraco com o atalho pro módulo. */}
+            <Linha className="flex min-h-0 w-full flex-1 !p-2.5">
+              <PentagonoScore perf={performance} explicacao={explicacaoScore(performance)} />
+            </Linha>
+            {/* Em janela baixa a faixa do ROI sai pra o pentágono ter
+                altura legível; o ROI segue na Gestão de Banca e dentro da
+                explicação do Score (pilar Performance). */}
             {roi != null && (
-              <InfoHover explicacao={EXPLICACAO_ROI}>
+              <InfoHover explicacao={EXPLICACAO_ROI} className="xl:[@media(max-height:819px)]:hidden">
                 <Linha className="flex items-center justify-between gap-2 !px-3 !py-2">
                   <span className="flex items-center gap-1.5 text-[12px] text-muted/80">
                     <Percent size={13} aria-hidden style={{ color: roi >= 0 ? "#22c55e" : "#e0555a" }} />

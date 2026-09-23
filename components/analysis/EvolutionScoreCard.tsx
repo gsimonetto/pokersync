@@ -8,7 +8,7 @@ import { nivelDoScore, type PlayerPerformance } from "@/lib/services/performance
 // que ao passar o mouse mostre o que contempla aquele valor". Usa o
 // atributo title nativo (mesmo padrão do ScoreRing em components/ui),
 // não uma lib de tooltip nova.
-interface ScoreComponent {
+export interface ScoreComponent {
   key: keyof Pick<
     PlayerPerformance,
     "score_tecnica" | "score_conhecimento" | "score_disciplina" | "score_performance" | "score_consistencia"
@@ -18,7 +18,7 @@ interface ScoreComponent {
   explicacao: string;
 }
 
-const COMPONENTES: ScoreComponent[] = [
+export const COMPONENTES: ScoreComponent[] = [
   {
     key: "score_tecnica",
     label: "Técnica",
