@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Kanban, CheckCircle2, AlertTriangle, ArrowRight, CalendarDays, GitCompare, CalendarCheck } from "lucide-react";
+import { AlertTriangle, CalendarDays, GitCompare, CalendarCheck } from "lucide-react";
 import { EvolutionChart } from "@/components/time/evolution-chart";
 import { TeamHeatmap } from "@/components/time/team-heatmap";
 import { PainelCard } from "@/components/time/painel-card";
-import { AssistenteCoach } from "@/components/time/assistente-coach";
 import { Kpi } from "@/components/time/kpi";
 import { HeroMetric } from "@/components/time/hero-metric";
 import { PeriodSelector } from "@/components/period-selector";
@@ -18,7 +16,6 @@ import {
   type TeamScoreHistoryPoint,
 } from "@/lib/services/team-service";
 import type { TeamEvent } from "@/lib/services/team-calendar-service";
-import { fetchPlayerCards, progressoPronto } from "@/lib/services/team-funnel-service";
 import { BRL, variacao } from "@/lib/format";
 
 // Estatisticas do time. Hierarquia visual:
@@ -32,12 +29,11 @@ import { BRL, variacao } from "@/lib/format";
 // 3. Treino x Revisoes + Comparacao de periodo/Confirmacao de presenca
 //    lado a lado -- a comparacao nao repete XP aqui, ja que mora do
 //    lado do proprio grafico de treino;
-// 4. Assistente do coach por ultimo, largura cheia (Top do periodo foi
-//    removido daqui por pedido explicito -- ranking mora na aba
-//    Jogadores).
+// (O Assistente do coach, que fechava a aba, foi para o AI Coach da tela
+// inicial. Top do periodo foi removido daqui por pedido explicito --
+// ranking mora na aba Jogadores.)
 
 export function TabVisaoGeral({
-  teamId,
   jogadores,
   atividade,
   financeiro,
@@ -48,10 +44,7 @@ export function TabVisaoGeral({
   dias,
   periodos,
   onDiasChange,
-  onAbrirFunil,
-  onErro,
 }: {
-  teamId: string;
   jogadores: TeamDashboardRow[];
   atividade: TeamActivityDay[];
   financeiro: FinancialDay[];
@@ -63,8 +56,6 @@ export function TabVisaoGeral({
   dias: number;
   periodos: { label: string; days: number }[];
   onDiasChange: (dias: number) => void;
-  onAbrirFunil: () => void;
-  onErro: (s: string) => void;
 }) {
   const treinos = jogadores.reduce((a, j) => a + j.treinos, 0);
   const acertos = jogadores.reduce((a, j) => a + j.acertosGto, 0);
@@ -158,7 +149,6 @@ export function TabVisaoGeral({
         </div>
       </section>
 
-      <ResumoFunilMini onAbrirFunil={onAbrirFunil} />
 
       <section className="grid gap-4 lg:grid-cols-2">
         <EvolutionChart
@@ -180,59 +170,13 @@ export function TabVisaoGeral({
         <ComparacaoEPresenca comparacao={comparacao} eventos={eventos} />
       </section>
 
-      <AssistenteCoach teamId={teamId} jogadores={jogadores} onErro={onErro} />
+      {/* O Assistente do coach e o resumo do funil ("prontos"/"com
+          faltas") que ficavam nesta aba foram para o AI Coach da tela
+          inicial -- único lugar com orientações automáticas. */}
     </div>
   );
 }
 
-// ------------------------------------------------------------
-// Espelho compacto do assistente do Kanban — so pra quem abre o painel
-// e fica na Visao Geral sem clicar em Funil. Busca leve (so cards),
-// some sozinho se nao ha nada a mostrar.
-function ResumoFunilMini({ onAbrirFunil }: { onAbrirFunil: () => void }) {
-  const [prontos, setProntos] = useState(0);
-  const [comFaltas, setComFaltas] = useState(0);
-  const [carregado, setCarregado] = useState(false);
-
-  useEffect(() => {
-    fetchPlayerCards()
-      .then((cards) => {
-        setProntos(cards.filter(progressoPronto).length);
-        setComFaltas(cards.filter((c) => c.eventosAusente >= 2).length);
-      })
-      .catch(() => {})
-      .finally(() => setCarregado(true));
-  }, []);
-
-  if (!carregado || (prontos === 0 && comFaltas === 0)) return null;
-
-  return (
-    <button
-      onClick={onAbrirFunil}
-      className="flex w-full flex-wrap items-center gap-3 rounded-xl border border-hairline bg-surface px-4 py-3 text-left transition-colors hover:border-ink/30"
-    >
-      <Kanban size={16} className="shrink-0 text-muted" />
-      <span className="text-[13px] text-muted">No funil:</span>
-      {prontos > 0 && (
-        <span className="flex items-center gap-1 text-[13px] font-medium text-positive">
-          <CheckCircle2 size={13} /> {prontos} pronto{prontos > 1 ? "s" : ""} pra subir de fase
-        </span>
-      )}
-      {comFaltas > 0 && (
-        <span className="flex items-center gap-1 text-[13px] font-medium text-negative">
-          <AlertTriangle size={13} /> {comFaltas} com faltas
-        </span>
-      )}
-      <ArrowRight size={14} className="ml-auto shrink-0 text-muted" />
-    </button>
-  );
-}
-
-// ------------------------------------------------------------
-// Comparação de período (atual vs anterior) e confirmação de presença
-// nos eventos do calendário, juntas no mesmo card -- fica ao lado do
-// gráfico de Treino x Revisões, entao a comparação aqui não repete a
-// info de XP que já aparece no gráfico ao lado.
 // ------------------------------------------------------------
 function ComparacaoEPresenca({ comparacao, eventos }: { comparacao: PeriodComparison | null; eventos: TeamEvent[] }) {
   const temComparacao = comparacao && (comparacao.treinosAnterior > 0 || comparacao.treinosAtual > 0);

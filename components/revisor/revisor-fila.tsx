@@ -1,12 +1,10 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, resetRevisorRadarImports, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
-import { LeaksCard } from "./leaks-card";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -54,7 +52,6 @@ export function RevisorFila({
   filterLabel?: string;
   onClearFilter?: () => void;
 }) {
-  const router = useRouter();
   const confirm = useConfirm();
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("sessoes");
@@ -286,15 +283,6 @@ export function RevisorFila({
     } catch {
       setError("Erro ao excluir.");
     }
-  }
-
-  // Leva pro Modo Treino ja filtrado pela sugestao vinculada ao leak.
-  // drill_id aqui e' o id de hand_review_drill_suggestions (confirmado na
-  // definicao da RPC suggest_drills_for_user) — e' o que /treino espera.
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  function handlePractice(leak: any) {
-    if (!leak?.drill_id) return;
-    router.push(`/treino?suggestionId=${leak.drill_id}`);
   }
 
   const filteredSessions = useMemo(() => {
@@ -573,7 +561,8 @@ export function RevisorFila({
             </div>
           )}
 
-          <LeaksCard onPractice={handlePractice} />
+          {/* O card "Leaks recorrentes" (Leak Finder) que ficava aqui foi
+              para o AI Coach da tela inicial, com o mesmo botão "Treinar". */}
 
           {loading ? (
             <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
