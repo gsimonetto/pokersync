@@ -11,33 +11,35 @@ import { useLargura, useTamanho } from "./usar-largura";
 
 // Tendência semana a semana -- responde "estou corrigindo o leak ou
 // piorando?". Dá pra trocar a métrica (VPIP e PFR juntos, 3-Bet, roubo
-// de blinds, c-bet). Em VPIP e PFR, a faixa entre as duas linhas fica
+// de blinds, c-bet, fold to c-bet, ida ao showdown). Em VPIP e PFR, a faixa entre as duas linhas fica
 // sombreada: é o quanto você entra só pagando. Embaixo, uma faixinha de
 // barras com as mãos de cada semana (gráfico separado, mesmo eixo de
 // datas -- nunca um segundo eixo Y no mesmo gráfico).
 //
 // Semana com menos de MIN_SEMANA mãos fica de fora (um ponto com 5 mãos só
 // faria a linha pular sem motivo). Nas métricas que dependem de uma
-// situação (roubo, c-bet), a semana com menos de MIN_SITUACAO chances fica
+// situação (roubo, c-bet, fold to c-bet, showdown), a semana com menos de MIN_SITUACAO chances fica
 // sem ponto. Últimas 12 semanas com dado.
 
 const MIN_SEMANA = 20;
 const MIN_SITUACAO = 5;
-// Altura mínima (estica se o card ao lado for mais alto).
-const ALTURA_MIN = 280;
-const ALTURA_VOLUME = 34;
+// Compacto de propósito: é a leitura de direção, não o gráfico principal.
+const ALTURA_MIN = 190;
+const ALTURA_VOLUME = 26;
 const M = { t: 12, r: 44, b: 26, l: 34 };
 
-type Metrica = "vpfr" | "3bet" | "roubo" | "cbet";
+type Metrica = "vpfr" | "3bet" | "roubo" | "cbet" | "foldcbet" | "sd";
 const METRICAS: { valor: Metrica; rotulo: string }[] = [
   { valor: "vpfr", rotulo: "VPIP e PFR" },
   { valor: "3bet", rotulo: "3-Bet" },
   { valor: "roubo", rotulo: "Roubo" },
   { valor: "cbet", rotulo: "C-bet" },
+  { valor: "foldcbet", rotulo: "Fold to c-bet" },
+  { valor: "sd", rotulo: "Showdown" },
 ];
 
 type Conta = { sim: number; base: number };
-type Semana = { inicio: Date; n: number; vpip: Conta; pfr: Conta; tresBet: Conta; roubo: Conta; cbet: Conta };
+type Semana = { inicio: Date; n: number; vpip: Conta; pfr: Conta; tresBet: Conta; roubo: Conta; cbet: Conta; foldCbet: Conta; sd: Conta };
 
 function inicioDaSemana(d: Date): Date {
   const x = new Date(d.getFullYear(), d.getMonth(), d.getDate());
@@ -54,6 +56,8 @@ const nova = (inicio: Date): Semana => ({
   tresBet: { sim: 0, base: 0 },
   roubo: { sim: 0, base: 0 },
   cbet: { sim: 0, base: 0 },
+  foldCbet: { sim: 0, base: 0 },
+  sd: { sim: 0, base: 0 },
 });
 
 function porSemana(rows: AnalysisHandRow[]): Semana[] {
@@ -72,9 +76,19 @@ function porSemana(rows: AnalysisHandRow[]): Semana[] {
       s.roubo.base += 1;
       if (r.stealAttempt) s.roubo.sim += 1;
     }
-    if (r.isPreflopAggressor === true && r.cbetFlop !== null) {
+    // Pós-flop: base = as vezes em que a situação aconteceu (histórico).
+    const p = r.posflop;
+    if (p?.cbet.flop != null) {
       s.cbet.base += 1;
-      if (r.cbetFlop) s.cbet.sim += 1;
+      if (p.cbet.flop) s.cbet.sim += 1;
+    }
+    if (p?.respostaCbet.flop != null) {
+      s.foldCbet.base += 1;
+      if (p.respostaCbet.flop === "fold") s.foldCbet.sim += 1;
+    }
+    if (p?.viu.flop) {
+      s.sd.base += 1;
+      if (r.wentToShowdown) s.sd.sim += 1;
     }
     mapa.set(ini.getTime(), s);
   }
@@ -100,7 +114,9 @@ function series(semanas: Semana[], m: Metrica): Serie[] {
   if (m === "vpfr") return [s("vpip", "VPIP", COR_VPIP, (x) => x.vpip), s("pfr", "PFR", COR_PFR, (x) => x.pfr)];
   if (m === "3bet") return [s("3bet", "3-Bet", COR_UNICA, (x) => x.tresBet)];
   if (m === "roubo") return [s("roubo", "Roubo", COR_UNICA, (x) => x.roubo, MIN_SITUACAO)];
-  return [s("cbet", "C-bet no flop", COR_UNICA, (x) => x.cbet, MIN_SITUACAO)];
+  if (m === "cbet") return [s("cbet", "C-bet no flop", COR_UNICA, (x) => x.cbet, MIN_SITUACAO)];
+  if (m === "foldcbet") return [s("foldcbet", "Fold to c-bet no flop", COR_UNICA, (x) => x.foldCbet, MIN_SITUACAO)];
+  return [s("sd", "Vai ao showdown (dos flops vistos)", COR_UNICA, (x) => x.sd, MIN_SITUACAO)];
 }
 
 export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: AnalysisHandRow[]; referenceProfile: ReferenceProfile; ordem?: number }) {
@@ -171,7 +187,7 @@ export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: Anal
         ) : (
           <>
             <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
-              <div role="tablist" aria-label="Métrica" className="flex rounded-full border border-white/10 bg-white/[0.03] p-0.5">
+              <div role="tablist" aria-label="Métrica" className="flex max-w-full overflow-x-auto rounded-full border border-white/10 bg-white/[0.03] p-0.5 [scrollbar-width:none]">
                 {METRICAS.map((m) => {
                   const ativo = m.valor === metrica;
                   return (
@@ -181,7 +197,7 @@ export function LinhaSemanal({ rows, referenceProfile, ordem = 0 }: { rows: Anal
                       role="tab"
                       aria-selected={ativo}
                       onClick={() => setMetrica(m.valor)}
-                      className={`relative rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors ${ativo ? "text-black" : "text-muted hover:text-ink"}`}
+                      className={`relative shrink-0 whitespace-nowrap rounded-full px-3 py-1 text-[11.5px] font-semibold transition-colors ${ativo ? "text-black" : "text-muted hover:text-ink"}`}
                     >
                       {ativo && (
                         <motion.span layoutId="semana-metrica" className="absolute inset-0 rounded-full bg-[#d4af37]" transition={{ type: "spring", stiffness: 420, damping: 34 }} />

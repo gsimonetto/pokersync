@@ -115,12 +115,16 @@ export function TopNav() {
           logo/icones "recuados" enquanto o corpo da pagina foi esticado
           ate a borda pra matar o espaco vazio nas laterais em telas
           largas, dando a impressao de margem desalinhada. */}
-      <div className="flex h-16 sm:h-18 items-center justify-between gap-4 px-4 sm:px-6">
-        <Link href="/modulos" aria-label="Ir para Módulos" className="shrink-0">
-          <Logo className="h-8 w-auto sm:h-10" />
+      {/* No celular (abaixo de sm) tudo aperta um pouco -- logo menor,
+          ícones de 32px com 2px entre eles, menos respiro nas bordas -- pra
+          caber em 360px sem rolagem lateral (se ainda faltar espaço, o logo
+          encolhe sem deformar). No computador nada muda. */}
+      <div className="flex h-16 sm:h-18 items-center justify-between gap-2 px-3 sm:gap-4 sm:px-6">
+        <Link href="/modulos" aria-label="Ir para Módulos" className="min-w-0 shrink">
+          <Logo className="h-7 w-auto object-contain object-left sm:h-10" />
         </Link>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex shrink-0 items-center gap-0.5 sm:gap-1.5">
           {TABS.map((tab) => {
             const isActive = pathname === tab.href;
             const Icon = tab.icon;
@@ -131,7 +135,7 @@ export function TopNav() {
                 aria-current={isActive ? "page" : undefined}
                 aria-label={tab.label}
                 title={tab.label}
-                className={`grid size-9 place-items-center rounded-lg transition-colors ${
+                className={`grid size-8 place-items-center rounded-lg transition-colors sm:size-9 ${
                   isActive ? "bg-white/[0.08] text-ink" : "text-muted hover:bg-white hover:text-void"
                 }`}
               >
@@ -148,7 +152,7 @@ export function TopNav() {
               aria-current={pathname === "/planos" ? "page" : undefined}
               aria-label="Planos"
               title="Planos"
-              className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
+              className={`grid size-8 place-items-center rounded-lg text-[#E8B93C] transition-colors sm:size-9 hover:bg-[#E8B93C]/10 ${
                 pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
               }`}
             >
@@ -160,7 +164,7 @@ export function TopNav() {
               aria-current={pathname === "/minha-conta" ? "page" : undefined}
               aria-label="Meu Plano"
               title="Meu Plano"
-              className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
+              className={`grid size-8 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void sm:size-9 ${
                 pathname === "/minha-conta" ? "text-ink" : "text-muted"
               }`}
             >
@@ -172,7 +176,7 @@ export function TopNav() {
             <button
               type="button"
               onClick={() => toggle("notifications")}
-              className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
+              className="relative grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void sm:size-9"
               aria-label="Notificações"
             >
               <Bell className="size-[18px]" />
@@ -189,7 +193,7 @@ export function TopNav() {
             <button
               type="button"
               onClick={() => toggle("help")}
-              className="grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
+              className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void sm:size-9"
               aria-label="Ajuda"
             >
               <CircleHelp className="size-[18px]" />
@@ -201,7 +205,7 @@ export function TopNav() {
             <button
               type="button"
               onClick={() => toggle("profile")}
-              className="ml-1.5 flex items-center gap-2 rounded-full border border-hairline bg-white/[0.04] py-1 pl-1 pr-2.5 transition-colors hover:bg-white/[0.08]"
+              className="ml-1 flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.04] py-1 pl-1 pr-1.5 transition-colors hover:bg-white/[0.08] sm:ml-1.5 sm:gap-2 sm:pr-2.5"
               aria-label="Perfil"
             >
               <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={34} />

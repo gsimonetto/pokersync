@@ -15,6 +15,9 @@ import {
   type TournamentMetrics,
   type ReferenceProfile,
   type BuyinBucket,
+  type PosflopDaMao,
+  type RespostaAposta,
+  type RuaPosflop,
   HERO_POSITION_ORDER,
   PREFLOP_ACTION_TO_POT_TYPE,
 } from "@/types/analysis";
@@ -189,6 +192,92 @@ function contextoPreflop(parsed: any): ContextoPreflop {
   };
 }
 
+// Pós-flop a partir do histórico. Regras (mesmas dos trackers):
+// - c-bet: o agressor pré-flop aposta primeiro na rua, sem ninguém ter
+//   apostado antes dele; turn/river só contam se ele apostou nas ruas
+//   anteriores (2º e 3º tiro).
+// - enfrentar c-bet: o agressor pré-flop (outro jogador) faz a primeira
+//   aposta da rua, com a linha dele viva; vale a PRÓXIMA ação do herói.
+// - donk: herói sem a iniciativa, age antes do agressor no flop e aposta.
+// - check-raise: herói dá check, alguém aposta, herói aumenta.
+// "allin" conta como aposta/aumento.
+const RUAS: RuaPosflop[] = ["flop", "turn", "river"];
+const agressiva = (a: string) => a === "bets" || a === "raises" || a === "allin";
+const resposta = (a: string | undefined): RespostaAposta | null =>
+  a === "folds" ? "fold" : a === "calls" ? "call" : a && agressiva(a) ? "raise" : null;
+
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+function contextoPosflop(parsed: any): PosflopDaMao | null {
+  const heroi: string | null = parsed?.heroName ?? null;
+  const ruas: { name: string; board?: string[]; actions?: AcaoParseada[] }[] = Array.isArray(parsed?.streets) ? parsed.streets : [];
+  if (!heroi || ruas.length === 0) return null;
+  const acoesDe = (nome: string) =>
+    (ruas.find((r) => r.name === nome)?.actions ?? []).filter((a) => a.action !== "uncalled_return" && a.action !== "posts");
+  const temRua = (nome: string) => ruas.some((r) => r.name === nome);
+
+  const pre = acoesDe("preflop");
+  const raisesPre = pre.filter((a) => agressiva(a.action));
+  const agressor = raisesPre.length ? raisesPre[raisesPre.length - 1].player : null;
+  const heroiAgressor = agressor === heroi;
+  let foldou = pre.some((a) => a.player === heroi && a.action === "folds");
+
+  const viu = { flop: false, turn: false, river: false };
+  const cbet: PosflopDaMao["cbet"] = { flop: null, turn: null, river: null };
+  const respostaCbet: PosflopDaMao["respostaCbet"] = { flop: null, turn: null, river: null };
+  const checkRaise: PosflopDaMao["checkRaise"] = { flop: null, turn: null, river: null };
+  let donk: boolean | null = null;
+  let linhaHeroi = heroiAgressor;
+  let linhaVilao = !!agressor && !heroiAgressor;
+
+  for (const rua of RUAS) {
+    if (!temRua(rua) || foldou) {
+      linhaHeroi = linhaVilao = false;
+      continue;
+    }
+    viu[rua] = true;
+    const acoes = acoesDe(rua);
+    const iHeroi = acoes.findIndex((a) => a.player === heroi);
+    const iAposta = acoes.findIndex((a) => agressiva(a.action));
+
+    // Herói como agressor: c-bet / 2º / 3º tiro.
+    if (linhaHeroi && iHeroi >= 0 && (iAposta < 0 || iAposta >= iHeroi)) {
+      cbet[rua] = agressiva(acoes[iHeroi].action);
+    }
+    linhaHeroi = cbet[rua] === true;
+
+    // Agressor pré-flop (outro) apostando: o que o herói fez em seguida.
+    // Só conta se ninguém aumentou no meio (aí o herói já responde a um
+    // raise, não à c-bet).
+    if (linhaVilao && iAposta >= 0 && acoes[iAposta].player === agressor) {
+      const iResp = acoes.findIndex((a, i) => i > iAposta && a.player === heroi);
+      const raiseNoMeio = iResp > 0 && acoes.slice(iAposta + 1, iResp).some((a) => agressiva(a.action));
+      if (iResp > 0 && !raiseNoMeio) respostaCbet[rua] = resposta(acoes[iResp].action);
+    }
+    linhaVilao = linhaVilao && iAposta >= 0 && acoes[iAposta].player === agressor;
+
+    // Donk: só no flop, sem a iniciativa, agindo antes do agressor.
+    if (rua === "flop" && agressor && !heroiAgressor && iHeroi >= 0) {
+      const iAgressor = acoes.findIndex((a) => a.player === agressor);
+      if (iAgressor > iHeroi && (iAposta < 0 || iAposta >= iHeroi)) donk = agressiva(acoes[iHeroi].action);
+    }
+
+    // Check-raise: check, alguém aposta, e a próxima ação do herói.
+    if (iHeroi >= 0 && acoes[iHeroi].action === "checks") {
+      const iBetDepois = acoes.findIndex((a, i) => i > iHeroi && agressiva(a.action));
+      if (iBetDepois >= 0) {
+        const prox = acoes.slice(iBetDepois + 1).find((a) => a.player === heroi);
+        if (prox) checkRaise[rua] = agressiva(prox.action);
+      }
+    }
+
+    if (acoes.some((a) => a.player === heroi && a.action === "folds")) foldou = true;
+  }
+
+  const flopRua = ruas.find((r) => r.name === "flop");
+  const flop = Array.isArray(flopRua?.board) && flopRua!.board!.length >= 3 ? flopRua!.board!.slice(0, 3) : null;
+  return { viu, heroiAgressor, cbet, respostaCbet, donk, checkRaise, flop };
+}
+
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToAnalysisHand(r: any): AnalysisHandRow {
   const hr = r.hand_reviews;
@@ -244,6 +333,7 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
     reSteal: r.re_steal,
     squeeze: r.squeeze,
     ...contextoPreflop(parsed),
+    posflop: contextoPosflop(parsed),
   };
 }
 
@@ -405,45 +495,51 @@ export function computeMetricTrend(rows: AnalysisHandRow[], metricFn: (subset: A
 // ============================================================
 // Postflop
 // ============================================================
+// Cada % usa como base só as mãos em que a situação ACONTECEU (lido do
+// histórico, ver contextoPosflop). Antes a base eram todas as mãos do
+// agressor/não-agressor -- inclusive as que nem viram o flop --, o que
+// derrubava c-bet, fold to c-bet, donk, check-raise e ida ao showdown.
 export function computePostflopMetrics(rows: AnalysisHandRow[]): PostflopMetrics {
-  const pfaHands = rows.filter((r) => r.isPreflopAggressor === true);
-  const nonPfaHands = rows.filter((r) => r.isPreflopAggressor === false);
-  // fold_to_cbet_* já é nullable de verdade (null = não enfrentou c-bet
-  // naquela rua) — "!== null" aqui é o gate certo, ao contrário dos
-  // campos de oportunidade do preflop (ver computePreflopMetrics).
-  const facedCbetFlop = rows.filter((r) => r.foldToCbetFlop !== null);
-  const facedCbetTurn = rows.filter((r) => r.foldToCbetTurn !== null);
-  const facedCbetRiver = rows.filter((r) => r.foldToCbetRiver !== null);
+  const com = rows.filter((r) => r.posflop != null);
+  const taxaSim = (lista: (boolean | null)[]) => {
+    const base = lista.filter((v) => v !== null);
+    return pct(base.filter((v) => v === true).length, base.length);
+  };
+  const cbet = (rua: RuaPosflop) => taxaSim(com.map((r) => r.posflop!.cbet[rua]));
+  const foldCbet = (rua: RuaPosflop) => {
+    const base = com.map((r) => r.posflop!.respostaCbet[rua]).filter((v) => v !== null);
+    return pct(base.filter((v) => v === "fold").length, base.length);
+  };
+  const checkRaise = (rua: RuaPosflop) => taxaSim(com.map((r) => r.posflop!.checkRaise[rua]));
 
   const betRaise = rows.reduce((acc, r) => acc + (r.postflopBetCount ?? 0) + (r.postflopRaiseCount ?? 0), 0);
   const calls = rows.reduce((acc, r) => acc + (r.postflopCallCount ?? 0), 0);
   const folds = rows.reduce((acc, r) => acc + (r.postflopFoldCount ?? 0), 0);
 
-  // W$SD% usa como base as mãos que REALMENTE chegaram a showdown
-  // (wentToShowdown === true) — WSD% em si usa todas as mãos jogadas
-  // como base, convenção padrão de mercado (não é "oportunidade", é taxa
-  // sobre o volume total).
-  const reachedShowdown = rows.filter((r) => r.wentToShowdown === true);
+  // WTSD = das vezes que viu o flop, quantas foi ao showdown (convenção
+  // HM3/PT4); W$SD = dos showdowns, quantos ganhou.
+  const viuFlop = com.filter((r) => r.posflop!.viu.flop);
+  const reachedShowdown = viuFlop.filter((r) => r.wentToShowdown === true);
 
   return {
     hands: rows.length,
-    cbet_flop_pct: pct(countIf(pfaHands, (r) => r.cbetFlop), pfaHands.length),
-    cbet_turn_pct: pct(countIf(pfaHands, (r) => r.cbetTurn), pfaHands.length),
-    cbet_river_pct: pct(countIf(pfaHands, (r) => r.cbetRiver), pfaHands.length),
-    fold_to_cbet_flop_pct: pct(countIf(facedCbetFlop, (r) => r.foldToCbetFlop), facedCbetFlop.length),
-    fold_to_cbet_turn_pct: pct(countIf(facedCbetTurn, (r) => r.foldToCbetTurn), facedCbetTurn.length),
-    fold_to_cbet_river_pct: pct(countIf(facedCbetRiver, (r) => r.foldToCbetRiver), facedCbetRiver.length),
-    check_raise_flop_pct: pct(countIf(nonPfaHands, (r) => r.checkRaiseFlop), nonPfaHands.length),
-    check_raise_turn_pct: pct(countIf(nonPfaHands, (r) => r.checkRaiseTurn), nonPfaHands.length),
-    check_raise_river_pct: pct(countIf(nonPfaHands, (r) => r.checkRaiseRiver), nonPfaHands.length),
-    donk_bet_pct: pct(countIf(nonPfaHands, (r) => r.donkBetFlop), nonPfaHands.length),
+    cbet_flop_pct: cbet("flop"),
+    cbet_turn_pct: cbet("turn"),
+    cbet_river_pct: cbet("river"),
+    fold_to_cbet_flop_pct: foldCbet("flop"),
+    fold_to_cbet_turn_pct: foldCbet("turn"),
+    fold_to_cbet_river_pct: foldCbet("river"),
+    check_raise_flop_pct: checkRaise("flop"),
+    check_raise_turn_pct: checkRaise("turn"),
+    check_raise_river_pct: checkRaise("river"),
+    donk_bet_pct: taxaSim(com.map((r) => r.posflop!.donk)),
     // AF = (bet+raise) / call. Com 0 calls o AF tradicionalmente não tem
     // teto definido — fica null em vez de Infinity/0 fabricado.
     aggression_factor: calls > 0 ? Math.round((betRaise / calls) * 100) / 100 : null,
     // AFq = (bet+raise) / (bet+raise+call+fold) — convenção HM3/PT4,
     // checks ficam fora do denominador (não são decisão de apostar).
     aggression_frequency_pct: pct(betRaise, betRaise + calls + folds),
-    wsd_pct: pct(reachedShowdown.length, rows.length),
+    wsd_pct: pct(reachedShowdown.length, viuFlop.length),
     wsd_won_pct: pct(countIf(reachedShowdown, (r) => r.wonShowdown), reachedShowdown.length),
   };
 }

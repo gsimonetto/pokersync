@@ -43,10 +43,11 @@ const pctDe = (a: number, b: number) => (b > 0 ? (a / b) * 100 : null);
 const fmt = (v: number | null) => (v == null ? "—" : `${Math.round(v)}%`);
 
 function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
-  const agressor = rows.filter((r) => r.isPreflopAggressor === true && r.cbetFlop !== null);
-  const cbet = agressor.filter((r) => r.cbetFlop === true);
-  const chegouTurn = cbet.filter((r) => r.doubleBarrel !== null);
-  const segundo = chegouTurn.filter((r) => r.doubleBarrel === true);
+  // Base = chances reais (histórico da mão), não todas as mãos do agressor.
+  const agressor = rows.filter((r) => r.posflop?.cbet.flop != null);
+  const cbet = agressor.filter((r) => r.posflop!.cbet.flop === true);
+  const chegouTurn = rows.filter((r) => r.posflop?.cbet.turn != null);
+  const segundo = chegouTurn.filter((r) => r.posflop!.cbet.turn === true);
   const vpipN = rows.filter((r) => r.vpip).length;
   const pfrN = rows.filter((r) => r.pfr).length;
   return [
