@@ -5,7 +5,6 @@ import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowUpRight } from "lucide-react";
 import { EASE } from "./painel-card";
-import { fonteNumeros } from "./fonte-numeros";
 
 // Explicação de um número ao passar o mouse (ou focar pelo teclado):
 // "o que é" e "de onde vem". Pedido explícito pros indicadores da tela
@@ -112,7 +111,7 @@ export function InfoHover({
                 animate={{ opacity: 1, y: 0, scale: 1 }}
                 exit={{ opacity: 0, y: pos.acima ? 4 : -4, scale: 0.98 }}
                 transition={{ duration: 0.18, ease: EASE }}
-                className={`${fonteNumeros.variable} pointer-events-none fixed z-[70] rounded-xl border border-white/10 bg-[#141414]/95 p-3.5 text-left shadow-2xl shadow-black/60 backdrop-blur-md`}
+                className={`pointer-events-none fixed z-[70] rounded-xl border border-white/10 bg-[#141414]/95 p-3.5 text-left shadow-2xl shadow-black/60 backdrop-blur-md`}
                 style={pos.acima ? { left: pos.x, bottom: pos.y, width: LARGURA } : { left: pos.x, top: pos.y, width: LARGURA }}
               >
                 <p className="text-[13px] font-semibold text-ink">{explicacao.titulo}</p>
@@ -122,7 +121,7 @@ export function InfoHover({
                     {explicacao.itens.map((it) => (
                       <li key={it.rotulo} className="flex items-center justify-between gap-3 text-[11.5px]">
                         <span className="text-muted">{it.rotulo}</span>
-                        <span className="painel-numero tnum font-medium text-ink/90">{it.valor}</span>
+                        <span className="tnum font-medium text-ink/90">{it.valor}</span>
                       </li>
                     ))}
                   </ul>
