@@ -38,9 +38,22 @@ import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-par
 import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility";
 import { computeHandEv, fetchHandEvResult, type HandEvResult } from "@/lib/services/hand-ev-service";
 import { CoachThread } from "./coach-thread";
+import { ResumoDaMao } from "./resumo-da-mao";
 import { ShareHandModal } from "./share-hand-modal";
 
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
+
+// Ruas em que o heroi DECIDIU alguma coisa (acao alem de blind/ante) --
+// so' essas pedem avaliacao. All-in no pre-flop, fold no pre-flop etc.
+// deixam flop/turn/river de fora (o board ate' sai, mas nao ha decisao
+// sua pra avaliar). Pre-flop sempre conta. Sem hand history: as 4.
+function ruasComDecisao(mao: ParsedHand | null): string[] {
+  if (!mao?.heroName || !mao.streets) return [...STREETS];
+  const comAcao = new Set(
+    mao.streets.filter((st) => st.actions.some((a) => a.player === mao.heroName && a.action !== "posts")).map((st) => st.name)
+  );
+  return STREETS.filter((s, i) => i === 0 || comAcao.has(s));
+}
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
 
 export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack: () => void }) {
@@ -166,37 +179,35 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       setLearning(r.learning_note || "");
       setDrill(r.drill_suggestion || "");
 
-      if (r.parsed_data?.kind === "parsed") {
-        setParsedHandForTable(r.parsed_data as ParsedHand);
-        setObjectiveVerdict(r.parsed_data.objectiveVerdict ?? null);
-        if (findEligibleAllInConfrontation(r.parsed_data as unknown as ParsedHand)) {
-          fetchHandEvResult(reviewId)
-            .then(setEvResult)
-            .catch(() => {});
-        }
-      } else if (r.hand_history) {
+      // Reparseia o hand history bruto quando existe (mesma regra da tela
+      // da sessao: correcoes do parser chegam nas maos ja importadas) e so'
+      // cai no parsed_data salvo quando nao ha texto.
+      let mao: ParsedHand | null = null;
+      if (r.hand_history) {
         try {
-          const parsed = parseHand(r.hand_history);
-          setParsedHandForTable(parsed);
+          mao = parseHand(r.hand_history);
         } catch (e) {
-          setParsedHandForTable(null);
           if (!(e instanceof HandParseError)) {
             console.warn("[RevisorDetalhe] hand history nao parseavel:", e);
           }
         }
-        setObjectiveVerdict(null);
-      } else {
-        setParsedHandForTable(null);
-        setObjectiveVerdict(null);
+      }
+      if (!mao && r.parsed_data?.kind === "parsed") mao = r.parsed_data as ParsedHand;
+      setParsedHandForTable(mao);
+      setObjectiveVerdict(r.parsed_data?.kind === "parsed" ? r.parsed_data.objectiveVerdict ?? null : null);
+      if (mao && findEligibleAllInConfrontation(mao)) {
+        fetchHandEvResult(reviewId)
+          .then(setEvResult)
+          .catch(() => {});
       }
 
       const existing = r.answers || [];
       const questions = existing.length
         ? existing.map((a) => ({ question: a.question, answer: a.answer || "" }))
-        : suggestGuidedQuestions(
-            r.tags,
-            r.parsed_data?.kind === "parsed" ? { board: r.parsed_data.board, heroPosition: r.parsed_data.heroPosition } : null
-          ).map((q) => ({ question: q, answer: "" }));
+        : suggestGuidedQuestions(r.tags, mao ? { board: mao.board, heroPosition: mao.heroPosition } : null).map((q) => ({
+            question: q,
+            answer: "",
+          }));
       setQas(questions);
       setReviewTagIds(r.tags.map((t) => t.id));
 
@@ -216,6 +227,14 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
               : { street: s, self_rating: "", reason_code: "", notes: "" };
           })
         );
+      }
+      // Rua sem decisao sua (a mao acabou antes, ou voce ja estava
+      // all-in) entra como "N/A" sozinha -- a tela nem mostra o cartao
+      // dela, e a "avaliacao completa" passa a depender so' das ruas em
+      // que voce agiu.
+      if (mao) {
+        const jogadas = ruasComDecisao(mao);
+        setStreetEvals((prev) => prev.map((e) => (!jogadas.includes(e.street) && !e.self_rating ? { ...e, self_rating: "nao_se_aplica" } : e)));
       }
 
       const urls = await Promise.all(r.images.map((im) => getThumbUrl(im.storage_path)));
@@ -394,7 +413,30 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   if (loading) return <p className="text-muted">Carregando…</p>;
   if (!review) return <p className="text-muted">Mão não encontrada.</p>;
 
-  const answeredCount = qas.filter((q) => q.answer.trim()).length;
+  const ruasJogadas = ruasComDecisao(parsedHandForTable);
+  const perguntasVisiveis = qas.filter((_, i) => i >= STREETS.length || ruasJogadas.includes(STREETS[i]));
+  const answeredCount = perguntasVisiveis.filter((q) => q.answer.trim()).length;
+  // Sugestao automatica de drill (em vez de so' um campo de texto em
+  // branco): posicao + stack do heroi viram um atalho pro Modo Treino
+  // ja no stack certo (?stack=, que o Treino ja entende).
+  const heroSeat = parsedHandForTable?.seats?.find((s) => s.playerName === parsedHandForTable.heroName);
+  const heroStackBb =
+    heroSeat && parsedHandForTable?.bigBlind ? heroSeat.startingChips / parsedHandForTable.bigBlind : null;
+  // Stacks que o Modo Treino cobre (mesma lista dos filtros do drill) --
+  // mao mais funda que o maior deles fica sem sugestao, em vez de mandar
+  // pro Treino um spot que nao existe.
+  const STACKS_DO_TREINO = [10, 15, 20, 25, 30, 40, 50, 60];
+  const stackDoTreino =
+    heroStackBb != null && heroStackBb <= 65
+      ? STACKS_DO_TREINO.reduce((melhor, st) => (Math.abs(st - heroStackBb) < Math.abs(melhor - heroStackBb) ? st : melhor))
+      : null;
+  const drillAuto =
+    stackDoTreino != null && parsedHandForTable?.heroPosition
+      ? {
+          texto: `Decisões pré-flop do ${parsedHandForTable.heroPosition} com ${stackDoTreino} bb`,
+          href: `/treino?stack=${stackDoTreino}`,
+        }
+      : null;
   const canConclude = learning.trim().length > 0;
   // Fluxo unificado de autoavaliacao (rating + pergunta guiada por street,
   // sem modal): a street aberta e' a escolha manual do jogador (openIdx),
@@ -411,10 +453,14 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   // padding p-4->p-3, margens mb-3.5->mb-2.5, chips e textarea menores.
   // Objetivo: sobrar mais espaco visual pra coluna da mesa, que ficou
   // maior (ver grid abaixo).
-  const secondaryContent = (
+  // Duas colunas no computador (pedido: "Analisar mão" era uma coluna
+  // comprida so'): a MAO a esquerda (resumo legivel, prints, EV/ICM) e a
+  // AVALIACAO a direita (ruas, aprendizado, drill, botoes). No celular
+  // vira uma coluna, com a mao primeiro.
+  const colunaMao = (
     <>
       {imgUrls.length > 0 && (
-        <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
+        <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
           <h3 className="m-0 text-sm font-semibold text-ink">Prints</h3>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {imgUrls.map(
@@ -431,7 +477,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       )}
 
       {parsedHandForTable && findEligibleAllInConfrontation(parsedHandForTable) && (
-        <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
+        <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
           <div className="mb-2 flex items-center gap-2">
             <Gauge size={15} className="icon-glow text-review" />
             <h3 className="m-0 text-sm font-semibold text-ink">EV/ICM desse all-in</h3>
@@ -550,6 +596,11 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </section>
       )}
 
+    </>
+  );
+
+  const colunaAvaliacao = (
+    <>
       {/* Fluxo unificado (pedido explicito): antes eram tres pecas soltas
           -- rating por street aqui, perguntas guiadas atras de um botao que
           abria modal, compartilhar com coach atras de outro botao com
@@ -561,27 +612,31 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           enviar ao coach aparece no final, depois que as 4 streets tem
           nota -- e' a conclusao natural do fluxo, nao mais uma acao solta
           no cabecalho. */}
-      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
+      <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
         <div className="mb-2 flex items-center justify-between gap-2">
           <div className="flex items-center gap-2">
             <Scale size={15} className="icon-glow text-review" />
             <h3 className="m-0 text-sm font-semibold text-ink">Avaliação por street</h3>
           </div>
-          {qas.length > 0 && (
+          {perguntasVisiveis.length > 0 && (
             <span className="text-[10.5px] text-muted">
-              {answeredCount}/{qas.length} perguntas
+              {answeredCount}/{perguntasVisiveis.length} perguntas
             </span>
           )}
         </div>
 
         <div className="flex flex-col gap-1.5">
           {streetEvals.map((ev, idx) => {
+            // Rua sem decisao sua nao aparece -- ja entra como "N/A"
+            // sozinha (ver load), em vez de pedir avaliacao de flop numa
+            // mao que terminou (ou foi all-in) no pre-flop.
+            if (!ruasJogadas.includes(ev.street)) return null;
             const isOpen = effectiveOpenIdx === idx;
             const rating = RATINGS.find((r) => r.code === ev.self_rating);
             const question = qas[idx];
 
             return (
-              <div key={ev.street} className="overflow-hidden rounded-lg border border-hairline bg-void">
+              <div key={ev.street} className="painel-bloco overflow-hidden rounded-xl border border-white/5">
                 <button
                   type="button"
                   onClick={() => setOpenIdx(isOpen ? -1 : idx)}
@@ -728,7 +783,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         }}
       />
 
-      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
+      <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
         <div className="mb-2 flex items-center gap-2">
           <Lightbulb size={15} className="icon-glow text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Registro de aprendizado</h3>
@@ -742,16 +797,28 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         />
       </section>
 
-      <section className="mb-2.5 rounded-xl border border-hairline bg-surface p-3">
+      <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
         <div className="mb-2 flex items-center gap-2">
           <Target size={15} className="icon-glow text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Sugestão de drill</h3>
         </div>
+        {drillAuto && (
+          <Link
+            href={drillAuto.href}
+            className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/[0.08] px-3 py-2 text-[12px] text-ink transition hover:border-[#d4af37]/60"
+          >
+            <span className="min-w-0">
+              <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-[#d4af37]">Sugestão automática</span>
+              <span className="block truncate">{drillAuto.texto}</span>
+            </span>
+            <span className="shrink-0 text-[11.5px] font-semibold text-[#d4af37]">Treinar →</span>
+          </Link>
+        )}
         <textarea
           value={drill}
           onChange={(e) => setDrill(e.target.value)}
           rows={2}
-          placeholder="Ex.: BB defense vs BTN open — 20–30bb."
+          placeholder={drillAuto ? "Ou descreva outro spot pra treinar…" : "Ex.: BB defense vs BTN open — 20–30bb."}
           className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
         />
       </section>
@@ -767,7 +834,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           <button
             onClick={() => persist("em_revisao")}
             disabled={saving}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[10px] border border-hairline px-4 py-3 text-sm text-ink disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-ink transition hover:border-white/20 disabled:opacity-50"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
             Salvar rascunho
@@ -775,7 +842,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           <button
             onClick={() => persist("concluida")}
             disabled={saving || !canConclude}
-            className="flex flex-1 items-center justify-center gap-2 rounded-[10px] bg-ink px-4 py-3 text-sm font-semibold text-void disabled:opacity-50"
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#d4af37] px-4 py-3 text-sm font-semibold text-black transition hover:bg-[#e2c35a] disabled:opacity-50"
           >
             {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
             Concluir revisão
@@ -789,7 +856,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
     <div>
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
-          <h2 className="m-0 text-lg text-ink">{review.title || "Mão sem título"}</h2>
+          <h2 className="m-0 text-xl font-semibold tracking-tight text-ink">{review.title || "Mão sem título"}</h2>
           <div className="mt-1.5 flex flex-wrap items-center gap-1">
             {review.tags.map((t) => (
               <span key={t.id} className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
@@ -910,7 +977,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             disabled={savingSpot}
             title={review.saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
             className={`grid h-[34px] w-[34px] shrink-0 place-items-center rounded-lg border transition-colors disabled:opacity-50 ${
-              review.saved ? "border-ink bg-ink text-void" : "border-hairline bg-elevated text-muted hover:border-ink/40 hover:text-ink"
+              review.saved ? "border-ink bg-ink text-void" : "border-white/10 bg-white/[0.04] text-muted hover:border-white/20 hover:text-ink"
             }`}
           >
             <Bookmark size={15} fill={review.saved ? "currentColor" : "none"} />
@@ -925,7 +992,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
               precisa checar isso de antemao. */}
           <button
             onClick={() => setShareModalOpen(true)}
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-ink transition hover:border-white/20"
           >
             <Share2 size={14} />
             Compartilhar
@@ -940,20 +1007,26 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       {/* A mesa visual (RevisorHandTable) saiu daqui de vez -- pedido
           explicito: "no replayer no celular está todo quebrado, acho que
           não precisamos mostrar ali, pode retirar tanto do desktop quanto
-          celular". "Analisar mão" agora sempre mostra o hand history cru
-          + as perguntas guiadas, sem tentar montar a mesa. */}
-      {(review.free_text || review.hand_history) && (
-        <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
-          <h3 className="m-0 text-sm font-semibold text-ink">Contexto</h3>
-          {review.free_text && <p className="mt-2 text-[13px] leading-relaxed text-ink/85">{review.free_text}</p>}
-          {review.hand_history && (
-            <pre className="mt-2.5 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-hairline bg-void p-2.5 font-mono text-[11px] text-muted">
-              {review.hand_history}
-            </pre>
+          celular". No lugar do hand history cru, um resumo legivel da mao
+          (ResumoDaMao); o texto original continua la', recolhido. */}
+      <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
+        <div className="flex min-w-0 flex-col gap-2.5">
+          {parsedHandForTable && <ResumoDaMao hand={parsedHandForTable} historicoBruto={review.hand_history} />}
+          {(review.free_text || (!parsedHandForTable && review.hand_history)) && (
+            <section className="painel-vidro rounded-2xl border border-white/10 p-4">
+              <h3 className="m-0 text-sm font-semibold text-ink">Contexto</h3>
+              {review.free_text && <p className="mt-2 text-[13px] leading-relaxed text-ink/85">{review.free_text}</p>}
+              {!parsedHandForTable && review.hand_history && (
+                <pre className="mt-2.5 max-h-60 overflow-auto whitespace-pre-wrap rounded-lg border border-white/5 bg-black/30 p-2.5 font-mono text-[11px] text-muted">
+                  {review.hand_history}
+                </pre>
+              )}
+            </section>
           )}
-        </section>
-      )}
-      {secondaryContent}
+          {colunaMao}
+        </div>
+        <div className="flex min-w-0 flex-col">{colunaAvaliacao}</div>
+      </div>
 
       {xpFeedback && (
         <div className="fixed bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 flex-col items-center gap-1 rounded-xl bg-positive px-5 py-3 font-semibold text-void shadow-[0_8px_24px_rgba(34,197,94,0.4)]">

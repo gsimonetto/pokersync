@@ -15,6 +15,15 @@ export function TreinoResponsiveStyles() {
       .ps-tr-filters-toggle { display: flex; }
       .ps-tr-filters-backdrop { display: none; }
 
+      /* Range do spot ao lado da mesa: só em tela larga (abaixo disso a
+         mesa precisa da largura toda). */
+      .ps-tr-mesa-grid { grid-template-columns: minmax(0, 1fr); }
+      .ps-tr-range { display: none; }
+      @media (min-width: 1180px) {
+        .ps-tr-mesa-grid { grid-template-columns: minmax(0, 1fr) 270px; }
+        .ps-tr-range { display: flex; }
+      }
+
       /* O aside de filtros sempre teve overflow-y:auto (mais filtros
          cabem do que a coluna de 240px tem altura) -- a barra de rolagem
          nativa do navegador (larga, cinza-clara, com botões de seta no

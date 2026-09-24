@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Lock, Target } from "lucide-react";
 import { RfiJamDrill } from "@/components/drill/rfi-jam-drill";
 import { AppShell } from "@/components/app-shell";
+import { PerfEstilos } from "@/components/performance/perf-estilos";
 import { F } from "@/lib/poker/drill-theme";
 import { fetchSuggestionTarget, fetchTodayTrainingCount } from "@/lib/services/drill-service";
 import { fetchMyPlanId } from "@/lib/services/plan-service";
@@ -156,7 +157,7 @@ function TreinoShell() {
   // py-10 (2.5rem = 40px) do container padrao entra embaixo tambem —
   // sem descontar isso aqui o card calculava altura ate' a base da
   // viewport e o padding inferior nunca aparecia (ficava cortado).
-  const BOTTOM_PADDING_PX = 40;
+  const BOTTOM_PADDING_PX = 24;
 
   useEffect(() => {
     function measure() {
@@ -175,7 +176,16 @@ function TreinoShell() {
     // Margem padrao do app (px-6 py-10, full-width) — consistencia entre
     // todo modulo, entao entra aqui tambem.
     <AppShell>
-    <main className="w-full px-6 py-10">
+    <main className="perf w-full px-4 pb-6 pt-6 text-ink md:px-6">
+    <PerfEstilos />
+    {/* Cabeçalho no padrão das outras telas (Performance, Banca, Time).
+        No celular sai: lá o treino abre direto na mesa cheia. */}
+    <header className="mb-3 hidden flex-col gap-1 md:flex">
+      <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Modo Treino</h1>
+      <p className="text-[12.5px] text-muted">
+        Decisões pré-flop contra a estratégia do GTO. Atalhos: Q, W e E pra jogar · espaço pra próxima mão.
+      </p>
+    </header>
     <div
       ref={pageRef}
       className="ps-treino-page"
@@ -190,18 +200,15 @@ function TreinoShell() {
       }}
     >
       <div
-        className="ps-treino-card"
+        className="ps-treino-card painel-vidro"
         style={{
           width: "100%",
           maxWidth: "100%",
           height: "100%",
           margin: "0 auto",
-          // Antes #050505 -- praticamente identico ao void (#000000) do
-          // resto do app, a margem existia no layout mas era invisivel a
-          // olho nu por falta de contraste. bg-surface (#111111) e' o
-          // mesmo tom que todo outro painel do produto usa contra o void.
-          background: "#111111",
-          borderRadius: 18,
+          // Vidro (painel-vidro) no lugar do #111 chapado -- mesmo card
+          // da Performance/Banca/Time, com os brilhos de fundo da .perf.
+          borderRadius: 24,
           border: "1px solid rgba(255,255,255,0.10)",
           boxShadow: "0 30px 80px rgba(0,0,0,0.7)",
           display: "flex",

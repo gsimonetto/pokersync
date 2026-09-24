@@ -15,7 +15,9 @@ import { projectHandAtStep, HandReplayError, type ReplayState } from "@/lib/poke
 import type { BorderRingConfig } from "@/lib/poker/seat-layout";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
+import { resumoDaMao } from "@/lib/poker/hand-summary";
 import { F, T, num } from "@/lib/poker/drill-theme";
+import { LinhaDoTempo } from "./linha-do-tempo";
 
 // Mesa PERSISTENTE do Revisor de Mãos — decisao de arquitetura (2026-08):
 // "a mesa precisa estar presente a todo momento". Componente proprio,
@@ -66,13 +68,15 @@ function navDockBtnStyle(disabled: boolean): React.CSSProperties {
 
 // Chip estático (não clicável) — mesmo visual do ChipButton, usado pra
 // exibir info (torneio/blinds) em vez de disparar ação.
-function InfoChip({ icon, label }: { icon: React.ReactNode; label: string }) {
+function InfoChip({ icon, label, encolhe = false }: { icon: React.ReactNode; label: string; encolhe?: boolean }) {
   return (
     <div
       className="ps-rv-table-header-chip"
+      title={encolhe ? label : undefined}
       style={{
         display: "flex",
         alignItems: "center",
+        flexShrink: encolhe ? 1 : 0,
         gap: 6,
         fontFamily: F,
         fontSize: 12,
@@ -581,6 +585,10 @@ export function RevisorHandTable({
     return () => window.removeEventListener("keydown", onKey);
   }, [nextStep, prevStep]);
 
+  // Resultado do heroi na mao (bb) -- mostrado na linha do tempo quando a
+  // mao chega ao fim.
+  const resumo = useMemo(() => resumoDaMao(parsedHand), [parsedHand]);
+
   // Link "Treinar esse spot" — so existe quando rua e' postflop, posicao
   // suportada pelos drills, e a situacao preflop foi resolvida com sucesso.
   const trainHref = useMemo(() => {
@@ -657,11 +665,13 @@ export function RevisorHandTable({
   // ao mesmo tempo na mesma tela seria redundante.
   const canSave = !!reviewId && !!onOpenHand;
   const isLastStep = replayState.stepIndex >= replayState.stepCount - 1;
+  const heroPos = replayState.seatLayout.find((s) => s.isHero)?.posLabel ?? null;
 
   return (
     <div style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10, flex: 1, minHeight: 0 }}>
       <div
         ref={cardRef}
+        className={isMobile ? undefined : "painel-vidro"}
         style={
           isMobile
             ? // No celular a mesa vive dentro do portal em tela cheia
@@ -675,7 +685,8 @@ export function RevisorHandTable({
               // aqui tambem, a mesa usa a mesma area util que o Treino.
               { display: "flex", flexDirection: "column", flex: 1, minHeight: 0 }
             : {
-                background: "#050505",
+                // Fundo = vidro (className painel-vidro), igual aos cards
+                // das outras telas -- antes era um preto chapado #050505.
                 borderRadius: 14,
                 border: "1px solid rgba(255,255,255,0.08)",
                 // padding 10 -> 32 (pedido explicito: "diminua um pouco mais
@@ -691,7 +702,11 @@ export function RevisorHandTable({
                 // e' visible; esse respiro extra da espaco pra ele
                 // terminar de aparecer DENTRO desse card, em vez de vazar
                 // pro que vem depois na pagina.
-                padding: "32px 32px 110px",
+                // Topo 32 -> 16: o respiro que os assentos de cima precisam
+                // agora fica ENTRE o cabecalho e a mesa (marginBottom do
+                // cabecalho), onde as cartas deles realmente aparecem --
+                // antes o cabecalho cobria o nome/cartas desses assentos.
+                padding: "16px 32px 110px",
                 // overflow:visible (era "hidden") -- pedido explicito: "tem
                 // algumas informacoes cortadas... pode deixar as cartas
                 // passar da mesa e nome tambem, nao precisa cortar". Sem
@@ -736,12 +751,16 @@ export function RevisorHandTable({
           // pintam por cima dele. position:relative + zIndex acima do
           // maior usado pelos assentos (6, ver Seat acima) garante que
           // esse header sempre fica na frente.
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 10, flexWrap: "wrap", flexShrink: 0, position: "relative", zIndex: 10 }}>
-            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "wrap", minWidth: 0 }}>
+          // Uma linha SO' (nowrap): com o chip de EV/ICM a linha quebrava
+          // em duas e empurrava o controle de navegacao pra cima dos
+          // assentos do topo da mesa. Agora o nome do torneio e' que
+          // encolhe (reticencias) quando falta espaco.
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 44, flexWrap: "nowrap", flexShrink: 0, position: "relative", zIndex: 10 }}>
+            <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
               {onBack && (
                 <ChipButton icon={<ArrowLeft size={13} />} label="Voltar" onClick={onBack} title="Voltar pra fila de mãos" iconOnly />
               )}
-              <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} />
+              <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} encolhe />
               <InfoChip
                 icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
                 label={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`}
@@ -1057,48 +1076,18 @@ export function RevisorHandTable({
 
       {/* No celular, "Treinar esse spot" virou parte do chip de
           navegacao (so' aparece no ultimo passo, ver acima) -- essa
-          linha abaixo da mesa e' so' desktop. */}
+          faixa abaixo da mesa e' so' desktop. Altura FIXA (ver
+          LinhaDoTempo): a mesa acima mede o espaco que sobra, e uma
+          faixa que mudasse de altura (antes: link "Treinar" x texto "Sem
+          drill") fazia a mesa piscar redimensionando. */}
       {!isMobile && (
-        // FIX (2026-09): "quando aparece o board a mesa da uma leve
-        // piscada redimensionando" -- o link "Treinar esse spot" (com
-        // padding 8px/14px + borda) e o texto "Sem drill correspondente"
-        // (sem padding nem borda) tinham alturas bem diferentes. Como
-        // esse row fica ACIMA da caixa da mesa (flex:1) no mesmo container
-        // flex, a troca de um pro outro -- que acontece bem na hora que o
-        // flop revela (trainHref so' existe pos-flop) -- mudava a altura
-        // disponivel pra mesa, disparando o ResizeObserver de
-        // useSeatScale e recalculando a escala visual de repente. Mesmo
-        // padding/borda (so' com cor transparente no estado "sem drill")
-        // fixa a altura da linha igual nos dois casos, entao a mesa nunca
-        // precisa remedir.
-        <div style={{ display: "flex", alignItems: "center", justifyContent: "flex-end", gap: 10, flexShrink: 0, minHeight: 37 }}>
-          {trainHref ? (
-            <Link
-              href={trainHref}
-              style={{
-                display: "flex", alignItems: "center", gap: 6,
-                background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.25)",
-                color: "#FFFFFF", borderRadius: 10, padding: "8px 14px",
-                fontFamily: F, fontSize: 12.5, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap",
-              }}
-            >
-              <Target size={13} /> Treinar esse spot
-            </Link>
-          ) : (
-            situationAction !== "pending" && (
-              <span
-                title="Sem drill correspondente pra essa rua/posição/situação"
-                style={{
-                  display: "flex", alignItems: "center",
-                  border: "1px solid transparent", borderRadius: 10, padding: "8px 14px",
-                  fontSize: 11, color: "rgba(255,255,255,0.3)", whiteSpace: "nowrap",
-                }}
-              >
-                Sem drill correspondente
-              </span>
-            )
-          )}
-        </div>
+        <LinhaDoTempo
+          ruas={replayState.tableHand.history}
+          board={replayState.tableHand.board}
+          heroPos={heroPos}
+          resultadoBb={isLastStep ? resumo.resultadoBb : null}
+          trainHref={trainHref}
+        />
       )}
 
       <OpponentStatsModal stats={opponentClicked} onClose={() => setOpponentClicked(null)} />

@@ -310,12 +310,33 @@ export async function getReview(reviewId: string): Promise<ReviewDetail> {
 // ============================================================
 // Perguntas guiadas
 // ============================================================
+// Naipe em simbolo pra pergunta ficar legivel ("Q♦ 7♣ 2♥", nao "Qd 7c 2h").
+function cartasLegiveis(cards: string[]): string {
+  const naipe: Record<string, string> = { h: "♥", d: "♦", c: "♣", s: "♠" };
+  return cards.map((c) => c.slice(0, -1).replace("T", "10") + (naipe[c.slice(-1)] ?? "")).join(" ");
+}
+
+// Uma pergunta POR RUA, na ordem das ruas (a tela mostra a pergunta de
+// indice i dentro do cartao da rua i: 0 pre-flop, 1 flop, 2 turn, 3
+// river) -- antes eram 3 perguntas genericas e a primeira citava o BOARD
+// dentro do cartao do PRE-FLOP (quando ainda nao existe board), e o
+// river ficava sem pergunta. Extras (ICM, 3-bet, PKO...) vem depois das
+// 4, como aprofundamento opcional.
 export function suggestGuidedQuestions(tags: Tag[], parsedHand?: { board?: string[]; heroPosition?: string | null } | null): string[] {
   const labels = tags.map((t) => t.label.toLowerCase());
+  const board = parsedHand?.board ?? [];
+  const pos = parsedHand?.heroPosition;
   const base = [
-    "Qual era o seu plano antes da ação do vilão?",
-    "Qual parte do range do vilão você estava atacando/defendendo?",
-    "Que informação você usou para tomar a decisão (sizings, timing, dinâmica)?",
+    `Pré-flop${pos ? ` (você no ${pos})` : ""}: por que você escolheu essa jogada? Que range você dava pro vilão?`,
+    board.length >= 3
+      ? `No flop ${cartasLegiveis(board.slice(0, 3))}, qual era o seu plano antes da ação do vilão?`
+      : "No flop, qual era o seu plano antes da ação do vilão?",
+    board.length >= 4
+      ? `O turn ${cartasLegiveis([board[3]])} mudou o seu plano? Que parte do range do vilão você estava atacando ou defendendo?`
+      : "No turn, que parte do range do vilão você estava atacando ou defendendo?",
+    board.length >= 5
+      ? `No river ${cartasLegiveis([board[4]])}, que informação você usou pra decidir (tamanho da aposta, tempo, perfil do vilão)?`
+      : "No river, que informação você usou pra decidir (tamanho da aposta, tempo, perfil do vilão)?",
   ];
   const extras: string[] = [];
   if (labels.some((l) => l.includes("icm") || l.includes("bubble") || l.includes("final table")))
@@ -328,15 +349,7 @@ export function suggestGuidedQuestions(tags: Tag[], parsedHand?: { board?: strin
   if (labels.some((l) => l.includes("cbet") || l.includes("turn barrel")))
     extras.push("A textura da board favorece mais o range do agressor ou do caller?");
 
-  // Quando a mao veio de import parseado, ancora a primeira pergunta no board
-  // e na posicao reais em vez de generica.
-  if (parsedHand?.board?.length) {
-    base[0] = `No board ${parsedHand.board.join(" ")}${
-      parsedHand.heroPosition ? ` (você na ${parsedHand.heroPosition})` : ""
-    }, qual era o seu plano antes da ação do vilão?`;
-  }
-
-  return [...base, ...extras].slice(0, 5);
+  return [...base, ...extras].slice(0, 6);
 }
 
 export async function saveAnswers(reviewId: string, userId: string, qas: ReviewAnswer[]) {
