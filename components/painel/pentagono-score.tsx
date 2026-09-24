@@ -1,12 +1,11 @@
 "use client";
 
-import { useEffect, useState } from "react";
 import Link from "next/link";
-import { animate, useReducedMotion } from "framer-motion";
 import { ArrowRight, TriangleAlert } from "lucide-react";
 import { COMPONENTES } from "@/components/analysis/EvolutionScoreCard";
 import { nivelDoScore, type PlayerPerformance } from "@/lib/services/performance-service";
-import { EASE, Numero } from "./painel-card";
+import { Numero } from "./painel-card";
+import { PentagonoCircuito, type EixoCircuito } from "@/components/time/pentagono-circuito";
 import { InfoHover, type Explicacao } from "./info-hover";
 import { num } from "./formato";
 
@@ -19,9 +18,9 @@ import { num } from "./formato";
 // (components/analysis/EvolutionScoreCard.tsx, exportados de lá), e as
 // faixas de cor também: abaixo de 40 fraco, 40-69 em evolução, 70+ bom.
 //
-// Regras de gráfico seguidas: uma série só (sem legenda), uma cor (o
-// dourado do Painel), linha de 2px, pontos de 8px com anel na cor do
-// fundo, grade discreta e rótulos na cor de texto, não na cor do dado.
+// Desenho: o mesmo pentágono 3D ("placa de circuito") da ficha do
+// jogador (components/time/pentagono-circuito.tsx) -- um padrão só de
+// pentágono no produto.
 
 export function corDoScore(v: number): string {
   return v < 40 ? "#e0555a" : v < 70 ? "#f59e0b" : "#22c55e";
@@ -36,18 +35,6 @@ const ACAO: Record<string, { texto: string; href: string }> = {
   score_consistencia: { texto: "Registrar sessões", href: "/banca" },
 };
 
-// Geometria (viewBox 200x200). Centro um pouco abaixo do meio: o
-// pentágono tem ponta pra cima e base larga, assim fica centrado no olho.
-const CX = 100;
-const CY = 104;
-const R = 70;
-const r2 = (n: number) => Math.round(n * 100) / 100; // evita diferença de arredondamento servidor x navegador
-function ponto(i: number, fracao: number) {
-  const a = ((-90 + i * 72) * Math.PI) / 180;
-  return { x: r2(CX + R * fracao * Math.cos(a)), y: r2(CY + R * fracao * Math.sin(a)) };
-}
-const poligono = (fracoes: number[]) => fracoes.map((f, i) => `${ponto(i, f).x},${ponto(i, f).y}`).join(" ");
-
 // Rótulo curto por pilar (o nome inteiro vai na explicação do hover).
 const CURTO: Record<string, string> = {
   score_tecnica: "Técnica",
@@ -59,17 +46,6 @@ const CURTO: Record<string, string> = {
 
 export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance | null; explicacao: Explicacao }) {
   const score = perf?.score_geral ?? null;
-  const reduzir = useReducedMotion();
-  // Entrada: os 5 pontos saem do centro e vão até a nota de cada pilar.
-  const [crescimento, setCrescimento] = useState(reduzir ? 1 : 0);
-  useEffect(() => {
-    if (reduzir) {
-      setCrescimento(1);
-      return;
-    }
-    const c = animate(0, 1, { duration: 0.9, ease: EASE, delay: 0.45, onUpdate: setCrescimento });
-    return () => c.stop();
-  }, [reduzir]);
   // Pilar sem dado vem 50 (neutro) direto da view; null só se a view
   // inteira não existe pro jogador ainda.
   const pilares = COMPONENTES.map((c) => {
@@ -77,13 +53,24 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
     return { ...c, valor: typeof v === "number" ? Math.max(0, Math.min(100, v)) : null };
   });
   const temDado = pilares.some((p) => p.valor != null);
-  const fracoes = pilares.map((p) => (p.valor ?? 0) / 100);
 
   // Ponto fraco: menor pilar abaixo de 70 (empate: o de maior peso, que é
   // a ordem da lista). Sem nada abaixo de 70, não há o que apontar.
   const fraco = pilares
     .filter((p) => p.valor != null && p.valor < 70)
     .reduce<(typeof pilares)[number] | null>((menor, p) => (menor == null || p.valor! < menor.valor! ? p : menor), null);
+
+  // Mesmo pentágono 3D ("placa de circuito") da ficha do jogador, com os
+  // 5 pilares do Score de 0 a 100. O ponto fraco sai em vermelho.
+  const eixos: EixoCircuito[] = pilares.map((p) => ({
+    chave: p.key,
+    curto: CURTO[p.key] ?? p.label,
+    titulo: `${p.label} · peso ${p.peso}`,
+    oQueE: p.explicacao,
+    comoCalcula: `Nota de 0 a 100. Vale ${p.peso} do Score geral.`,
+    teto: 100,
+    valor: p.valor,
+  }));
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -111,86 +98,24 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
         </span>
       </div>
 
-      {/* O pentágono. Os rótulos são HTML por cima do SVG (posição em %)
-          pra cada um poder abrir a explicação ao passar o mouse. */}
-      {/* Quadrado que manda na geometria: no computador o lado é o MENOR
-          entre a largura e a altura que sobram no card (unidades de
-          container), pra caber sem rolagem e continuar quadrado -- os
-          rótulos são posicionados em % dele. No celular, segue a largura. */}
+      {/* No computador a tela inteira cabe sem rolagem: o pentágono ocupa
+          o maior tamanho que couber na altura E na largura que sobram
+          (unidades de container), mantendo a proporção. No celular segue
+          a largura. */}
       <div className="flex min-h-0 flex-1 items-center justify-center xl:[container-type:size]">
-      <div className="relative aspect-square w-full max-w-[210px] xl:h-[min(100cqw,100cqh)] xl:w-[min(100cqw,100cqh)] xl:max-w-none">
-        <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full" aria-hidden>
-          {/* grade: 25/50/75/100 e os raios */}
-          {[0.25, 0.5, 0.75, 1].map((f) => (
-            <polygon
-              key={f}
-              points={poligono([f, f, f, f, f])}
-              fill="none"
-              stroke={f === 1 ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.06)"}
-              strokeWidth={1}
-            />
-          ))}
-          {pilares.map((_, i) => {
-            const p = ponto(i, 1);
-            return <line key={i} x1={CX} y1={CY} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />;
-          })}
-          {temDado && (
-            <g opacity={Math.min(1, crescimento * 2)}>
-              <polygon
-                points={poligono(fracoes.map((f) => f * crescimento))}
-                fill="rgba(212,175,55,0.16)"
-                stroke="#d4af37"
-                strokeWidth={2}
-                strokeLinejoin="round"
-              />
-              {pilares.map((p, i) => {
-                if (p.valor == null) return null;
-                const pt = ponto(i, fracoes[i] * crescimento);
-                const ehFraco = fraco?.key === p.key;
-                return (
-                  <circle
-                    key={p.key}
-                    cx={pt.x}
-                    cy={pt.y}
-                    r={4}
-                    fill={ehFraco ? "#e0555a" : "#d4af37"}
-                    stroke="#161616"
-                    strokeWidth={2}
-                  />
-                );
-              })}
-            </g>
-          )}
-        </svg>
-
-        {pilares.map((p, i) => {
-          // Rótulo um pouco pra fora da ponta, em % do quadro.
-          const a = ((-90 + i * 72) * Math.PI) / 180;
-          const x = r2(((CX + (R + 17) * Math.cos(a)) / 200) * 100);
-          const y = r2(((CY + (R + 13) * Math.sin(a)) / 200) * 100);
-          return (
-            <InfoHover
-              key={p.key}
-              explicacao={{
-                titulo: `${p.label} · peso ${p.peso}`,
-                oQueE: p.explicacao,
-                itens: [{ rotulo: "Sua nota", valor: p.valor == null ? "—" : `${num(p.valor)} de 100` }],
-                origem: "Performance · Score de Evolução",
-              }}
-              className="absolute -translate-x-1/2 -translate-y-1/2 rounded-md px-1 text-center leading-none"
-              style={{ left: `${x}%`, top: `${y}%` }}
-            >
-              <span className="block whitespace-nowrap text-[10.5px] text-muted/80">
-                <span aria-hidden>{CURTO[p.key]}</span>
-                <span className="sr-only">{p.label}</span>
-              </span>
-              <span className="tnum block text-[11.5px] font-bold text-ink/90">
-                {p.valor == null ? "—" : num(p.valor)}
-              </span>
-            </InfoHover>
-          );
-        })}
-      </div>
+        <div className="w-full xl:w-[min(100cqw,calc(100cqh*2.05))]">
+          <PentagonoCircuito
+            eixos={eixos}
+            amostra={temDado ? 1 : 0}
+            formatar={(v) => (v == null ? "—" : num(v))}
+            rotuloValor="Sua nota"
+            rotuloTeto="Escala"
+            unidadeTeto=""
+            origem="Performance · Score de Evolução"
+            vazio="O Score aparece assim que você registrar sessões, drills ou mãos."
+            destaque={fraco ? pilares.indexOf(fraco) : null}
+          />
+        </div>
       </div>
 
       {/* O que fazer: leva ao módulo que sobe o pilar mais fraco. Ícone +
@@ -202,9 +127,6 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
           className="mt-1 flex items-center gap-1.5 rounded-lg px-1 py-1 text-[11.5px] transition-colors hover:bg-white/[0.04]"
         >
           <TriangleAlert size={13} className="shrink-0 text-[#e0555a]" aria-hidden />
-          {/* "Ponto fraco:" só pra leitor de tela: no painel estreito o
-              texto cortava o nome do pilar. O ícone de alerta e o ponto
-              vermelho no pentágono já dizem isso a quem enxerga. */}
           <span className="min-w-0 flex-1 truncate text-ink/90">
             <span className="sr-only">Ponto fraco: </span>
             {fraco.label}

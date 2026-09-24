@@ -179,7 +179,7 @@ export function IndicatorsCard({
   return (
     <PainelCard title="Seus indicadores" icon={<Activity size={15} />} style={style} className={className} ordem={ordem}>
       {carregando ? (
-        <div className="grid h-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid h-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
           <div className="painel-esqueleto min-h-[180px] rounded-2xl" />
           <div className="grid grid-cols-2 gap-2">
             {Array.from({ length: 4 }, (_, i) => (
@@ -193,7 +193,7 @@ export function IndicatorsCard({
         // Pentágono do Score à esquerda (o número que resume tudo ganha o
         // maior peso visual) e os outros indicadores 2x2 à direita. No
         // celular, um embaixo do outro.
-        <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)]">
           <motion.div
             className="flex min-h-0 flex-col gap-2"
             initial={{ opacity: 0, scale: 0.97 }}

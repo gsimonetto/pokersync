@@ -62,9 +62,34 @@ function saida(i: number): Saida {
 const SAIDAS = [0, 1, 2, 3, 4].map(saida);
 const caminho = (lista: { x: number; y: number }[]) => lista.map((p, j) => `${j === 0 ? "M" : "L"}${p.x},${p.y}`).join(" ");
 
-const fmt = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
+const fmtPct = (v: number | null) => (v == null ? "—" : `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`);
 
-export function PentagonoCircuito({ eixos, amostra }: { eixos: EixoCircuito[]; amostra: number }) {
+// Reusado em dois lugares: ficha do jogador (frequências em %) e tela
+// inicial (os 5 pilares do Score, de 0 a 100). As props opcionais trocam
+// só o texto -- a placa, o prisma e a animação são os mesmos.
+export function PentagonoCircuito({
+  eixos,
+  amostra,
+  formatar = fmtPct,
+  rotuloValor = "Jogador",
+  rotuloTeto = "Ponta do gráfico",
+  unidadeTeto = "%",
+  origem = "Mãos importadas do jogador no período",
+  vazio = "Sem mãos importadas no período — o perfil aparece assim que o jogador importar o histórico.",
+  destaque = null,
+}: {
+  eixos: EixoCircuito[];
+  amostra: number;
+  formatar?: (v: number | null) => string;
+  rotuloValor?: string;
+  rotuloTeto?: string;
+  unidadeTeto?: string;
+  origem?: string;
+  vazio?: string;
+  /** Índice do eixo em destaque (ponto fraco): nó e trilha em vermelho. */
+  destaque?: number | null;
+}) {
+  const fmt = formatar;
   const uid = useId().replace(/:/g, "");
   const reduzir = useReducedMotion();
   const [cresc, setCresc] = useState(reduzir ? 1 : 0);
@@ -104,7 +129,7 @@ export function PentagonoCircuito({ eixos, amostra }: { eixos: EixoCircuito[]; a
 
   return (
     <div
-      className="relative w-full select-none"
+      className="@container relative w-full select-none"
       style={{ perspective: 1100 }}
       onMouseMove={(e) => {
         if (reduzir) return;
@@ -209,7 +234,13 @@ export function PentagonoCircuito({ eixos, amostra }: { eixos: EixoCircuito[]; a
             const aceso = ativo === i;
             return (
               <g key={`saida-${i}`}>
-                <path d={caminho(s.trilha)} fill="none" stroke={aceso ? "rgba(212,175,55,0.8)" : "rgba(255,255,255,0.18)"} strokeWidth={1.1} strokeLinejoin="round" />
+                <path
+                  d={caminho(s.trilha)}
+                  fill="none"
+                  stroke={aceso ? "rgba(212,175,55,0.8)" : destaque === i ? "rgba(224,85,90,0.55)" : "rgba(255,255,255,0.18)"}
+                  strokeWidth={1.1}
+                  strokeLinejoin="round"
+                />
                 {s.trilha.slice(1, -1).map((p, j) => (
                   <circle key={j} cx={p.x} cy={p.y} r={1.6} fill="rgba(255,255,255,0.3)" />
                 ))}
@@ -253,8 +284,8 @@ export function PentagonoCircuito({ eixos, amostra }: { eixos: EixoCircuito[]; a
               {topo.map((p, i) =>
                 eixos[i].valor == null ? null : (
                   <g key={`no-${i}`}>
-                    <circle cx={p.x} cy={p.y} r={6} fill="#f0cf63" className={`circ-no-${uid}`} style={{ animationDelay: `${i * 0.3}s` }} />
-                    <circle cx={p.x} cy={p.y} r={ativo === i ? 5 : 3.8} fill="#f0cf63" stroke="#0d0d0d" strokeWidth={1.6} />
+                    <circle cx={p.x} cy={p.y} r={6} fill={destaque === i ? "#e0555a" : "#f0cf63"} className={`circ-no-${uid}`} style={{ animationDelay: `${i * 0.3}s` }} />
+                    <circle cx={p.x} cy={p.y} r={ativo === i ? 5 : 3.8} fill={destaque === i ? "#e0555a" : "#f0cf63"} stroke="#0d0d0d" strokeWidth={1.6} />
                   </g>
                 ),
               )}
@@ -272,18 +303,21 @@ export function PentagonoCircuito({ eixos, amostra }: { eixos: EixoCircuito[]; a
                 titulo: e.titulo,
                 oQueE: e.oQueE,
                 itens: [
-                  { rotulo: "Jogador", valor: fmt(e.valor) },
-                  { rotulo: "Ponta do gráfico", valor: `0 a ${e.teto}%` },
+                  { rotulo: rotuloValor, valor: fmt(e.valor) },
+                  { rotulo: rotuloTeto, valor: `0 a ${e.teto}${unidadeTeto}` },
                 ],
-                origem: "Mãos importadas do jogador no período",
+                origem,
                 comoCalcula: e.comoCalcula,
               }}
               className={`absolute -translate-y-1/2 ${s.lado === "esq" ? "-translate-x-full text-right" : "text-left"}`}
               style={{ left: `${(s.x / W) * 100}%`, top: `${(s.y / H) * 100}%` }}
             >
-              <span className="block cursor-help rounded-lg px-1 py-0.5 sm:px-1.5 transition-colors hover:bg-white/[0.05]" onMouseEnter={() => setAtivo(i)} onMouseLeave={() => setAtivo(null)}>
-                <span className="block whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.1em] text-muted sm:text-[10.5px] sm:tracking-[0.12em]">{e.curto}</span>
-                <span className={`block text-[13px] font-bold leading-tight tabular-nums sm:text-[19px] ${ativo === i ? "text-[#f0cf63]" : "text-ink"}`}>
+              <span className="block cursor-help rounded-lg px-1 py-0.5 @sm:px-1.5 transition-colors hover:bg-white/[0.05]" onMouseEnter={() => setAtivo(i)} onMouseLeave={() => setAtivo(null)}>
+                <span className="block whitespace-nowrap text-[9px] font-semibold uppercase tracking-[0.1em] text-muted @sm:text-[10.5px] @sm:tracking-[0.12em]">{e.curto}</span>
+                <span
+                  className={`block text-[13px] font-bold leading-tight tabular-nums @sm:text-[17px] @lg:text-[19px] ${ativo === i ? "text-[#f0cf63]" : "text-ink"}`}
+                  style={destaque === i && ativo !== i ? { color: "#f08a8e" } : undefined}
+                >
                   {fmt(e.valor)}
                 </span>
               </span>
@@ -293,7 +327,7 @@ export function PentagonoCircuito({ eixos, amostra }: { eixos: EixoCircuito[]; a
 
         {!temDado && (
           <p className="absolute inset-x-0 top-1/2 mx-auto max-w-[260px] -translate-y-1/2 rounded-xl bg-black/60 px-3 py-2 text-center text-[12px] text-muted backdrop-blur">
-            Sem mãos importadas no período — o perfil aparece assim que o jogador importar o histórico.
+            {vazio}
           </p>
         )}
       </motion.div>
