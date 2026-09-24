@@ -1,4 +1,7 @@
+"use client";
+
 import { T, F, SUITS, num } from "@/lib/poker/drill-theme";
+import { usePreferenciasMesa, type Baralho } from "@/lib/hooks/use-preferencias-mesa";
 
 const RANK_ORDER = "23456789TJQKA";
 
@@ -223,7 +226,7 @@ function CornerMark({
 }
 
 export function Card({
-  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false, hideCornerSuitGlyph = false, centerSuitTop, showCenterRank = false,
+  card, size = "board", hideCenterSuit = false, hideCorners = false, hideBottomRightCorner = false, hideCornerSuitGlyph = false, centerSuitTop, showCenterRank = false, baralho,
 }: {
   card: string | null;
   size?: Size;
@@ -250,7 +253,12 @@ export function Card({
   // visualmente (ex: HalfCard) devem passar o centro da area VISIVEL,
   // nao da carta inteira — ver HalfCard abaixo.
   centerSuitTop?: string;
+  // Força um baralho (prévia lado a lado nas Configurações); sem isso vale
+  // a escolha salva (4 cores, o padrão, ou 2 cores).
+  baralho?: Baralho;
 }) {
+  const preferencias = usePreferenciasMesa();
+  const baralhoUsado = baralho ?? preferencias.baralho;
   const s = SIZES[size] || SIZES.board;
   if (!card) {
     return (
@@ -283,7 +291,10 @@ export function Card({
     d: "#1D4E89", // ouros — azul marinho escuro
     c: "#1E6B45", // paus — verde floresta escuro
   };
-  const bgColor = FOUR_COLOR[suitKey] ?? "#1A1A1A";
+  // Baralho de 2 cores (opção das Configurações): ouros no vermelho de
+  // copas e paus no preto de espadas -- o resto da carta não muda.
+  const TWO_COLOR: Record<string, string> = { ...FOUR_COLOR, d: FOUR_COLOR.h, c: FOUR_COLOR.s };
+  const bgColor = (baralhoUsado === "2cores" ? TWO_COLOR : FOUR_COLOR)[suitKey] ?? "#1A1A1A";
 
   return (
     <div

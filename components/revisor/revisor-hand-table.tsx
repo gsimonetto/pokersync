@@ -4,7 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
 import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Trophy, Layers, ArrowLeft, Gauge } from "lucide-react";
-import { PokerTable } from "@/components/drill/poker-table";
+import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { OpponentStatsModal } from "./opponent-stats-modal";
 import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
@@ -16,7 +16,9 @@ import type { BorderRingConfig } from "@/lib/poker/seat-layout";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
 import { resumoDaMao } from "@/lib/poker/hand-summary";
+import { equidade, nomeDaJogada } from "@/lib/poker/jogada";
 import { F, T, num } from "@/lib/poker/drill-theme";
+import { salvarPreferenciaMesa, usePreferenciasMesa, type UnidadeValor } from "@/lib/hooks/use-preferencias-mesa";
 import { LinhaDoTempo } from "./linha-do-tempo";
 
 // Mesa PERSISTENTE do Revisor de Mãos — decisao de arquitetura (2026-08):
@@ -92,6 +94,47 @@ function InfoChip({ icon, label, encolhe = false }: { icon: React.ReactNode; lab
     >
       {icon}
       <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+    </div>
+  );
+}
+
+// BB ou fichas (M8), como a opção das salas -- ao lado dos blinds, no
+// mesmo formato de pílula da navegação. A escolha fica guardada (também
+// dá pra trocar em Configurações > Mesa, que vale no celular).
+function SeletorUnidade({ unidade }: { unidade: UnidadeValor }) {
+  const opcao = (valor: UnidadeValor, rotulo: string) => {
+    const ativo = unidade === valor;
+    return (
+      <button
+        type="button"
+        aria-pressed={ativo}
+        onClick={() => salvarPreferenciaMesa("unidade", valor)}
+        style={{
+          border: 0,
+          cursor: ativo ? "default" : "pointer",
+          borderRadius: 999,
+          padding: "5px 10px",
+          fontFamily: F,
+          fontSize: 11,
+          fontWeight: 600,
+          background: ativo ? "rgba(255,255,255,0.14)" : "transparent",
+          color: ativo ? "#FFFFFF" : "rgba(255,255,255,0.5)",
+          transition: "all 150ms ease",
+        }}
+      >
+        {rotulo}
+      </button>
+    );
+  };
+  return (
+    <div
+      role="group"
+      aria-label="Mostrar valores em"
+      title="Mostrar os valores da mesa em BB ou em fichas"
+      style={{ display: "flex", alignItems: "center", gap: 2, padding: 3, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)", flexShrink: 0 }}
+    >
+      {opcao("bb", "BB")}
+      {opcao("fichas", "Fichas")}
     </div>
   );
 }
@@ -308,6 +351,9 @@ export function RevisorHandTable({
   const [stepIndex, setStepIndex] = useState(0);
   const previousStepRef = useRef(0);
   const [autoplay, setAutoplay] = useState(false);
+  // BB ou fichas (M8) -- com fichas, a mesa inteira sai em fichas cruas.
+  const { unidade } = usePreferenciasMesa();
+  const emFichas = unidade === "fichas";
 
   // "Salvar spot" direto na mesa (pedido explicito, 2026-08): antes so
   // existia dentro de "Analisar mão" (RevisorDetalhe) -- pra maos de
@@ -457,12 +503,12 @@ export function RevisorHandTable({
       ? { aspectRatio: 4 / 5, cornerXPercent: 28, cornerYPercent: 22 }
       : { aspectRatio: 8 / 5, cornerXPercent: 34, cornerYPercent: 54 };
     try {
-      return { replayState: projectHandAtStep(parsedHand, stepIndex, previousStepRef.current, borderRing), replayError: null };
+      return { replayState: projectHandAtStep(parsedHand, stepIndex, previousStepRef.current, borderRing, emFichas), replayError: null };
     } catch (e) {
       if (e instanceof HandReplayError) return { replayState: null, replayError: e.message };
       return { replayState: null, replayError: e instanceof Error ? e.message : "Erro ao montar a mesa dessa mão." };
     }
-  }, [parsedHand, stepIndex, isMobile, compact]);
+  }, [parsedHand, stepIndex, isMobile, compact, emFichas]);
 
   // Dispara o callback pro consumidor (RevisorSessao) trocar de mao
   // assim que um erro aparece — nao renderiza a caixa de erro nesse caso,
@@ -588,6 +634,85 @@ export function RevisorHandTable({
   // Resultado do heroi na mao (bb) -- mostrado na linha do tempo quando a
   // mao chega ao fim.
   const resumo = useMemo(() => resumoDaMao(parsedHand), [parsedHand]);
+  // Fichas na frente dos assentos: a mesa só mostra a partir de meio BB
+  // (em BB os antes nunca aparecem). Em fichas esse piso precisa ser em
+  // fichas também -- senão os antes (ex.: 30) viram fichinha em todo mundo.
+  const commitsNaMesa = useMemo(() => {
+    const sc = replayState?.streetCommitments;
+    if (!sc || !emFichas || !parsedHand.bigBlind) return sc;
+    const piso = 0.5 * parsedHand.bigBlind;
+    return Object.fromEntries(Object.entries(sc).filter(([, v]) => v >= piso));
+  }, [replayState, emFichas, parsedHand.bigBlind]);
+
+  // O mesmo resultado em fichas (opção Fichas): stack final - inicial do
+  // herói, sem passar por BB arredondado.
+  const resultadoFichas = useMemo(() => {
+    if (!emFichas || !parsedHand.heroName) return null;
+    try {
+      const st = projectHandAtStep(parsedHand, Number.MAX_SAFE_INTEGER, undefined, undefined, true);
+      const slot = st.seatLayout.find((s) => s.playerName === parsedHand.heroName);
+      const seat = parsedHand.seats.find((s) => s.playerName === parsedHand.heroName);
+      const final = slot ? st.tableHand.seats[slot.posLabel]?.stack : undefined;
+      return final != null && seat ? Math.round(final - seat.startingChips) : null;
+    } catch {
+      return null;
+    }
+  }, [emFichas, parsedHand]);
+
+  // Passo da ÚLTIMA ação da mão (depois dele só saem cartas do board,
+  // showdown e o pote). Numa mão com all-in que vai ao showdown, é a partir
+  // daqui que as salas já abrem as cartas de todo mundo e mostram a chance
+  // de cada um enquanto o board sai.
+  const passoUltimaAcao = useMemo(() => {
+    let ultimo = -1;
+    try {
+      const total = projectHandAtStep(parsedHand, 0).stepCount;
+      for (let i = 0; i < total; i++) {
+        if (projectHandAtStep(parsedHand, i).currentEvent?.kind === "action") ultimo = i;
+      }
+    } catch {
+      return -1;
+    }
+    return ultimo;
+  }, [parsedHand]);
+
+  // Mesa com as informações de fim de mão, no padrão das salas:
+  // - all-in que vai ao showdown: as cartas já abrem na hora do all-in e o
+  //   placar embaixo do board mostra a chance de vitória de cada um
+  //   ("76%"), atualizando a cada carta que sai;
+  // - showdown com o board completo: o placar mostra o nome da jogada
+  //   ("Par de Reis") e marca quem levou o pote.
+  // O placar fica no CENTRO da mesa -- os assentos continuam iguais.
+  const mesaComInfo = useMemo(() => {
+    if (!replayState) return null;
+    const th = replayState.tableHand;
+    const sd = (parsedHand.showdown ?? []).filter((x) => x.cards?.length === 2);
+    if (sd.length < 2) return th;
+    const passo = replayState.stepIndex;
+    const ultimoPasso = passo >= replayState.stepCount - 1;
+    const teveAllIn = (parsedHand.streets ?? []).some((st) => st.actions.some((a) => a.isAllIn));
+    const modoAllIn = teveAllIn && passoUltimaAcao >= 0 && passo >= passoUltimaAcao;
+    if (!modoAllIn && !ultimoPasso) return th;
+    const board = th.board.filter((c): c is string => Boolean(c));
+    const slotDe = (nome: string) => replayState.seatLayout.find((sl) => sl.playerName === nome);
+    const seats = { ...th.seats };
+    const placar: NonNullable<TableHand["placar"]> = [];
+    const eq = board.length === 5 ? null : equidade(sd.map((p) => p.cards), board);
+    sd.forEach((p, i) => {
+      const slot = slotDe(p.player);
+      if (!slot || !seats[slot.posLabel]) return;
+      seats[slot.posLabel] = { ...seats[slot.posLabel], cards: p.cards };
+      const texto = board.length === 5 ? nomeDaJogada(p.cards, board) : eq ? `${Math.round(eq[i])}%` : null;
+      if (!texto) return;
+      placar.push({
+        pos: slot.posLabel,
+        voce: slot.isHero,
+        texto,
+        vencedor: board.length === 5 && ultimoPasso && parsedHand.winner === p.player,
+      });
+    });
+    return { ...th, seats, placar: placar.length >= 2 ? placar : null };
+  }, [replayState, parsedHand, passoUltimaAcao]);
 
   // Link "Treinar esse spot" — so existe quando rua e' postflop, posicao
   // suportada pelos drills, e a situacao preflop foi resolvida com sucesso.
@@ -706,7 +831,11 @@ export function RevisorHandTable({
                 // agora fica ENTRE o cabecalho e a mesa (marginBottom do
                 // cabecalho), onde as cartas deles realmente aparecem --
                 // antes o cabecalho cobria o nome/cartas desses assentos.
-                padding: "16px 32px 110px",
+                // Embaixo 110 -> 56: com o alinhamento pela placa
+                // (centrarNaPlaca) o hero não desce mais tanto pra fora da
+                // mesa -- as cartas dele ficam em cima da placa, pra dentro.
+                // O espaço passou pro topo (marginBottom do cabeçalho).
+                padding: "16px 32px 56px",
                 // overflow:visible (era "hidden") -- pedido explicito: "tem
                 // algumas informacoes cortadas... pode deixar as cartas
                 // passar da mesa e nome tambem, nao precisa cortar". Sem
@@ -755,17 +884,32 @@ export function RevisorHandTable({
           // em duas e empurrava o controle de navegacao pra cima dos
           // assentos do topo da mesa. Agora o nome do torneio e' que
           // encolhe (reticencias) quando falta espaco.
-          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: 44, flexWrap: "nowrap", flexShrink: 0, position: "relative", zIndex: 10 }}>
+          // marginBottom 44 -> 88: espaço pras cartas dos assentos de cima,
+          // que com o alinhamento pela placa ficam inteiras ACIMA da borda
+          // da mesa (antes encostavam no cabeçalho). Na mesa estreita
+          // (compact) os assentos já saem bem menores -- 52 basta, e o
+          // resto do espaço fica pra mesa.
+          <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 8, marginBottom: compact ? 52 : 88, flexWrap: "nowrap", flexShrink: 0, position: "relative", zIndex: 10 }}>
             <div style={{ display: "flex", alignItems: "center", gap: 6, flexWrap: "nowrap", minWidth: 0, flex: "1 1 auto", overflow: "hidden" }}>
               {onBack && (
                 <ChipButton icon={<ArrowLeft size={13} />} label="Voltar" onClick={onBack} title="Voltar pra fila de mãos" iconOnly />
               )}
-              <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} encolhe />
+              {/* Mesa estreita (compact): o nome do torneio encolhia até
+                  sumir e ainda empurrava os blinds pra baixo dos botões de
+                  navegação -- nesse tamanho ele sai (continua na lista). */}
+              {!compact && <InfoChip icon={<Trophy size={12} color="rgba(255,255,255,0.45)" />} label={tournamentName ?? "Torneio sem nome"} encolhe />}
               <InfoChip
                 icon={<Layers size={12} color="rgba(255,255,255,0.45)" />}
                 label={`${parsedHand.smallBlind}/${parsedHand.bigBlind}`}
               />
+              {/* Na mesa estreita não cabe -- lá (e no celular) a troca fica
+                  em Configurações > Mesa. */}
+              {!compact && <SeletorUnidade unidade={unidade} />}
+              {/* Mesa estreita: o chip de EV/ICM ficava cortado atrás da
+                  navegação -- nesse tamanho ele sai daqui (o cálculo
+                  continua em "Analisar mão"). */}
               {evEligible &&
+                !compact &&
                 (evResult ? (
                   <InfoChip
                     icon={<Gauge size={12} color="rgba(255,255,255,0.45)" />}
@@ -899,11 +1043,12 @@ export function RevisorHandTable({
             do modo mobile (blinds fosco + dock de navegacao) abaixo. */}
         <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
           <PokerTable
-            hand={replayState.tableHand}
+            hand={mesaComInfo ?? replayState.tableHand}
             seats={isMobile && mobileSeatLayout ? mobileSeatLayout : replayState.seatLayout}
             chipAnimation={chipAnimation}
             potAwardAnimation={potAwardAnimation}
-            streetCommitments={replayState.streetCommitments}
+            streetCommitments={commitsNaMesa}
+            unidade={unidade}
             opponentStats={opponentStats}
             onOpponentClick={(name) => setOpponentClicked(opponentStats[name] ?? null)}
             {...(isMobile
@@ -922,8 +1067,8 @@ export function RevisorHandTable({
                 // "bico" (ver comentario original em poker-table.tsx),
                 // so' com raio bem maior que o padrao.
                 compact
-                ? { aspectRatio: "4 / 5", cornerRadius: "28% / 22%", minSeatScale: 0.5 }
-                : { cornerRadius: "34% / 54%" })}
+                ? { aspectRatio: "4 / 5", cornerRadius: "28% / 22%", minSeatScale: 0.5, centrarNaPlaca: true, escalaAssentos: 0.92 }
+                : { cornerRadius: "34% / 54%", centrarNaPlaca: true, escalaAssentos: 0.92 })}
           />
 
           {isMobile && (
@@ -1085,7 +1230,8 @@ export function RevisorHandTable({
           ruas={replayState.tableHand.history}
           board={replayState.tableHand.board}
           heroPos={heroPos}
-          resultadoBb={isLastStep ? resumo.resultadoBb : null}
+          resultadoBb={isLastStep ? (emFichas ? resultadoFichas : resumo.resultadoBb) : null}
+          emFichas={emFichas}
           trainHref={trainHref}
         />
       )}

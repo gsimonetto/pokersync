@@ -172,6 +172,33 @@ export async function updateProfileDetails(patch: {
   if (error) throw error;
 }
 
+// Preferências da mesa (cor, baralho, BB/fichas, animações, tempo) na conta,
+// pra acompanhar a pessoa em qualquer aparelho -- ver use-preferencias-mesa.
+// Só com sessão aberta (getSession não vai à rede): em página pública, sem
+// login, nem consulta. null = sem sessão, sem coluna ou nada salvo ainda --
+// quem chama fica com o que tem no aparelho.
+export async function fetchPreferenciasMesa(): Promise<Record<string, unknown> | null> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return null;
+  const { data, error } = await supabase.from("profiles").select("preferencias_mesa").eq("id", session.user.id).maybeSingle();
+  if (error || !data) return null;
+  const valor = (data as { preferencias_mesa?: unknown }).preferencias_mesa;
+  return valor && typeof valor === "object" && !Array.isArray(valor) ? (valor as Record<string, unknown>) : null;
+}
+
+export async function salvarPreferenciasMesaNaConta(dados: Record<string, unknown>): Promise<void> {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return;
+  const { error } = await supabase.from("profiles").update({ preferencias_mesa: dados }).eq("id", session.user.id);
+  if (error) throw error;
+}
+
 export async function updatePassword(newPassword: string) {
   if (!newPassword || newPassword.length < 6) {
     throw new Error("A senha precisa ter ao menos 6 caracteres.");
