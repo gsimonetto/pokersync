@@ -15,7 +15,9 @@ import { CartaTexto, FATIA_BOARD, NOME_RUA, rotuloAcao } from "./linha-do-tempo"
 // Usa o MESMO cálculo do replayer (projectHandAtStep no último passo),
 // então os números batem com a mesa.
 
-export function ResumoDaMao({ hand, historicoBruto }: { hand: ParsedHand; historicoBruto: string | null }) {
+// hero: como chamar o dono da mão -- "Você" pra quem jogou; "Jogador" pro
+// coach vendo a mão que o jogador compartilhou com ele.
+export function ResumoDaMao({ hand, historicoBruto, hero = "Você" }: { hand: ParsedHand; historicoBruto: string | null; hero?: string }) {
   const dados = useMemo(() => {
     try {
       const st = projectHandAtStep(hand, Number.MAX_SAFE_INTEGER);
@@ -47,7 +49,7 @@ export function ResumoDaMao({ hand, historicoBruto }: { hand: ParsedHand; histor
               background: bb >= 0 ? "rgba(52,211,153,0.10)" : "rgba(248,113,113,0.10)",
             }}
           >
-            {bb >= 0 ? "Você ganhou " : "Você perdeu "}
+            {bb >= 0 ? `${hero} ganhou ` : `${hero} perdeu `}
             {formatarBb(Math.abs(bb)).replace(/^\+/, "")}
           </span>
         )}
@@ -64,7 +66,7 @@ export function ResumoDaMao({ hand, historicoBruto }: { hand: ParsedHand; histor
         )}
         <div className="min-w-0 text-[12.5px] leading-relaxed text-muted">
           <p className="m-0 text-ink">
-            Você {dados?.heroPos ? <>no <b>{dados.heroPos}</b></> : "na mesa"}
+            {hero} {dados?.heroPos ? <>no <b>{dados.heroPos}</b></> : "na mesa"}
             {dados?.stackBb != null && <> com <b>{dados.stackBb.toLocaleString("pt-BR", { maximumFractionDigits: 1 })} bb</b></>}
           </p>
           <p className="m-0">
@@ -143,12 +145,12 @@ export function ResumoDaMao({ hand, historicoBruto }: { hand: ParsedHand; histor
                   {r.actions.length === 0
                     ? "Sem ação (já estava all-in)."
                     : r.actions.map((a, i) => {
-                        const hero = a.pos === dados.heroPos;
+                        const ehHero = a.pos === dados.heroPos;
                         return (
                           <span key={i}>
                             {i > 0 && <span className="text-muted"> · </span>}
-                            <span className={hero ? "font-semibold text-[#d4af37]" : a.label === "fold" ? "text-muted" : ""}>
-                              {hero ? "Você" : a.pos} {rotuloAcao(a.label)}
+                            <span className={ehHero ? "font-semibold text-[#d4af37]" : a.label === "fold" ? "text-muted" : ""}>
+                              {ehHero ? hero : a.pos} {rotuloAcao(a.label)}
                             </span>
                           </span>
                         );

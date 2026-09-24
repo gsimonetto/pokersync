@@ -10,7 +10,7 @@ import { ModalPortal } from "@/components/modal-portal";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
-import { markReviewViewedInReplayer } from "@/lib/services/hand-review-service";
+import { marcarMaoCompartilhadaVista, markReviewViewedInReplayer } from "@/lib/services/hand-review-service";
 import { resumoDaMao, formatarBb, type ResumoMao } from "@/lib/poker/hand-summary";
 import { F, T } from "@/lib/poker/drill-theme";
 
@@ -93,6 +93,10 @@ interface HandInListing {
   // mais `status === "concluida"` (que so reflete o fluxo separado de
   // "Analisar mao" em RevisorDetalhe).
   viewed_in_replayer_at: string | null;
+  // Dono da mao -- a mesa tambem abre mao de OUTRA pessoa (o coach vendo a
+  // mao que o jogador compartilhou, link ?shared=), e ai' salvar, dar nota,
+  // calcular EV e marcar como vista ficam so' com o dono.
+  user_id?: string;
   // Marcadores da mao (pedido explicito: filtrar maos marcadas na lista).
   // hand_review_tags vem como OBJETO (tag_id -> hand_review_tags e'
   // muitos-pra-um, o PostgREST devolve um objeto so'), mas o tipo aceita
@@ -209,6 +213,9 @@ export function RevisorSessao({
   // no modo reviewIds nao existe uma linha de hand_sessions de verdade.
   const [session, setSession] = useState<{ label: string | null } | null>(null);
   const [hands, setHands] = useState<HandInListing[]>([]);
+  // Quem esta' olhando -- pra saber se a mao aberta e' dele (ver user_id
+  // em HandInListing).
+  const [meuId, setMeuId] = useState<string | null>(null);
   const [selectedId, setSelectedId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -291,7 +298,7 @@ export function RevisorSessao({
   }, [loading]);
 
   const HANDS_SELECT =
-    "id, title, hand_history, parsed_data, created_at, status, viewed_in_replayer_at, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )";
+    "id, user_id, title, hand_history, parsed_data, created_at, status, viewed_in_replayer_at, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )";
 
   useEffect(() => {
     let cancelled = false;
@@ -300,6 +307,10 @@ export function RevisorSessao({
       setError(null);
       try {
         const supabase = createClient();
+        const {
+          data: { session: sessaoAuth },
+        } = await supabase.auth.getSession();
+        setMeuId(sessaoAuth?.user.id ?? null);
         let handsList: HandInListing[];
         let sessionLabel: string | null;
         if (reviewIds) {
@@ -349,6 +360,7 @@ export function RevisorSessao({
   // Cacheia por id pra nao reparsear ao trocar de volta.
   const [parsedCache, setParsedCache] = useState<Record<string, ParsedHand | null>>({});
   const selectedHand = useMemo(() => hands.find((h) => h.id === selectedId) ?? null, [hands, selectedId]);
+  const maoDeOutro = !!selectedHand?.user_id && !!meuId && selectedHand.user_id !== meuId;
   const parsedForSelected: ParsedHand | null | undefined = selectedId ? parsedCache[selectedId] : null;
 
   useEffect(() => {
@@ -385,8 +397,19 @@ export function RevisorSessao({
   // ja' so' grava na 1a vez (WHERE viewed_in_replayer_at IS NULL); o guard
   // local (selectedHand?.viewed_in_replayer_at) so evita a chamada de rede
   // repetida ao reabrir a mesma mao na sessao.
+  const compartilhadasVistas = useRef(new Set<string>());
   useEffect(() => {
-    if (!selectedId || !parsedForSelected || selectedHand?.viewed_in_replayer_at) return;
+    if (!selectedId || !parsedForSelected) return;
+    // Mao de outra pessoa (coach vendo a mao que o jogador compartilhou): o
+    // "vista" da mao e' do dono -- aqui marca so' o compartilhamento como
+    // visto pelo coach (o painel dele separa o que ja' viu), uma vez.
+    if (maoDeOutro) {
+      if (compartilhadasVistas.current.has(selectedId)) return;
+      compartilhadasVistas.current.add(selectedId);
+      marcarMaoCompartilhadaVista(selectedId).catch(() => {});
+      return;
+    }
+    if (selectedHand?.viewed_in_replayer_at) return;
     markReviewViewedInReplayer(selectedId)
       .then(() => {
         setHands((prev) =>
@@ -394,7 +417,7 @@ export function RevisorSessao({
         );
       })
       .catch(() => {});
-  }, [selectedId, parsedForSelected, selectedHand]);
+  }, [selectedId, parsedForSelected, selectedHand, maoDeOutro]);
 
   // Busca (lupa): filtra por posicao do hero, stack inicial do hero, ou
   // numero da mao ("Mão 5" casa com "5"). Um unico campo de texto livre
@@ -829,6 +852,7 @@ export function RevisorSessao({
       canAdvanceOnError={hasNextHand}
       actionsSlot={isMobile ? actionsSlotEl : undefined}
       avaliacaoSlot={isMobile ? undefined : avaliacaoSlotEl}
+      somenteLeitura={maoDeOutro}
       onPrevHand={hasPrevHand ? goToPrevHandManual : undefined}
       onNextHand={hasNextHand ? goToNextHandManual : undefined}
       // RevisorHandTable so' renderiza esse botao no proprio header

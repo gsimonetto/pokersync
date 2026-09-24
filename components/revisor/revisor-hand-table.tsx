@@ -249,6 +249,7 @@ export function RevisorHandTable({
   canAdvanceOnError = true,
   actionsSlot,
   avaliacaoSlot,
+  somenteLeitura = false,
   onPrevHand,
   onNextHand,
   onBack,
@@ -301,6 +302,13 @@ export function RevisorHandTable({
   // avaliacao-rapida.tsx). Ausente = o cartao nao aparece (no celular a
   // nota vai numa faixa embaixo da mesa, dentro deste componente).
   avaliacaoSlot?: HTMLElement | null;
+  // Mao de OUTRA pessoa (o coach abrindo a mao que o jogador compartilhou,
+  // link ?shared=): a mesa funciona igual, mas o que grava na mao ou em
+  // nome de quem clica fica so' com o dono -- sem Salvar, sem calcular
+  // EV/ICM (o resultado seria gravado no nome do coach e depois travaria o
+  // calculo do proprio jogador nessa mao) e a nota por rua vira so' leitura
+  // (a nota que o JOGADOR deu).
+  somenteLeitura?: boolean;
   // Navegar pra mao anterior/seguinte da sessao -- pedido explicito: o
   // chip unico de controles no celular ganha "ir pra proxima mao" (e
   // anterior) alem dos passos dentro da mesma mao. Omitido = botao
@@ -436,7 +444,7 @@ export function RevisorHandTable({
   useEffect(() => {
     setEvResult(null);
     setEvError("");
-    if (!reviewId || !evEligible) return;
+    if (!reviewId || !evEligible || somenteLeitura) return;
     let cancelled = false;
     fetchHandEvResult(reviewId)
       .then((r) => {
@@ -446,7 +454,7 @@ export function RevisorHandTable({
     return () => {
       cancelled = true;
     };
-  }, [reviewId, evEligible]);
+  }, [reviewId, evEligible, somenteLeitura]);
 
   async function handleComputeEv() {
     if (!reviewId) return;
@@ -726,7 +734,8 @@ export function RevisorHandTable({
   // MESMAS do "Analisar mão" (hand_review_street_evals). Só nas mãos do
   // próprio jogador (onde existe "Analisar mão"), e só nas ruas em que a
   // jogada dele já apareceu no replay (sem entregar a mão antes da hora).
-  // Onde aparecem: ver avaliacao-rapida.tsx.
+  // Onde aparecem: ver avaliacao-rapida.tsx. Mao de outra pessoa (coach):
+  // aparecem so' pra ver a nota do jogador (somenteLeitura).
   const podeAvaliar = !!reviewId && !!onOpenHand;
   const [avaliacoes, setAvaliacoes] = useState<Record<string, string>>({});
   useEffect(() => {
@@ -744,7 +753,7 @@ export function RevisorHandTable({
   }, [reviewId, podeAvaliar]);
   const avaliar = useCallback(
     async (rua: string, nota: string) => {
-      if (!reviewId) return false;
+      if (!reviewId || somenteLeitura) return false;
       const antes = avaliacoes[rua] ?? "";
       setAvaliacoes((a) => ({ ...a, [rua]: nota }));
       try {
@@ -756,7 +765,7 @@ export function RevisorHandTable({
         return false;
       }
     },
-    [reviewId, avaliacoes]
+    [reviewId, avaliacoes, somenteLeitura]
   );
   const ruasAvaliaveis = useMemo(() => {
     if (!replayState || !podeAvaliar) return [];
@@ -840,7 +849,7 @@ export function RevisorHandTable({
   // (RevisorSessao), nao a propria RevisorDetalhe. La' o header ja tem
   // seu proprio bookmark (o mesmo campo, mesma acao) -- mostrar os dois
   // ao mesmo tempo na mesma tela seria redundante.
-  const canSave = !!reviewId && !!onOpenHand;
+  const canSave = !!reviewId && !!onOpenHand && !somenteLeitura;
   const isLastStep = replayState.stepIndex >= replayState.stepCount - 1;
   const heroPos = replayState.seatLayout.find((s) => s.isHero)?.posLabel ?? null;
 
@@ -961,6 +970,7 @@ export function RevisorHandTable({
                   navegação -- nesse tamanho ele sai daqui (o cálculo
                   continua em "Analisar mão"). */}
               {evEligible &&
+                !somenteLeitura &&
                 !compact &&
                 (evResult ? (
                   <InfoChip
@@ -1217,7 +1227,7 @@ export function RevisorHandTable({
             (perto do polegar) -- em cima não dá: as cartas dos assentos do
             topo passam da borda da mesa e cobriam a faixa no celular baixo. */}
         {isMobile && podeAvaliar && (
-          <FaixaAvaliacaoCelular avaliacoes={avaliacoes} ruasLiberadas={ruasAvaliaveis} onAvaliar={avaliar} />
+          <FaixaAvaliacaoCelular avaliacoes={avaliacoes} ruasLiberadas={ruasAvaliaveis} onAvaliar={avaliar} somenteLeitura={somenteLeitura} />
         )}
       </div>
 
@@ -1249,6 +1259,7 @@ export function RevisorHandTable({
                 toque do celular. Com rotulo em texto, o motivo fica visivel
                 na propria tela em vez de invisivel. */}
             {evEligible &&
+              !somenteLeitura &&
               (evResult ? (
                 <ChipButton
                   icon={<Gauge size={13} />}
@@ -1300,7 +1311,13 @@ export function RevisorHandTable({
           mesa não usa, então nada nela muda de tamanho nem fica coberto. */}
       {!isMobile && podeAvaliar && avaliacaoSlot &&
         createPortal(
-          <CartaoAvaliacao avaliacoes={avaliacoes} ruasLiberadas={ruasAvaliaveis} fimDaMao={isLastStep} onAvaliar={avaliar} />,
+          <CartaoAvaliacao
+            avaliacoes={avaliacoes}
+            ruasLiberadas={ruasAvaliaveis}
+            fimDaMao={isLastStep}
+            onAvaliar={avaliar}
+            somenteLeitura={somenteLeitura}
+          />,
           avaliacaoSlot
         )}
 

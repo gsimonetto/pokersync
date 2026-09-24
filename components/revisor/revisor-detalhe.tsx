@@ -409,6 +409,14 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
     }
   }
 
+  // Mão de OUTRA pessoa (o coach abrindo a mão que o jogador compartilhou
+  // com ele): a análise é do jogador e aparece só pra ler -- sem salvar,
+  // compartilhar, calcular EV (gravaria no nome do coach e travaria o
+  // cálculo do jogador), marcadores ou Banca. A conversa (CoachThread)
+  // continua liberada: é ali que o coach escreve.
+  const somenteLeitura = !!userId && !!review && review.user_id !== userId;
+  const heroNome = somenteLeitura ? "Jogador" : "Você";
+
   // O que aconteceu em cada rua até a sua última decisão nela, sem os
   // folds dos outros: "MP raise 2,4 · CO all-in 23,8 · Você all-in 50,8".
   // É o que o passo 1 avalia -- antes a tela só dizia "Pré-flop".
@@ -426,13 +434,13 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         mapa[r.street.toLowerCase()] = acoes
           .slice(inicio, ultimaMinha + 1)
           .filter((a) => a.label !== "fold" || a.pos === heroPos)
-          .map((a) => ({ texto: `${a.pos === heroPos ? "Você" : a.pos} ${rotuloAcao(a.label)}`, voce: a.pos === heroPos }));
+          .map((a) => ({ texto: `${a.pos === heroPos ? heroNome : a.pos} ${rotuloAcao(a.label)}`, voce: a.pos === heroPos }));
       }
     } catch {
       // replay não montou -- o passo 1 mostra só o nome da rua
     }
     return mapa;
-  }, [parsedHandForTable]);
+  }, [parsedHandForTable, heroNome]);
 
   if (loading) return <p className="text-muted">Carregando…</p>;
   if (!review) return <p className="text-muted">Mão não encontrada.</p>;
@@ -483,7 +491,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
     setStreetEvals((prev) => prev.map((e, i) => (i === idx ? { ...e, self_rating: code, reason_code: code === "errei" ? e.reason_code : "" } : e)));
 
   const passo1 = (
-    <Passo numero={1} titulo="Como você jogou?" feito={passo1Ok}>
+    <Passo numero={1} titulo={somenteLeitura ? "Como o jogador jogou?" : "Como você jogou?"} feito={passo1Ok}>
       {ruasParaAvaliar.map(({ ev, idx }) => {
         const lances = lancesPorRua[ev.street] ?? [];
         const cartas = cartasDaRua(ev.street);
@@ -511,41 +519,48 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   </span>
                 ))}
               </p>
-            ) : (
+            ) : somenteLeitura ? null : (
               <p className="m-0 mt-1 text-[12px] text-muted">Avalie pelo que você lembra da sua decisão nessa rua.</p>
             )}
 
-            <div className="mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label={`Sua decisão no ${NOME_RUA[ev.street.toUpperCase()] ?? ev.street}`}>
-              {OPCOES_AVALIACAO.map((r) => {
-                const ativo = ev.self_rating === r.code;
-                return (
-                  <button
-                    key={r.code}
-                    type="button"
-                    aria-pressed={ativo}
-                    onClick={() => avaliarRua(idx, r.code)}
-                    className="flex-1 rounded-lg border px-2 py-1.5 text-[12px] transition-colors"
-                    style={{
-                      borderColor: ativo ? r.color : "rgba(255,255,255,0.12)",
-                      background: ativo ? r.color : "transparent",
-                      color: ativo ? "#000" : "#fff",
-                      fontWeight: ativo ? 700 : 500,
-                    }}
-                  >
-                    {r.label}
-                  </button>
-                );
-              })}
-            </div>
+            {somenteLeitura && (!ev.self_rating || ev.self_rating === "nao_se_aplica") ? (
+              <p className="m-0 mt-2 text-[12px] text-muted">O jogador não deu nota nessa rua.</p>
+            ) : (
+              <div className="mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label={`Decisão no ${NOME_RUA[ev.street.toUpperCase()] ?? ev.street}`}>
+                {OPCOES_AVALIACAO.map((r) => {
+                  const ativo = ev.self_rating === r.code;
+                  return (
+                    <button
+                      key={r.code}
+                      type="button"
+                      aria-pressed={ativo}
+                      disabled={somenteLeitura}
+                      onClick={() => avaliarRua(idx, r.code)}
+                      className="flex-1 rounded-lg border px-2 py-1.5 text-[12px] transition-colors disabled:cursor-default"
+                      style={{
+                        borderColor: ativo ? r.color : "rgba(255,255,255,0.12)",
+                        background: ativo ? r.color : "transparent",
+                        color: ativo ? "#000" : "#fff",
+                        fontWeight: ativo ? 700 : 500,
+                        opacity: somenteLeitura && !ativo ? 0.35 : 1,
+                      }}
+                    >
+                      {r.label}
+                    </button>
+                  );
+                })}
+              </div>
+            )}
 
-            {ev.self_rating === "errei" && (
+            {ev.self_rating === "errei" && (!somenteLeitura || ev.reason_code) && (
               <select
                 value={ev.reason_code}
+                disabled={somenteLeitura}
                 onChange={(e) => {
                   const val = e.target.value;
                   setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: val } : x)));
                 }}
-                className="mt-2 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[12px] text-ink outline-none"
+                className="mt-2 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[12px] text-ink outline-none disabled:opacity-80"
               >
                 <option value="">O que deu errado? (opcional)</option>
                 {reasons.map((r) => (
@@ -577,11 +592,12 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
 
             {/* "Por quê?" só depois de escolher -- a pergunta guiada vira a
                 dica do campo, em vez de mais um bloco de texto na tela. */}
-            {ev.self_rating && question && (
+            {ev.self_rating && question && (!somenteLeitura || question.answer.trim()) && (
               <label className="mt-2 block">
-                <span className="text-[11px] text-muted">Por quê? (opcional)</span>
+                <span className="text-[11px] text-muted">{somenteLeitura ? "Por quê" : "Por quê? (opcional)"}</span>
                 <textarea
                   value={question.answer}
+                  readOnly={somenteLeitura}
                   onChange={(e) => updateAnswer(idx, e.target.value)}
                   rows={2}
                   placeholder={question.question}
@@ -608,9 +624,10 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   <span className="text-[11.5px] font-medium text-ink/80">{q.question}</span>
                   <textarea
                     value={q.answer}
+                    readOnly={somenteLeitura}
                     onChange={(e) => updateAnswer(idx, e.target.value)}
                     rows={2}
-                    placeholder="Sua resposta…"
+                    placeholder={somenteLeitura ? "Sem resposta." : "Sua resposta…"}
                     className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12px] text-ink outline-none focus:border-ink/40"
                   />
                 </label>
@@ -627,28 +644,44 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       <header className="flex items-center justify-between gap-3">
         <div className="flex items-center gap-2">
           <Scale size={15} className="icon-glow text-review" />
-          <h3 className="m-0 text-sm font-semibold text-ink">Sua análise</h3>
+          <h3 className="m-0 text-sm font-semibold text-ink">{somenteLeitura ? "Análise do jogador" : "Sua análise"}</h3>
         </div>
         <span className="tnum text-[11px] text-muted">{passosFeitos} de 2 passos</span>
       </header>
       <p className="m-0 mt-1 text-[12px] leading-snug text-muted">
-        Avalie o que você fez e escreva o que aprendeu. O treino no fim é opcional.
+        {somenteLeitura
+          ? "O que o jogador marcou em cada rua e o que ele aprendeu com a mão. Só pra ler."
+          : "Avalie o que você fez e escreva o que aprendeu. O treino no fim é opcional."}
       </p>
 
       <div className="mt-3.5 flex flex-col gap-4">
         {passo1}
 
-        <Passo numero={2} titulo="O que você leva dessa mão?" feito={passo2Ok}>
-          <textarea
-            value={learning}
-            onChange={(e) => setLearning(e.target.value)}
-            rows={2}
-            placeholder="Uma frase curta. Ex.: com KK no BTN, all-in em cima de shove curto é sempre call."
-            className="w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[12.5px] text-ink outline-none focus:border-ink/40"
-          />
-          <p className="m-0 text-[11px] text-muted">É essa frase que conclui a análise e fica guardada pra você rever depois.</p>
+        <Passo numero={2} titulo={somenteLeitura ? "O que o jogador levou dessa mão?" : "O que você leva dessa mão?"} feito={passo2Ok}>
+          {somenteLeitura && !learning.trim() ? (
+            <p className="m-0 text-[12px] text-muted">O jogador ainda não escreveu.</p>
+          ) : (
+            <textarea
+              value={learning}
+              readOnly={somenteLeitura}
+              onChange={(e) => setLearning(e.target.value)}
+              rows={2}
+              placeholder="Uma frase curta. Ex.: com KK no BTN, all-in em cima de shove curto é sempre call."
+              className="w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[12.5px] text-ink outline-none focus:border-ink/40"
+            />
+          )}
+          {!somenteLeitura && (
+            <p className="m-0 text-[11px] text-muted">É essa frase que conclui a análise e fica guardada pra você rever depois.</p>
+          )}
         </Passo>
 
+        {somenteLeitura ? (
+          drill.trim() && (
+            <Passo numero={3} titulo="Spot que o jogador quer treinar" opcional>
+              <p className="m-0 text-[12.5px] leading-relaxed text-ink/85">{drill}</p>
+            </Passo>
+          )
+        ) : (
         <Passo numero={3} titulo="Treinar esse spot" opcional>
           {drillAuto ? (
             <Link
@@ -674,10 +707,12 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             />
           </details>
         </Passo>
+        )}
       </div>
 
       {error && <div className="mt-3 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{error}</div>}
 
+      {!somenteLeitura && (
       <footer className="mt-4 flex flex-col gap-2">
         {!canConclude && <p className="m-0 text-center text-[11.5px] text-muted">Pra concluir, falta o passo 2: escrever o que você aprendeu.</p>}
         <div className="flex gap-2.5">
@@ -699,6 +734,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           </button>
         </div>
       </footer>
+      )}
     </section>
   );
 
@@ -707,7 +743,9 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   // vínculo com a Banca (antes ficavam no topo, competindo com o título).
   const extras = (
     <>
-      {imgUrls.length > 0 && (
+      {/* some(Boolean): print que não abre (ex.: o coach não tem acesso à
+          pasta de prints do jogador) não deixa mais uma caixa vazia. */}
+      {imgUrls.some(Boolean) && (
         <section className="painel-vidro rounded-2xl border border-white/10 p-3.5">
           <h3 className="m-0 text-sm font-semibold text-ink">Prints</h3>
           <div className="mt-2 grid grid-cols-3 gap-2">
@@ -724,7 +762,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </section>
       )}
 
-      {parsedHandForTable && findEligibleAllInConfrontation(parsedHandForTable) && (
+      {!somenteLeitura && parsedHandForTable && findEligibleAllInConfrontation(parsedHandForTable) && (
         <section className="painel-vidro rounded-2xl border border-white/10 p-3.5">
           <div className="flex items-center gap-2">
             <Gauge size={15} className="icon-glow text-review" />
@@ -775,11 +813,13 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </section>
       )}
 
-      {isPrintOnly && (
+      {isPrintOnly && (!somenteLeitura || ticketSaved) && (
         <section className="rounded-xl border border-evolution/40 bg-evolution/[0.06] p-3">
           <h3 className="m-0 text-sm font-semibold text-ink">Ficha rápida</h3>
           <p className="mb-3 mt-1 text-xs text-muted">
-            Sem hand history pra ancorar o contexto — classifique em 3 toques pra essa mão entrar nas suas estatísticas de leak.
+            {somenteLeitura
+              ? "Como o jogador classificou essa mão."
+              : "Sem hand history pra ancorar o contexto — classifique em 3 toques pra essa mão entrar nas suas estatísticas de leak."}
           </p>
 
           <div className="mb-3">
@@ -789,6 +829,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                 <button
                   key={f}
                   onClick={() => saveTicket({ ...ticket, format: f })}
+                  disabled={somenteLeitura}
                   className={`rounded-full border px-2.5 py-1.5 text-xs transition-colors ${
                     ticket.format === f ? "border-evolution bg-evolution text-void" : "border-hairline bg-void text-ink"
                   }`}
@@ -806,6 +847,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                 <button
                   key={s}
                   onClick={() => saveTicket({ ...ticket, street: s })}
+                  disabled={somenteLeitura}
                   className={`rounded-full border px-2.5 py-1.5 text-xs capitalize transition-colors ${
                     ticket.street === s ? "border-evolution bg-evolution text-void" : "border-hairline bg-void text-ink"
                   }`}
@@ -823,6 +865,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                 <button
                   key={a}
                   onClick={() => saveTicket({ ...ticket, action: a })}
+                  disabled={somenteLeitura}
                   className={`rounded-full border px-2.5 py-1.5 text-xs transition-colors ${
                     ticket.action === a ? "border-evolution bg-evolution text-void" : "border-hairline bg-void text-ink"
                   }`}
@@ -837,6 +880,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         </section>
       )}
 
+      {!somenteLeitura && (
       <details
         className="painel-vidro group rounded-2xl border border-white/10 px-3.5 py-3"
         onToggle={(e) => {
@@ -923,6 +967,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           </div>
         </div>
       </details>
+      )}
     </>
   );
 
@@ -933,6 +978,9 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="m-0 text-xl font-semibold tracking-tight text-ink">{review.title || "Mão sem título"}</h2>
+          {somenteLeitura && (
+            <p className="m-0 mt-1 text-[12.5px] text-muted">Mão do jogador, só pra ler. A sua análise vai na conversa logo abaixo.</p>
+          )}
           {review.tags.length > 0 && (
             <div className="mt-1.5 flex flex-wrap items-center gap-1">
               {review.tags.map((t) => (
@@ -944,6 +992,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           )}
         </div>
 
+        {!somenteLeitura && (
         <div className="flex shrink-0 items-center gap-1.5">
           {/* Salvar spot -- maos que valeram a pena guardar pra rever
               depois, com biblioteca propria (aba "Salvos"). */}
@@ -969,6 +1018,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             Compartilhar
           </button>
         </div>
+        )}
       </div>
 
       {/* Conversa do compartilhamento: so renderiza se existir share
@@ -976,7 +1026,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       <CoachThread reviewId={reviewId} reviewTitle={review.title || "Mão sem título"} />
 
       <ShareHandModal
-        open={shareModalOpen}
+        open={shareModalOpen && !somenteLeitura}
         reviewId={reviewId}
         onClose={() => setShareModalOpen(false)}
         onShared={() => {
@@ -992,7 +1042,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           resumo da mão, análise, e só depois os extras. */}
       <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:grid-rows-[auto_1fr]">
         <div className="flex min-w-0 flex-col gap-2.5 lg:col-start-1 lg:row-start-1">
-          {parsedHandForTable && <ResumoDaMao hand={parsedHandForTable} historicoBruto={review.hand_history} />}
+          {parsedHandForTable && <ResumoDaMao hand={parsedHandForTable} historicoBruto={review.hand_history} hero={heroNome} />}
           {(review.free_text || (!parsedHandForTable && review.hand_history)) && (
             <section className="painel-vidro rounded-2xl border border-white/10 p-4">
               <h3 className="m-0 text-sm font-semibold text-ink">Contexto</h3>

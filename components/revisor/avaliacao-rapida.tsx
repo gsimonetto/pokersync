@@ -14,6 +14,8 @@ import { NOME_RUA } from "./linha-do-tempo";
 // escrita pra ela no "Analisar mão", sem a pessoa ver. Só os ícones
 // (✓ ✗ ?), sem escrever "Acertei/Errei/Dúvida" -- pedido explícito: "apenas
 // o ícone já soluciona" (o nome continua no tooltip e pro leitor de tela).
+// Mão de outra pessoa (o coach abrindo a mão que o jogador compartilhou):
+// "somenteLeitura" -- mostra só a nota que o JOGADOR deu, sem botões.
 //
 // Onde fica: no computador, um cartão no rodapé da coluna de mãos (colado
 // na mesa, com as 4 ruas); no celular, uma faixa fina logo abaixo da mesa
@@ -109,23 +111,47 @@ function BotoesNota({
   );
 }
 
+/** Só leitura: a nota que o jogador deu (um ícone só) ou "sem nota". */
+function SeloNota({ nota, tamanho }: { nota: string; tamanho: number }) {
+  const n = NOTAS.find((x) => x.code === nota);
+  if (!n) return <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)" }}>sem nota</span>;
+  const { label, cor, Icone } = n;
+  return (
+    <span
+      role="img"
+      aria-label={`Nota do jogador: ${label}`}
+      title={`Nota do jogador: ${label}`}
+      style={{
+        display: "inline-flex", alignItems: "center", justifyContent: "center", flexShrink: 0,
+        width: tamanho, height: tamanho, borderRadius: 7, border: `1px solid ${cor}`, background: cor, color: "#0A0A0A",
+      }}
+    >
+      <Icone size={Math.round(tamanho * 0.55)} strokeWidth={2.6} />
+    </span>
+  );
+}
+
 /** Computador: cartão com as 4 ruas, no rodapé da coluna de mãos. */
 export function CartaoAvaliacao({
   avaliacoes,
   ruasLiberadas,
   fimDaMao,
   onAvaliar,
+  somenteLeitura = false,
 }: {
   avaliacoes: Record<string, string>;
   /** Ruas em que a sua jogada já apareceu no replay -- só elas aceitam nota. */
   ruasLiberadas: string[];
   fimDaMao: boolean;
   onAvaliar: AvaliarRua;
+  /** Mão de outra pessoa: mostra a nota do jogador, sem botões. */
+  somenteLeitura?: boolean;
 }) {
   const [salvo, marcarSalvo] = useAvisoSalvo();
+  const titulo = somenteLeitura ? "Nota do jogador" : "Como você jogou?";
   return (
     <section
-      aria-label="Como você jogou?"
+      aria-label={titulo}
       style={{
         fontFamily: F,
         flexShrink: 0,
@@ -138,7 +164,7 @@ export function CartaoAvaliacao({
     >
       <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8, marginBottom: 2 }}>
         <span style={{ fontSize: 10, fontWeight: 500, letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-          Como você jogou?
+          {titulo}
         </span>
         <span aria-live="polite" style={{ fontSize: 10, fontWeight: 700, whiteSpace: "nowrap", color: "#34D399" }}>
           {salvo ? "Salvo ✓" : ""}
@@ -155,7 +181,13 @@ export function CartaoAvaliacao({
             {/* No fim da mão, rua sem jogada sua = você não jogou ela
                 (antes disso fica só travada, pra não entregar a mão). */}
             {!liberada && fimDaMao ? (
-              <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>você não jogou</span>
+              <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>{somenteLeitura ? "não jogou" : "você não jogou"}</span>
+            ) : somenteLeitura ? (
+              liberada ? (
+                <SeloNota nota={avaliacoes[rua] ?? ""} tamanho={26} />
+              ) : (
+                <span style={{ fontSize: 10.5, color: "rgba(255,255,255,0.3)" }}>—</span>
+              )
             ) : (
               <BotoesNota
                 nota={avaliacoes[rua] ?? ""}
@@ -179,10 +211,13 @@ export function FaixaAvaliacaoCelular({
   avaliacoes,
   ruasLiberadas,
   onAvaliar,
+  somenteLeitura = false,
 }: {
   avaliacoes: Record<string, string>;
   ruasLiberadas: string[];
   onAvaliar: AvaliarRua;
+  /** Mão de outra pessoa: mostra a nota do jogador, sem botões. */
+  somenteLeitura?: boolean;
 }) {
   const [salvo, marcarSalvo] = useAvisoSalvo();
   // Antes da sua primeira jogada: pré-flop com os botões apagados (igual o
@@ -204,17 +239,23 @@ export function FaixaAvaliacaoCelular({
           aria-live="polite"
           style={{ minWidth: 52, fontSize: 11.5, fontWeight: 600, color: salvo ? "#34D399" : liberada ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.3)" }}
         >
-          {salvo ? "Salvo ✓" : rotulo}
+          {salvo ? "Salvo ✓" : somenteLeitura ? `Nota do jogador · ${rotulo}` : rotulo}
         </span>
-        <BotoesNota
-          nota={avaliacoes[rua] ?? ""}
-          rotuloRua={rotulo}
-          tamanho={34}
-          bloqueado={!liberada}
-          onAvaliar={async (nota) => {
-            if (await onAvaliar(rua, nota)) marcarSalvo();
-          }}
-        />
+        {somenteLeitura ? (
+          <span style={{ display: "inline-flex", alignItems: "center", minHeight: 34, paddingRight: 11 }}>
+            {liberada ? <SeloNota nota={avaliacoes[rua] ?? ""} tamanho={28} /> : <span style={{ color: "rgba(255,255,255,0.3)" }}>—</span>}
+          </span>
+        ) : (
+          <BotoesNota
+            nota={avaliacoes[rua] ?? ""}
+            rotuloRua={rotulo}
+            tamanho={34}
+            bloqueado={!liberada}
+            onAvaliar={async (nota) => {
+              if (await onAvaliar(rua, nota)) marcarSalvo();
+            }}
+          />
+        )}
       </div>
     </div>
   );

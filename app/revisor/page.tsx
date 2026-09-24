@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, Suspense } from "react";
+import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { ArrowLeft, Bookmark, ListChecks, Plus, SlidersHorizontal } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
@@ -28,17 +28,24 @@ type Screen = "fila" | "salvos" | "filtros" | "filtro-replay" | "nova" | "sessao
 // Voltar do detalhe volta pra sessao de origem (nao pra fila) — a gente
 // guarda o sessionId enquanto navega pra manter contexto.
 //
-// Deep-link ?shared=<reviewId> (2026-08): abre direto no "detalhe" —
-// vem do clique na notificacao de "mao compartilhada" (coach recebendo
-// mao de um jogador do time). O coach nao tem contexto de sessao dessa
-// mao (e' do torneio de outra pessoa), entao "voltar" cai na propria
-// fila do coach, nao numa sessao — comportamento aceitavel pro caso de
-// uso (o coach normalmente so chega aqui via notificacao mesmo).
+// Deep-link ?shared=<reviewId>: mao compartilhada com o coach (aviso "Mão
+// pra revisar", aba "Mãos recebidas", detalhe do jogador). Abre na MESA
+// (pedido explicito), com a mao sozinha na lista -- a mesa sabe quando a
+// mao e' de outra pessoa e trava o que so' o dono pode fazer (ver
+// somenteLeitura em RevisorHandTable). Com "&conversa=1" (avisos de
+// mensagem nova e recados do coach) abre direto no "Analisar mão", onde
+// fica a conversa -- e "Voltar" de la' cai na mesa dessa mao. Voltar da
+// mesa vai pra fila de quem esta' olhando (a mao e' do torneio de outra
+// pessoa, nao existe sessao pra voltar).
 
 function RevisorPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [screen, setScreen] = useState<Screen>(() => (searchParams.get("hands") ? "filtro-replay" : "fila"));
+  const sharedParam = searchParams.get("shared");
+  const abrirConversa = searchParams.get("conversa") === "1";
+  const [screen, setScreen] = useState<Screen>(() =>
+    searchParams.get("hands") ? "filtro-replay" : sharedParam ? (abrirConversa ? "detalhe" : "filtro-replay") : "fila"
+  );
   // Deep-link "?hands=id1,id2&label=..." — vem da Performance (posição,
   // decisões, c-bet, matriz de mãos, ruas): abre direto a MESA com a lista
   // dessas mãos pra ver uma a uma (pedido explícito: "quero ver todas as
@@ -46,32 +53,49 @@ function RevisorPageInner() {
   const handsParam = searchParams.get("hands");
   const filterHandIds = handsParam ? handsParam.split(",").filter(Boolean) : undefined;
   const filterLabel = searchParams.get("label") ?? undefined;
-  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(null);
+  const [selectedReviewId, setSelectedReviewId] = useState<string | null>(sharedParam);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
   // Resultado dos Filtros avancados que o jogador clicou pra ver na mesa
   // (replayer) -- guardado enquanto ele navega pro "Analisar mao" e volta,
   // pra reabrir o mesmo conjunto de maos filtradas em vez de voltar pro
   // formulario de filtro.
-  const [filtroReviewIds, setFiltroReviewIds] = useState<string[]>(filterHandIds ?? []);
-  // De onde veio a lista aberta na mesa: Filtros avançados, Salvos ou um
-  // link com filtro (Performance) -- decide o título e pra onde "voltar".
-  const [filtroOrigem, setFiltroOrigem] = useState<"filtros" | "salvos" | "link">(filterHandIds?.length ? "link" : "filtros");
+  const [filtroReviewIds, setFiltroReviewIds] = useState<string[]>(filterHandIds ?? (sharedParam ? [sharedParam] : []));
+  // De onde veio a lista aberta na mesa: Filtros avançados, Salvos, um
+  // link com filtro (Performance) ou uma mao compartilhada -- decide o
+  // título e pra onde "voltar".
+  const [filtroOrigem, setFiltroOrigem] = useState<"filtros" | "salvos" | "link" | "compartilhada">(
+    filterHandIds?.length ? "link" : sharedParam ? "compartilhada" : "filtros"
+  );
   // De onde "detalhe" foi aberto (fila normal, salvos ou replayer dos
   // filtros avancados) — sem isso, voltar de um spot salvo/filtrado caia
   // sempre na fila em vez de voltar pra onde o usuario realmente veio.
-  const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos" | "filtro-replay">("fila");
+  const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos" | "filtro-replay">(sharedParam ? "filtro-replay" : "fila");
   // Muda quando o menu do Radar (agora no cabecalho da pagina) troca o
   // corte ou apaga as importacoes -- remonta a Fila, que relê o corte e as
   // listas do zero.
   const [filaVersao, setFilaVersao] = useState(0);
 
+  // Aviso clicado com o Revisor ja' aberto (o sininho fica em toda tela): a
+  // pagina nao remonta, entao os useState acima nao releem a URL -- sem
+  // isso o clique no aviso nao fazia nada. Na montagem nao faz nada (os
+  // useState ja' cuidaram).
+  const linkCompartilhado = `${sharedParam ?? ""}|${abrirConversa ? 1 : 0}`;
+  const linkAnterior = useRef(linkCompartilhado);
   useEffect(() => {
-    const shared = searchParams.get("shared");
-    if (shared) {
-      setSelectedReviewId(shared);
-      setScreen("detalhe");
-      return;
-    }
+    if (linkAnterior.current === linkCompartilhado) return;
+    linkAnterior.current = linkCompartilhado;
+    if (!sharedParam) return;
+    setFiltroOrigem("compartilhada");
+    setFiltroReviewIds([sharedParam]);
+    setSelectedReviewId(sharedParam);
+    setSelectedSessionId(null);
+    setDetalheOrigin("filtro-replay");
+    setScreen(abrirConversa ? "detalhe" : "filtro-replay");
+  }, [linkCompartilhado, sharedParam, abrirConversa]);
+
+  useEffect(() => {
+    // ?shared= ja' decide a tela no useState acima.
+    if (sharedParam) return;
     // Acao rapida do painel de leaks da Banca: "vi onde perco, quero
     // registrar a mao agora" cai direto na captura, sem passar pela fila.
     if (searchParams.get("nova")) setScreen("nova");
@@ -127,10 +151,11 @@ function RevisorPageInner() {
     setScreen("filtro-replay");
   }
   // Voltar da mesa filtrada: pra lista de onde ela veio. Do link com
-  // filtro (Performance) volta pra fila, limpando o filtro da URL.
+  // filtro (Performance) ou da mao compartilhada volta pra fila, limpando
+  // a URL.
   function voltarDaMesaFiltrada() {
     if (filtroOrigem === "salvos") goSalvos();
-    else if (filtroOrigem === "link") {
+    else if (filtroOrigem === "link" || filtroOrigem === "compartilhada") {
       router.replace("/revisor");
       goFila();
     } else goFiltros();
@@ -229,7 +254,15 @@ function RevisorPageInner() {
         {screen === "filtro-replay" && filtroReviewIds.length > 0 && (
           <RevisorSessao
             reviewIds={filtroReviewIds}
-            title={filtroOrigem === "salvos" ? "Salvos" : filtroOrigem === "link" ? filterLabel ?? "Mãos filtradas" : "Filtros avançados"}
+            title={
+              filtroOrigem === "salvos"
+                ? "Salvos"
+                : filtroOrigem === "link"
+                  ? (filterLabel ?? "Mãos filtradas")
+                  : filtroOrigem === "compartilhada"
+                    ? "Mão compartilhada"
+                    : "Filtros avançados"
+            }
             initialSelectedId={selectedReviewId ?? undefined}
             onOpenHand={goDetalheFromFiltroReplay}
             onBack={voltarDaMesaFiltrada}
