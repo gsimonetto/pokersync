@@ -32,8 +32,8 @@ export function resumoDaMao(hand: ParsedHand): ResumoMao {
   return { resultadoBb, allIn, showdown };
 }
 
-/** "+52,4 bb" / "−3,8 bb" / "0 bb" */
+/** "+52,4 BB" / "−3,8 BB" / "0 BB" -- mesmo formato da mesa e dos botões. */
 export function formatarBb(v: number): string {
   const txt = Math.abs(v).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
-  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${txt} bb`;
+  return `${v > 0 ? "+" : v < 0 ? "−" : ""}${txt} BB`;
 }

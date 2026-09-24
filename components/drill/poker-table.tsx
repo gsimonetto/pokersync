@@ -73,11 +73,13 @@ function truncateName(name: string): string {
 }
 
 // Stack sempre com no máximo 1 casa decimal (pedido explícito: "21.5 no
-// máximo, não mais que isso"). 21.515 -> "21.5"; 21 -> "21" (sem ".0"
-// solto quando o valor já é redondo).
+// máximo, não mais que isso"). 21.515 -> "21,5"; 21 -> "21" (sem ",0"
+// solto quando o valor já é redondo). Vírgula decimal (padrão BR) e
+// "BB" maiúsculo, como as salas mostram quando o valor está em big
+// blinds -- mesmo formato dos botões de ação do Treino.
 function formatStack(value: number): string {
   const rounded = Math.round(value * 10) / 10;
-  return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+  return rounded.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 }
 
 export interface HistoryStep {
@@ -213,7 +215,7 @@ function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: numbe
       }}
     >
       {a.label}
-      {action.size ? ` ${action.size}bb` : ""}
+      {action.size ? ` ${formatStack(action.size)} BB` : ""}
       {potPct && <span style={{ opacity: 0.7 }}> · {potPct} pot</span>}
     </div>
   );
@@ -255,8 +257,8 @@ function CommittedPill({ amount }: { amount: number }) {
     >
       <ChipStackIcon size={13} />
       <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>
-        {amount}
-        <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>bb</span>
+        {formatStack(amount)}
+        <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>BB</span>
       </span>
     </div>
   );
@@ -645,7 +647,7 @@ function Seat({
                 />
               </>
             )}
-            <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} bb</span>
+            <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} BB</span>
           </div>
         </div>
       )}
@@ -768,7 +770,7 @@ function ChipAnimation({
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <ChipStackIcon size={13} />
           <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 500, color: TEXT.critical, ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-            +{amount}bb
+            +{formatStack(amount)} BB
           </span>
         </div>
       </div>
@@ -822,7 +824,7 @@ function PotAwardAnimation({
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <PotChipStack />
           <span style={{ fontFamily: F, fontSize: 13, fontWeight: 700, color: "#FCD34D", ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-            +{amount}bb
+            +{formatStack(amount)} BB
           </span>
         </div>
       </div>
@@ -854,7 +856,7 @@ function SprBadge({ spr }: { spr: number }) {
       }}
     >
       <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.6, color: TEXT.decorative }}>SPR</span>
-      <span style={{ fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>{spr}</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>{formatStack(spr)}</span>
     </div>
   );
 }
@@ -1108,8 +1110,8 @@ export function PokerTable({
                   }}
                 >
                   <PotChipStack />
-                  <span style={{ color: TEXT.critical, fontWeight: 500, fontSize: 15, ...num }}>{hand.pot}</span>
-                  <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>bb</span>
+                  <span style={{ color: TEXT.critical, fontWeight: 500, fontSize: 15, ...num }}>{formatStack(hand.pot)}</span>
+                  <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>BB</span>
                 </div>
               </div>
               <div style={{ display: "flex", gap: 7 }}>
