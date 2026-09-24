@@ -24,7 +24,10 @@ const nextConfig = {
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
-              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com",
+              // economia.awesomeapi.com.br: cotação do dólar (lib/services/fx-service.ts)
+              // -- sem ela aqui o navegador bloqueava a consulta, e a banca
+              // em dólar nunca era convertida pra reais.
+              "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://economia.awesomeapi.com.br",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",

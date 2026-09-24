@@ -4,8 +4,10 @@ import { useEffect, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Flame, Wallet } from "lucide-react";
 import { formatBRL } from "@/lib/format";
+import { fmtMoneyIn } from "@/lib/bankroll/format";
 import { Chip } from "@/components/chip";
 import { EASE, Numero, Selo, TileIcone } from "./painel-card";
+import { InfoHover, type Explicacao } from "./info-hover";
 import { usePainelDados } from "./painel-dados";
 import { dataCurta, num } from "./formato";
 
@@ -20,7 +22,27 @@ function saudacao(hora: number): string {
 // cards. Hierarquia: a Banca total é a informação que importa, então ela
 // tem o maior peso; o relógio é apoio e fica menor e mais apagado.
 export function PainelHeader() {
-  const { perfil, progresso, bancaAtual, resultado30d } = usePainelDados();
+  const { perfil, progresso, bancaAtual, resultado30d, moedaBanca, bancaConvertida } = usePainelDados();
+  const formatarBanca = (v: number) => (moedaBanca === "BRL" ? formatBRL(v) : fmtMoneyIn(v, moedaBanca));
+  // Saldo em outra moeda entra convertido; ao passar o mouse o jogador vê
+  // de onde veio cada parte (ex.: "US$ 305,00 × 5,32").
+  const explicacaoBanca: Explicacao = {
+    titulo: "Banca total",
+    oQueE: "Quanto você tem pra jogar agora: banca inicial + resultado das sessões + depósitos − saques − caixinha.",
+    origem: "Gestão de Banca",
+    comoCalcula:
+      bancaConvertida.length > 0
+        ? "Saldos em outra moeda entram convertidos pra reais (dólar pela cotação do dia)."
+        : moedaBanca !== "BRL"
+          ? `Mostrado em ${moedaBanca}: a cotação pra converter não carregou agora.`
+          : undefined,
+    itens: bancaConvertida.length > 0
+      ? bancaConvertida.map((c) => ({
+          rotulo: `${fmtMoneyIn(c.saldo, c.moeda)} × ${c.taxa.toLocaleString("pt-BR", { maximumFractionDigits: 2 })}`,
+          valor: formatBRL(c.saldo * c.taxa),
+        }))
+      : undefined,
+  };
   const [agora, setAgora] = useState<Date | null>(null);
 
   // Relógio: a data só existe depois de montar no cliente (o servidor
@@ -89,26 +111,28 @@ export function PainelHeader() {
           <p className="mt-1 text-[11px] text-muted/80">{agora ? dataCurta(agora) : ""}</p>
         </div>
 
-        <div className="painel-vidro flex min-w-0 flex-1 items-center gap-3 rounded-2xl border border-white/10 px-4 py-2.5 sm:flex-none">
-          <TileIcone cor="#d4af37" grande>
-            <Wallet size={17} />
-          </TileIcone>
-          <div className="min-w-0 flex-1">
-            <p className="text-[11px] uppercase tracking-[0.1em] text-muted/80">Banca total</p>
-            <p className="tnum text-xl font-semibold leading-tight">
-              {bancaAtual == null ? "—" : <Numero valor={bancaAtual} formatar={formatBRL} duracao={1100} />}
-            </p>
-          </div>
-          {resultado30d != null && (
-            <div className="shrink-0 border-l border-hairline pl-3">
-              <Selo cor={corResultado}>
-                {resultado30d > 0 ? "+" : ""}
-                <Numero valor={resultado30d} formatar={formatBRL} duracao={1100} />
-              </Selo>
-              <p className="mt-1 text-[11px] text-muted/80">30 dias</p>
+        <InfoHover explicacao={explicacaoBanca} className="min-w-0 flex-1 sm:flex-none">
+          <div className="painel-vidro flex min-w-0 items-center gap-3 rounded-2xl border border-white/10 px-4 py-2.5">
+            <TileIcone cor="#d4af37" grande>
+              <Wallet size={17} />
+            </TileIcone>
+            <div className="min-w-0 flex-1">
+              <p className="text-[11px] uppercase tracking-[0.1em] text-muted/80">Banca total</p>
+              <p className="tnum text-xl font-semibold leading-tight">
+                {bancaAtual == null ? "—" : <Numero valor={bancaAtual} formatar={formatarBanca} duracao={1100} />}
+              </p>
             </div>
-          )}
-        </div>
+            {resultado30d != null && (
+              <div className="shrink-0 border-l border-hairline pl-3">
+                <Selo cor={corResultado}>
+                  {resultado30d > 0 ? "+" : ""}
+                  <Numero valor={resultado30d} formatar={formatarBanca} duracao={1100} />
+                </Selo>
+                <p className="mt-1 text-[11px] text-muted/80">30 dias</p>
+              </div>
+            )}
+          </div>
+        </InfoHover>
       </div>
     </header>
   );

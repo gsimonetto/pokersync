@@ -15,6 +15,12 @@
   --font-sans: "Space Grotesk", ui-sans-serif, system-ui, sans-serif;
 }
 
+/* Computador com janela alta o bastante pra uma tela inteira caber sem
+   barra de rolagem (Gestão de Banca). Abaixo de 800px de altura (ex.:
+   notebook 1366x768) os cards ficariam espremidos e cortando conteúdo,
+   então ali a página volta a rolar normalmente. */
+@custom-variant tela-cheia (@media (min-width: 1280px) and (min-height: 800px));
+
 :root {
   color-scheme: dark;
   --background: #000000;
