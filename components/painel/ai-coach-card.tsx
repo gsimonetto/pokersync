@@ -7,6 +7,7 @@ import {
   AlertTriangle,
   ArrowRight,
   BookOpen,
+  Brain,
   Check,
   Crosshair,
   Info,
@@ -425,7 +426,7 @@ export function AiCoachCard({
   return (
     <PainelCard
       title="AI Coach"
-      icon={<Sparkles size={15} />}
+      icon={<Brain size={15} />}
       action={
         atual &&
         total > 1 && (

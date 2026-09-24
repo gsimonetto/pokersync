@@ -78,7 +78,7 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
   }
   if (perf?.taxa_acerto_treino_pct != null) {
     lista.push({
-      rotulo: "Acerto no treino",
+      rotulo: "Acerto GTO",
       valor: pct(perf.taxa_acerto_treino_pct, { casas: 0 }),
       alvo: perf.taxa_acerto_treino_pct,
       formatar: (n) => semPct(pct(n, { casas: 0 })),
@@ -124,12 +124,16 @@ const semPct = (txt: string) => txt.replace(/%$/, "");
 // largura fixa (2 por linha, ao lado do pentágono) e um valor longo
 // passaria por cima do quadro vizinho. Número curto fica grande. Em
 // janela baixa tudo desce um degrau, pro card caber sem barra.
+// No computador os 4 indicadores viram linhas compactas (card da mesma
+// largura dos outros, pedido explícito), então o número cai pra um
+// tamanho só; no celular continuam quadros 2x2 com o número grande.
 function tamanhoValor(numero: string): string {
   const n = numero.length;
-  if (n <= 3) return "text-[32px] xl:[@media(max-height:819px)]:text-[25px]";
-  if (n <= 5) return "text-[28px] xl:[@media(max-height:819px)]:text-[22px]";
-  if (n <= 7) return "text-[23px] xl:[@media(max-height:819px)]:text-[19px]";
-  return "text-[19px] xl:[@media(max-height:819px)]:text-[16px]";
+  const xl = "xl:text-[20px] xl:[@media(max-height:819px)]:text-[17px]";
+  if (n <= 3) return `text-[32px] ${xl}`;
+  if (n <= 5) return `text-[28px] ${xl}`;
+  if (n <= 7) return `text-[23px] ${xl}`;
+  return `text-[19px] ${xl}`;
 }
 
 const COMPONENTES_SCORE: { chave: keyof PlayerPerformance; rotulo: string }[] = [
@@ -179,7 +183,7 @@ export function IndicatorsCard({
   return (
     <PainelCard title="Seus indicadores" icon={<Activity size={15} />} style={style} className={className} ordem={ordem}>
       {carregando ? (
-        <div className="grid h-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid h-full grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
           <div className="painel-esqueleto min-h-[180px] rounded-2xl" />
           <div className="grid grid-cols-2 gap-2">
             {Array.from({ length: 4 }, (_, i) => (
@@ -193,7 +197,7 @@ export function IndicatorsCard({
         // Pentágono do Score à esquerda (o número que resume tudo ganha o
         // maior peso visual) e os outros indicadores 2x2 à direita. No
         // celular, um embaixo do outro.
-        <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,0.95fr)_minmax(0,1.05fr)]">
+        <div className="grid h-full min-h-0 grid-cols-1 gap-2 sm:grid-cols-[minmax(0,1.45fr)_minmax(0,1fr)] xl:grid-cols-[minmax(0,1.7fr)_minmax(0,1fr)]">
           <motion.div
             className="flex min-h-0 flex-col gap-2"
             initial={{ opacity: 0, scale: 0.97 }}
@@ -226,7 +230,7 @@ export function IndicatorsCard({
             )}
           </motion.div>
 
-          <ul className="grid auto-rows-fr grid-cols-2 gap-2">
+          <ul className="grid auto-rows-fr grid-cols-2 gap-2 xl:grid-cols-1">
             {itens.map(({ rotulo, alvo, formatar, sufixo, corValor, detalhe, icone: Icone, cor, progresso: barra, explicacao }, i) => (
               <motion.li
                 key={rotulo}
@@ -238,9 +242,9 @@ export function IndicatorsCard({
                 {/* Passar o mouse (ou focar pelo teclado) mostra o que é o
                     número e de que módulo ele vem. */}
                 <InfoHover explicacao={explicacao} className="h-full">
-                  <Linha className="flex h-full min-w-0 flex-col !p-3 xl:[@media(max-height:819px)]:!p-2">
-                    <span className="flex items-start justify-between gap-2">
-                      <span className="min-w-0 text-[12px] leading-tight text-muted/80">{rotulo}</span>
+                  <Linha className="flex h-full min-w-0 flex-col !p-3 xl:flex-row xl:items-center xl:gap-2 xl:!px-2.5 xl:!py-1.5">
+                    <span className="flex items-start justify-between gap-2 xl:min-w-0 xl:flex-1 xl:flex-row-reverse xl:items-center xl:justify-end">
+                      <span className="min-w-0 text-[12px] leading-tight text-muted/80 xl:truncate xl:text-[11.5px]">{rotulo}</span>
                       <Icone size={15} className="shrink-0" style={{ color: cor }} aria-hidden />
                     </span>
                     {/* Número marcante: centralizado no quadro, em negrito
@@ -248,7 +252,7 @@ export function IndicatorsCard({
                         indicador -- a mesma do ícone, pra o quadro ter uma
                         identidade só. A unidade vem menor e apagada, pra o
                         olho pegar primeiro o valor. */}
-                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center pt-1.5 text-center">
+                    <div className="flex min-h-0 flex-1 flex-col items-center justify-center pt-1.5 text-center xl:flex-none xl:items-end xl:pt-0 xl:text-right">
                       <p
                         className={`tnum flex max-w-full items-baseline justify-center truncate font-bold leading-none tracking-[-0.02em] ${tamanhoValor(formatar(alvo))}`}
                         style={{ color: corValor ?? cor }}
@@ -256,8 +260,8 @@ export function IndicatorsCard({
                         <Numero valor={alvo} formatar={formatar} />
                         {sufixo && <span className="ml-0.5 text-[0.55em] font-semibold tracking-normal text-muted/70">{sufixo}</span>}
                       </p>
-                      {barra != null && <BarraProgresso className="mt-2 h-1 w-full max-w-[120px]" pct={barra} cor={cor} atraso={0.5} />}
-                      <p className="tnum mt-1.5 max-w-full truncate text-[11px] leading-tight text-muted/70">{detalhe}</p>
+                      {barra != null && <BarraProgresso className="mt-2 h-1 w-full max-w-[120px] xl:hidden" pct={barra} cor={cor} atraso={0.5} />}
+                      <p className="tnum mt-1.5 max-w-full truncate text-[11px] leading-tight text-muted/70 xl:mt-0.5 xl:text-[10px] xl:[@media(max-height:819px)]:hidden">{detalhe}</p>
                     </div>
                   </Linha>
                 </InfoHover>
