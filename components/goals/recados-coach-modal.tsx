@@ -252,7 +252,8 @@ export function RecadosCoachModalBody() {
           <ul className="space-y-2">
             {comentarios.map((c) => (
               <li key={c.id} className="rounded-lg border border-hairline bg-elevated p-3">
-                <Link href={`/revisor?shared=${c.reviewId}`} className="text-[12.5px] font-semibold text-ink hover:text-training hover:underline">
+                {/* conversa=1: comentário abre direto na conversa ("Analisar mão"). */}
+                <Link href={`/revisor?shared=${c.reviewId}&conversa=1`} className="text-[12.5px] font-semibold text-ink hover:text-training hover:underline">
                   {c.reviewTitle}
                 </Link>
                 <p className="mt-0.5 text-[12.5px] text-muted">

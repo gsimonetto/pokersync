@@ -846,6 +846,24 @@ export async function markShareViewed(shareId: string) {
     .is("viewed_at", null);
 }
 
+// Mesmo "visto" do markShareViewed, mas pelo id da mao -- a mesa do
+// Revisor (link ?shared=, que agora abre na mesa) tem a mao, nao o
+// compartilhamento. So' marca o lado de quem RECEBEU (RLS
+// hrs_update_viewed) e so' na primeira vez.
+export async function marcarMaoCompartilhadaVista(reviewId: string) {
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) return;
+  await supabase
+    .from("hand_review_shares")
+    .update({ viewed_at: new Date().toISOString() })
+    .eq("review_id", reviewId)
+    .eq("shared_with", session.user.id)
+    .is("viewed_at", null);
+}
+
 export async function fetchShareComments(shareId: string): Promise<ShareComment[]> {
   const supabase = createClient();
   const { data: userData } = await supabase.auth.getUser();
@@ -900,13 +918,15 @@ export async function addShareComment(
     .single();
   if (error) throw error;
 
-  // Avisa o outro lado — mesmo deep-link da mao compartilhada.
+  // Avisa o outro lado -- deep-link da mao compartilhada com "conversa=1":
+  // mensagem nova abre direto no "Analisar mão", onde a conversa fica (sem
+  // isso o link abre a mesa, que e' o que o aviso "Mão pra revisar" quer).
   await supabase.rpc("notify_user", {
     p_user_id: thread.counterpartId,
     p_title: thread.iAmCoach ? "Comentário do coach" : "Resposta do jogador",
     p_body: `Nova mensagem em "${reviewTitle || "uma mão"}".`,
     p_kind: "info",
-    p_action_url: `/revisor?shared=${reviewId}`,
+    p_action_url: `/revisor?shared=${reviewId}&conversa=1`,
     p_category: "team",
   });
 
