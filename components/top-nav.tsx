@@ -6,11 +6,10 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { Bell, CircleHelp, CreditCard, Crown, House, Trophy } from "lucide-react";
 import { Logo } from "./logo";
-import { Avatar } from "./avatar";
+import { AvatarNivel } from "./avatar-nivel";
 import { ProfileMenu } from "./profile-menu";
 import { NotificationsMenu } from "./notifications-menu";
 import { HelpMenu } from "./help-menu";
-import { RankChip } from "./ui/rank-chip";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { fetchMyPlanId } from "@/lib/services/plan-service";
@@ -64,6 +63,7 @@ export function TopNav() {
   usePresenceHeartbeat();
   const [profile, setProfile] = useState<Profile | null>(null);
   const [level, setLevel] = useState<number | null>(null);
+  const [xpNivel, setXpNivel] = useState(0);
   const [unread, setUnread] = useState(0);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
   const [plan, setPlan] = useState<PlanId | null>(null);
@@ -75,13 +75,14 @@ export function TopNav() {
         const supabase = createClient();
         const [p, { data: progressRow }, unreadCount, planId] = await Promise.all([
           fetchProfile(),
-          supabase.from("user_progress").select("level").maybeSingle(),
+          supabase.from("user_progress").select("level, xp_current").maybeSingle(),
           fetchUnreadCount().catch(() => 0),
           fetchMyPlanId().catch(() => null),
         ]);
         if (!alive) return;
         setProfile(p);
         setLevel(progressRow?.level ?? null);
+        setXpNivel(progressRow?.xp_current ?? 0);
         setUnread(unreadCount);
         setPlan(planId);
       } catch {
@@ -208,8 +209,9 @@ export function TopNav() {
               className="ml-1 flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.04] py-1 pl-1 pr-1.5 transition-colors hover:bg-white/[0.08] sm:ml-1.5 sm:gap-2 sm:pr-2.5"
               aria-label="Perfil"
             >
-              <Avatar id={profile?.avatar_id ?? 1} url={profile?.avatar_url} size={34} />
-              {level != null && <RankChip level={level} />}
+              {/* Anel de nível (cor da patente + quanto falta pro próximo),
+                  o mesmo de toda foto de jogador no app. */}
+              <AvatarNivel avatarId={profile?.avatar_id ?? 1} avatarUrl={profile?.avatar_url} tamanho={36} nivel={level} xpAtual={xpNivel} />
             </button>
             {openMenu === "profile" && profile && (
               <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />

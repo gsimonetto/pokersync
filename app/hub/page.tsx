@@ -1,28 +1,46 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import { Target, Trophy } from "lucide-react";
+import { MotionConfig } from "framer-motion";
+import { Layers, Target, Trophy } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { TabNav } from "@/components/ui/tab-nav";
-import { Esqueleto } from "@/components/painel/painel-card";
+import { PainelVisual } from "@/components/dashboard/kit";
+import { PerfEstilos } from "@/components/performance/perf-estilos";
+import { AbasAnimadas } from "@/components/performance/abas-animadas";
+import { PainelCard } from "@/components/painel/painel-card";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { CartaoNivel, HubEstilos, PatentesModal } from "@/components/hub/nivel";
 import { Missoes } from "@/components/hub/missoes";
 import { Ranking } from "@/components/hub/ranking/ranking";
+import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import {
+  MAX_LEVEL,
   fetchActiveMissions,
   fetchActiveSeason,
   fetchMissionCatalog,
   fetchProgress,
+  levelColor,
+  levelMaterial,
+  levelSubTier,
+  xpForNextLevel,
   type Progress,
   type Season,
 } from "@/lib/services/xp-service";
 
 type Vista = "missoes" | "ranking";
 
-// Hub de Evolução: duas vistas (Missões / Ranking) no mesmo lugar. A aba
-// vai pra URL (?aba=ranking) pra dar pra linkar direto no ranking -- ex.:
-// avisos de fim de temporada -- e pro "voltar" do navegador respeitar a
-// aba em que a pessoa estava.
+const ABAS = [
+  { value: "missoes" as const, label: "Missões", icon: Target },
+  { value: "ranking" as const, label: "Ranking", icon: Trophy },
+];
+
+// Hub de Evolução. Mesmo padrão visual do Início, do Time e da
+// Performance (pedido explícito): fundo com brilho suave (PerfEstilos),
+// título grande no topo, abas presas ao rolar (AbasAnimadas) e todo
+// conteúdo em cards de vidro (PainelCard / PainelVisual "vidro").
+//
+// A aba vai pra URL (?aba=ranking) pra dar pra linkar direto no ranking
+// -- ex.: avisos de fim de temporada.
 function vistaDaUrl(): Vista {
   try {
     return new URLSearchParams(window.location.search).get("aba") === "ranking" ? "ranking" : "missoes";
@@ -34,6 +52,7 @@ function vistaDaUrl(): Vista {
 export default function HubPage() {
   const [vista, setVista] = useState<Vista>("missoes");
   const [progress, setProgress] = useState<Progress | null>(null);
+  const [perfil, setPerfil] = useState<Profile | null>(null);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
   const [ativas, setAtivas] = useState<any[]>([]);
   // eslint-disable-next-line @typescript-eslint/no-explicit-any
@@ -56,7 +75,6 @@ export default function HubPage() {
     } catch {
       // sem URL: só troca a aba
     }
-    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   useEffect(() => {
@@ -65,6 +83,9 @@ export default function HubPage() {
       .then((s) => vivo && setSeason(s))
       .catch(() => {})
       .finally(() => vivo && setSeasonPronta(true));
+    fetchProfile()
+      .then((p) => vivo && setPerfil(p))
+      .catch(() => {});
     (async () => {
       try {
         const [p, m, c] = await Promise.all([fetchProgress(), fetchActiveMissions(), fetchMissionCatalog()]);
@@ -85,42 +106,86 @@ export default function HubPage() {
 
   return (
     <AppShell>
-      <main className="w-full px-4 py-6 md:px-6 md:py-8">
-        <HubEstilos />
-        <div className="rounded-3xl border border-hairline bg-surface p-4 sm:p-5">
-          <TabNav
-            value={vista}
-            onChange={trocarVista}
-            options={[
-              { value: "missoes", label: "Missões", icon: Target },
-              { value: "ranking", label: "Ranking", icon: Trophy },
-            ]}
-          />
+      <PainelVisual value="vidro">
+        <MotionConfig reducedMotion="user">
+          <main className="perf w-full px-4 pb-12 pt-6 text-ink md:px-6">
+            <PerfEstilos />
+            <HubEstilos />
 
-          {vista === "missoes" ? (
-            carregando ? (
-              <div className="mt-4 space-y-3">
-                <div className="painel-esqueleto h-[236px] rounded-2xl" />
-                <Esqueleto linhas={3} altura={96} />
+            <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
+              <div>
+                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Hub de Evolução</h1>
+                <p className="mt-1 text-[12.5px] text-muted">Seu nível, suas missões e a disputa da temporada.</p>
               </div>
-            ) : erro || !progress ? (
-              <p className="p-10 text-center text-sm text-negative">{erro || "Falha ao carregar o Hub."}</p>
-            ) : (
-              <div className="mt-4">
-                <CartaoNivel progress={progress} onVerPatentes={() => setPatentes(true)} />
-                <Missoes ativas={ativas} catalogo={catalogo} />
-              </div>
-            )
-          ) : seasonPronta ? (
-            <Ranking season={season} onIrParaMissoes={() => trocarVista("missoes")} />
-          ) : (
-            <div className="mt-4">
-              <Esqueleto linhas={4} altura={64} />
+              {progress && <ResumoNivel progress={progress} perfil={perfil} onVerPatentes={() => setPatentes(true)} />}
+            </header>
+
+            <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-white/[0.06] bg-black/70 px-4 pt-2 backdrop-blur-xl md:-mx-6 md:px-6">
+              <AbasAnimadas value={vista} onChange={trocarVista} options={ABAS} rotulo="Seções do Hub" />
             </div>
-          )}
-        </div>
-      </main>
+
+            {vista === "missoes" ? (
+              carregando ? (
+                <div className="grid gap-3.5 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+                  <div className="painel-esqueleto h-[300px] rounded-3xl" />
+                  <div className="painel-esqueleto h-[300px] rounded-3xl" />
+                </div>
+              ) : erro || !progress ? (
+                <p className="rounded-xl border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro || "Falha ao carregar o Hub."}</p>
+              ) : (
+                <div className="grid items-start gap-3.5 xl:grid-cols-[minmax(0,420px)_minmax(0,1fr)]">
+                  <PainelCard title="Seu nível" icon={<Layers size={15} />} ordem={0} rolagem={false}>
+                    <CartaoNivel progress={progress} onVerPatentes={() => setPatentes(true)} semMoldura />
+                  </PainelCard>
+                  <PainelCard title="Missões" icon={<Target size={15} />} ordem={1} rolagem={false}>
+                    <Missoes ativas={ativas} catalogo={catalogo} />
+                  </PainelCard>
+                </div>
+              )
+            ) : seasonPronta ? (
+              <Ranking season={season} onIrParaMissoes={() => trocarVista("missoes")} />
+            ) : (
+              <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px]">
+                <div className="painel-esqueleto h-[420px] rounded-3xl" />
+                <div className="painel-esqueleto h-[220px] rounded-3xl" />
+              </div>
+            )}
+          </main>
+        </MotionConfig>
+      </PainelVisual>
       {patentes && progress && <PatentesModal nivelAtual={progress.level} onFechar={() => setPatentes(false)} />}
     </AppShell>
+  );
+}
+
+// Canto direito do cabeçalho: sua foto com o anel de nível + patente e
+// quanto falta -- o "quem sou eu aqui" visível nas duas abas.
+function ResumoNivel({ progress, perfil, onVerPatentes }: { progress: Progress; perfil: Profile | null; onVerPatentes: () => void }) {
+  const max = progress.level >= MAX_LEVEL;
+  const cor = levelColor(progress.level);
+  return (
+    <button
+      type="button"
+      onClick={onVerPatentes}
+      className="painel-vidro flex items-center gap-3 self-start rounded-2xl border border-white/10 py-2 pl-2 pr-4 text-left transition-colors hover:border-white/20 sm:self-auto"
+      title="Ver todas as patentes"
+    >
+      <AvatarNivel
+        avatarId={perfil?.avatar_id ?? 1}
+        avatarUrl={perfil?.avatar_url}
+        nivel={progress.level}
+        xpAtual={progress.xp_current}
+        tamanho={46}
+        animar
+      />
+      <span className="min-w-0">
+        <span className="block text-[13px] font-semibold" style={{ color: cor }}>
+          {levelMaterial(progress.level)} {levelSubTier(progress.level)} · Nível {progress.level}
+        </span>
+        <span className="block text-[11.5px] tabular-nums text-muted">
+          {max ? "Nível máximo" : `faltam ${(xpForNextLevel(progress.level) - progress.xp_current).toLocaleString("pt-BR")} XP pro ${progress.level + 1}`}
+        </span>
+      </span>
+    </button>
   );
 }

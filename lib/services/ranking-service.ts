@@ -17,6 +17,8 @@ export interface JogadorRanking {
   avatarId: number;
   avatarUrl: string | null;
   nivel: number;
+  /** XP dentro do nível atual (anel da foto); null = desconhecido. */
+  xpNivel: number | null;
   /** XP ganho na temporada. */
   xp: number;
   /** XP ganho nos últimos 7 dias (null = dado indisponível). */
@@ -65,6 +67,7 @@ export async function fetchRankingTemporada(escopo: EscopoRanking, limite = 50):
           avatarId: r.avatar_id ?? 1,
           avatarUrl: r.avatar_url ?? null,
           nivel: r.level ?? 1,
+          xpNivel: r.xp_nivel ?? null,
           xp: r.xp ?? 0,
           xp7d: r.xp_7d ?? 0,
           posicao: r.rank ?? null,
@@ -96,6 +99,7 @@ export async function fetchRankingTemporada(escopo: EscopoRanking, limite = 50):
     avatarId: 1,
     avatarUrl: null,
     nivel: e.level,
+    xpNivel: null,
     xp: e.xpTotal,
     xp7d: null,
     posicao: e.rank,
@@ -111,6 +115,7 @@ export async function fetchRankingTemporada(escopo: EscopoRanking, limite = 50):
       avatarId: 1,
       avatarUrl: null,
       nivel: 1,
+      xpNivel: null,
       xp: meu.xp,
       xp7d: null,
       posicao: meu.rank,

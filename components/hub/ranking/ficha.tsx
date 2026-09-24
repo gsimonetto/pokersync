@@ -3,13 +3,12 @@
 import { useEffect } from "react";
 import { motion } from "framer-motion";
 import { Flame, Trophy, X } from "lucide-react";
-import { Avatar } from "@/components/avatar";
 import { ModalPortal } from "@/components/modal-portal";
 import { EASE } from "@/components/painel/painel-card";
 import type { JogadorRanking } from "@/lib/services/ranking-service";
 import { levelColor, levelMaterial, levelSubTier } from "@/lib/services/xp-service";
 import { MEDALHA, fmtXP, movimento } from "@/lib/hub/ranking-regras";
-import { SetaMovimento } from "@/components/hub/ranking/linha";
+import { FotoRanking, SetaMovimento } from "@/components/hub/ranking/linha";
 
 const OURO = "#E0B24C";
 
@@ -58,11 +57,7 @@ export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: Jogad
           </button>
 
           <div className="relative flex flex-col items-center px-5 pt-5 text-center">
-            <span className="rounded-full p-[2.5px]" style={{ background: medalha ? `conic-gradient(${medalha}, ${medalha}55, ${medalha})` : `${cor}55` }}>
-              <span className="block rounded-full bg-surface p-[2px]">
-                <Avatar id={j.avatarId} url={j.avatarUrl} size={72} />
-              </span>
-            </span>
+            <FotoRanking j={j} tamanho={92} animar brilho />
             <p className="mt-3 max-w-full truncate text-lg font-bold text-ink">{j.nome}</p>
             <p className="mt-0.5 flex items-center gap-1.5 text-[12px]">
               <span className="font-semibold" style={{ color: cor }}>

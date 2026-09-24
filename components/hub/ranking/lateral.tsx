@@ -3,12 +3,11 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, BookOpen, Crosshair, Gift, LocateFixed, Scale, Shield, Target, TrendingUp, Trophy } from "lucide-react";
-import { Avatar } from "@/components/avatar";
 import { EASE, Numero } from "@/components/painel/painel-card";
 import type { Season } from "@/lib/services/xp-service";
 import type { EscopoRanking } from "@/lib/services/ranking-service";
 import { fmtXP, movimento, relogioTemporada, ritmoNecessario, type Corrida } from "@/lib/hub/ranking-regras";
-import { SetaMovimento } from "@/components/hub/ranking/linha";
+import { FotoRanking, SetaMovimento } from "@/components/hub/ranking/linha";
 
 const OURO = "#E0B24C";
 
@@ -24,10 +23,15 @@ export function CartaoTemporada({ season }: { season: Season }) {
   const retaFinal = r.restantes <= 7;
   const corTempo = retaFinal ? "#f97316" : OURO;
   return (
-    <section
-      className="relative overflow-hidden rounded-2xl border p-4"
-      style={{ borderColor: `${OURO}33`, background: `linear-gradient(135deg, ${OURO}14, rgba(255,255,255,0.015) 60%)` }}
+    <motion.section
+      initial={{ opacity: 0, y: 16, scale: 0.985 }}
+      animate={{ opacity: 1, y: 0, scale: 1 }}
+      transition={{ duration: 0.6, ease: EASE, delay: 0.05 }}
+      className="painel-vidro relative overflow-hidden rounded-3xl border p-4 sm:p-5 xl:p-4"
+      style={{ borderColor: `${OURO}40` }}
     >
+      <div aria-hidden className="pointer-events-none absolute inset-0" style={{ background: `linear-gradient(135deg, ${OURO}1c, transparent 60%)` }} />
+      <div aria-hidden className="pointer-events-none absolute inset-x-8 top-0 h-px" style={{ background: `linear-gradient(90deg, transparent, ${OURO}66, transparent)` }} />
       <Trophy aria-hidden size={120} strokeWidth={1} className="pointer-events-none absolute -right-6 -top-6 opacity-[0.06]" style={{ color: OURO }} />
       <div className="relative flex items-start gap-3">
         <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl" style={{ background: `${OURO}1f`, color: OURO, boxShadow: `inset 0 0 0 1px ${OURO}40` }}>
@@ -66,7 +70,7 @@ export function CartaoTemporada({ season }: { season: Season }) {
           <span>{fmtData(season.endsAt)}</span>
         </div>
       </div>
-    </section>
+    </motion.section>
   );
 }
 
@@ -84,6 +88,7 @@ export function SuaCorrida({
   onIrParaMim,
   completo,
   compacto = false,
+  semMoldura = false,
 }: {
   corrida: Corrida;
   escopo: EscopoRanking;
@@ -94,6 +99,8 @@ export function SuaCorrida({
   /** Celular: uma faixa curta (posição + quanto falta), pra não empurrar
    *  o pódio pra baixo da dobra. O resto fica na ficha e no desktop. */
   compacto?: boolean;
+  /** Dentro de um PainelCard (que já traz título e "Me achar"). */
+  semMoldura?: boolean;
 }) {
   const { eu, alvo, faltam, perseguidor, vantagem, proximidadePct } = corrida;
 
@@ -154,10 +161,10 @@ export function SuaCorrida({
   const ameacado = perseguidor && perseguidor.xp7d != null && eu.xp7d != null && perseguidor.xp7d > eu.xp7d;
 
   return (
-    <section className="rounded-2xl border border-hairline bg-white/[0.02] p-4">
+    <section className={semMoldura ? "" : "rounded-2xl border border-hairline bg-white/[0.02] p-4"}>
       <div className="flex items-center justify-between gap-2">
-        <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">Sua corrida · {ROTULO_ESCOPO[escopo]}</p>
-        {onIrParaMim && (
+        <p className="text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">{semMoldura ? ROTULO_ESCOPO[escopo] : `Sua corrida · ${ROTULO_ESCOPO[escopo]}`}</p>
+        {onIrParaMim && !semMoldura && (
           <button
             type="button"
             onClick={onIrParaMim}
@@ -183,7 +190,7 @@ export function SuaCorrida({
               Faltam <span className="font-bold tabular-nums" style={{ color: OURO }}><Numero valor={faltam} formatar={fmtXP} /> XP</span> pra passar
             </p>
             <div className="mt-1.5 flex items-center gap-2">
-              <Avatar id={alvo.avatarId} url={alvo.avatarUrl} size={22} />
+              <FotoRanking j={alvo} tamanho={26} />
               <span className="min-w-0 flex-1 truncate text-[12.5px] font-semibold text-ink">
                 {alvo.nome} <span className="font-normal text-muted">· {alvo.posicao}º</span>
               </span>
@@ -246,13 +253,15 @@ const FONTES = [
   { href: "/banca", rotulo: "Gestão de Banca", detalhe: "Lançar as sessões do dia", icone: Scale, cor: "#5AA6E0" },
 ] as const;
 
-export function ComoSubir({ onMissoes }: { onMissoes: () => void }) {
+export function ComoSubir({ onMissoes, semMoldura = false }: { onMissoes: () => void; semMoldura?: boolean }) {
   return (
-    <section className="rounded-2xl border border-hairline bg-white/[0.02] p-4">
-      <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">
-        <TrendingUp size={12} /> Como subir
-      </p>
-      <ul className="mt-2.5 flex flex-col gap-1">
+    <section className={semMoldura ? "" : "rounded-2xl border border-hairline bg-white/[0.02] p-4"}>
+      {!semMoldura && (
+        <p className="flex items-center gap-1.5 text-[10.5px] font-bold uppercase tracking-[0.14em] text-muted">
+          <TrendingUp size={12} /> Como subir
+        </p>
+      )}
+      <ul className={`${semMoldura ? "-mx-2" : "mt-2.5"} flex flex-col gap-1`}>
         {FONTES.map((f) => {
           const Icone = f.icone;
           return (

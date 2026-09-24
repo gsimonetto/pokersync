@@ -29,8 +29,7 @@ import {
   BellRing,
 } from "lucide-react";
 import { Chip } from "@/components/chip";
-import { Avatar } from "@/components/avatar";
-import { RankChip } from "@/components/ui/rank-chip";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { AbasAnimadas } from "@/components/performance/abas-animadas";
 import { EASE } from "@/components/painel/painel-card";
 import { ScoreHistoryChart } from "@/components/time/score-history-chart";
@@ -402,9 +401,6 @@ function CapaJogador({
   const cor = corDoScore(score.valor);
   const parado = diasSemAtividade(p.lastActivityAt);
   const banner = perfil?.bannerUrl ?? null;
-  // Anel de 124px em volta da foto de 104px.
-  const R = 59;
-  const C = 2 * Math.PI * R;
 
   return (
     <motion.section
@@ -444,38 +440,15 @@ function CapaJogador({
 
       <div className="relative px-4 pb-5 sm:px-7">
         <div className="-mt-14 flex flex-col items-start gap-x-5 gap-y-2 sm:-mt-16 sm:flex-row sm:items-end">
-          <span className="relative grid size-[124px] shrink-0 place-items-center rounded-full bg-[#111111] shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)]" title={`Score de evolução ${score.valor}/100`}>
-            <svg viewBox="0 0 124 124" className="absolute inset-0 -rotate-90" aria-hidden>
-              <circle cx="62" cy="62" r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth="3.5" />
-              <motion.circle
-                cx="62"
-                cy="62"
-                r={R}
-                fill="none"
-                stroke={cor}
-                strokeWidth="3.5"
-                strokeLinecap="round"
-                strokeDasharray={C}
-                initial={{ strokeDashoffset: C }}
-                animate={{ strokeDashoffset: C * (1 - score.valor / 100) }}
-                transition={{ duration: 1, ease: EASE, delay: 0.25 }}
-                style={{ filter: `drop-shadow(0 0 6px ${cor}88)` }}
-              />
-            </svg>
-            <Avatar id={p.avatarId} url={p.avatarUrl} size={104} />
-            <span
-              className="absolute -bottom-1 left-1/2 flex -translate-x-1/2 items-center gap-0.5 rounded-full border-2 border-[#111111] px-2 text-[11px] font-bold leading-5 tabular-nums text-black"
-              style={{ background: cor }}
-            >
-              {score.valor}
-              {tendencia !== "estavel" && <span className="text-[9px]">{tendencia === "subiu" ? "▲" : "▼"}</span>}
-            </span>
+          {/* Foto com o anel de nível (padrão de toda foto de jogador). O
+              score de evolução fica como selo ao lado, só aqui na ficha. */}
+          <span className="relative shrink-0 rounded-full bg-[#111111] p-1 shadow-[0_10px_40px_-10px_rgba(0,0,0,0.8)]">
+            <AvatarNivel userId={p.userId} avatarId={p.avatarId} avatarUrl={p.avatarUrl} tamanho={120} animar brilho />
           </span>
 
           <div className="w-full min-w-0 flex-1 pb-1.5">
             <h2 className="flex items-center gap-2 text-[22px] font-bold tracking-tight sm:text-[26px]">
               <span className="truncate">{p.nome}</span>
-              {p.level != null && <RankChip level={p.level} />}
             </h2>
             <p className="truncate text-[13px] text-muted">
               {perfil?.apelido && <span>@{perfil.apelido} · </span>}
@@ -484,6 +457,14 @@ function CapaJogador({
           </div>
 
           <div className="flex flex-wrap items-center gap-2 sm:mb-2">
+            <span
+              className="flex items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-semibold tabular-nums"
+              style={{ color: cor, borderColor: `${cor}59`, background: `${cor}1a` }}
+              title="Score de evolução (0 a 100)"
+            >
+              Score {score.valor}
+              {tendencia !== "estavel" && <span className="text-[10px]">{tendencia === "subiu" ? "▲" : "▼"}</span>}
+            </span>
             {(p.streakDays ?? 0) > 0 && (
               <span className="flex items-center gap-1 rounded-full border border-[#f59e0b]/35 bg-[#f59e0b]/10 px-2.5 py-1 text-[12px] font-semibold text-[#f5b544]">
                 <Flame size={13} />

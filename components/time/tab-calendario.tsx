@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
 import { Cake, CalendarDays, CalendarPlus, ChevronLeft, ChevronRight, CheckCircle2, Clock, ExternalLink, Link2, Repeat, Trash2, UserCheck, Users, Video, X, XCircle } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { Campo } from "@/components/time/campo";
 import {
   cancelEventSeries,
@@ -357,7 +357,7 @@ export function TabCalendario({
                       {aniversariosDoDia.map((a) => (
                         <li key={`niver-${a.userId}`} className="flex items-center gap-2.5 border-t border-white/[0.06] px-1 py-2.5">
                           <Cake size={15} className="shrink-0" style={{ color: COR_ANIVERSARIO }} aria-hidden />
-                          <Avatar id={a.avatarId} url={a.avatarUrl} size={22} />
+                          <AvatarNivel userId={a.userId} avatarId={a.avatarId} avatarUrl={a.avatarUrl} tamanho={24} />
                           <span className="min-w-0 flex-1 truncate text-[13px]">Aniversário de {a.nome}</span>
                         </li>
                       ))}
@@ -753,7 +753,7 @@ export function ModalNovoEvento({
                       selecionados.has(j.userId) ? "bg-ink/10" : "hover:bg-elevated"
                     }`}
                   >
-                    <Avatar id={j.avatarId} url={j.avatarUrl} size={24} />
+                    <AvatarNivel userId={j.userId} avatarId={j.avatarId} avatarUrl={j.avatarUrl} tamanho={26} />
                     <span className="min-w-0 flex-1 truncate">{j.nome}</span>
                     {selecionados.has(j.userId) && <span className="text-xs text-ink/70">✓</span>}
                   </button>

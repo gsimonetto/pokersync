@@ -2,9 +2,8 @@
 
 import { motion, useReducedMotion } from "framer-motion";
 import { Crown, Trophy } from "lucide-react";
-import { Avatar } from "@/components/avatar";
 import { EASE, Numero } from "@/components/painel/painel-card";
-import { RankChip } from "@/components/ui/rank-chip";
+import { FotoRanking } from "@/components/hub/ranking/linha";
 import type { JogadorRanking } from "@/lib/services/ranking-service";
 import { MEDALHA, fmtXP } from "@/lib/hub/ranking-regras";
 
@@ -22,9 +21,9 @@ import { MEDALHA, fmtXP } from "@/lib/hub/ranking-regras";
 // movimento no sistema vê tudo já no lugar.
 
 const LUGARES = [
-  { pos: 2, altura: "h-[72px] sm:h-24", foto: 52, atraso: 0.2 },
-  { pos: 1, altura: "h-[104px] sm:h-32", foto: 68, atraso: 0.45 },
-  { pos: 3, altura: "h-14 sm:h-[72px]", foto: 48, atraso: 0 },
+  { pos: 2, altura: "h-[72px] sm:h-24", foto: 62, atraso: 0.2 },
+  { pos: 1, altura: "h-[104px] sm:h-32", foto: 80, atraso: 0.45 },
+  { pos: 3, altura: "h-14 sm:h-[72px]", foto: 58, atraso: 0 },
 ] as const;
 
 // Ângulos fixos (não aleatórios) pra render do servidor e do cliente
@@ -99,28 +98,22 @@ export function Podio({
                       ))}
                     </span>
                   )}
-                  <span
-                    className="relative block rounded-full p-[2.5px] transition-transform duration-300 group-hover:-translate-y-0.5"
-                    style={{ background: `conic-gradient(from 210deg, ${cor}, ${cor}55, ${cor})`, boxShadow: primeiro ? `0 0 26px -4px ${cor}` : undefined }}
-                  >
-                    <span className="block rounded-full bg-void p-[2px]">
-                      <Avatar id={j.avatarId} url={j.avatarUrl} size={l.foto} />
-                    </span>
+                  <span className="relative block transition-transform duration-300 group-hover:-translate-y-0.5">
+                    <FotoRanking j={j} tamanho={l.foto} animar brilho={primeiro} />
                   </span>
                   {j.souEu && (
-                    <span className="absolute -bottom-1 left-1/2 -translate-x-1/2 rounded-full bg-ink px-1.5 text-[9.5px] font-bold uppercase leading-4 text-void">
+                    <span className="absolute -right-2 -top-1 rounded-full bg-ink px-1.5 text-[9.5px] font-bold uppercase leading-4 text-void">
                       você
                     </span>
                   )}
                 </span>
-                <span className={`mt-2 flex w-full min-w-0 items-center justify-center gap-1 ${primeiro ? "text-[13px] sm:text-sm" : "text-[12px] sm:text-[13px]"} font-semibold text-ink`}>
+                <span className={`mt-2.5 flex w-full min-w-0 items-center justify-center gap-1 ${primeiro ? "text-[13px] sm:text-sm" : "text-[12px] sm:text-[13px]"} font-semibold text-ink`}>
                   <span className="truncate" title={j.nome}>
                     {j.nome}
                   </span>
                   {j.titulos.length > 0 && <Trophy size={11} className="shrink-0" fill="#F5D48C" color="#F5D48C" aria-label="Campeão de temporada" />}
                 </span>
                 <span className="mt-1 flex items-center gap-1.5">
-                  <RankChip level={j.nivel} />
                   <span className="text-[12px] font-bold tabular-nums sm:text-[13px]" style={{ color: primeiro ? cor : "#E0B24C" }}>
                     <Numero valor={j.xp} formatar={fmtXP} duracao={1200} />
                   </span>

@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Target, Trophy, MessageSquare, type LucideIcon } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchPlayerPerformance, type PlayerPerformance } from "@/lib/services/performance-service";
@@ -196,12 +196,15 @@ export default function ModulosPage() {
             sessao na Banca nao muda esses dois numeros aqui. */}
         <section className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface transition-all duration-300 hover:border-white/15 hover:shadow-[0_0_40px_-12px_rgba(255,255,255,0.18)] sm:flex-row">
           <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center overflow-hidden bg-elevated p-4 sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
-            <Avatar
-              id={profile?.avatar_id ?? 1}
-              url={profile?.avatar_url}
-              shape="square"
-              size={190}
-              className="shrink-0 transition-transform duration-300 group-hover:scale-[1.03]"
+            <AvatarNivel
+              userId={profile?.id}
+              avatarId={profile?.avatar_id ?? 1}
+              avatarUrl={profile?.avatar_url}
+              quadrado
+              tamanho={190}
+              animar
+              brilho
+              className="transition-transform duration-300 group-hover:scale-[1.03]"
             />
           </div>
 

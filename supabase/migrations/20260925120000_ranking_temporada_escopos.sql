@@ -5,7 +5,8 @@
 -- mudança) pra quem ainda chama.
 --
 -- O que esta função entrega a mais, numa chamada só:
---   * foto (avatar_id / avatar_url) de cada jogador;
+--   * foto (avatar_id / avatar_url) de cada jogador e o XP do nível
+--     atual (xp_nivel), pro anel de nível em volta da foto;
 --   * xp_7d  -- XP ganho nos últimos 7 dias dentro da temporada (ritmo);
 --   * rank_7d -- posição que o jogador tinha 7 dias atrás, no MESMO
 --     recorte. A tela compara com a posição de hoje pra mostrar
@@ -35,6 +36,7 @@ returns table (
   avatar_id int,
   avatar_url text,
   level int,
+  xp_nivel int,
   xp int,
   xp_7d int,
   rank int,
@@ -115,6 +117,7 @@ begin
            coalesce(pt.xp_7d, 0) as xp_7d,
            coalesce(pt.xp_antes, 0) as xp_antes,
            coalesce(up.level, 1) as level,
+           coalesce(up.xp_current, 0) as xp_nivel,
            coalesce(up.streak_days, 0) as streak_days
       from populacao po
       left join pontos pt on pt.uid = po.uid
@@ -146,6 +149,7 @@ begin
          p.avatar_id::int,
          p.avatar_url,
          r.level::int,
+         r.xp_nivel::int,
          r.xp,
          r.xp_7d,
          r.rk,

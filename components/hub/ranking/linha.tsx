@@ -3,13 +3,43 @@
 import { forwardRef } from "react";
 import { motion } from "framer-motion";
 import { ChevronDown, ChevronUp, Flame, Minus, Trophy } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { EASE } from "@/components/painel/painel-card";
-import { RankChip } from "@/components/ui/rank-chip";
 import type { JogadorRanking } from "@/lib/services/ranking-service";
 import { fmtXP, movimento, type Movimento } from "@/lib/hub/ranking-regras";
 
 const OURO = "#E0B24C";
+
+// Foto de jogador do ranking com o anel de nível. Quando o ranking já
+// trouxe o XP do nível (RPC nova), desenha direto; senão busca pelo id.
+export function FotoRanking({
+  j,
+  tamanho,
+  animar = false,
+  brilho = false,
+  mostrarNivel,
+}: {
+  j: JogadorRanking;
+  tamanho: number;
+  animar?: boolean;
+  brilho?: boolean;
+  mostrarNivel?: boolean;
+}) {
+  const temXp = j.xpNivel != null;
+  return (
+    <AvatarNivel
+      userId={temXp ? null : j.userId}
+      nivel={temXp ? j.nivel : undefined}
+      xpAtual={temXp ? j.xpNivel : undefined}
+      avatarId={j.avatarId}
+      avatarUrl={j.avatarUrl}
+      tamanho={tamanho}
+      animar={animar}
+      brilho={brilho}
+      mostrarNivel={mostrarNivel}
+    />
+  );
+}
 
 // Seta de movimento na semana. Nunca só cor: sempre ícone + número.
 export function SetaMovimento({ m, grande = false }: { m: Movimento; grande?: boolean }) {
@@ -77,7 +107,7 @@ export const LinhaRanking = forwardRef<
         <SetaMovimento m={m} />
       </span>
       <span className="relative shrink-0">
-        <Avatar id={j.avatarId} url={j.avatarUrl} size={34} />
+        <FotoRanking j={j} tamanho={42} />
       </span>
       <span className="relative min-w-0 flex-1">
         <span className="flex min-w-0 items-center gap-1.5">
@@ -91,7 +121,6 @@ export const LinhaRanking = forwardRef<
           {j.souEu && <span className="shrink-0 rounded bg-ink px-1 text-[9.5px] font-bold uppercase leading-4 text-void">você</span>}
         </span>
         <span className="mt-0.5 flex items-center gap-2 text-[11px] text-muted">
-          <RankChip level={j.nivel} />
           {j.xp7d != null && j.xp7d > 0 && <span className="tabular-nums text-positive/90">+{fmtXP(j.xp7d)} na semana</span>}
           {j.streak > 0 && (
             <span className="hidden items-center gap-0.5 tabular-nums min-[400px]:flex" title={`${j.streak} dias seguidos ganhando XP`}>

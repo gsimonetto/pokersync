@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Link2, Copy, Check, Trash2, UserCheck, UserX, Clock } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { Campo } from "@/components/time/campo";
 import { useConfirm } from "@/components/confirm-dialog";
 import {
@@ -116,7 +116,7 @@ export function TabConvites({
           <ul className="mt-4 divide-y divide-hairline">
             {pendentes.map((p) => (
               <li key={p.userId} className="flex flex-wrap items-center gap-3 py-3">
-                <Avatar id={p.avatarId} url={p.avatarUrl} size={36} />
+                <AvatarNivel userId={p.userId} avatarId={p.avatarId} avatarUrl={p.avatarUrl} tamanho={40} />
                 <div className="min-w-[170px] flex-1">
                   <p className="truncate text-sm font-medium">{p.nome}</p>
                   <p className="flex items-start gap-1 text-xs text-muted">

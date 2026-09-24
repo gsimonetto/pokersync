@@ -27,8 +27,8 @@ export function HubEstilos() {
     <style>{`
       @keyframes hubGirar { to { transform: rotate(360deg); } }
       @keyframes hubRespirar {
-        0%, 100% { box-shadow: 0 0 0 4px color-mix(in srgb, var(--badge) 14%, transparent), 0 0 20px 0 color-mix(in srgb, var(--badge) 50%, transparent); }
-        50%      { box-shadow: 0 0 0 7px color-mix(in srgb, var(--badge) 22%, transparent), 0 0 34px 4px color-mix(in srgb, var(--badge) 70%, transparent); }
+        0%, 100% { box-shadow: 0 0 0 3px color-mix(in srgb, var(--badge) 14%, transparent), 0 0 12px 0 color-mix(in srgb, var(--badge) 45%, transparent); }
+        50%      { box-shadow: 0 0 0 5px color-mix(in srgb, var(--badge) 22%, transparent), 0 0 20px 2px color-mix(in srgb, var(--badge) 60%, transparent); }
       }
       @keyframes hubHalo { 0%, 100% { opacity: .5; transform: scale(1); } 50% { opacity: .9; transform: scale(1.1); } }
       @keyframes hubBrilho { 0% { transform: translateX(-140%) skewX(-18deg); } 55%, 100% { transform: translateX(240%) skewX(-18deg); } }
@@ -124,7 +124,16 @@ function proximoMarco(level: number): { nivel: number; rotulo: string } | null {
 //      encavalados: cada um fica numa ponta e não quebra linha);
 //   3) seus hábitos -- sequência, XP total, combo e recorde, em 4 blocos
 //      iguais (2x2 no celular, 1 linha no resto).
-export function CartaoNivel({ progress, onVerPatentes }: { progress: Progress; onVerPatentes: () => void }) {
+export function CartaoNivel({
+  progress,
+  onVerPatentes,
+  semMoldura = false,
+}: {
+  progress: Progress;
+  onVerPatentes: () => void;
+  /** Dentro de um PainelCard (o card de vidro padrão já dá a moldura). */
+  semMoldura?: boolean;
+}) {
   const level = progress.level;
   const max = level >= MAX_LEVEL;
   const cor = levelColor(level);
@@ -133,15 +142,17 @@ export function CartaoNivel({ progress, onVerPatentes }: { progress: Progress; o
   const marco = proximoMarco(level);
 
   return (
-    <section className="relative overflow-hidden rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-      <div
-        aria-hidden
-        className="pointer-events-none absolute inset-0"
-        style={{ background: `radial-gradient(ellipse at 0% 0%, ${cor}14 0%, transparent 55%)` }}
-      />
+    <section className={`@container relative ${semMoldura ? "" : "overflow-hidden rounded-2xl border border-hairline bg-surface p-4 sm:p-5"}`}>
+      {!semMoldura && (
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0"
+          style={{ background: `radial-gradient(ellipse at 0% 0%, ${cor}14 0%, transparent 55%)` }}
+        />
+      )}
 
       <div className="relative flex items-center gap-4 sm:gap-5">
-        <div className="p-2">
+        <div className="ml-1 p-3">
           <LevelBadge level={level} size={64} />
         </div>
         <div className="min-w-0 flex-1">
@@ -202,7 +213,7 @@ export function CartaoNivel({ progress, onVerPatentes }: { progress: Progress; o
         </div>
       </div>
 
-      <div className="relative mt-4 grid grid-cols-2 gap-2 sm:grid-cols-4">
+      <div className="relative mt-4 grid grid-cols-2 gap-2 @xl:grid-cols-4">
         <BlocoSequencia dias={progress.streak_days} recorde={progress.streak_best} />
         <Bloco icone={Zap} rotulo="XP total" valor={progress.xp_total} />
         <Bloco icone={Target} rotulo="Combo GTO" valor={progress.combo_gto} ajuda="Acertos seguidos no Modo Treino (multiplica o XP)" />

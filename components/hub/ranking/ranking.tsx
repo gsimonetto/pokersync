@@ -3,14 +3,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { ArrowDown, ArrowUp, Globe, RefreshCw, Shield, Sparkles, Trophy, UsersRound, X, type LucideIcon } from "lucide-react";
-import { Avatar } from "@/components/avatar";
-import { EASE, Esqueleto } from "@/components/painel/painel-card";
+import { ArrowDown, ArrowUp, Crosshair, Globe, LocateFixed, RefreshCw, Shield, Sparkles, TrendingUp, Trophy, UsersRound, X, type LucideIcon } from "lucide-react";
+import { EASE, Esqueleto, PainelCard } from "@/components/painel/painel-card";
 import { checkSeasonNotifications, settleExpiredSeasons, type Season } from "@/lib/services/xp-service";
 import { fetchRankingTemporada, type EscopoRanking, type JogadorRanking, type RankingTemporada } from "@/lib/services/ranking-service";
 import { corrida as calcCorrida, lembrarPosicao, posicaoVistaAntes } from "@/lib/hub/ranking-regras";
 import { Podio } from "@/components/hub/ranking/podio";
-import { LinhaRanking } from "@/components/hub/ranking/linha";
+import { FotoRanking, LinhaRanking } from "@/components/hub/ranking/linha";
 import { CartaoTemporada, ComoSubir, SuaCorrida } from "@/components/hub/ranking/lateral";
 import { FichaJogador } from "@/components/hub/ranking/ficha";
 
@@ -124,9 +123,11 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
 
   if (!season) {
     return (
-      <Vazio icone={Trophy} titulo="Nenhuma temporada ativa no momento">
-        Assim que uma nova temporada abrir, o ranking e o pódio aparecem aqui.
-      </Vazio>
+      <PainelCard title="Ranking da temporada" icon={<Trophy size={15} />} rolagem={false}>
+        <Vazio icone={Trophy} titulo="Nenhuma temporada ativa no momento">
+          Assim que uma nova temporada abrir, o ranking e o pódio aparecem aqui.
+        </Vazio>
+      </PainelCard>
     );
   }
 
@@ -142,24 +143,42 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
   const mostraCorrida = !carregando && !erro && ranqueados.length > 0;
 
   return (
-    <div className="mt-4 grid gap-4 lg:grid-cols-[minmax(0,1fr)_300px] xl:grid-cols-[minmax(0,1fr)_340px]">
-      <aside className="flex min-w-0 flex-col gap-4 lg:sticky lg:top-4 lg:order-2 lg:self-start">
+    <div className="grid gap-3.5 lg:grid-cols-[minmax(0,1fr)_320px] xl:grid-cols-[minmax(0,1fr)_360px]">
+      {/* Coluna lateral (no celular vem antes da lista): temporada, sua
+          corrida e como subir -- cada um no card de vidro padrão do app. */}
+      <aside className="flex min-w-0 flex-col gap-3.5 lg:sticky lg:top-16 lg:order-2 lg:self-start">
         <CartaoTemporada season={season} />
         {mostraCorrida && (
-          <div className="hidden lg:block">
-            <SuaCorrida {...corridaProps} />
-          </div>
+          <PainelCard
+            title="Sua corrida"
+            icon={<Crosshair size={15} />}
+            ordem={2}
+            rolagem={false}
+            className="hidden lg:flex"
+            action={
+              corridaProps.onIrParaMim && (
+                <button
+                  type="button"
+                  onClick={corridaProps.onIrParaMim}
+                  className="flex items-center gap-1 rounded-lg px-2 py-1 text-[12px] text-muted transition-colors hover:bg-white/[0.06] hover:text-ink"
+                >
+                  <LocateFixed size={13} /> Me achar
+                </button>
+              )
+            }
+          >
+            <SuaCorrida {...corridaProps} semMoldura />
+          </PainelCard>
         )}
-        <div className="hidden lg:block">
-          <ComoSubir onMissoes={onIrParaMissoes} />
-        </div>
+        <PainelCard title="Como subir" icon={<TrendingUp size={15} />} ordem={3} rolagem={false} className="hidden lg:flex">
+          <ComoSubir onMissoes={onIrParaMissoes} semMoldura />
+        </PainelCard>
       </aside>
 
-      <div className="min-w-0 lg:order-1">
+      <PainelCard title="Ranking da temporada" icon={<Trophy size={15} />} ordem={1} rolagem={false} className="min-w-0 lg:order-1">
         <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-          <div>
-            <h2 className="text-[15px] font-semibold tracking-tight text-ink">Ranking da temporada</h2>
-            <p className="text-[12px] text-muted">
+          <div className="min-w-0">
+            <p className="text-[12.5px] text-muted">
               {dados && ranqueados.length > 0
                 ? `${dados.total} ${dados.total === 1 ? "jogador pontuou" : "jogadores pontuaram"} · XP ganho desde ${new Date(season.startsAt + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "short" }).replace(".", "")}`
                 : "Quem ganhar mais XP até o fim leva o prêmio"}
@@ -299,7 +318,7 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
                         onClick={() => setAberto(j)}
                         className="flex items-center gap-1.5 rounded-full border border-white/[0.07] bg-white/[0.02] py-1 pl-1 pr-2.5 text-[12px] text-muted transition-colors hover:border-white/20 hover:text-ink"
                       >
-                        <Avatar id={j.avatarId} url={j.avatarUrl} size={20} />
+                        <FotoRanking j={j} tamanho={24} />
                         <span className="max-w-[140px] truncate">{j.souEu ? "Você" : j.nome}</span>
                       </button>
                     ))}
@@ -314,10 +333,11 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
           )}
         </div>
 
-        <div className="mt-4 lg:hidden">
-          <ComoSubir onMissoes={onIrParaMissoes} />
-        </div>
-      </div>
+      </PainelCard>
+
+      <PainelCard title="Como subir" icon={<TrendingUp size={15} />} ordem={2} rolagem={false} className="lg:hidden">
+        <ComoSubir onMissoes={onIrParaMissoes} semMoldura />
+      </PainelCard>
 
       {aberto && <FichaJogador j={aberto} eu={eu} onFechar={() => setAberto(null)} />}
     </div>

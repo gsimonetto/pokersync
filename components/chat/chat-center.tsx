@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { ArrowLeft, Check, Copy, MessageCircle, Plus, UserPlus, X } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { Chip } from "@/components/chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
@@ -418,7 +418,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
                       }`}
                     >
                       <div className="relative shrink-0">
-                        <Avatar id={c.avatarId} url={c.avatarUrl} size={34} />
+                        <AvatarNivel userId={c.id} avatarId={c.avatarId} avatarUrl={c.avatarUrl} tamanho={38} />
                         {c.online && (
                           <span
                             className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface bg-positive"
@@ -475,7 +475,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
                     <ArrowLeft size={16} />
                   </button>
                   <div className="relative shrink-0">
-                    <Avatar id={contatoAtivo.avatarId} url={contatoAtivo.avatarUrl} size={32} />
+                    <AvatarNivel userId={contatoAtivo.id} avatarId={contatoAtivo.avatarId} avatarUrl={contatoAtivo.avatarUrl} tamanho={34} />
                     {contatoAtivo.online && (
                       <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface bg-positive" />
                     )}
@@ -690,7 +690,7 @@ function AdicionarAmigo({
             {pedidos.map((p) => (
               <li key={p.friendshipId} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2">
                 <div className="flex items-center gap-2">
-                  <Avatar id={p.avatarId} url={p.avatarUrl} size={26} />
+                  <AvatarNivel userId={p.userId} avatarId={p.avatarId} avatarUrl={p.avatarUrl} tamanho={28} />
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[12.5px] font-medium text-ink">{p.nome}</p>
                     <p className="truncate text-[10.5px] text-muted">{p.friendTag}</p>

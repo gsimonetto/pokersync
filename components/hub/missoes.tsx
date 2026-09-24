@@ -149,7 +149,7 @@ export function Missoes({ ativas, catalogo }: { ativas: Bruto[]; catalogo: Bruto
   const renovacao = proximaRenovacao(atual.tipo, agora);
 
   return (
-    <section className="mt-4">
+    <section>
       {/* Abas numa linha só (rola de lado se faltar espaço), cada uma com
           "feitas/total" -- o jogador vê onde ainda tem XP na mesa sem
           precisar abrir aba por aba. */}

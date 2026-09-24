@@ -5,6 +5,7 @@ import { useRouter } from "next/navigation";
 import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock3, ImagePlus } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AVATARS } from "./avatar";
+import { AvatarNivel } from "./avatar-nivel";
 import { ModalPortal } from "./modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import {
@@ -170,7 +171,7 @@ export function ProfileMenu({
       >
         <div className="flex items-center gap-3 border-b border-hairline p-4">
           <div className="relative">
-            <Avatar id={profile.avatar_id} url={profile.avatar_url} size={44} />
+            <AvatarNivel userId={profile.id} avatarId={profile.avatar_id} avatarUrl={profile.avatar_url} tamanho={48} />
             <button
               onClick={() => fileRef.current?.click()}
               disabled={uploading}
