@@ -38,10 +38,11 @@ type Screen = "fila" | "salvos" | "filtros" | "filtro-replay" | "nova" | "sessao
 function RevisorPageInner() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  const [screen, setScreen] = useState<Screen>("fila");
-  // Deep-link "?hands=id1,id2&label=..." — vem de Análise (posição,
-  // matchup, leak): já entra na fila filtrada só com essas mãos, em vez de
-  // uma lista solta lá na tela de Análise que duplicaria a UI do Revisor.
+  const [screen, setScreen] = useState<Screen>(() => (searchParams.get("hands") ? "filtro-replay" : "fila"));
+  // Deep-link "?hands=id1,id2&label=..." — vem da Performance (posição,
+  // decisões, c-bet, matriz de mãos, ruas): abre direto a MESA com a lista
+  // dessas mãos pra ver uma a uma (pedido explícito: "quero ver todas as
+  // jogadas do UTG" não pode cair no "Analisar mão").
   const handsParam = searchParams.get("hands");
   const filterHandIds = handsParam ? handsParam.split(",").filter(Boolean) : undefined;
   const filterLabel = searchParams.get("label") ?? undefined;
@@ -51,7 +52,10 @@ function RevisorPageInner() {
   // (replayer) -- guardado enquanto ele navega pro "Analisar mao" e volta,
   // pra reabrir o mesmo conjunto de maos filtradas em vez de voltar pro
   // formulario de filtro.
-  const [filtroReviewIds, setFiltroReviewIds] = useState<string[]>([]);
+  const [filtroReviewIds, setFiltroReviewIds] = useState<string[]>(filterHandIds ?? []);
+  // De onde veio a lista aberta na mesa: Filtros avançados, Salvos ou um
+  // link com filtro (Performance) -- decide o título e pra onde "voltar".
+  const [filtroOrigem, setFiltroOrigem] = useState<"filtros" | "salvos" | "link">(filterHandIds?.length ? "link" : "filtros");
   // De onde "detalhe" foi aberto (fila normal, salvos ou replayer dos
   // filtros avancados) — sem isso, voltar de um spot salvo/filtrado caia
   // sempre na fila em vez de voltar pra onde o usuario realmente veio.
@@ -110,9 +114,26 @@ function RevisorPageInner() {
   // filtro -- pedido explicito: clicar numa mao filtrada deve mostrar ela
   // na mesa de verdade, nao ir direto pro fluxo de "Analisar mao".
   function goFiltroReplay(reviewIds: string[], selectedId: string) {
+    setFiltroOrigem("filtros");
     setFiltroReviewIds(reviewIds);
     setSelectedReviewId(selectedId);
     setScreen("filtro-replay");
+  }
+  // Salvos: mesma mesa com a lista dos spots salvos, a partir do clicado.
+  function goSalvosNaMesa(selectedId: string, reviewIds: string[]) {
+    setFiltroOrigem("salvos");
+    setFiltroReviewIds(reviewIds);
+    setSelectedReviewId(selectedId);
+    setScreen("filtro-replay");
+  }
+  // Voltar da mesa filtrada: pra lista de onde ela veio. Do link com
+  // filtro (Performance) volta pra fila, limpando o filtro da URL.
+  function voltarDaMesaFiltrada() {
+    if (filtroOrigem === "salvos") goSalvos();
+    else if (filtroOrigem === "link") {
+      router.replace("/revisor");
+      goFila();
+    } else goFiltros();
   }
   function goDetalheFromFiltroReplay(reviewId: string) {
     setDetalheOrigin("filtro-replay");
@@ -201,25 +222,17 @@ function RevisorPageInner() {
         )}
 
         {screen === "fila" && (
-          <RevisorFila
-            key={filaVersao}
-            onNova={goNova}
-            onOpen={goDetalhe}
-            onOpenSession={goSessao}
-            filterHandIds={filterHandIds}
-            filterLabel={filterLabel}
-            onClearFilter={() => router.replace("/revisor")}
-          />
+          <RevisorFila key={filaVersao} onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />
         )}
-        {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} />}
+        {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} onOpenNaMesa={goSalvosNaMesa} />}
         {screen === "filtros" && <RevisorFiltrosAvancados onOpen={goFiltroReplay} />}
         {screen === "filtro-replay" && filtroReviewIds.length > 0 && (
           <RevisorSessao
             reviewIds={filtroReviewIds}
-            title="Filtros avançados"
+            title={filtroOrigem === "salvos" ? "Salvos" : filtroOrigem === "link" ? filterLabel ?? "Mãos filtradas" : "Filtros avançados"}
             initialSelectedId={selectedReviewId ?? undefined}
             onOpenHand={goDetalheFromFiltroReplay}
-            onBack={goFiltros}
+            onBack={voltarDaMesaFiltrada}
           />
         )}
         {screen === "nova" && (

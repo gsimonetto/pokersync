@@ -270,6 +270,9 @@ export function RevisorSessao({
   // verdade no DOM; guardar em state garante o re-render assim que o
   // callback ref abaixo dispara.
   const [actionsSlotEl, setActionsSlotEl] = useState<HTMLDivElement | null>(null);
+  // Rodape da coluna de maos no computador: RevisorHandTable porta pra ca
+  // o cartao "Como você jogou?" (nota rapida por rua, colada na mesa).
+  const [avaliacaoSlotEl, setAvaliacaoSlotEl] = useState<HTMLDivElement | null>(null);
 
   useEffect(() => {
     function measure() {
@@ -748,8 +751,16 @@ export function RevisorSessao({
                       numero da mao... isso e bom para filtros
                       depois". Titulo (formato/stakes) e data
                       continuam removidos. */}
-                  <div style={{ fontSize: 11.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)" }}>
-                    Mão {i + 1}
+                  {/* Lista filtrada (Performance, Salvos, Filtros
+                      avançados): vale o número da mão no torneio dela
+                      ("MTT $11 · Mão 3" -> "Mão 3", nome inteiro no
+                      mouse) -- a posição na lista ("Mão 1") não diz qual
+                      mão é. A coluna é estreita demais pro nome inteiro. */}
+                  <div
+                    title={reviewIds && h.title ? h.title : undefined}
+                    style={{ fontSize: 11.5, fontWeight: 500, color: active ? "#FFFFFF" : "rgba(255,255,255,0.75)", overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}
+                  >
+                    {reviewIds && h.title ? h.title.split(" · ").pop() : `Mão ${i + 1}`}
                   </div>
                   <div style={{ fontSize: 11, color: "rgba(255,255,255,0.5)", marginTop: 2, display: "flex", alignItems: "center", gap: 6 }}>
                     {h.viewed_in_replayer_at && <span style={{ color: T.ok }}>✓</span>}
@@ -817,6 +828,7 @@ export function RevisorSessao({
       onFatalError={goToNextHand}
       canAdvanceOnError={hasNextHand}
       actionsSlot={isMobile ? actionsSlotEl : undefined}
+      avaliacaoSlot={isMobile ? undefined : avaliacaoSlotEl}
       onPrevHand={hasPrevHand ? goToPrevHandManual : undefined}
       onNextHand={hasNextHand ? goToNextHandManual : undefined}
       // RevisorHandTable so' renderiza esse botao no proprio header
@@ -992,6 +1004,7 @@ export function RevisorSessao({
           }}
         >
           {listPanel}
+          <div ref={setAvaliacaoSlotEl} style={{ flexShrink: 0 }} />
         </aside>
 
         {/* overflow "auto" (era "hidden") — pedido explicito: "botoes de

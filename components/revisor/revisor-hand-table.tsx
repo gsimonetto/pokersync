@@ -7,7 +7,7 @@ import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, Chevr
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { OpponentStatsModal } from "./opponent-stats-modal";
-import { fetchSpotSaved, setSpotSaved } from "@/lib/services/hand-review-service";
+import { fetchSpotSaved, fetchStreetEvals, salvarAvaliacaoDaRua, setSpotSaved, type Street } from "@/lib/services/hand-review-service";
 import { fetchOpponentsStatsForHand, type OpponentStats } from "@/lib/services/opponent-stats-service";
 import { computeHandEv, fetchHandEvResult, type HandEvResult } from "@/lib/services/hand-ev-service";
 import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility";
@@ -20,6 +20,7 @@ import { equidade, nomeDaJogada } from "@/lib/poker/jogada";
 import { F, T, num } from "@/lib/poker/drill-theme";
 import { salvarPreferenciaMesa, usePreferenciasMesa, type UnidadeValor } from "@/lib/hooks/use-preferencias-mesa";
 import { LinhaDoTempo } from "./linha-do-tempo";
+import { CartaoAvaliacao, FaixaAvaliacaoCelular } from "./avaliacao-rapida";
 
 // Mesa PERSISTENTE do Revisor de Mãos — decisao de arquitetura (2026-08):
 // "a mesa precisa estar presente a todo momento". Componente proprio,
@@ -247,6 +248,7 @@ export function RevisorHandTable({
   onFatalError,
   canAdvanceOnError = true,
   actionsSlot,
+  avaliacaoSlot,
   onPrevHand,
   onNextHand,
   onBack,
@@ -294,6 +296,11 @@ export function RevisorHandTable({
   // desktop (ou quando ausente) os botoes continuam no header normal da
   // mesa, sem mudanca de comportamento.
   actionsSlot?: HTMLElement | null;
+  // Alvo (DOM node) do cartao "Como você jogou?" no computador -- o
+  // rodape da coluna de maos do RevisorSessao, colado na mesa (ver
+  // avaliacao-rapida.tsx). Ausente = o cartao nao aparece (no celular a
+  // nota vai numa faixa embaixo da mesa, dentro deste componente).
+  avaliacaoSlot?: HTMLElement | null;
   // Navegar pra mao anterior/seguinte da sessao -- pedido explicito: o
   // chip unico de controles no celular ganha "ir pra proxima mao" (e
   // anterior) alem dos passos dentro da mesma mao. Omitido = botao
@@ -713,6 +720,51 @@ export function RevisorHandTable({
     });
     return { ...th, seats, placar: placar.length >= 2 ? placar : null };
   }, [replayState, parsedHand, passoUltimaAcao]);
+
+  // Notas rápidas por rua, ao lado da mesa (pedido explícito: avaliar
+  // pré-flop/flop/turn/river sem sair da mesa, salvando a cada rua) -- as
+  // MESMAS do "Analisar mão" (hand_review_street_evals). Só nas mãos do
+  // próprio jogador (onde existe "Analisar mão"), e só nas ruas em que a
+  // jogada dele já apareceu no replay (sem entregar a mão antes da hora).
+  // Onde aparecem: ver avaliacao-rapida.tsx.
+  const podeAvaliar = !!reviewId && !!onOpenHand;
+  const [avaliacoes, setAvaliacoes] = useState<Record<string, string>>({});
+  useEffect(() => {
+    setAvaliacoes({});
+    if (!reviewId || !podeAvaliar) return;
+    let vivo = true;
+    fetchStreetEvals(reviewId)
+      .then((evs) => {
+        if (vivo) setAvaliacoes(Object.fromEntries(evs.map((e) => [e.street, e.self_rating])));
+      })
+      .catch(() => {});
+    return () => {
+      vivo = false;
+    };
+  }, [reviewId, podeAvaliar]);
+  const avaliar = useCallback(
+    async (rua: string, nota: string) => {
+      if (!reviewId) return false;
+      const antes = avaliacoes[rua] ?? "";
+      setAvaliacoes((a) => ({ ...a, [rua]: nota }));
+      try {
+        await salvarAvaliacaoDaRua(reviewId, rua as Street, nota);
+        return true;
+      } catch {
+        // não gravou -- volta a nota de antes pra tela não mentir
+        setAvaliacoes((a) => ({ ...a, [rua]: antes }));
+        return false;
+      }
+    },
+    [reviewId, avaliacoes]
+  );
+  const ruasAvaliaveis = useMemo(() => {
+    if (!replayState || !podeAvaliar) return [];
+    const pos = replayState.seatLayout.find((sl) => sl.isHero)?.posLabel;
+    return replayState.tableHand.history
+      .filter((r) => r.actions.some((a) => a.pos === pos && !a.label.startsWith("posts")))
+      .map((r) => r.street.toLowerCase());
+  }, [replayState, podeAvaliar]);
 
   // Link "Treinar esse spot" — so existe quando rua e' postflop, posicao
   // suportada pelos drills, e a situacao preflop foi resolvida com sucesso.
@@ -1160,6 +1212,13 @@ export function RevisorHandTable({
             </div>
           )}
         </div>
+
+        {/* Celular: nota da rua numa faixa fina EMBAIXO da mesa, fora dela
+            (perto do polegar) -- em cima não dá: as cartas dos assentos do
+            topo passam da borda da mesa e cobriam a faixa no celular baixo. */}
+        {isMobile && podeAvaliar && (
+          <FaixaAvaliacaoCelular avaliacoes={avaliacoes} ruasLiberadas={ruasAvaliaveis} onAvaliar={avaliar} />
+        )}
       </div>
 
       {/* Salvar/Compartilhar/Analisar no celular: portados pro slot que
@@ -1235,6 +1294,15 @@ export function RevisorHandTable({
           trainHref={trainHref}
         />
       )}
+
+      {/* Computador: cartão "Como você jogou?" portado pro rodapé da
+          coluna de mãos (RevisorSessao), colado na mesa -- espaço que a
+          mesa não usa, então nada nela muda de tamanho nem fica coberto. */}
+      {!isMobile && podeAvaliar && avaliacaoSlot &&
+        createPortal(
+          <CartaoAvaliacao avaliacoes={avaliacoes} ruasLiberadas={ruasAvaliaveis} fimDaMao={isLastStep} onAvaliar={avaliar} />,
+          avaliacaoSlot
+        )}
 
       <OpponentStatsModal stats={opponentClicked} onClose={() => setOpponentClicked(null)} />
     </div>
