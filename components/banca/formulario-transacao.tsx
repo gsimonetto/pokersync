@@ -7,7 +7,7 @@ import { CURRENCIES, todayISO } from "@/lib/bankroll/format";
 import { OUTRO_PLATFORM, PLATFORMS } from "@/lib/bankroll/platforms";
 import { Modal } from "@/components/ui/modal";
 import { Escolhas } from "./formulario-sessao";
-import { BOTAO_OURO, CAMPO, TIPO_TX, dataBR, numero } from "./util";
+import { BOTAO_OURO, CAMPO, CATEGORIAS_DESPESA, TIPO_TX, dataBR, numero } from "./util";
 
 // Depósito / saque / caixinha. Não entra no resultado de jogo: só move
 // dinheiro entre a banca de jogo e o que está guardado.
@@ -29,6 +29,7 @@ export function FormularioTransacao({
   const [sala, setSala] = useState(sugestoes.plataforma);
   const [salaOutra, setSalaOutra] = useState("");
   const [moeda, setMoeda] = useState(sugestoes.moeda);
+  const [categoria, setCategoria] = useState("coach");
   const [aviso, setAviso] = useState("");
 
   useEffect(() => {
@@ -55,19 +56,25 @@ export function FormularioTransacao({
       type: tipo,
       amount: v,
       note: nota,
-      venue: (sala === OUTRO_PLATFORM ? salaOutra.trim() : sala) || undefined,
+      venue: pedeSala ? (sala === OUTRO_PLATFORM ? salaOutra.trim() : sala) || undefined : undefined,
       currency: moeda,
+      category: tipo === "despesa" ? categoria : undefined,
     });
   }
 
   const explicacao: Record<TransactionType, string> = {
-    deposito: "Dinheiro que entrou na banca de jogo.",
-    saque: "Dinheiro que você tirou da banca pra uso pessoal.",
+    deposito: "Dinheiro que entrou na banca de jogo. Não conta como lucro.",
+    saque: "Dinheiro que você tirou da banca pra uso pessoal. Não conta como prejuízo.",
     caixinha: "Dinheiro separado da banca de jogo, mas que continua sendo seu (reserva).",
+    rakeback: "Rake devolvido pela sala. Soma na banca e conta como lucro.",
+    bonus: "Bônus, prêmio de ranking ou promoção da sala. Soma na banca e conta como lucro.",
+    despesa: "Custo do poker (coach, software, viagem pra torneio ao vivo). Sai da banca e desconta do lucro.",
   };
+  // Plataforma só faz sentido pra dinheiro que entra/sai de uma sala.
+  const pedeSala = tipo !== "despesa";
 
   return (
-    <Modal open={aberto} onClose={onFechar} title="Depósito, saque ou caixinha">
+    <Modal open={aberto} onClose={onFechar} title="Movimentar dinheiro">
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -76,7 +83,10 @@ export function FormularioTransacao({
         className="flex flex-col gap-3"
       >
         <Escolhas valor={tipo} opcoes={(Object.keys(TIPO_TX) as TransactionType[]).map((t) => ({ value: t, label: TIPO_TX[t] }))} onChange={setTipo} />
-        <p className="-mt-1 text-[12px] text-muted">{explicacao[tipo]} Não entra no resultado de jogo.</p>
+        <p className="-mt-1 text-[12px] text-muted">{explicacao[tipo]}</p>
+        {tipo === "despesa" && (
+          <Escolhas valor={categoria} opcoes={CATEGORIAS_DESPESA} onChange={setCategoria} />
+        )}
         <div className="grid grid-cols-2 gap-2">
           <label className="flex flex-col gap-1">
             <span className="text-[11px] font-medium text-muted">Valor</span>
@@ -96,7 +106,7 @@ export function FormularioTransacao({
             <span className="text-[11px] font-medium text-muted">Data</span>
             <input type="date" value={data} onChange={(e) => setData(e.target.value)} className={CAMPO} />
           </label>
-          <label className="flex flex-col gap-1">
+          <label className={`flex flex-col gap-1 ${pedeSala ? "" : "hidden"}`}>
             <span className="text-[11px] font-medium text-muted">Plataforma</span>
             <select value={sala} onChange={(e) => setSala(e.target.value)} className={CAMPO}>
               {PLATFORMS.map((p) => (
@@ -107,7 +117,7 @@ export function FormularioTransacao({
               <option value={OUTRO_PLATFORM}>{OUTRO_PLATFORM}</option>
             </select>
           </label>
-          {sala === OUTRO_PLATFORM && (
+          {pedeSala && sala === OUTRO_PLATFORM && (
             <label className="col-span-2 flex flex-col gap-1">
               <span className="text-[11px] font-medium text-muted">Qual plataforma?</span>
               <input value={salaOutra} onChange={(e) => setSalaOutra(e.target.value)} className={CAMPO} />

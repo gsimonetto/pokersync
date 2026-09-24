@@ -44,7 +44,10 @@ export interface Session {
   importedHandSessionId?: string | null;
 }
 
-export type TransactionType = "deposito" | "saque" | "caixinha";
+// rakeback/bonus: dinheiro que entra fora das mesas (conta como lucro).
+// despesa: custo do poker (coach, software, viagem) -- tira do lucro.
+// deposito/saque/caixinha só movem dinheiro, não são lucro nem prejuízo.
+export type TransactionType = "deposito" | "saque" | "caixinha" | "rakeback" | "bonus" | "despesa";
 
 // Movimentacao de capital — separada do resultado de jogo (Session).
 // Depositos somam a banca de jogo; saques e caixinha tiram da banca de
@@ -57,6 +60,8 @@ export interface Transaction {
   note?: string;
   venue?: string;
   currency?: string;
+  /** Só pra despesa: coach, software, viagem ou outros. */
+  category?: string;
 }
 
 export type GoalType = "volume" | "estudo";

@@ -105,9 +105,11 @@ export function AbaVisaoGeral({
               origem: "Gestão de Banca",
               comoCalcula: b.filtrandoPlataforma
                 ? `Só ${b.plataforma}: resultado das sessões + depósitos − saques dessa plataforma.`
-                : "Banca inicial + resultado das sessões + depósitos − saques − caixinha.",
+                : "Banca inicial + resultado das sessões + rakeback e bônus − despesas + depósitos − saques − caixinha.",
               itens: [
                 { rotulo: "Resultado de jogo", valor: fmtSignedMoneyIn(agg.profit, b.moeda) },
+                { rotulo: "Rakeback e bônus", valor: fmt(b.patrimonio.extras) },
+                { rotulo: "Despesas", valor: fmt(b.patrimonio.despesas) },
                 { rotulo: "Depósitos", valor: fmt(b.patrimonio.deposits) },
                 { rotulo: "Saques + caixinha", valor: fmt(b.patrimonio.withdrawn + b.patrimonio.caixinha) },
               ],
@@ -282,6 +284,29 @@ export function AbaVisaoGeral({
             <ReguaBrm leitura={b.brm} compacta />
           ) : (
             <p className="text-sm text-muted">Registre sessões pra ver quantos buy-ins sua banca cobre.</p>
+          )}
+          {b.hoje.limite != null && (
+            <button
+              type="button"
+              onClick={() => onIrPara("risco")}
+              title="Limite de perda do dia"
+              className="flex items-center gap-2 rounded-xl border border-white/[0.06] bg-white/[0.02] px-3 py-2 text-left"
+            >
+              <span className="text-[11.5px] text-muted">Hoje</span>
+              <span className="h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.06]">
+                <span
+                  className="block h-full rounded-full"
+                  style={{
+                    width: `${Math.min(100, b.hoje.pct)}%`,
+                    background: b.hoje.status === "atingido" ? COR_NEGATIVO : b.hoje.status === "perto" ? "#f59e0b" : COR_POSITIVO,
+                  }}
+                />
+              </span>
+              <span className="tnum text-[12px] font-semibold" style={{ color: b.hoje.resultado >= 0 ? COR_POSITIVO : COR_NEGATIVO }}>
+                {fmtSignedMoneyIn(b.hoje.resultado, b.moeda)}
+              </span>
+              <span className="text-[11px] text-muted">/ −{fmt(b.hoje.limite)}</span>
+            </button>
           )}
           <div className="grid grid-cols-2 gap-2">
             <InfoHover

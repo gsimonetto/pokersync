@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import type { Annotation, BrmFormat, BrmThreshold, Session, Transaction } from "@/lib/bankroll/types";
+import type { Annotation, BrmFormat, BrmThreshold, Session, Transaction, TransactionType } from "@/lib/bankroll/types";
 import {
   aggregate,
   bbHourlyRate,
@@ -17,6 +17,7 @@ import {
   netWorth,
   platformBalances,
   riskOfRuin,
+  sinalTransacao,
   tiltImpact,
 } from "@/lib/bankroll/calc";
 import { saldosPorMoeda } from "@/lib/bankroll/consolidado";
@@ -28,6 +29,7 @@ import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
 import { getUsdBrlRate } from "@/lib/services/fx-service";
+import { TIPO_TX } from "./util";
 import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
 import {
   addAnnotation as apiAddAnnotation,
@@ -44,6 +46,7 @@ import {
   notifyBrmAlert,
   resetBancaRadarImports,
   saveBrmThreshold as apiSaveBrmThreshold,
+  saveStopLoss,
   updateSession as apiUpdateSession,
 } from "@/lib/services/bankroll-service";
 
@@ -62,7 +65,7 @@ export interface PontoSaldo {
   date: string;
   valor: number;
   variacao: number;
-  tipo: "inicio" | "sessao" | "deposito" | "saque" | "caixinha";
+  tipo: "inicio" | "sessao" | TransactionType;
   rotulo: string;
 }
 
@@ -72,6 +75,8 @@ export function useBanca() {
   const [limites, setLimites] = useState<BrmThreshold[]>([]);
   const [anotacoes, setAnotacoes] = useState<Annotation[]>([]);
   const [base, setBase] = useState(0);
+  // Limite de perda do dia, em buy-ins (null = desligado).
+  const [limiteDia, setLimiteDia] = useState<number | null>(null);
   const [carregando, setCarregando] = useState(true);
   const [erro, setErro] = useState("");
   const [moeda, setMoeda] = useState("BRL");
@@ -104,6 +109,7 @@ export function useBanca() {
         if (!vivo) return;
         setSessoes(s);
         setBase(Number(cfg.bankroll) || 0);
+        setLimiteDia(cfg.stopLossBuyins ?? null);
         setTransacoes(tx);
         setLimites(brm);
         setAnotacoes(annos);
@@ -259,9 +265,9 @@ export function useBanca() {
       eventos.push({
         chave: `${t.date}T00:00`,
         date: t.date,
-        variacao: t.type === "deposito" ? v : -v,
+        variacao: sinalTransacao(t) * v,
         tipo: t.type,
-        rotulo: [t.type === "deposito" ? "Depósito" : t.type === "saque" ? "Saque" : "Caixinha", t.venue].filter(Boolean).join(" · "),
+        rotulo: [TIPO_TX[t.type], t.venue].filter(Boolean).join(" · "),
       });
     }
     if (eventos.length === 0) return [];
@@ -306,6 +312,43 @@ export function useBanca() {
     const iso = corte.toISOString().slice(0, 10);
     return aggregate(sessoesFiltradas.filter((s) => s.date >= iso));
   }, [sessoesFiltradas]);
+
+  // ---- Limite de perda do dia ----
+  // Buy-in de referência: o do formato que você mais joga (mesma base do
+  // BRM); sem leitura de BRM, o buy-in médio geral.
+  const hoje = useMemo(() => {
+    const dia = todayISO();
+    const sessHoje = sessoesMoeda.filter((s) => s.date === dia);
+    const resultado = sessHoje.reduce((t, s) => t + net(s), 0);
+    const buyInRef = brm?.avgBuyIn ?? agg.avgBuyIn;
+    const limite = limiteDia != null && buyInRef > 0 ? limiteDia * buyInRef : null;
+    const perda = Math.max(0, -resultado);
+    const pct = limite ? (perda / limite) * 100 : 0;
+    const status: "livre" | "ok" | "perto" | "atingido" = limite == null ? "livre" : pct >= 100 ? "atingido" : pct >= 75 ? "perto" : "ok";
+    return { resultado, n: sessHoje.length, limite, buyInRef, pct, status };
+  }, [sessoesMoeda, brm?.avgBuyIn, agg.avgBuyIn, limiteDia]);
+
+  // Aviso no sino quando bate o limite (1x por dia: notifyBrmAlert não
+  // repete o mesmo título em 20h).
+  useEffect(() => {
+    if (carregando || hoje.status !== "atingido") return;
+    notifyBrmAlert(
+      "Limite de perda do dia atingido",
+      `Você perdeu ${hoje.limite != null ? Math.round(hoje.pct) : 0}% do limite de ${limiteDia} buy-ins de hoje. Hora de parar e voltar amanhã.`,
+    ).catch(() => {});
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [carregando, hoje.status]);
+
+  async function salvarLimiteDia(buyins: number | null) {
+    const antes = limiteDia;
+    setLimiteDia(buyins);
+    try {
+      await saveStopLoss(buyins);
+    } catch {
+      setErro("Não foi possível salvar o limite de perda do dia.");
+      setLimiteDia(antes);
+    }
+  }
 
   // ---- Relatórios ----
   const porFormato = useMemo(() => groupStats(sessoesFiltradas, "format"), [sessoesFiltradas]);
@@ -523,6 +566,10 @@ export function useBanca() {
     adicionarAnotacao,
     removerAnotacao,
     zerarImportacoesRadar,
+    // limite do dia
+    limiteDia,
+    hoje,
+    salvarLimiteDia,
   };
 }
 
