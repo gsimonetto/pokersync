@@ -92,6 +92,7 @@ export function Escolhas<T extends string>({ valor, opcoes, onChange }: { valor:
 export function FormularioSessao({
   aberto,
   sessao,
+  inicial,
   sugestoes,
   onFechar,
   onSalvar,
@@ -99,6 +100,8 @@ export function FormularioSessao({
   aberto: boolean;
   /** Sessão sendo editada; null = registrar nova. */
   sessao: Session | null;
+  /** Nova sessão já com data/horário/horas (vindo do cronômetro). */
+  inicial?: Partial<Session> | null;
   sugestoes: SugestoesSessao;
   onFechar: () => void;
   onSalvar: (rascunho: Session, editandoId: string | null) => void;
@@ -136,15 +139,16 @@ export function FormularioSessao({
     const s = sessao;
     const conhecida = s?.venue && (PLATFORMS as readonly string[]).includes(s.venue);
     setFormato(s?.format ?? sugestoes.formato);
-    setData(s?.date ?? todayISO());
-    setHora(s?.time ?? "");
+    setData(s?.date ?? inicial?.date ?? todayISO());
+    setHora(s?.time ?? inicial?.time ?? "");
     setBuyIn(s ? String(s.buyIn) : "");
     setReentradas(s?.reentries ? String(s.reentries) : "");
     setCashout(s ? String(s.cashout) : "");
     setStake(s?.stake ?? "");
     setSala(s ? (conhecida ? (s.venue as string) : s.venue ? OUTRO_PLATFORM : PLATFORMS[0]) : sugestoes.plataforma);
     setSalaOutra(s && !conhecida ? s.venue ?? "" : "");
-    setHoras(s?.hours != null ? String(s.hours) : "");
+    const h = s?.hours ?? inicial?.hours;
+    setHoras(h != null ? String(h).replace(".", ",") : "");
     setMoeda(s?.currency ?? sugestoes.moeda);
     setNotas(s?.notes ?? "");
     setHumor(s?.mood ?? "");
@@ -156,13 +160,15 @@ export function FormularioSessao({
     setMinhaPct(s?.ownPct != null ? String(s.ownPct) : "");
     setMarkup(s?.markup != null ? String(s.markup) : "");
     setBacker(s?.backerName ?? "");
-    setAbrirDetalhes(Boolean(s && (s.time || s.hours != null || s.stake || s.reentries || s.notes || (s.currency && s.currency !== "BRL"))));
+    setAbrirDetalhes(
+      Boolean(inicial?.hours != null || (s && (s.time || s.hours != null || s.stake || s.reentries || s.notes || (s.currency && s.currency !== "BRL")))),
+    );
     setAbrirDiario(Boolean(s && (s.mood || s.tilt != null || s.diaryNote)));
     setAbrirStaking(Boolean(s && (s.rake != null || s.rakeback != null || s.ownPct != null || s.markup != null || s.backerName)));
     setAviso("");
     setTimeout(() => primeiroCampo.current?.focus(), 60);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [aberto, sessao]);
+  }, [aberto, sessao, inicial]);
 
   const rascunho: Session = {
     id: sessao?.id ?? `tmp-${Date.now()}`,

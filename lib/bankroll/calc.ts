@@ -299,9 +299,12 @@ export function platformBalances(sessions: Session[], transactions: Transaction[
     bucket(s.venue?.trim() || "Sem plataforma").sessions.push(s);
   }
   for (const t of transactions || []) {
+    // Despesa (coach, software, viagem) não sai de nenhuma sala.
+    if (t.type === "despesa") continue;
     const b = bucket(t.venue?.trim() || "Sem plataforma");
     const v = Number(t.amount) || 0;
-    if (t.type === "deposito") b.deposits += v;
+    // Rakeback/bônus entram como entrada; saque, caixinha e despesa saem.
+    if (sinalTransacao(t) > 0) b.deposits += v;
     else b.withdrawn += v;
   }
 
@@ -357,25 +360,44 @@ export interface NetWorth {
   withdrawn: number;
   caixinha: number;
   deposits: number;
+  /** Rakeback + bônus: lucro que não veio das mesas. */
+  extras: number;
+  /** Despesas do poker (coach, software, viagem...). */
+  despesas: number;
+  /** Lucro de verdade: resultado de jogo + extras − despesas. */
+  lucroReal: number;
+}
+
+// Entrada (+1) ou saída (−1) de dinheiro da banca de jogo por tipo.
+export function sinalTransacao(t: Transaction): 1 | -1 {
+  return t.type === "deposito" || t.type === "rakeback" || t.type === "bonus" ? 1 : -1;
 }
 
 export function netWorth(base: number, sessionsProfit: number, transactions: Transaction[]): NetWorth {
   let deposits = 0,
     withdrawn = 0,
-    caixinha = 0;
+    caixinha = 0,
+    extras = 0,
+    despesas = 0;
   for (const t of transactions || []) {
     const v = Number(t.amount) || 0;
     if (t.type === "deposito") deposits += v;
     else if (t.type === "saque") withdrawn += v;
     else if (t.type === "caixinha") caixinha += v;
+    else if (t.type === "rakeback" || t.type === "bonus") extras += v;
+    else if (t.type === "despesa") despesas += v;
   }
-  const totalIn = base + sessionsProfit + deposits;
+  const lucroReal = sessionsProfit + extras - despesas;
+  const totalIn = base + deposits + lucroReal;
   return {
     playingBankroll: totalIn - withdrawn - caixinha,
     netWorth: totalIn,
     withdrawn,
     caixinha,
     deposits,
+    extras,
+    despesas,
+    lucroReal,
   };
 }
 

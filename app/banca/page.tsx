@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { AlertTriangle, Landmark, Plus, Wallet } from "lucide-react";
+import { AlertTriangle, Landmark, Plus, ShieldAlert, Wallet } from "lucide-react";
 import type { Session, Transaction } from "@/lib/bankroll/types";
 import { fmtMoneyIn, suggestFormat } from "@/lib/bankroll/format";
 import { PLATFORMS } from "@/lib/bankroll/platforms";
@@ -23,6 +23,7 @@ import { AbaDinheiro } from "@/components/banca/aba-dinheiro";
 import { AbaRelatorios } from "@/components/banca/aba-relatorios";
 import { FormularioSessao } from "@/components/banca/formulario-sessao";
 import { FormularioTransacao, ModalAnotacoes } from "@/components/banca/formulario-transacao";
+import { AvisoJornadas, ControleCronometro, ModalFimJornada, dataLocal, useCronometro, type Jornada } from "@/components/banca/cronometro";
 import { BOTAO_OURO, BOTAO_VIDRO, CAMPO, TIPO_TX, dataBR, haQuanto } from "@/components/banca/util";
 
 // Gestão de Banca no visual novo (o mesmo da tela inicial, da Performance
@@ -52,6 +53,32 @@ export default function BancaPage() {
   const [editando, setEditando] = useState<Session | null>(null);
   const [txAberta, setTxAberta] = useState(false);
   const [anotacoesAbertas, setAnotacoesAbertas] = useState(false);
+  const [inicialSessao, setInicialSessao] = useState<Partial<Session> | null>(null);
+
+  // Cronômetro de sessão (ver components/banca/cronometro.tsx).
+  const cron = useCronometro();
+  const [jornada, setJornada] = useState<Jornada | null>(null);
+  function tirarPendente(j: Jornada) {
+    cron.salvarPendentes(cron.pendentes.filter((x) => x.inicioIso !== j.inicioIso));
+  }
+  // Cada torneio do Radar da jornada ganha uma parte igual do tempo.
+  async function dividirHoras(j: Jornada, torneios: Session[]) {
+    setJornada(null);
+    tirarPendente(j);
+    const parte = +(j.horas / torneios.length).toFixed(3);
+    for (const t of torneios) await b.salvarSessao({ ...t, hours: parte }, t.id);
+  }
+  function lancarJornada(j: Jornada) {
+    setJornada(null);
+    const inicio = new Date(j.inicioIso);
+    setEditando(null);
+    setInicialSessao({
+      date: dataLocal(j.inicioIso),
+      time: `${String(inicio.getHours()).padStart(2, "0")}:${String(inicio.getMinutes()).padStart(2, "0")}`,
+      hours: j.horas,
+    });
+    setSessaoAberta(true);
+  }
 
   // Formulário já vem com o formato e a plataforma que o jogador mais usa.
   const sugestoes = useMemo(() => {
@@ -62,6 +89,7 @@ export default function BancaPage() {
 
   function novaSessao() {
     setEditando(null);
+    setInicialSessao(null);
     setSessaoAberta(true);
   }
   function editarSessao(s: Session) {
@@ -109,9 +137,14 @@ export default function BancaPage() {
                   onScopeChange={({ since }) => b.setCorteRadar(since)}
                   onReset={b.zerarImportacoesRadar}
                 />
-                <button type="button" onClick={() => setTxAberta(true)} className={`${BOTAO_VIDRO} whitespace-nowrap`}>
-                  <Wallet size={15} /> <span className="hidden sm:inline">Depósito/Saque</span>
-                  <span className="sm:hidden">Dinheiro</span>
+                <ControleCronometro c={cron} alerta={b.hoje.status === "atingido"} onEncerrar={setJornada} />
+                <button
+                  type="button"
+                  onClick={() => setTxAberta(true)}
+                  title="Depósito, saque, caixinha, rakeback, bônus ou despesa"
+                  className={`${BOTAO_VIDRO} whitespace-nowrap`}
+                >
+                  <Wallet size={15} /> Movimentação
                 </button>
                 <button type="button" onClick={novaSessao} className={`${BOTAO_OURO} whitespace-nowrap`}>
                   <Plus size={16} strokeWidth={2.2} /> Registrar sessão
@@ -173,6 +206,24 @@ export default function BancaPage() {
               </p>
             )}
 
+            {!b.carregando && (
+              <AvisoJornadas pendentes={cron.pendentes} sessoes={b.sessoes} onAplicar={dividirHoras} onDescartar={tirarPendente} />
+            )}
+            {(b.hoje.status === "perto" || b.hoje.status === "atingido") && b.hoje.limite != null && (
+              <p
+                className="mb-3 flex shrink-0 items-start gap-2 rounded-xl border px-3 py-2 text-[12.5px] text-ink/90"
+                style={{
+                  borderColor: b.hoje.status === "atingido" ? "rgba(224,85,90,0.4)" : "rgba(245,158,11,0.35)",
+                  background: b.hoje.status === "atingido" ? "rgba(224,85,90,0.08)" : "rgba(245,158,11,0.07)",
+                }}
+              >
+                <ShieldAlert size={15} className="mt-0.5 shrink-0" style={{ color: b.hoje.status === "atingido" ? "#e0555a" : "#f59e0b" }} />
+                {b.hoje.status === "atingido"
+                  ? `Limite de perda do dia atingido: você perdeu ${fmtMoneyIn(-b.hoje.resultado, b.moeda)} hoje (limite ${fmtMoneyIn(b.hoje.limite, b.moeda)}). Hora de parar e voltar amanhã.`
+                  : `Perto do limite de perda do dia: ${fmtMoneyIn(-b.hoje.resultado, b.moeda)} de ${fmtMoneyIn(b.hoje.limite, b.moeda)}. Pense bem antes da próxima mesa.`}
+              </p>
+            )}
+
             {b.carregando ? (
               <div className="grid gap-3.5 tela-cheia:min-h-0 tela-cheia:flex-1 xl:grid-cols-6 tela-cheia:grid-rows-2">
                 <div className="painel-esqueleto h-[280px] rounded-3xl xl:col-span-2 tela-cheia:h-auto" />
@@ -213,6 +264,7 @@ export default function BancaPage() {
             <FormularioSessao
               aberto={sessaoAberta}
               sessao={editando}
+              inicial={inicialSessao}
               sugestoes={sugestoes}
               onFechar={() => setSessaoAberta(false)}
               onSalvar={(rascunho, id) => {
@@ -227,6 +279,21 @@ export default function BancaPage() {
               onSalvar={(t) => {
                 setTxAberta(false);
                 b.adicionarTransacao(t);
+              }}
+            />
+            <ModalFimJornada
+              jornada={jornada}
+              sessoes={b.sessoes}
+              onFechar={() => {
+                // Fechar sem escolher não perde o tempo: guarda pra depois.
+                if (jornada) cron.salvarPendentes([...cron.pendentes, jornada]);
+                setJornada(null);
+              }}
+              onLancarSessao={lancarJornada}
+              onAplicarTorneios={dividirHoras}
+              onGuardar={(j) => {
+                cron.salvarPendentes([...cron.pendentes, j]);
+                setJornada(null);
               }}
             />
             <ModalAnotacoes

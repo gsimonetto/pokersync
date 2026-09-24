@@ -186,12 +186,27 @@ export async function fetchSettings() {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("bankroll_settings")
-    .select("bankroll, profile")
+    .select("bankroll, profile, stop_loss_buyins")
     .maybeSingle();
   if (error) throw error;
   return data
-    ? { bankroll: Number(data.bankroll) || 0, profile: data.profile || "Padrao" }
-    : { bankroll: 0, profile: "Padrao" };
+    ? {
+        bankroll: Number(data.bankroll) || 0,
+        profile: data.profile || "Padrao",
+        stopLossBuyins: data.stop_loss_buyins != null ? Number(data.stop_loss_buyins) : null,
+      }
+    : { bankroll: 0, profile: "Padrao", stopLossBuyins: null as number | null };
+}
+
+// Limite de perda do dia, em buy-ins (null = desligado). Upsert só com essa
+// coluna: se a linha já existe, banca inicial e perfil ficam como estão.
+export async function saveStopLoss(buyins: number | null) {
+  const supabase = createClient();
+  const userId = await getUserId();
+  const { error } = await supabase
+    .from("bankroll_settings")
+    .upsert({ user_id: userId, stop_loss_buyins: buyins, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
+  if (error) throw error;
 }
 
 export async function saveSettings({ bankroll, profile }: { bankroll: number; profile: string }) {
@@ -204,7 +219,7 @@ export async function saveSettings({ bankroll, profile }: { bankroll: number; pr
   if (error) throw error;
 }
 
-// --- Transacoes (deposito/saque/caixinha) --------------------------------
+// --- Transacoes (deposito/saque/caixinha/rakeback/bonus/despesa) ----------
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 function rowToTransaction(r: any): Transaction {
@@ -216,6 +231,7 @@ function rowToTransaction(r: any): Transaction {
     note: r.note || undefined,
     venue: r.venue || undefined,
     currency: r.currency || "BRL",
+    category: r.category || undefined,
   };
 }
 
@@ -236,6 +252,7 @@ export async function addTransaction(t: {
   note?: string;
   venue?: string;
   currency?: string;
+  category?: string;
 }): Promise<Transaction> {
   const supabase = createClient();
   const userId = await getUserId();
@@ -249,6 +266,7 @@ export async function addTransaction(t: {
       note: t.note || null,
       venue: t.venue || null,
       currency: t.currency || "BRL",
+      category: t.type === "despesa" ? t.category || null : null,
     })
     .select()
     .single();

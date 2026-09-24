@@ -1,26 +1,43 @@
 "use client";
 
 import { motion } from "framer-motion";
-import { ArrowDownLeft, ArrowUpRight, Coins, Landmark, PiggyBank, Plus, Receipt, Trash2 } from "lucide-react";
-import type { Transaction } from "@/lib/bankroll/types";
+import { ArrowDownLeft, ArrowUpRight, BadgePercent, Coins, Gift, Landmark, PiggyBank, Plus, Receipt, Trash2, TrendingUp, Wrench } from "lucide-react";
+import type { Transaction, TransactionType } from "@/lib/bankroll/types";
+import { sinalTransacao } from "@/lib/bankroll/calc";
 import { fmtMoneyIn, fmtSignedMoneyIn } from "@/lib/bankroll/format";
 import { consolidarEmReais } from "@/lib/bankroll/consolidado";
 import { EASE, Linha, Numero, PainelCard, TileIcone } from "@/components/painel/painel-card";
 import { InfoHover } from "@/components/painel/info-hover";
 import type { Banca } from "./use-banca";
-import { BOTAO_VIDRO, COR_NEGATIVO, COR_POSITIVO, COR_UNICA, TIPO_TX, dataBR } from "./util";
+import { BOTAO_VIDRO, COR_NEGATIVO, COR_POSITIVO, COR_TX, COR_UNICA, TIPO_TX, dataCurta, nomeCategoria, num1 } from "./util";
 
 // Aba "Dinheiro": onde está o dinheiro (por plataforma e por moeda) e o
 // que entrou/saiu. Nada daqui é resultado de jogo -- é o caixa.
 //
-//   ┌──────── Saldo por plataforma (4) ────────┐┌ Entradas e saídas (2) ┐
-//   ┌──────── Movimentações (4) ───────────────┐┌ Suas moedas (2) ──────┐
+//   ┌──────── Saldo por plataforma (4) ────────┐┌ Lucro real (2) ───────┐
+//   ┌ Movimentações (2) ┐┌ Entradas e saídas (2) ┐┌ Suas moedas (2) ──┐
+
+const ICONE_TX: Record<TransactionType, React.ReactNode> = {
+  deposito: <ArrowDownLeft size={15} />,
+  saque: <ArrowUpRight size={15} />,
+  caixinha: <PiggyBank size={15} />,
+  rakeback: <BadgePercent size={15} />,
+  bonus: <Gift size={15} />,
+  despesa: <Wrench size={15} />,
+};
 
 export function AbaDinheiro({ b, onNovaTransacao, onExcluir }: { b: Banca; onNovaTransacao: () => void; onExcluir: (t: Transaction) => void }) {
   const fmt = (v: number) => fmtMoneyIn(v, b.moeda);
   const totalPositivo = b.plataformas.reduce((t, p) => t + Math.max(0, p.balance), 0);
   const movs = [...b.transacoesFiltradas].sort((x, y) => y.date.localeCompare(x.date));
   const c = consolidarEmReais(b.saldosMoedas, b.cambio.taxaParaBRL);
+  const despesasPorCategoria = Object.entries(
+    b.transacoesFiltradas
+      .filter((t) => t.type === "despesa")
+      .reduce<Record<string, number>>((acc, t) => ({ ...acc, [nomeCategoria(t.category)]: (acc[nomeCategoria(t.category)] ?? 0) + (Number(t.amount) || 0) }), {}),
+  )
+    .map(([nome, total]) => ({ nome, total }))
+    .sort((x, y) => y.total - x.total);
 
   return (
     <div className="grid grid-cols-1 gap-3.5 md:grid-cols-2 tela-cheia:h-full xl:grid-cols-6 tela-cheia:grid-rows-[minmax(0,1fr)_minmax(0,1fr)]">
@@ -38,11 +55,11 @@ export function AbaDinheiro({ b, onNovaTransacao, onExcluir }: { b: Banca; onNov
                     className="h-full"
                     explicacao={{
                       titulo: p.platform,
-                      oQueE: "Quanto você tem nessa plataforma: resultado das sessões jogadas nela + depósitos − saques.",
+                      oQueE: "Quanto você tem nessa plataforma: resultado das sessões jogadas nela + entradas (depósito, rakeback, bônus) − saídas (saque, caixinha).",
                       origem: "Gestão de Banca · sessões e movimentações com essa plataforma",
                       itens: [
                         { rotulo: `Resultado (${p.sessionsN} sessões)`, valor: fmtSignedMoneyIn(p.sessionsNet, b.moeda) },
-                        { rotulo: "Depósitos", valor: fmt(p.deposits) },
+                        { rotulo: "Depósitos, rakeback e bônus", valor: fmt(p.deposits) },
                         { rotulo: "Saques e caixinha", valor: fmt(p.withdrawn) },
                       ],
                     }}
@@ -77,25 +94,36 @@ export function AbaDinheiro({ b, onNovaTransacao, onExcluir }: { b: Banca; onNov
         )}
       </PainelCard>
 
-      {/* ---------------- Entradas e saídas ---------------- */}
-      <PainelCard title="Entradas e saídas" icon={<Receipt size={15} />} ordem={1} className="md:col-span-2 xl:col-span-2 tela-cheia:min-h-0">
+      {/* ---------------- Lucro real ---------------- */}
+      <PainelCard title="Lucro real" icon={<TrendingUp size={15} />} ordem={1} className="md:col-span-2 xl:col-span-2 tela-cheia:min-h-0">
         <div className="flex flex-col gap-2">
-          <Movimento icone={<ArrowDownLeft size={16} />} cor={COR_POSITIVO} rotulo="Depositado" valor={fmt(b.patrimonio.deposits)} />
-          <Movimento icone={<ArrowUpRight size={16} />} cor={COR_NEGATIVO} rotulo="Sacado" valor={fmt(b.patrimonio.withdrawn)} />
-          <Movimento icone={<PiggyBank size={16} />} cor="#f59e0b" rotulo="Na caixinha" valor={fmt(b.patrimonio.caixinha)} />
           <InfoHover
             explicacao={{
-              titulo: "Patrimônio no poker",
-              oQueE: "Tudo que o poker já te deu, inclusive o que você sacou ou guardou. Saque e caixinha não são perda: só saem da banca de jogo.",
-              origem: "Gestão de Banca",
-              comoCalcula: "Banca inicial + resultado das sessões + depósitos.",
+              titulo: "Lucro real",
+              oQueE: "O que o poker te deu de verdade: o resultado das mesas, mais o que veio fora delas (rakeback, bônus), menos o que você gastou pra jogar (coach, software, viagem).",
+              origem: "Gestão de Banca · sessões e movimentações",
+              comoCalcula: "Resultado das sessões + rakeback + bônus − despesas. Depósito, saque e caixinha não entram: só movem dinheiro.",
             }}
           >
-            <Linha className="flex items-center justify-between gap-2">
-              <span className="text-[12.5px] text-muted">Patrimônio no poker</span>
-              <span className="tnum text-[16px] font-bold text-ink">{fmt(b.patrimonio.netWorth)}</span>
-            </Linha>
+            <div className="rounded-2xl border border-[#d4af37]/25 p-3" style={{ background: "linear-gradient(135deg, rgba(212,175,55,0.12), transparent)" }}>
+              <p className="tnum text-[28px] font-bold leading-none" style={{ color: b.patrimonio.lucroReal >= 0 ? COR_POSITIVO : COR_NEGATIVO }}>
+                {fmtSignedMoneyIn(b.patrimonio.lucroReal, b.moeda)}
+              </p>
+              {b.agg.totalInvested > 0 && (
+                <p className="mt-1.5 text-[11.5px] text-muted">
+                  ROI com extras e despesas: <span className="font-semibold text-ink">{num1((b.patrimonio.lucroReal / b.agg.totalInvested) * 100)}%</span>
+                </p>
+              )}
+            </div>
           </InfoHover>
+          <Movimento icone={<Landmark size={16} />} cor="#c4c7c8" rotulo="Resultado das mesas" valor={fmtSignedMoneyIn(b.agg.profit, b.moeda)} />
+          <Movimento icone={<BadgePercent size={16} />} cor={COR_UNICA} rotulo="Rakeback e bônus" valor={`+${fmt(b.patrimonio.extras)}`} />
+          <Movimento icone={<Wrench size={16} />} cor={COR_TX.despesa} rotulo="Despesas" valor={`−${fmt(b.patrimonio.despesas)}`} />
+          {despesasPorCategoria.length > 0 && (
+            <p className="px-1 text-[11px] text-muted">
+              {despesasPorCategoria.map((d) => `${d.nome} ${fmt(d.total)}`).join(" · ")}
+            </p>
+          )}
         </div>
       </PainelCard>
 
@@ -104,7 +132,7 @@ export function AbaDinheiro({ b, onNovaTransacao, onExcluir }: { b: Banca; onNov
         title={`Movimentações (${movs.length})`}
         icon={<Receipt size={15} />}
         ordem={2}
-        className="md:col-span-2 xl:col-span-4 tela-cheia:min-h-0"
+        className="md:col-span-2 xl:col-span-2 tela-cheia:min-h-0"
         action={
           <button type="button" onClick={onNovaTransacao} className={`${BOTAO_VIDRO} !px-2.5 !py-1.5 text-[12px]`}>
             <Plus size={14} /> Nova
@@ -118,17 +146,17 @@ export function AbaDinheiro({ b, onNovaTransacao, onExcluir }: { b: Banca; onNov
             {movs.map((t) => (
               <li key={t.id}>
                 <Linha className="group/linha flex items-center gap-3 !py-2.5">
-                  <TileIcone cor={t.type === "deposito" ? COR_POSITIVO : t.type === "saque" ? COR_NEGATIVO : "#f59e0b"}>
-                    {t.type === "deposito" ? <ArrowDownLeft size={15} /> : t.type === "saque" ? <ArrowUpRight size={15} /> : <PiggyBank size={15} />}
-                  </TileIcone>
+                  <TileIcone cor={COR_TX[t.type]}>{ICONE_TX[t.type]}</TileIcone>
                   <div className="min-w-0 flex-1">
                     <p className="truncate text-[13.5px] font-medium text-ink">
-                      {TIPO_TX[t.type]} <span className="font-normal text-muted">· {dataBR(t.date)}</span>
+                      {TIPO_TX[t.type]} <span className="font-normal text-muted">· {dataCurta(t.date)}</span>
                     </p>
-                    <p className="truncate text-[11.5px] text-muted">{[t.venue || "Sem plataforma", t.note].filter(Boolean).join(" · ")}</p>
+                    <p className="truncate text-[11.5px] text-muted">
+                      {[t.type === "despesa" ? nomeCategoria(t.category) : t.venue || "Sem plataforma", t.note].filter(Boolean).join(" · ")}
+                    </p>
                   </div>
-                  <span className="shrink-0 text-[14px] font-semibold tabular-nums" style={{ color: t.type === "deposito" ? COR_POSITIVO : COR_NEGATIVO }}>
-                    {t.type === "deposito" ? "+" : "−"}
+                  <span className="shrink-0 text-[14px] font-semibold tabular-nums" style={{ color: sinalTransacao(t) > 0 ? COR_POSITIVO : COR_NEGATIVO }}>
+                    {sinalTransacao(t) > 0 ? "+" : "−"}
                     {fmtMoneyIn(t.amount, t.currency || b.moeda)}
                   </span>
                   <button
@@ -147,8 +175,30 @@ export function AbaDinheiro({ b, onNovaTransacao, onExcluir }: { b: Banca; onNov
         )}
       </PainelCard>
 
+      {/* ---------------- Entradas e saídas ---------------- */}
+      <PainelCard title="Entradas e saídas" icon={<Receipt size={15} />} ordem={3} className="xl:col-span-2 tela-cheia:min-h-0">
+        <div className="flex flex-col gap-2">
+          <Movimento icone={<ArrowDownLeft size={16} />} cor={COR_POSITIVO} rotulo="Depositado" valor={fmt(b.patrimonio.deposits)} />
+          <Movimento icone={<ArrowUpRight size={16} />} cor={COR_NEGATIVO} rotulo="Sacado" valor={fmt(b.patrimonio.withdrawn)} />
+          <Movimento icone={<PiggyBank size={16} />} cor="#f59e0b" rotulo="Na caixinha" valor={fmt(b.patrimonio.caixinha)} />
+          <InfoHover
+            explicacao={{
+              titulo: "Patrimônio no poker",
+              oQueE: "Tudo que o poker já te deu, inclusive o que você sacou ou guardou. Saque e caixinha não são perda: só saem da banca de jogo.",
+              origem: "Gestão de Banca",
+              comoCalcula: "Banca inicial + depósitos + lucro real.",
+            }}
+          >
+            <Linha className="flex items-center justify-between gap-2">
+              <span className="text-[12.5px] text-muted">Patrimônio no poker</span>
+              <span className="tnum text-[16px] font-bold text-ink">{fmt(b.patrimonio.netWorth)}</span>
+            </Linha>
+          </InfoHover>
+        </div>
+      </PainelCard>
+
       {/* ---------------- Moedas ---------------- */}
-      <PainelCard title="Suas moedas" icon={<Coins size={15} />} ordem={3} className="md:col-span-2 xl:col-span-2 tela-cheia:min-h-0">
+      <PainelCard title="Suas moedas" icon={<Coins size={15} />} ordem={4} className="xl:col-span-2 tela-cheia:min-h-0">
         <div className="flex flex-col gap-2">
           {b.saldosMoedas.length === 0 && <p className="text-sm text-muted">Sem saldo registrado ainda.</p>}
           {b.saldosMoedas.map((m) => {

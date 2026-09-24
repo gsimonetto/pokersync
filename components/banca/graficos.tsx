@@ -10,6 +10,7 @@ import { DicaGrafico } from "@/components/performance/graficos/base";
 import { formatadorMoeda } from "@/components/performance/graficos/torneios";
 import { useTamanho } from "@/components/performance/graficos/usar-largura";
 import type { PontoSaldo } from "./use-banca";
+import type { FaixaPasso } from "@/lib/bankroll/variancia";
 import { COR_NEGATIVO, COR_POSITIVO, COR_UNICA, dataBR, dataEixo } from "./util";
 
 // Gráficos da Gestão de Banca. Mesma linguagem da Performance (linha
@@ -366,6 +367,99 @@ export function CalendarioVolume({ atividade, moeda }: { atividade: Record<strin
           `${diasJogados} ${diasJogados === 1 ? "dia jogado" : "dias jogados"} nas últimas ${semanas} semanas`
         )}
       </p>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------
+// Leque da variância: onde a banca deve estar nas próximas sessões. Faixa
+// clara = 80% dos casos (10% a 90%), faixa forte = metade do meio (25% a
+// 75%), linha = o caso típico (mediana). Uma cor só (dourado) em
+// intensidades -- é a mesma grandeza, só a confiança muda.
+export function LequeVariancia({ leque, moeda }: { leque: FaixaPasso[]; moeda: string }) {
+  const caixa = useRef<HTMLDivElement>(null);
+  const { largura, altura: alturaCaixa } = useTamanho(caixa);
+  const altura = Math.max(ALTURA_MIN, alturaCaixa);
+  const [foco, setFoco] = useState<number | null>(null);
+  const fmtEixo = useMemo(() => formatadorMoeda(moeda, true), [moeda]);
+
+  const minV = Math.min(...leque.map((p) => p.p10));
+  const maxV = Math.max(...leque.map((p) => p.p90));
+  const marcas = niceTicks(minV, maxV, 4);
+  const lo = Math.min(minV, marcas[0]);
+  const hi = Math.max(maxV, marcas[marcas.length - 1]);
+  const w = Math.max(0, largura - M.l - M.r);
+  const h = Math.max(0, altura - M.t - M.b);
+  const ultimo = leque.length - 1;
+  const x = (i: number) => M.l + (ultimo <= 0 ? 0 : (i / ultimo) * w);
+  const y = (v: number) => M.t + h - ((v - lo) / (hi - lo || 1)) * h;
+  const faixa = (a: keyof FaixaPasso, b: keyof FaixaPasso) =>
+    leque.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p[a]).toFixed(1)}`).join(" ") +
+    " " +
+    [...leque]
+      .reverse()
+      .map((p, k) => `L${x(ultimo - k).toFixed(1)},${y(p[b]).toFixed(1)}`)
+      .join(" ") +
+    " Z";
+  const mediana = leque.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.p50).toFixed(1)}`).join(" ");
+  const p = foco != null ? leque[foco] : null;
+
+  return (
+    <div ref={caixa} className="relative min-h-[150px] w-full flex-1" onMouseLeave={() => setFoco(null)}>
+      {largura > 0 && (
+        <svg
+          width={largura}
+          height={altura}
+          className="absolute inset-0"
+          role="img"
+          aria-label="Faixa provável da banca nas próximas sessões"
+          onMouseMove={(e) => {
+            const px = e.clientX - e.currentTarget.getBoundingClientRect().left;
+            setFoco(Math.max(0, Math.min(ultimo, Math.round(((px - M.l) / Math.max(1, w)) * ultimo))));
+          }}
+        >
+          {marcas.map((g) => (
+            <g key={g}>
+              <line x1={M.l} x2={M.l + w} y1={y(g)} y2={y(g)} stroke="rgba(255,255,255,0.05)" />
+              <text x={M.l - 8} y={y(g)} textAnchor="end" dominantBaseline="middle" fontSize={10} fill="rgba(255,255,255,0.4)">
+                {fmtEixo(g)}
+              </text>
+            </g>
+          ))}
+          {lo < 0 && <line x1={M.l} x2={M.l + w} y1={y(0)} y2={y(0)} stroke={COR_NEGATIVO} strokeOpacity={0.6} strokeDasharray="4 4" />}
+          <motion.path d={faixa("p10", "p90")} fill={COR_UNICA} fillOpacity={0.12} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.3 }} />
+          <motion.path d={faixa("p25", "p75")} fill={COR_UNICA} fillOpacity={0.22} initial={{ opacity: 0 }} animate={{ opacity: 1 }} transition={{ duration: 0.8, delay: 0.45 }} />
+          <motion.path
+            d={mediana}
+            fill="none"
+            stroke={COR_UNICA}
+            strokeWidth={2}
+            initial={{ pathLength: 0 }}
+            animate={{ pathLength: 1 }}
+            transition={{ duration: 1.1, ease: [0.22, 1, 0.36, 1], delay: 0.2 }}
+          />
+          <text x={M.l} y={altura - 6} fontSize={10} fill="rgba(255,255,255,0.4)">
+            hoje
+          </text>
+          <text x={M.l + w} y={altura - 6} textAnchor="end" fontSize={10} fill="rgba(255,255,255,0.4)">
+            +{ultimo} sessões
+          </text>
+          {p && foco != null && (
+            <line x1={x(foco)} x2={x(foco)} y1={M.t} y2={M.t + h} stroke="rgba(255,255,255,0.25)" strokeDasharray="3 3" pointerEvents="none" />
+          )}
+        </svg>
+      )}
+      <DicaGrafico aberta={!!p} x={foco != null ? x(foco) : 0} y={p ? y(p.p50) : 0} largura={largura}>
+        {p && (
+          <>
+            <p className="font-semibold text-ink">Depois de {p.passo} sessões</p>
+            <p className="tabular-nums text-ink/90">Típico: {fmtMoneyIn(p.p50, moeda)}</p>
+            <p className="tabular-nums text-muted">
+              8 em 10 vezes: {fmtMoneyIn(p.p10, moeda)} a {fmtMoneyIn(p.p90, moeda)}
+            </p>
+          </>
+        )}
+      </DicaGrafico>
     </div>
   );
 }

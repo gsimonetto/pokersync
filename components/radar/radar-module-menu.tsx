@@ -101,7 +101,9 @@ export function RadarModuleMenu({
       </button>
 
       {open && (
-        <div className="absolute right-0 top-full z-20 mt-2 w-72 rounded-lg border border-hairline bg-surface p-2 shadow-lg">
+        // z-50: acima da barra de abas presa no topo (z-30) da Banca e da
+        // Performance -- com z-20 a barra passava por cima e cortava o menu.
+        <div className="absolute right-0 top-full z-50 mt-2 w-72 rounded-lg border border-hairline bg-surface p-2 shadow-lg">
           <p className="px-2 pb-1.5 pt-1 text-[11px] font-bold uppercase tracking-wider text-muted/60">Radar PokerSync</p>
           <button
             type="button"

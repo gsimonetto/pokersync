@@ -6,6 +6,7 @@ import { TrendingUp } from "lucide-react";
 import { evolutionSeries } from "@/lib/bankroll/calc";
 import type { Session } from "@/lib/bankroll/types";
 import { PainelCard } from "@/components/painel/painel-card";
+import { InfoHover } from "@/components/painel/info-hover";
 import { COR_NEGATIVO, COR_POSITIVO, COR_UNICA, DicaGrafico, SeloAmostra } from "./base";
 import { formatadorMoeda, torneiosNumaMoeda } from "./torneios";
 import { useLargura } from "./usar-largura";
@@ -41,6 +42,11 @@ export function CurvaLucro({ sessoes, ordem = 0 }: { sessoes: Session[]; ordem?:
   const linha = serie.map((p, i) => `${i ? "L" : "M"}${x(i).toFixed(1)},${y(p.value).toFixed(1)}`).join(" ");
   const area = serie.length ? `${linha} L${x(serie.length - 1).toFixed(1)},${y(0).toFixed(1)} L${x(0).toFixed(1)},${y(0).toFixed(1)} Z` : "";
   const final = serie[serie.length - 1]?.value ?? 0;
+  // Lucro sem os 3 maiores prêmios: mostra se o resultado vem de ganhar
+  // com consistência ou de uma ou duas forras grandes. Só com amostra
+  // mínima (com 5 torneios, tirar 3 não diz nada).
+  const top3 = [...serie.map((x) => x.net)].sort((a, b) => b - a).slice(0, 3).filter((v) => v > 0);
+  const semTop3 = serie.length >= 15 && top3.length > 0 ? final - top3.reduce((a, b) => a + b, 0) : null;
   const grade = [lo, (lo + hi) / 2, hi];
 
   function mover(e: React.MouseEvent<SVGSVGElement>) {
@@ -70,6 +76,25 @@ export function CurvaLucro({ sessoes, ordem = 0 }: { sessoes: Session[]; ordem?:
                 {fmt(final)}
               </span>
               <span className="text-[11px] text-muted">em {serie.length} torneios ({moeda})</span>
+              {semTop3 != null && (
+                <InfoHover
+                  className="ml-auto"
+                  explicacao={{
+                    titulo: "Sem os 3 maiores prêmios",
+                    oQueE: "Seu lucro se tirarmos os 3 melhores resultados. Positivo = você ganha com consistência; negativo = o lucro depende de poucas forras grandes (normal em MTT, mas mostra o tamanho da variância).",
+                    origem: "Gestão de Banca · sessões de torneio",
+                    comoCalcula: `Lucro total − (${top3.map((v) => fmt(v)).join(" + ")}).`,
+                  }}
+                >
+                  <span className="text-[11.5px] text-muted">
+                    Sem os 3 maiores:{" "}
+                    <span className="font-semibold tabular-nums" style={{ color: semTop3 >= 0 ? COR_POSITIVO : COR_NEGATIVO }}>
+                      {semTop3 > 0 ? "+" : ""}
+                      {fmt(semTop3)}
+                    </span>
+                  </span>
+                </InfoHover>
+              )}
             </div>
             {largura > 0 && (
               <svg width={largura} height={ALTURA} onMouseMove={mover} role="img" aria-label="Lucro acumulado por torneio">

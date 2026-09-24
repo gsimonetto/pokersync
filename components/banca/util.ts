@@ -36,6 +36,28 @@ export const TIPO_TX: Record<TransactionType, string> = {
   deposito: "Depósito",
   saque: "Saque",
   caixinha: "Caixinha",
+  rakeback: "Rakeback",
+  bonus: "Bônus",
+  despesa: "Despesa",
+};
+
+export const CATEGORIAS_DESPESA: { value: string; label: string }[] = [
+  { value: "coach", label: "Coach" },
+  { value: "software", label: "Software" },
+  { value: "viagem", label: "Viagem/Live" },
+  { value: "outros", label: "Outros" },
+];
+export const nomeCategoria = (c?: string) => CATEGORIAS_DESPESA.find((x) => x.value === c)?.label ?? "Outros";
+
+// Cor de cada tipo de movimentação (entrada verde, saída vermelha,
+// reserva âmbar, extras dourado, despesa roxa).
+export const COR_TX: Record<TransactionType, string> = {
+  deposito: "#22c55e",
+  saque: "#e0555a",
+  caixinha: "#f59e0b",
+  rakeback: "#d4af37",
+  bonus: "#d4af37",
+  despesa: "#a855f7",
 };
 
 // Em cash o jogador recompra/recarrega; "reentrada" é termo de torneio.
