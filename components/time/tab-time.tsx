@@ -2,7 +2,7 @@
 
 import { useRef, useState } from "react";
 import { AlertTriangle, Camera, Check, Loader2, Pencil, Plus, ShieldCheck, Trash2, X } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { Chip } from "@/components/chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { TeamBanner } from "@/components/time/team-banner";
@@ -241,7 +241,7 @@ export function EquipeTecnica({ info, staff, jogadores }: { info: TeamInfo; staf
         const stats = s.isCoach ? statsDoCoach(s.userId) : null;
         return (
           <li key={s.userId} className="flex items-center gap-3 py-3 first:pt-0 last:pb-0">
-            <Avatar id={s.avatarId} url={s.avatarUrl} size={36} />
+            <AvatarNivel userId={s.userId} avatarId={s.avatarId} avatarUrl={s.avatarUrl} tamanho={40} />
             <div className="min-w-0 flex-1">
               <p className="flex min-w-0 items-center gap-2 text-sm font-medium">
                 <span className="truncate">{s.nome}</span>

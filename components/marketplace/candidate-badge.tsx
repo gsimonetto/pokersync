@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { Check, X, Loader2, MessageCircle, Clock, CalendarDays, ChevronRight } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { Modal } from "@/components/ui/modal";
 import { SpeedGauge } from "@/components/dashboard/kit";
 import { Chip } from "@/components/chip";
@@ -144,7 +144,7 @@ function CandidateDetail({
           foto) -- a foto do jogador entra aqui, no topo do conteudo,
           pra manter a identidade visual de "crachá" tambem no detalhe. */}
       <div className="flex items-center gap-3">
-        <Avatar id={snap.avatarId} url={snap.avatarUrl} shape="square" size={56} />
+        <AvatarNivel userId={snap.userId} avatarId={snap.avatarId} avatarUrl={snap.avatarUrl} tamanho={60} quadrado />
         <div className="min-w-0">
           <p className="truncate text-base font-bold tracking-tight text-ink">{snap.apelido || snap.nome}</p>
           {snap.apelido && snap.nome !== snap.apelido && <p className="truncate text-sm text-muted">{snap.nome}</p>}

@@ -1,8 +1,6 @@
 "use client";
 
-import { motion } from "framer-motion";
-import { Avatar } from "@/components/avatar";
-import { EASE } from "@/components/painel/painel-card";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { BRL, BRL_CURTO } from "@/lib/format";
 import { calcularScore, type PlayerDetail, type TeamDashboardRow } from "@/lib/services/team-service";
 import type { CandidateSnapshot } from "@/lib/services/marketplace-service";
@@ -14,7 +12,9 @@ import type { CandidateSnapshot } from "@/lib/services/marketplace-service";
 // qualquer tela.
 //
 // Leitura, da esquerda pra direita, sempre na mesma ordem:
-//   anel = score de evolução (cor = faixa de risco: <40 / <70 / 70+)
+//   anel = nível (cor da patente, preenchido com o que falta pro próximo
+//          nível) -- o mesmo anel de toda foto de jogador no app
+//          (components/avatar-nivel.tsx). O score fica só na ficha.
 //   1) Resultado  -- R$ em destaque, ROI embaixo
 //   2) Buy-in     -- buy-in médio em destaque, volume de sessões embaixo
 //   3) Acerto GTO -- % em destaque, quantidade de treinos embaixo
@@ -29,10 +29,13 @@ import type { CandidateSnapshot } from "@/lib/services/marketplace-service";
 // ============================================================
 
 export interface CrachaDados {
+  /** Dono do crachá -- o anel de nível em volta da foto busca por ele. */
+  userId?: string | null;
   nome: string;
   avatarId: number;
   avatarUrl: string | null;
-  /** 0-100 -- anel em volta da foto. null esconde o anel. */
+  /** Score de evolução 0-100. Não aparece no crachá (o anel é o nível);
+   *  fica só na ficha do jogador. */
   score: number | null;
   resultado: {
     /** "No time" (membro) ou "Ganhos" (candidato). */
@@ -73,6 +76,7 @@ const corDoSinal = (v: number | null) => (v == null || v === 0 ? undefined : v >
 
 export function crachaDoTime(j: TeamDashboardRow): CrachaDados {
   return {
+    userId: j.userId,
     nome: j.nome,
     avatarId: j.avatarId,
     avatarUrl: j.avatarUrl,
@@ -102,6 +106,7 @@ export function crachaDoTime(j: TeamDashboardRow): CrachaDados {
 // existem na linha do painel, quando a ficha foi aberta a partir dele.
 export function crachaDaFicha(p: PlayerDetail, j?: TeamDashboardRow): CrachaDados {
   return {
+    userId: p.userId,
     nome: p.nome,
     avatarId: p.avatarId,
     avatarUrl: p.avatarUrl,
@@ -128,6 +133,7 @@ export function crachaDaFicha(p: PlayerDetail, j?: TeamDashboardRow): CrachaDado
 
 export function crachaDoCandidato(s: CandidateSnapshot): CrachaDados {
   return {
+    userId: s.userId,
     nome: s.apelido || s.nome,
     avatarId: s.avatarId,
     avatarUrl: s.avatarUrl,
@@ -184,85 +190,6 @@ function blocos(d: CrachaDados): Bloco[] {
       ajuda: e.ajuda,
     },
   ];
-}
-
-// ------------------------------------------------------------
-// Anel do score em volta da foto
-// ------------------------------------------------------------
-
-export function AnelScore({
-  score,
-  avatarId,
-  avatarUrl,
-  tamanho = 64,
-  mostrarNumero = true,
-  animar = true,
-}: {
-  score: number | null;
-  avatarId: number;
-  avatarUrl: string | null;
-  tamanho?: number;
-  mostrarNumero?: boolean;
-  animar?: boolean;
-}) {
-  const espessura = tamanho >= 80 ? 4 : 3;
-  const foto = Math.round(tamanho * 0.8);
-  const R = tamanho / 2 - espessura / 2 - 0.5;
-  const C = 2 * Math.PI * R;
-  const cor = score == null ? "rgba(255,255,255,0.18)" : corDoScore(score);
-  const offset = score == null ? C : C * (1 - Math.max(0, Math.min(100, score)) / 100);
-  const numeroPequeno = tamanho < 48;
-
-  return (
-    <span
-      className="relative grid shrink-0 place-items-center"
-      style={{ width: tamanho, height: tamanho }}
-      title={score == null ? "Score de evolução indisponível" : `Score de evolução ${score}/100`}
-    >
-      <svg viewBox={`0 0 ${tamanho} ${tamanho}`} className="absolute inset-0 -rotate-90" aria-hidden>
-        <circle cx={tamanho / 2} cy={tamanho / 2} r={R} fill="none" stroke="rgba(255,255,255,0.08)" strokeWidth={espessura} />
-        {score != null &&
-          (animar ? (
-            <motion.circle
-              cx={tamanho / 2}
-              cy={tamanho / 2}
-              r={R}
-              fill="none"
-              stroke={cor}
-              strokeWidth={espessura}
-              strokeLinecap="round"
-              strokeDasharray={C}
-              initial={{ strokeDashoffset: C }}
-              animate={{ strokeDashoffset: offset }}
-              transition={{ duration: 0.9, ease: EASE, delay: 0.15 }}
-            />
-          ) : (
-            <circle
-              cx={tamanho / 2}
-              cy={tamanho / 2}
-              r={R}
-              fill="none"
-              stroke={cor}
-              strokeWidth={espessura}
-              strokeLinecap="round"
-              strokeDasharray={C}
-              strokeDashoffset={offset}
-            />
-          ))}
-      </svg>
-      <Avatar id={avatarId} url={avatarUrl} size={foto} />
-      {mostrarNumero && score != null && (
-        <span
-          className={`absolute left-1/2 -translate-x-1/2 rounded-full border-2 border-[#141414] font-bold tabular-nums text-black ${
-            numeroPequeno ? "-bottom-1.5 px-1 text-[8.5px] leading-3" : "-bottom-1 px-1.5 text-[10px] leading-4"
-          }`}
-          style={{ background: cor }}
-        >
-          {score}
-        </span>
-      )}
-    </span>
-  );
 }
 
 function Etiqueta({ nome, cor }: { nome: string; cor: string }) {
@@ -324,7 +251,7 @@ export function PlayerBadge({
   if (variante === "compacto") {
     return (
       <div className="flex min-w-0 items-center gap-2.5">
-        <AnelScore score={dados.score} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={38} animar={false} />
+        <AvatarNivel userId={dados.userId} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={38} animar={false} />
         <div className="min-w-0 flex-1">
           <p className="truncate text-[13px] font-semibold leading-tight text-ink">{dados.nome}</p>
           {/* Uma linha só, na ordem fixa do crachá: resultado · buy-in · acerto. */}
@@ -353,7 +280,7 @@ export function PlayerBadge({
           onClick ? "transition-colors hover:border-white/15" : ""
         }`}
       >
-        <AnelScore score={dados.score} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={48} animar={animar} />
+        <AvatarNivel userId={dados.userId} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={48} animar={animar} />
         <span className="min-w-0 flex-1">
           <span className="block truncate text-sm font-semibold text-ink">{dados.nome}</span>
           {subtitulo && <span className="mt-0.5 block min-w-0 text-[11.5px] text-muted">{subtitulo}</span>}
@@ -392,7 +319,7 @@ export function PlayerBadge({
         </div>
         <div className="-mt-12 flex flex-col items-center px-5 pb-5 text-center">
           <span className="rounded-full bg-[#0e0e0e] p-1">
-            <AnelScore score={dados.score} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={96} animar={animar} />
+            <AvatarNivel userId={dados.userId} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={96} animar={animar} />
           </span>
           <p className="mt-3 max-w-full truncate text-[18px] font-bold tracking-tight text-ink">{dados.nome}</p>
           {subtitulo && <div className="mt-0.5 max-w-full text-[12px] text-muted">{subtitulo}</div>}
@@ -426,7 +353,7 @@ export function PlayerBadge({
       }`}
     >
       <span className="flex items-center gap-3">
-        <AnelScore score={dados.score} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={64} animar={animar} />
+        <AvatarNivel userId={dados.userId} avatarId={dados.avatarId} avatarUrl={dados.avatarUrl} tamanho={64} animar={animar} />
         <span className="min-w-0 flex-1">
           <span className={`block truncate text-[14px] font-semibold text-ink ${onClick ? "group-hover:underline" : ""}`}>
             {dados.nome}

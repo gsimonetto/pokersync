@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { Tag, UserCog, UserMinus, MessageCircle, X } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import {
   assignCoach,
   removeMember,
@@ -82,7 +82,7 @@ export function AcoesJogadorModal({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
-          <Avatar id={jogador.avatarId} url={jogador.avatarUrl} size={36} />
+          <AvatarNivel userId={jogador.userId} avatarId={jogador.avatarId} avatarUrl={jogador.avatarUrl} tamanho={40} />
           <div className="min-w-0 flex-1">
             <p className="truncate text-sm font-semibold">{jogador.nome}</p>
             <p className="text-xs text-muted">Ações do jogador</p>

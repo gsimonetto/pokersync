@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AlertCircle, ArrowDown, ArrowUp, ArrowUpRight, Flag } from "lucide-react";
-import { AnelScore } from "@/components/time/player-badge";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { PRIORIDADE_LABEL, type FunnelPhase } from "@/lib/services/team-funnel-service";
 import { ESTADO_PASSO_COR, TEMPERATURA_COR, TEMPERATURA_LABEL, quandoRelativo } from "@/lib/time/funil-regras";
 import type { ItemFunil } from "@/components/time/funil/tipos";
@@ -176,7 +176,7 @@ export function FunilPlanilha({
               >
                 <td className="sticky left-0 border-b border-hairline/60 bg-[#0d0d0d] px-3 py-2 group-hover:bg-[#151515]">
                   <span className="flex items-center gap-2.5">
-                    <AnelScore score={i.score} avatarId={i.jogador?.avatarId ?? 1} avatarUrl={i.jogador?.avatarUrl ?? null} tamanho={30} mostrarNumero={false} animar={false} />
+                    <AvatarNivel userId={i.card.playerId} avatarId={i.jogador?.avatarId ?? 1} avatarUrl={i.jogador?.avatarUrl ?? null} tamanho={32} />
                     <span className="max-w-[160px] truncate font-semibold text-ink">{i.nome}</span>
                   </span>
                 </td>
@@ -336,7 +336,7 @@ function CartaoLinha({
     >
       {/* Nome sozinho na linha (não disputa espaço com o seletor). */}
       <div className="flex items-center gap-2.5">
-        <AnelScore score={i.score} avatarId={i.jogador?.avatarId ?? 1} avatarUrl={i.jogador?.avatarUrl ?? null} tamanho={34} animar={false} />
+        <AvatarNivel userId={i.card.playerId} avatarId={i.jogador?.avatarId ?? 1} avatarUrl={i.jogador?.avatarUrl ?? null} tamanho={36} />
         <span className="min-w-0 flex-1 truncate text-[13.5px] font-semibold text-ink">{i.nome}</span>
         {card.prioridade === "alta" && (
           <span className="flex shrink-0 items-center gap-0.5 text-[10.5px] font-semibold text-[#f08a8e]">

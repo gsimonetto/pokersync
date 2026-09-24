@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { motion } from "framer-motion";
 import { ArrowRight, BookOpenCheck, Crosshair, Gauge, Siren, Trophy, Wallet, type LucideIcon } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { EASE, Linha, Numero } from "@/components/painel/painel-card";
 import { InfoHover, type Explicacao } from "@/components/painel/info-hover";
 import { PainelCard } from "@/components/time/painel-card";
@@ -216,7 +216,7 @@ export function PrecisaAtencao({ jogadores, dias, pronto }: { jogadores: TeamDas
         <p className="text-sm text-muted">Ninguém parado nem com score baixo agora. Bom sinal.</p>
       ) : (
         <ul className="flex flex-col gap-2">
-          {top.map(({ j, score, motivos: ms }, i) => (
+          {top.map(({ j, motivos: ms }, i) => (
             <motion.li
               key={j.userId}
               initial={{ opacity: 0, x: -8 }}
@@ -227,16 +227,7 @@ export function PrecisaAtencao({ jogadores, dias, pronto }: { jogadores: TeamDas
                 href={`/time/jogador/${j.userId}`}
                 className="painel-bloco group flex items-center gap-3 rounded-2xl border border-white/5 p-3 transition hover:border-white/15"
               >
-                <span className="relative shrink-0">
-                  <Avatar id={j.avatarId} url={j.avatarUrl} size={40} />
-                  <span
-                    className="absolute -bottom-1 -right-1 grid h-5 min-w-5 place-items-center rounded-full border-2 border-[#141414] px-1 text-[10px] font-bold tabular-nums text-black"
-                    style={{ background: score.risco === "alto" ? COR_NEGATIVO : score.risco === "medio" ? "#f59e0b" : COR_POSITIVO }}
-                    title={`Score ${score.valor}/100`}
-                  >
-                    {score.valor}
-                  </span>
-                </span>
+                <AvatarNivel userId={j.userId} avatarId={j.avatarId} avatarUrl={j.avatarUrl} tamanho={42} />
                 <span className="min-w-0 flex-1">
                   <span className="block truncate text-[13.5px] font-semibold text-ink">{j.nome}</span>
                   <span className="mt-1 flex flex-wrap gap-1">

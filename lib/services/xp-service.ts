@@ -1,4 +1,5 @@
 import { createClient } from "@/lib/supabase/client";
+import { inicioDoPeriodo, type TipoMissao } from "@/lib/hub/missoes-regras";
 
 const PATENTES = [
   "Micro Stakes I", "Micro Stakes II", "Micro Stakes III",
@@ -132,18 +133,32 @@ export async function fetchLast7DaysActivity(): Promise<boolean[]> {
   return dias;
 }
 
+// Missões do período atual: as ativas E as já concluídas neste período
+// (diária de hoje, semanal desta semana, mensal deste mês). Antes só
+// vinham as ativas, então a missão sumia da tela no instante em que era
+// cumprida -- o jogador perdia o "2 de 3 feitas" que dá sensação de
+// progresso. Concluídas de períodos anteriores ficam de fora (o banco
+// não as expira, só as ativas).
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchActiveMissions(): Promise<any[]> {
   const supabase = createClient();
+  const agora = new Date();
+  const desde = [inicioDoPeriodo("weekly", agora), inicioDoPeriodo("monthly", agora)].sort()[0];
   const { data, error } = await supabase
     .from("user_missions")
     .select(
       "id, progress, goal_value, status, period_start, completed_at, missions(code, title, description, kind, category, xp_reward, icon, difficulty)"
     )
-    .eq("status", "active")
+    .in("status", ["active", "completed"])
+    .gte("period_start", desde)
     .order("period_start", { ascending: false });
   if (error) throw error;
-  return data || [];
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  return (data || []).filter((um: any) => {
+    if (um.status === "active") return true;
+    const tipo = (um.missions?.kind ?? "daily") as TipoMissao;
+    return um.period_start >= inicioDoPeriodo(tipo, agora);
+  });
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any

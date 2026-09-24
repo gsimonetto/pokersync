@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import { ArchiveRestore, ChevronDown, ChevronUp, Database, Pencil, Plus, Settings, Trash2, X } from "lucide-react";
-import { Avatar } from "@/components/avatar";
+import { AvatarNivel } from "@/components/avatar-nivel";
 import { Chip } from "@/components/chip";
 import { Campo } from "@/components/time/campo";
 import { ModalPortal } from "@/components/modal-portal";
@@ -474,7 +474,7 @@ export function ModalAdicionar({ jogadores, fases, onFechar, onChange, onErro }:
                   <li key={j.userId}>
                     <label className={`flex cursor-pointer items-center gap-2.5 rounded-lg border px-2.5 py-2 transition-colors ${marcado ? "border-white/25 bg-white/[0.04]" : "border-hairline hover:border-white/15"}`}>
                       <input type="checkbox" checked={marcado} onChange={() => alternar(j.userId)} className="accent-white" />
-                      <Avatar id={j.avatarId} url={j.avatarUrl} size={26} />
+                      <AvatarNivel userId={j.userId} avatarId={j.avatarId} avatarUrl={j.avatarUrl} tamanho={28} />
                       <span className="min-w-0 flex-1 truncate text-[13px] text-ink">{j.nome}</span>
                       {j.labelName && <span className="shrink-0 text-[11px]" style={{ color: j.labelColor ?? undefined }}>{j.labelName}</span>}
                     </label>
@@ -544,7 +544,7 @@ export function ListaArquivados({ arquivados, carregando, fases, onRestaurar, on
       <ul className="divide-y divide-hairline">
         {arquivados.map((a) => (
           <li key={a.cardId} className="flex flex-wrap items-center gap-3 py-3.5">
-            <Avatar id={a.avatarId} url={a.avatarUrl} size={34} />
+            <AvatarNivel userId={a.playerId} avatarId={a.avatarId} avatarUrl={a.avatarUrl} tamanho={38} />
             <div className="min-w-0 flex-1">
               <div className="flex flex-wrap items-center gap-2">
                 <span className="truncate text-sm font-medium">{a.nome}</span>
