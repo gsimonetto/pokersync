@@ -12,7 +12,8 @@ import {
   fetchStudyLogs,
   fetchTransactions,
 } from "@/lib/services/bankroll-service";
-import { aggregate, netWorth } from "@/lib/bankroll/calc";
+import { consolidarEmReais, saldosPorMoeda } from "@/lib/bankroll/consolidado";
+import { useTaxasCambio } from "@/lib/hooks/use-taxas-cambio";
 import type { BrmThreshold, Goal, Session, StudyLog, Transaction } from "@/lib/bankroll/types";
 import {
   fetchPlayerInsights,
@@ -93,6 +94,10 @@ export interface PainelDados {
   bancaAtual: number | null;
   /** Resultado dos últimos 30 dias, contados a partir de hoje. */
   resultado30d: number | null;
+  /** Moeda em que bancaAtual está: BRL, a não ser que falte cotação. */
+  moedaBanca: string;
+  /** Saldos em outra moeda que entraram na banca convertidos pra reais. */
+  bancaConvertida: { moeda: string; saldo: number; taxa: number }[];
   performance: PlayerPerformance | null;
   insights: string[];
   drillsHoje: number | null;
@@ -118,9 +123,6 @@ export function usePainelDados(): PainelDados {
   if (!v) throw new Error("usePainelDados fora do <PainelDadosProvider>");
   return v;
 }
-
-// Sessão sem moeda informada é BRL (convenção da Gestão de Banca).
-const emReais = (moeda?: string) => (moeda || "BRL") === "BRL";
 
 function ok<T>(r: PromiseSettledResult<T>): T | null {
   return r.status === "fulfilled" ? r.value : null;
@@ -288,20 +290,30 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
     return todasSessoes.filter((s) => !s.importedHandSessionId || s.date >= corte);
   }, [todasSessoes, corteRadar]);
 
-  // Banca atual = base + lucro + depósitos - saques - caixinha, em reais
-  // (visão padrão da Gestão de Banca). O Coach usava só a base cadastrada,
-  // e o "Banca cobre X buy-ins" daqui dava número diferente do de lá.
-  const { bancaAtual, resultado30d } = useMemo(() => {
-    if (bancaBase == null && todasSessoes.length === 0) return { bancaAtual: null, resultado30d: null };
-    const sessoesReais = sessoes.filter((s) => emReais(s.currency));
-    const transacoesReais = transacoes.filter((t) => emReais(t.currency));
-    const banca = netWorth(bancaBase ?? 0, aggregate(sessoesReais).profit, transacoesReais).playingBankroll;
-    const corte = new Date();
-    corte.setDate(corte.getDate() - 30);
-    const iso = corte.toISOString().slice(0, 10);
-    const r30 = aggregate(sessoesReais.filter((s) => s.date >= iso)).profit;
-    return { bancaAtual: banca, resultado30d: r30 };
-  }, [bancaBase, todasSessoes.length, sessoes, transacoes]);
+  // Banca atual = base + lucro + depósitos - saques - caixinha, com a
+  // MESMA conta da Gestão de Banca. Cada moeda é calculada à parte e
+  // convertida pra reais (dólar pela cotação do dia) -- antes só entrava
+  // o que estava em BRL, e quem depositou em dólar via "R$ 0" aqui.
+  const { taxaParaBRL } = useTaxasCambio();
+  const { bancaAtual, resultado30d, moedaBanca, bancaConvertida } = useMemo((): Pick<
+    PainelDados,
+    "bancaAtual" | "resultado30d" | "moedaBanca" | "bancaConvertida"
+  > => {
+    const vazio = { bancaAtual: null, resultado30d: null, moedaBanca: "BRL", bancaConvertida: [] };
+    if (bancaBase == null && todasSessoes.length === 0 && transacoes.length === 0) return vazio;
+    const saldos = saldosPorMoeda(sessoes, transacoes, bancaBase ?? 0);
+    if (saldos.length === 0) return { ...vazio, bancaAtual: 0, resultado30d: 0 };
+    const c = consolidarEmReais(saldos, taxaParaBRL);
+    // Sem cotação (API fora do ar) e uma moeda só: mostra na própria
+    // moeda em vez de esconder o saldo.
+    if (c.total == null) {
+      const unica = saldos.length === 1 ? saldos[0] : null;
+      return unica
+        ? { bancaAtual: unica.saldo, resultado30d: unica.resultado30d, moedaBanca: unica.moeda, bancaConvertida: [] }
+        : vazio;
+    }
+    return { bancaAtual: c.total, resultado30d: c.resultado30d, moedaBanca: "BRL", bancaConvertida: c.convertidas };
+  }, [bancaBase, todasSessoes.length, sessoes, transacoes, taxaParaBRL]);
 
   const valor: PainelDados = {
     carregando,
@@ -315,6 +327,8 @@ export function PainelDadosProvider({ children }: { children: ReactNode }) {
     limitesBrm,
     bancaAtual,
     resultado30d,
+    moedaBanca,
+    bancaConvertida,
     performance,
     insights,
     drillsHoje,

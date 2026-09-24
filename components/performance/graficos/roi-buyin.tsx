@@ -22,7 +22,7 @@ const FAIXAS = [
 ];
 const MIN_FAIXA = 10;
 
-export function RoiBuyin({ sessoes, ordem = 0 }: { sessoes: Session[]; ordem?: number }) {
+export function RoiBuyin({ sessoes, ordem = 0, className }: { sessoes: Session[]; ordem?: number; className?: string }) {
   const { lista, moeda } = useMemo(() => torneiosNumaMoeda(sessoes), [sessoes]);
   const fmt = useMemo(() => formatadorMoeda(moeda, true), [moeda]);
   const linhas = useMemo(() => {
@@ -43,7 +43,7 @@ export function RoiBuyin({ sessoes, ordem = 0 }: { sessoes: Session[]; ordem?: n
   const escala = Math.max(20, ...linhas.map((l) => Math.abs(l.roi ?? 0)));
 
   return (
-    <PainelCard title="ROI por faixa de buy-in" icon={<Coins size={15} />} ordem={ordem} rolagem={false}>
+    <PainelCard title="ROI por faixa de buy-in" icon={<Coins size={15} />} ordem={ordem} rolagem={false} className={className}>
       {linhas.length === 0 ? (
         <p className="text-sm text-muted">Sem torneios com buy-in registrado na Gestão de Banca ainda.</p>
       ) : (
