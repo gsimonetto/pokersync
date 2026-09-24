@@ -1,14 +1,13 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Hash } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Eye, ChevronRight, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import { getThumbUrl, deleteReview, resetRevisorRadarImports, type ReviewListItem } from "@/lib/services/hand-review-service";
+import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
-import { RadarModuleMenu } from "@/components/radar/radar-module-menu";
 import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
 
 const IMPORTED_HAND_SOURCES = ["agent", "import"];
@@ -131,16 +130,21 @@ export function RevisorFila({
   // Recalcula quais torneios/sessões ficam visíveis sempre que a lista ou
   // o corte mudam -- consulta enxuta (só hand_session_id/source/created_at),
   // não duplica o que listSessionsWithCount já trouxe.
+  // Mesma consulta enxuta alimenta tambem o PROGRESSO de cada torneio
+  // (quantas maos ja foram vistas na mesa / analisadas) -- sem isso o
+  // resumo do topo so' sabia contar maos importadas, nao revisadas.
+  const [progresso, setProgresso] = useState<Record<string, { vistas: number; total: number; concluidas: number }>>({});
   useEffect(() => {
-    if (!userId || !radarSince || sessionsList.length === 0) {
+    if (!userId || sessionsList.length === 0) {
       setRadarVisibleSessionIds(null);
+      setProgresso({});
       return;
     }
     (async () => {
       const supabase = createClient();
       const { data, error: qErr } = await supabase
         .from("hand_reviews")
-        .select("hand_session_id, source, created_at")
+        .select("hand_session_id, source, created_at, viewed_in_replayer_at, status")
         .eq("user_id", userId)
         .in(
           "hand_session_id",
@@ -151,13 +155,19 @@ export function RevisorFila({
         return;
       }
       const visible = new Set<string>();
+      const prog: Record<string, { vistas: number; total: number; concluidas: number }> = {};
       for (const row of data ?? []) {
         const sessionId = row.hand_session_id as string;
         const isImported = IMPORTED_HAND_SOURCES.includes(row.source as string);
-        const recentEnough = !isImported || (row.created_at as string) >= radarSince;
+        const recentEnough = !radarSince || !isImported || (row.created_at as string) >= radarSince;
         if (recentEnough) visible.add(sessionId);
+        const p = (prog[sessionId] ??= { vistas: 0, total: 0, concluidas: 0 });
+        p.total++;
+        if (row.viewed_in_replayer_at) p.vistas++;
+        if (row.status === "concluida") p.concluidas++;
       }
-      setRadarVisibleSessionIds(visible);
+      setRadarVisibleSessionIds(radarSince ? visible : null);
+      setProgresso(prog);
     })();
   }, [userId, radarSince, sessionsList]);
 
@@ -297,10 +307,23 @@ export function RevisorFila({
   // "Quantos torneios e quantas maos foram revisadas" -- pedido explicito
   // pra substituir o resumo antigo (Acertei/Errei/Duvida, que media
   // autoavaliacao de "Analisar mao", nao volume de revisao de verdade).
-  const totalHandsReviewed = useMemo(
+  // Antes o numero de "revisadas" somava TODAS as maos importadas; agora
+  // separa o total das maos de fato vistas na mesa.
+  const totalHands = useMemo(
     () => sessionsList.reduce((sum, s) => sum + Number(s.hand_count || 0), 0),
     [sessionsList]
   );
+  const resumoProgresso = useMemo(() => {
+    let vistas = 0;
+    let concluidas = 0;
+    for (const p of Object.values(progresso)) {
+      vistas += p.vistas;
+      concluidas += p.concluidas;
+    }
+    return { vistas, concluidas };
+  }, [progresso]);
+  const nTorneios = sessionsList.filter((s) => s.kind === "tournament").length;
+  const nCash = sessionsList.length - nTorneios;
 
   const counts = useMemo(() => {
     const acc: Record<string, number> = { pendente: 0, em_revisao: 0, concluida: 0 };
@@ -323,7 +346,7 @@ export function RevisorFila({
           {onClearFilter && (
             <button
               onClick={onClearFilter}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-ink/40 hover:text-ink"
+              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-white/20 hover:text-ink"
             >
               <X size={13} />
               Limpar filtro
@@ -336,11 +359,11 @@ export function RevisorFila({
         )}
 
         {filteredLoading ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+          <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center text-muted">
             Carregando…
           </div>
         ) : filteredItems.length === 0 ? (
-          <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+          <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center text-muted">
             Nenhuma mão encontrada pra esse filtro.
           </div>
         ) : (
@@ -354,21 +377,38 @@ export function RevisorFila({
     );
   }
 
+  const pctVistas = totalHands > 0 ? Math.round((resumoProgresso.vistas / totalHands) * 100) : 0;
+
   return (
     <div>
+      {/* Resumo do topo: o que falta revisar, nao so' o que foi importado. */}
       {!sessionsLoading && sessionsList.length > 0 && (
-        <div className="fade-in-up mb-4">
-          <SummaryStat
-            icon={Hash}
-            label="Torneios e mãos revisadas"
-            value={`${sessionsList.length} torneio${sessionsList.length === 1 ? "" : "s"} · ${totalHandsReviewed} mão${totalHandsReviewed === 1 ? "" : "s"}`}
-            accent="#5AA6E0"
+        <ul className="fade-in-up mb-4 grid grid-cols-3 gap-2.5">
+          <KpiFila
+            icone={Flag}
+            rotulo="Torneios e sessões"
+            valor={String(sessionsList.length)}
+            detalhe={`${nTorneios} ${nTorneios === 1 ? "torneio" : "torneios"} · ${nCash} cash`}
           />
-        </div>
+          <KpiFila
+            icone={Eye}
+            rotulo="Mãos vistas na mesa"
+            valor={`${resumoProgresso.vistas} de ${totalHands}`}
+            detalhe={`${pctVistas}% revisado`}
+            barra={pctVistas}
+          />
+          <KpiFila
+            icone={CheckCircle2}
+            rotulo="Análises concluídas"
+            valor={String(resumoProgresso.concluidas)}
+            detalhe="com avaliação e anotação"
+          />
+        </ul>
       )}
-      {/* Toolbar unica: abas + chips + busca + acao principal na mesma
-          linha -- mesmo padrao do Funil (Time > Painel), em vez de cada
-          grupo de filtro numa linha separada. */}
+      {/* Toolbar unica: abas + chips + busca na mesma linha -- mesmo
+          padrao do Funil (Time > Painel), em vez de cada grupo de filtro
+          numa linha separada. "Nova mão" e o menu do Radar subiram pro
+          cabecalho da pagina (igual a Gestao de Banca). */}
       <div className="mb-4 flex flex-wrap items-center gap-2">
         <SegmentedControl
           value={tab}
@@ -388,7 +428,7 @@ export function RevisorFila({
               }}
               title="Buscar torneios/sessões"
               className={`grid h-8 w-8 shrink-0 place-items-center rounded-full border transition-colors ${
-                sessionSearchOpen ? "border-ink bg-ink text-void" : "border-hairline text-muted hover:border-ink/40 hover:text-ink"
+                sessionSearchOpen ? "border-ink bg-ink text-void" : "border-white/10 bg-white/[0.04] text-muted hover:border-white/20 hover:text-ink"
               }`}
             >
               <Search size={13} />
@@ -400,30 +440,10 @@ export function RevisorFila({
           FILTERS.map((f) => (
             <FilterChip key={f.id} label={f.label} active={filter === f.id} onClick={() => setFilter(f.id)} />
           ))}
-
-        <div className="ml-auto flex items-center gap-2">
-          <button
-            onClick={onNova}
-            className="inline-flex items-center gap-1.5 rounded-lg bg-ink px-3.5 py-2 text-[13px] font-semibold text-void"
-          >
-            <Plus size={16} />
-            Nova mão
-          </button>
-          <RadarModuleMenu
-            module="revisor"
-            moduleLabel="o Revisor de Mãos"
-            onScopeChange={({ since }) => setRadarSince(since)}
-            onReset={async () => {
-              await resetRevisorRadarImports();
-              setRadarSince(null);
-              await Promise.all([loadSessions(), load()]);
-            }}
-          />
-        </div>
       </div>
 
       {tab === "sessoes" && sessionSearchOpen && (
-        <div className="mb-4 flex items-center gap-2 rounded-lg border border-hairline bg-void px-3 py-2">
+        <div className="painel-vidro mb-4 flex items-center gap-2 rounded-xl border border-white/10 px-3 py-2">
           <Search size={13} className="shrink-0 text-muted" />
           <input
             autoFocus
@@ -449,33 +469,42 @@ export function RevisorFila({
           )}
 
           {sessionsLoading ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+            <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center text-muted">
               Carregando…
             </div>
           ) : sessionsList.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center">
+            <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center">
               <Trophy size={32} className="text-elevated" />
               <p className="mt-3 text-muted">Nenhum torneio ou sessão de cash ainda.</p>
-              <p className="mt-1 text-xs text-muted">
-                Cole uma hand history em &quot;Nova mão&quot; (botão acima) — o torneio é criado automaticamente.
-              </p>
+              <p className="mt-1 text-xs text-muted">Cole uma hand history — o torneio é criado automaticamente.</p>
+              <button
+                onClick={onNova}
+                className="mt-4 inline-flex items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2 text-[13px] font-medium text-ink/90 transition hover:border-white/20"
+              >
+                <Plus size={15} /> Colar hand history
+              </button>
             </div>
           ) : filteredSessions.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+            <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center text-muted">
               Nenhum torneio/sessão encontrado pra esse filtro.
             </div>
           ) : (
             <ul className="flex flex-col gap-2.5">
               {filteredSessions.map((s, idx) => {
                 const showsBounty = s.kind === "tournament" && (s.format_type === "pko" || s.format_type === "mystery");
+                const p = progresso[s.id];
+                const total = p?.total ?? Number(s.hand_count || 0);
+                const vistas = p?.vistas ?? 0;
+                const pct = total > 0 ? Math.round((vistas / total) * 100) : 0;
+                const completo = total > 0 && vistas >= total;
                 return (
                   <li
                     key={s.id}
                     onClick={() => onOpenSession(s.id)}
                     style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
-                    className="fade-in-up flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 transition-all duration-150 hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-lg"
+                    className="painel-vidro fade-in-up flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 p-3.5 transition-all duration-150 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-lg"
                   >
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-[10px] bg-void">
+                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-inset ring-white/[0.08]">
                       {/* Icone generico de torneio virou "Flag" (pedido
                           explicito): a taca deixou de ser automatica pra
                           TODO torneio — agora so aparece (selo no canto)
@@ -544,7 +573,42 @@ export function RevisorFila({
                         <span>· {s.hand_count} mão{Number(s.hand_count) === 1 ? "" : "s"}</span>
                         <span>· {formatDate(s.updated_at)}</span>
                       </div>
+                      {/* Progresso: quantas maos desse torneio ja foram
+                          vistas na mesa (e quantas tem analise concluida). */}
+                      {total > 0 && (
+                        <div className="mt-2 flex items-center gap-2.5">
+                          <div className="h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-white/[0.08]">
+                            <div
+                              className="h-full rounded-full"
+                              style={{ width: `${pct}%`, background: completo ? "#34D399" : "linear-gradient(90deg, #5AA6E0, #34D399)" }}
+                            />
+                          </div>
+                          <span className="shrink-0 text-[11px] text-muted">
+                            <b className="font-semibold text-ink">{vistas}</b> de {total} vistas
+                            {p && p.concluidas > 0 && <> · {p.concluidas} analisada{p.concluidas === 1 ? "" : "s"}</>}
+                          </span>
+                        </div>
+                      )}
                     </div>
+                    {/* Continua da primeira mao ainda nao vista (a tela da
+                        sessao ja abre nela). */}
+                    <span
+                      className={`hidden shrink-0 items-center gap-1 rounded-xl border px-3 py-1.5 text-[12px] font-semibold sm:inline-flex ${
+                        completo
+                          ? "border-[#34D399]/30 bg-[#34D399]/10 text-[#34D399]"
+                          : "border-white/10 bg-white/[0.05] text-ink/90"
+                      }`}
+                    >
+                      {completo ? (
+                        <>
+                          <CheckCircle2 size={13} /> Revisado
+                        </>
+                      ) : (
+                        <>
+                          {vistas === 0 ? "Começar" : "Continuar"} <ChevronRight size={14} />
+                        </>
+                      )}
+                    </span>
                   </li>
                 );
               })}
@@ -565,11 +629,11 @@ export function RevisorFila({
               para o AI Coach da tela inicial, com o mesmo botão "Treinar". */}
 
           {loading ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center text-muted">
+            <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center text-muted">
               Carregando…
             </div>
           ) : items.length === 0 ? (
-            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center">
+            <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center">
               <BookOpen size={32} className="text-elevated" />
               <p className="mt-3 text-muted">Nenhuma mão avulsa aqui ainda.</p>
             </div>
@@ -582,7 +646,7 @@ export function RevisorFila({
           )}
 
           {items.length > 0 && (
-            <div className="mt-5 flex justify-around rounded-[10px] border border-hairline bg-void p-3 text-xs text-muted">
+            <div className="painel-vidro mt-5 flex justify-around rounded-2xl border border-white/10 p-3 text-xs text-muted">
               <span>
                 Pendentes: <b className="text-[#f59e0b]">{counts.pendente}</b>
               </span>
@@ -629,16 +693,21 @@ function ReviewCard({
     <li
       onClick={onOpen}
       style={{ animationDelay: `${delayMs}ms` }}
-      className="fade-in-up flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-lg"
+      className="painel-vidro fade-in-up flex cursor-pointer gap-3 rounded-2xl border border-white/10 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-lg"
     >
-      <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">
-        {thumb ? (
-          // eslint-disable-next-line @next/next/no-img-element
+      {/* Miniatura so' quando existe print de verdade -- antes toda mao
+          sem imagem ganhava um quadrado vazio de 72px com um icone
+          apagado, que so' ocupava espaco. */}
+      {thumb ? (
+        <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-xl bg-white/[0.04]">
+          {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={thumb} alt="" className="h-full w-full object-cover" />
-        ) : (
-          <ImageIcon size={22} className="text-elevated" />
-        )}
-      </div>
+        </div>
+      ) : (
+        <span className="grid h-9 w-9 shrink-0 place-items-center rounded-xl bg-white/[0.04] text-muted ring-1 ring-inset ring-white/[0.08]">
+          {(r as ReviewListItem & { source?: string }).source === "print" ? <ImageIcon size={16} /> : <PenLine size={16} />}
+        </span>
+      )}
 
       <div className="min-w-0 flex-1">
         <div className="flex items-center justify-between gap-2">
@@ -689,27 +758,36 @@ function ReviewCard({
   );
 }
 
-function SummaryStat({
-  icon: Icon,
-  label,
-  value,
-  accent,
+// Numero do resumo do topo -- mesmo desenho dos indicadores da Performance
+// e da Gestao de Banca (rotulo + icone em cima, numero grande, detalhe
+// embaixo), num card de vidro.
+function KpiFila({
+  icone: Icone,
+  rotulo,
+  valor,
+  detalhe,
+  barra,
 }: {
-  icon: typeof Clock;
-  label: string;
-  value: string;
-  accent: string;
+  icone: typeof Clock;
+  rotulo: string;
+  valor: string;
+  detalhe: string;
+  /** 0-100: barra fina de progresso embaixo do numero. */
+  barra?: number;
 }) {
   return (
-    <div
-      className="rounded-lg border bg-surface p-2.5 transition-all duration-200 hover:-translate-y-0.5 hover:shadow-lg"
-      style={{ borderColor: `${accent}30` }}
-    >
-      <p className="flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.08em] text-muted">
-        <Icon size={11} className="icon-glow" style={{ color: accent }} />
-        {label}
-      </p>
-      <p className="mt-1 text-lg font-bold text-ink">{value}</p>
-    </div>
+    <li className="painel-vidro flex min-w-0 flex-col gap-1.5 rounded-2xl border border-white/10 p-3 sm:p-3.5">
+      <span className="flex items-start justify-between gap-2">
+        <span className="min-w-0 text-[11px] leading-tight text-muted/80 sm:text-[11.5px]">{rotulo}</span>
+        <Icone size={14} className="hidden shrink-0 text-muted sm:block" aria-hidden />
+      </span>
+      <p className="tnum truncate text-[17px] font-bold leading-none tracking-[-0.02em] sm:text-[22px]">{valor}</p>
+      {barra != null && (
+        <div className="h-1 overflow-hidden rounded-full bg-white/[0.08]">
+          <div className="h-full rounded-full bg-gradient-to-r from-[#5AA6E0] to-[#34D399]" style={{ width: `${barra}%` }} />
+        </div>
+      )}
+      <span className="truncate text-[10.5px] leading-tight text-muted/80 sm:text-[11px]">{detalhe}</span>
+    </li>
   );
 }

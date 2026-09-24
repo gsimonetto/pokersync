@@ -2,9 +2,14 @@
 
 import { useEffect, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Bookmark, ListChecks, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, Bookmark, ListChecks, Plus, SlidersHorizontal } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
-import { TabNav } from "@/components/ui/tab-nav";
+import { PainelVisual } from "@/components/dashboard/kit";
+import { PerfEstilos } from "@/components/performance/perf-estilos";
+import { AbasAnimadas } from "@/components/performance/abas-animadas";
+import { RadarModuleMenu } from "@/components/radar/radar-module-menu";
+import { resetRevisorRadarImports } from "@/lib/services/hand-review-service";
+import { BOTAO_OURO } from "@/components/banca/util";
 import { RevisorFila } from "@/components/revisor/revisor-fila";
 import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
@@ -51,6 +56,10 @@ function RevisorPageInner() {
   // filtros avancados) — sem isso, voltar de um spot salvo/filtrado caia
   // sempre na fila em vez de voltar pra onde o usuario realmente veio.
   const [detalheOrigin, setDetalheOrigin] = useState<"fila" | "salvos" | "filtro-replay">("fila");
+  // Muda quando o menu do Radar (agora no cabecalho da pagina) troca o
+  // corte ou apaga as importacoes -- remonta a Fila, que relê o corte e as
+  // listas do zero.
+  const [filaVersao, setFilaVersao] = useState(0);
 
   useEffect(() => {
     const shared = searchParams.get("shared");
@@ -126,26 +135,55 @@ function RevisorPageInner() {
     }
   }
 
+  const emLista = screen === "fila" || screen === "salvos" || screen === "filtros";
+
   return (
     <AppShell>
-    <main className="w-full px-6 py-10 text-ink">
-      {/* Container externo unico, igual ao Funil e ao Painel do Time:
-          nav (alternador Fila/Salvos/Aderencia ou botao de voltar) e
-          conteudo moram dentro da MESMA caixa, em vez de boiar soltos
-          contra o fundo. Sem AppHeader (barra sticky) de proposito. */}
-      <div className="rounded-2xl border border-hairline bg-surface p-4 sm:p-5">
-        {(screen === "fila" || screen === "salvos" || screen === "filtros") && (
-          <TabNav
-            className="mb-4"
-            value={screen}
-            onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : goFiltros())}
-            options={[
-              { value: "fila", label: "Fila", icon: ListChecks },
-              { value: "salvos", label: "Salvos", icon: Bookmark },
-              { value: "filtros", label: "Filtros avançados", icon: SlidersHorizontal },
-            ]}
-          />
-        )}
+    <PainelVisual value="vidro">
+    <main className="perf w-full px-4 pb-6 pt-6 text-ink md:px-6">
+      <PerfEstilos />
+      {/* Cabecalho + abas so' nas telas de lista -- na mesa (sessao) e no
+          "Analisar mao" cada pixel de altura vai pra mesa/formulario. */}
+      {emLista && (
+        <>
+          <header className="mb-3 flex flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Revisor de Mãos</h1>
+              <p className="mt-1 text-[12.5px] text-muted">
+                Reveja seus torneios mão a mão, na mesa. Anote o que aprendeu e treine o spot depois.
+              </p>
+            </div>
+            <div className="flex flex-wrap items-center gap-2">
+              <RadarModuleMenu
+                module="revisor"
+                moduleLabel="o Revisor de Mãos"
+                onScopeChange={() => setFilaVersao((v) => v + 1)}
+                onReset={async () => {
+                  await resetRevisorRadarImports();
+                  setFilaVersao((v) => v + 1);
+                }}
+              />
+              <button type="button" onClick={goNova} className={`${BOTAO_OURO} whitespace-nowrap`}>
+                <Plus size={16} strokeWidth={2.2} /> Nova mão
+              </button>
+            </div>
+          </header>
+          <div className="sticky top-0 z-30 -mx-4 mb-3.5 border-b border-white/[0.06] bg-black/70 px-4 pt-1 backdrop-blur-xl md:-mx-6 md:px-6">
+            <AbasAnimadas
+              value={screen as "fila" | "salvos" | "filtros"}
+              onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : goFiltros())}
+              rotulo="Seções do Revisor de Mãos"
+              options={[
+                { value: "fila", label: "Fila", icon: ListChecks },
+                { value: "salvos", label: "Salvos", icon: Bookmark },
+                { value: "filtros", label: "Filtros avançados", icon: SlidersHorizontal },
+              ]}
+            />
+          </div>
+        </>
+      )}
+      <div>
+
         {/* "sessao" saiu daqui (pedido explicito: "botão de voltar
             aparecer ao lado do nome do torneio, tirando de lá de cima,
             pode subir mais o layout pra preencher aquele espaço") -- o
@@ -156,7 +194,7 @@ function RevisorPageInner() {
           <button
             onClick={screen === "detalhe" ? backFromDetalhe : goFila}
             aria-label="Voltar"
-            className="mb-4 grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink"
+            className="mb-4 grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.04] text-muted transition-colors hover:border-white/20 hover:text-ink"
           >
             <ArrowLeft size={18} />
           </button>
@@ -164,6 +202,7 @@ function RevisorPageInner() {
 
         {screen === "fila" && (
           <RevisorFila
+            key={filaVersao}
             onNova={goNova}
             onOpen={goDetalhe}
             onOpenSession={goSessao}
@@ -194,6 +233,7 @@ function RevisorPageInner() {
         )}
       </div>
     </main>
+    </PainelVisual>
     </AppShell>
   );
 }

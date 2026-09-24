@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Loader2, ChevronRight, Search, X, List, ArrowLeft, Maximize2, Minimize2 } from "lucide-react";
+import { AlertTriangle, Loader2, Search, X, List, ArrowLeft, Maximize2, Minimize2, Zap, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { HalfCard, sortCardsDesc } from "@/components/drill/card";
@@ -11,6 +11,7 @@ import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { parseHand, HandParseError, type ParsedHand } from "@/lib/poker/hand-parser";
 import { markReviewViewedInReplayer } from "@/lib/services/hand-review-service";
+import { resumoDaMao, formatarBb, type ResumoMao } from "@/lib/poker/hand-summary";
 import { F, T } from "@/lib/poker/drill-theme";
 
 // Tela nova (2026-08): abre uma sessao/torneio e mostra o master-detail —
@@ -93,7 +94,32 @@ interface HandInListing {
   // "Analisar mao" em RevisorDetalhe).
   viewed_in_replayer_at: string | null;
   // Marcadores da mao (pedido explicito: filtrar maos marcadas na lista).
-  hand_review_tag_links?: { tag_id: string; hand_review_tags: { id: string; label: string }[] | null }[];
+  // hand_review_tags vem como OBJETO (tag_id -> hand_review_tags e'
+  // muitos-pra-um, o PostgREST devolve um objeto so'), mas o tipo aceita
+  // lista tambem por seguranca -- antes era tipado so' como lista e o
+  // `for...of` em cima de um objeto derrubava a tela da sessao inteira
+  // assim que qualquer mao tivesse um marcador.
+  hand_review_tag_links?: {
+    tag_id: string;
+    hand_review_tags: { id: string; label: string } | { id: string; label: string }[] | null;
+  }[];
+}
+
+// Resumo da mao pra lista (resultado em bb, all-in, showdown) -- reparseia
+// o hand_history bruto (mesma fonte da mesa, entao o numero da lista bate
+// com o stack final mostrado no replayer) e so' cai no parsed_data salvo
+// quando nao ha texto. Custo medido: ~0,3 ms por mao.
+function resumoDaLinha(h: HandInListing): ResumoMao | null {
+  let parsed: ParsedHand | null = null;
+  if (h.hand_history) {
+    try {
+      parsed = parseHand(h.hand_history);
+    } catch {
+      parsed = null;
+    }
+  }
+  if (!parsed && h.parsed_data?.kind === "parsed") parsed = h.parsed_data as unknown as ParsedHand;
+  return parsed ? resumoDaMao(parsed) : null;
 }
 
 // Tamanho "mini" (era "board" -- pedido explicito de voltar atras: a
@@ -110,6 +136,25 @@ function HeroCardsPreview({ cards }: { cards: string[] }) {
         <HalfCard key={i} card={c} size="mini" />
       ))}
     </div>
+  );
+}
+
+// Selo minusculo da lista (icone de all-in / showdown) -- icone em vez de
+// texto porque a coluna tem 220px e "ALL-IN" + "SHOWDOWN" nao cabiam ao
+// lado do resultado; o significado aparece ao passar o mouse.
+function SeloMao({ cor, titulo, children }: { cor: string; titulo: string; children: ReactNode }) {
+  return (
+    <span
+      title={titulo}
+      aria-label={titulo}
+      style={{
+        display: "grid", placeItems: "center", width: 15, height: 15,
+        borderRadius: 4, color: cor,
+        background: `${cor}1F`, border: `1px solid ${cor}40`,
+      }}
+    >
+      {children}
+    </span>
   );
 }
 
@@ -171,6 +216,10 @@ export function RevisorSessao({
   const [searchQuery, setSearchQuery] = useState("");
   const [onlyWithAction, setOnlyWithAction] = useState(false);
   const [tagFilter, setTagFilter] = useState<string | null>(null);
+  // "ordem" = cronologica (padrao); "impacto" = maiores ganhos/perdas
+  // primeiro -- as maos que mais mexeram no stack sao as que mais valem
+  // revisar.
+  const [ordenacao, setOrdenacao] = useState<"ordem" | "impacto">("ordem");
 
   const gridRef = useRef<HTMLDivElement | null>(null);
   const [gridHeight, setGridHeight] = useState<number | null>(null);
@@ -232,7 +281,11 @@ export function RevisorSessao({
     measure();
     window.addEventListener("resize", measure);
     return () => window.removeEventListener("resize", measure);
-  }, []);
+    // `loading` nas dependencias: na montagem a tela ainda mostra o
+    // spinner (o grid nem existe), entao a 1a medicao nao achava nada e a
+    // altura ficava no chute (100vh - 240px) ate' a janela mudar de
+    // tamanho. Medir de novo quando o grid aparece usa a altura real.
+  }, [loading]);
 
   const HANDS_SELECT =
     "id, title, hand_history, parsed_data, created_at, status, viewed_in_replayer_at, hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) )";
@@ -271,7 +324,11 @@ export function RevisorSessao({
         setSession({ label: sessionLabel });
         setHands(handsList);
         const preselect = initialSelectedId && handsList.some((h) => h.id === initialSelectedId) ? initialSelectedId : null;
-        setSelectedId(preselect ?? (handsList.length > 0 ? handsList[0].id : null));
+        // Sem mao pedida, abre a primeira que AINDA NAO foi vista na mesa
+        // ("continuar de onde parei") -- so' cai na primeira da lista
+        // quando todas ja foram vistas.
+        const primeiraNaoVista = handsList.find((h) => !h.viewed_in_replayer_at)?.id ?? null;
+        setSelectedId(preselect ?? primeiraNaoVista ?? (handsList.length > 0 ? handsList[0].id : null));
       } catch (e) {
         if (!cancelled) setError(e instanceof Error ? e.message : "Erro ao carregar as mãos.");
       } finally {
@@ -348,7 +405,8 @@ export function RevisorSessao({
     const map = new Map<string, string>();
     for (const h of hands) {
       for (const link of h.hand_review_tag_links ?? []) {
-        for (const t of link.hand_review_tags ?? []) {
+        const tags = link.hand_review_tags;
+        for (const t of Array.isArray(tags) ? tags : tags ? [tags] : []) {
           map.set(t.id, t.label);
         }
       }
@@ -356,8 +414,16 @@ export function RevisorSessao({
     return [...map.entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [hands]);
 
+  // Resumo por mao (resultado em bb / all-in / showdown), calculado uma
+  // vez por carga da lista.
+  const resumos = useMemo(() => {
+    const out: Record<string, ResumoMao | null> = {};
+    for (const h of hands) out[h.id] = resumoDaLinha(h);
+    return out;
+  }, [hands]);
+
   const filteredHands = useMemo(() => {
-    return hands
+    const lista = hands
       .map((h, i) => ({ hand: h, index: i }))
       .filter(({ hand, index }) => {
         if (onlyWithAction) {
@@ -376,7 +442,12 @@ export function RevisorSessao({
         const handNumber = String(index + 1);
         return heroPosition.includes(q) || heroStack.includes(q) || handNumber === q;
       });
-  }, [hands, searchQuery, onlyWithAction, tagFilter]);
+    if (ordenacao === "impacto") {
+      const peso = (id: string) => Math.abs(resumos[id]?.resultadoBb ?? 0);
+      lista.sort((a, b) => peso(b.hand.id) - peso(a.hand.id) || a.index - b.index);
+    }
+    return lista;
+  }, [hands, searchQuery, onlyWithAction, tagFilter, ordenacao, resumos]);
 
   // Se o filtro "so com acao" tirar a mao selecionada da lista visivel,
   // pula pra primeira mao que sobrou — pedido explicito: "quando
@@ -493,6 +564,25 @@ export function RevisorSessao({
           </div>
         </div>
 
+        {/* Progresso da sessao: quantas maos ja foram abertas na mesa. */}
+        {hands.length > 0 && (() => {
+          const vistas = hands.filter((h) => h.viewed_in_replayer_at).length;
+          const pct = Math.round((vistas / hands.length) * 100);
+          return (
+            <div style={{ display: "flex", flexDirection: "column", gap: 5 }}>
+              <div style={{ display: "flex", justifyContent: "space-between", fontSize: 10.5, color: "rgba(255,255,255,0.5)" }}>
+                <span>
+                  <b style={{ color: "#FFFFFF", fontWeight: 600 }}>{vistas}</b> de {hands.length} vistas
+                </span>
+                <span>{pct}%</span>
+              </div>
+              <div style={{ height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+                <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: "linear-gradient(90deg, #34D399, #10B981)" }} />
+              </div>
+            </div>
+          );
+        })()}
+
         {/* "Só com ação" agora é um toggle sempre visível (pedido
             explicito) — não depende mais de abrir a busca pra
             aparecer. Selecionar pula a mão atual, se ela ficar de
@@ -518,6 +608,39 @@ export function RevisorSessao({
           />
           Só com ação
         </button>
+
+        {/* Ordem da lista: cronologica ou pelas maos que mais mexeram no
+            stack (ganho ou perda, em bb). */}
+        <div
+          role="radiogroup"
+          aria-label="Ordenar mãos"
+          style={{ display: "grid", gridTemplateColumns: "1fr 1fr", padding: 2, borderRadius: 9, background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.08)" }}
+        >
+          {(
+            [
+              { v: "ordem", rotulo: "Ordem" },
+              { v: "impacto", rotulo: "Maior impacto" },
+            ] as const
+          ).map((o) => {
+            const on = ordenacao === o.v;
+            return (
+              <button
+                key={o.v}
+                role="radio"
+                aria-checked={on}
+                onClick={() => setOrdenacao(o.v)}
+                style={{
+                  all: "unset", cursor: "pointer", textAlign: "center",
+                  fontFamily: F, fontSize: 10.5, fontWeight: 600, padding: "5px 4px", borderRadius: 7,
+                  background: on ? "rgba(255,255,255,0.12)" : "transparent",
+                  color: on ? "#FFFFFF" : "rgba(255,255,255,0.45)",
+                }}
+              >
+                {o.rotulo}
+              </button>
+            );
+          })}
+        </div>
 
         {searchOpen && (
           <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
@@ -588,6 +711,8 @@ export function RevisorSessao({
           const heroCards = h.parsed_data?.heroCards;
           const heroPosition = h.parsed_data?.heroPosition;
           const heroEntered = didHeroEnterHand(h.parsed_data?.heroName, h.parsed_data?.streets);
+          const resumo = resumos[h.id];
+          const bb = resumo?.resultadoBb ?? null;
           return (
             <button
               key={h.id}
@@ -599,7 +724,10 @@ export function RevisorSessao({
                 setListOpen(false);
               }}
               style={{
-                all: "unset", cursor: "pointer", display: "block", width: "100%",
+                // border-box: com `all: unset` o botao voltava pro
+                // content-box e width:100% + padding + borda passava 30px
+                // da coluna -- cortava o resultado da mao na direita.
+                all: "unset", boxSizing: "border-box", cursor: "pointer", display: "block", width: "100%",
                 padding: "10px 14px",
                 borderBottom:
                   filteredHands.findIndex((f) => f.hand.id === h.id) < filteredHands.length - 1
@@ -641,7 +769,35 @@ export function RevisorSessao({
                     )}
                   </div>
                 </div>
-                {active && <ChevronRight size={12} color="rgba(255,255,255,0.4)" />}
+                {/* Resultado do heroi na mao (bb) + selos de all-in /
+                    showdown -- o que mais ajuda a escolher QUAL mao
+                    rever primeiro. */}
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
+                  {bb != null && (
+                    <span
+                      style={{
+                        fontSize: 11.5, fontWeight: 600, fontVariantNumeric: "tabular-nums",
+                        color: bb > 0 ? "#34D399" : bb < 0 ? "#F87171" : "rgba(255,255,255,0.45)",
+                      }}
+                    >
+                      {formatarBb(bb)}
+                    </span>
+                  )}
+                  {(resumo?.allIn || resumo?.showdown) && (
+                    <span style={{ display: "flex", gap: 3 }}>
+                      {resumo.allIn && (
+                        <SeloMao cor="#F87171" titulo="Você foi all-in nessa mão">
+                          <Zap size={9} strokeWidth={2.4} />
+                        </SeloMao>
+                      )}
+                      {resumo.showdown && (
+                        <SeloMao cor="#60A5FA" titulo="Foi ao showdown (as cartas foram mostradas)">
+                          <Eye size={9} strokeWidth={2.4} />
+                        </SeloMao>
+                      )}
+                    </span>
+                  )}
+                </div>
               </div>
             </button>
           );
@@ -825,9 +981,9 @@ export function RevisorSessao({
         }}
       >
         <aside
+          className="painel-vidro"
           style={{
             borderRadius: 14,
-            background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
             border: "1px solid rgba(255,255,255,0.08)",
             overflow: "hidden",
             display: "flex",

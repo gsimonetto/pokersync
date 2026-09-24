@@ -22,7 +22,9 @@ import {
   type RfiJamListItem,
   type RfiJamPhaseRaw,
   type RfiJamSpot,
+  rfiJamSpotToRangeHands,
 } from "@/lib/services/rfi-jam-service";
+import { RangeDoSpot } from "@/components/drill/range-do-spot";
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const F = '"Space Grotesk", sans-serif';
@@ -169,6 +171,9 @@ const TYPE_OPTIONS = [
 
 const MARGINAL_GAP_THRESHOLD = 0.5;
 
+// Números no padrão brasileiro (vírgula decimal): toFixed escrevia "2.5%".
+const pct1 = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
+
 // register_training (RPC) so reconhece 'PERFECT'/'OK'/'BLUNDER' -- strings
 // diferentes do Verdict do frontend ('OTIMA'/'ACEITAVEL'/...). Sem esse
 // mapa, ERRO_GRAVE nunca cai no `else 10` do banco... pior, nunca reseta o
@@ -205,6 +210,26 @@ function FilterChip({
       onClick={onClick}
       style={{ fontFamily: F }}
     />
+  );
+}
+
+// "+N sem spot": as opções sem nenhuma mão gerada ficam recolhidas
+// atrás desse botão -- antes apareciam todas riscadas, e a maior parte
+// do painel de filtros era opção que não dava pra escolher.
+function MaisSemSpot({ n, onClick }: { n: number; onClick: () => void }) {
+  if (n <= 0) return null;
+  return (
+    <button
+      type="button"
+      onClick={onClick}
+      title="Mostrar as opções que ainda não têm mãos geradas"
+      style={{
+        fontFamily: F, fontSize: 11, fontWeight: 500, padding: "5px 10px", borderRadius: 999, cursor: "pointer",
+        background: "transparent", color: "rgba(255,255,255,0.4)", border: "1px dashed rgba(255,255,255,0.14)",
+      }}
+    >
+      +{n} sem spot
+    </button>
   );
 }
 
@@ -268,13 +293,15 @@ function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color:
 // central de SPR/board/pote, sem disputar espaco com nenhum dos dois --
 // ver `top` do wrapper, calibrado pra essa faixa.
 function VerdictCenterFlash({
-  label, color, isGood, freqPct, onDetails,
+  label, color, isGood, freqPct, onDetails, mensagem,
 }: {
   label: string;
   color: string;
   isGood: boolean;
   freqPct: number | null;
   onDetails: () => void;
+  /** Frase curta do que o GTO faz (a mesma da faixa do desktop). */
+  mensagem?: string | null;
 }) {
   const Icon = isGood ? CheckCircle2 : XCircle;
   return (
@@ -296,6 +323,11 @@ function VerdictCenterFlash({
           <span style={{ fontFamily: F, color: "rgba(255,255,255,.65)", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", textShadow: "0 2px 10px rgba(0,0,0,.85)" }}>{freqPct}%</span>
         )}
       </div>
+      {mensagem && (
+        <p style={{ margin: 0, maxWidth: 260, textAlign: "center", fontFamily: F, fontSize: 11.5, lineHeight: 1.4, color: "rgba(255,255,255,0.8)", textShadow: "0 2px 10px rgba(0,0,0,.9)" }}>
+          {mensagem}
+        </p>
+      )}
       <button
         onClick={onDetails}
         style={{ pointerEvents: "auto", display: "flex", alignItems: "center", gap: 5, fontFamily: F, fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.75)", background: "rgba(0,0,0,0.4)", backdropFilter: "blur(6px)", border: "1px solid rgba(255,255,255,0.16)", borderRadius: 999, padding: "5px 12px", cursor: "pointer" }}
@@ -440,7 +472,7 @@ function EvDetailsModal({
               </span>
               <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
                 <span style={{ fontSize: 26, fontWeight: 800, color: userLossPct === 0 ? "#34D399" : isMarginal ? "#f5a524" : "#FFFFFF" }}>
-                  {userLossPct != null ? `${userLossPct.toFixed(1)}%` : "—"}
+                  {userLossPct != null ? `${pct1(userLossPct)}%` : "—"}
                 </span>
                 <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>
                   {userLossPct === 0 ? "você manteve o valor máximo dessa decisão" : `do valor máximo que essa decisão tinha`}
@@ -448,11 +480,11 @@ function EvDetailsModal({
               </div>
               <p style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5, color: "rgba(255,255,255,0.35)" }}>
                 {userLossPct === 0 ? (
-                  <>Essa mão tinha até {gapRelativePct != null ? `${gapRelativePct.toFixed(1)}%` : "uma boa diferença"} de valor em jogo entre Fold e {actionLabel.toLowerCase()} — mas como você escolheu o lado certo, não perdeu nada disso.</>
+                  <>Essa mão tinha até {gapRelativePct != null ? `${pct1(gapRelativePct)}%` : "uma boa diferença"} de valor em jogo entre Fold e {actionLabel.toLowerCase()} — mas como você escolheu o lado certo, não perdeu nada disso.</>
                 ) : chosen === "distractor" && distractorLabel ? (
                   <>O motor não calcula o valor de {distractorLabel.toLowerCase()} aqui (ele nunca considera essa jogada) — o número acima é a diferença entre as duas opções reais (Fold e {actionLabel.toLowerCase()}), que é o que você abriu mão ao escolher uma jogada fora da conta do GTO.</>
                 ) : (
-                  <>Fold valia {evFold.toFixed(1)} e {actionLabel.toLowerCase()} valia {evAction.toFixed(1)} (em equity de premiação desse torneio) — a % acima é essa diferença, na fatia que você abriu mão. É comparável entre mãos diferentes; os valores brutos entre parênteses não são (dependem do formato desse torneio específico).</>
+                  <>Fold valia {pct1(evFold)} e {actionLabel.toLowerCase()} valia {pct1(evAction)} (em equity de premiação desse torneio) — a % acima é essa diferença, na fatia que você abriu mão. É comparável entre mãos diferentes; os valores brutos entre parênteses não são (dependem do formato desse torneio específico).</>
                 )}
               </p>
             </div>
@@ -547,6 +579,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // o filtro; volta pra false se ele reabrir os filtros (ver botao de
   // filtro no cabecalho do modo tela-cheia, mais abaixo).
   const [fullscreenMode, setFullscreenMode] = useState(false);
+  // Filtros: mostrar também as opções sem spot (riscadas)? Padrão: não.
+  const [mostrarSemSpot, setMostrarSemSpot] = useState(false);
+  // Celular já abre na mesa cheia (antes só depois de aplicar filtros --
+  // quem entrava direto via "Treinar" via a mesa pequena, deitada, com
+  // um vazio grande em cima e os botões quebrando em 2 linhas).
+  useEffect(() => {
+    if (isMobile) setFullscreenMode(true);
+  }, [isMobile]);
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<"fold" | "action" | "distractor" | null>(null);
@@ -821,6 +861,8 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     : null;
 
   const actionLabel = currentPhase ? ACTION_LABEL[currentPhase.action] : "";
+  // Range do GTO do spot atual (grade ao lado da mesa, ver RangeDoSpot).
+  const rangeDoSpot = useMemo(() => (spot ? rfiJamSpotToRangeHands(spot)[phaseKey] : {}), [spot, phaseKey]);
   const distractorLabel = getDistractorLabel(phaseKey, spot?.effectiveStack ?? null);
 
   // Uma frase só, sem "equity"/"ICM"/"gap" -- é o que aparece por
@@ -828,15 +870,25 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // em "Ver detalhes" (abre o EvDetailsModal, que tem o resto).
   const plainFeedback = useMemo(() => {
     if (!round || !chosen || !currentPhase) return null;
+    const actionPct = Math.round(round.freq * 100);
+    const foldPct = 100 - actionPct;
     // Distrator: não tem EV real calculado (o solver nunca resolve
     // essa jogada), então a frase não tenta comparar valor -- só avisa
     // que essa opção nem entra na conta do GTO aqui.
-    if (chosen === "distractor") return `O GTO nem considera ${(distractorLabel ?? "essa jogada").toLowerCase()} nessa situação.`;
-    if (isMarginal) return "As duas jogadas valem praticamente o mesmo aqui — não tinha erro grave possível.";
+    if (chosen === "distractor")
+      return `O GTO nunca joga ${(distractorLabel ?? "essa jogada").toLowerCase()} aqui: as opções dele são Fold (${foldPct}%) e ${actionLabel} (${actionPct}%).`;
+    if (isMarginal) return `As duas jogadas valem praticamente o mesmo aqui (Fold ${foldPct}% · ${actionLabel} ${actionPct}%) — não tinha erro grave possível.`;
     const chosenLabel = chosen === "fold" ? "Fold" : actionLabel;
     const otherLabel = chosen === "fold" ? actionLabel : "Fold";
-    if (isGoodVerdict) return `Boa escolha — o GTO também prefere ${chosenLabel} na maioria das vezes aqui.`;
-    return `O GTO prefere ${otherLabel} na maioria das vezes aqui.`;
+    const chosenPct = chosen === "fold" ? foldPct : actionPct;
+    const otherPct = 100 - chosenPct;
+    // Antes: "Aceitável" dizia "o GTO também prefere X na maioria das
+    // vezes" mesmo quando X era a jogada MENOS frequente (ex.: All-in 31%
+    // vs Fold 69%) -- a frase contradizia os números do próprio spot.
+    if (chosenPct >= 97) return `Boa escolha — o GTO sempre joga ${chosenLabel} aqui.`;
+    if (chosenPct >= 50) return `Boa escolha — o GTO também joga ${chosenLabel} na maioria das vezes aqui (${chosenPct}%).`;
+    if (isGoodVerdict) return `O GTO mistura aqui: ${otherLabel} ${otherPct}% e ${chosenLabel} ${chosenPct}%. Sua jogada vale, mas a mais comum é ${otherLabel}.`;
+    return otherPct >= 97 ? `O GTO sempre joga ${otherLabel} aqui.` : `O GTO prefere ${otherLabel} na maioria das vezes aqui (${otherPct}%).`;
   }, [round, chosen, currentPhase, isMarginal, isGoodVerdict, actionLabel, distractorLabel]);
 
   useEffect(() => {
@@ -1146,13 +1198,17 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
                 {blockProgress && (
                   <span style={{ fontSize: 10, fontWeight: 600, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
-                    Hoje: {blockProgress.hands} mãos
+                    Hoje: {blockProgress.hands} {blockProgress.hands === 1 ? "mão" : "mãos"}
                   </span>
                 )}
-                <Chip color={accuracyChipColor(stats.total, sessionPct)} size="sm">
-                  {stats.hits}/{stats.total}
-                  {stats.total > 0 ? ` · ${sessionPct}%` : ""}
-                </Chip>
+                {/* Mesmo texto do chip do computador ("67% ótimas", com o
+                    total no toque/hover) -- "142/214 · 66%" não dizia o
+                    que era contado. */}
+                <span title={`${stats.hits} de ${stats.total} mãos ótimas desde o início`}>
+                  <Chip color={accuracyChipColor(stats.total, sessionPct)} size="sm">
+                    {stats.total > 0 ? `${sessionPct}% ótimas` : "Sem histórico"}
+                  </Chip>
+                </span>
               </div>
             </div>
 
@@ -1176,6 +1232,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   isGood={isGoodVerdict}
                   freqPct={chosenFreqPct}
                   onDetails={() => setDetailsOpen(true)}
+                  mensagem={plainFeedback}
                 />
               )}
 
@@ -1259,13 +1316,16 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
         <div className="ps-tr-session" style={{ flex: 1, minWidth: 0, display: "flex", justifyContent: "center", gap: 12, alignItems: "center" }}>
           {blockProgress && (
-            <span style={{ fontFamily: F, fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)", whiteSpace: "nowrap" }}>
-              Hoje: {blockProgress.hands} mãos · {blockProgress.hits} ótimas
+            <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>
+              Hoje: {blockProgress.hands} {blockProgress.hands === 1 ? "mão" : "mãos"}
+              {blockProgress.hands > 0 ? ` · ${Math.round((blockProgress.hits / blockProgress.hands) * 100)}% ótimas` : ""}
             </span>
           )}
-          <Chip color={accuracyChipColor(stats.total, sessionPct)}>
-            {stats.hits}/{stats.total} ótimas{stats.total > 0 ? ` · ${sessionPct}%` : ""}
-          </Chip>
+          <span title={`${stats.hits} de ${stats.total} mãos ótimas desde o início`}>
+            <Chip color={accuracyChipColor(stats.total, sessionPct)}>
+              Histórico{stats.total > 0 ? ` · ${sessionPct}% ótimas` : ""}
+            </Chip>
+          </span>
         </div>
 
         {tabs}
@@ -1366,7 +1426,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
               <FilterSection label="Hero">
                 <FilterChip label={`Qualquer (${poolCount("hero", ANY)})`} active={heroAny} disabled={poolCount("hero", ANY) === 0} onClick={() => { setHeroAny(true); bump(); }} />
-                {ALL_POSITIONS.map((p) => {
+                {ALL_POSITIONS.filter((p) => mostrarSemSpot || poolCount("hero", p) > 0 || (!heroAny && p === heroPos)).map((p) => {
                   const n = poolCount("hero", p);
                   return (
                     <FilterChip
@@ -1378,11 +1438,17 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     />
                   );
                 })}
+                {!mostrarSemSpot && (
+                  <MaisSemSpot
+                    n={ALL_POSITIONS.filter((p) => poolCount("hero", p) === 0 && !(!heroAny && p === heroPos)).length}
+                    onClick={() => setMostrarSemSpot(true)}
+                  />
+                )}
               </FilterSection>
 
               <FilterSection label="Vilão">
                 <FilterChip label={`Qualquer (${poolCount("villain", ANY)})`} active={villainAny} disabled={poolCount("villain", ANY) === 0} onClick={() => { setVillainAny(true); bump(); }} />
-                {ALL_POSITIONS.map((p) => {
+                {ALL_POSITIONS.filter((p) => mostrarSemSpot || poolCount("villain", p) > 0 || (!villainAny && p === villainPos)).map((p) => {
                   const n = poolCount("villain", p);
                   return (
                     <FilterChip
@@ -1394,11 +1460,17 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     />
                   );
                 })}
+                {!mostrarSemSpot && (
+                  <MaisSemSpot
+                    n={ALL_POSITIONS.filter((p) => poolCount("villain", p) === 0 && !(!villainAny && p === villainPos)).length}
+                    onClick={() => setMostrarSemSpot(true)}
+                  />
+                )}
               </FilterSection>
 
               <FilterSection label="Stack">
                 <FilterChip label={`Qualquer (${poolCount("stack", ANY)})`} active={stackAny} disabled={poolCount("stack", ANY) === 0} onClick={() => { setStackAny(true); bump(); }} />
-                {STACK_OPTIONS.map((s) => {
+                {STACK_OPTIONS.filter((s) => mostrarSemSpot || poolCount("stack", s) > 0 || (!stackAny && s === stackBb)).map((s) => {
                   const n = poolCount("stack", s);
                   return (
                     <FilterChip
@@ -1410,6 +1482,12 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     />
                   );
                 })}
+                {!mostrarSemSpot && (
+                  <MaisSemSpot
+                    n={STACK_OPTIONS.filter((s) => poolCount("stack", s) === 0 && !(!stackAny && s === stackBb)).length}
+                    onClick={() => setMostrarSemSpot(true)}
+                  />
+                )}
               </FilterSection>
             </div>
 
@@ -1481,7 +1559,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     EvDetailsModal, atrás do botão "Ver detalhes". */}
                 <div style={{ minHeight: 60, flexShrink: 0, display: "flex", alignItems: "center" }}>
                   {chosen && verdict && displayLabel && displayColor && plainFeedback && (
-                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontFamily: F, background: "#0A0A0A", padding: "10px 14px", borderRadius: 14, border: "1px solid rgba(255,255,255,0.08)" }}>
+                    // Tingida na cor do veredito: agora que o selo em cima da
+                    // mesa saiu (no computador), essa faixa e' o UNICO lugar
+                    // do resultado -- precisa chamar a atencao sozinha.
+                    <div style={{ width: "100%", display: "flex", alignItems: "center", justifyContent: "space-between", gap: 10, fontFamily: F, background: `${displayColor}14`, padding: "10px 14px", borderRadius: 14, border: `1px solid ${displayColor}55` }}>
                       <div style={{ display: "flex", alignItems: "center", gap: 10, minWidth: 0 }}>
                         {isGoodVerdict ? <CheckCircle2 size={18} color={displayColor} style={{ flexShrink: 0 }} /> : <XCircle size={18} color={displayColor} style={{ flexShrink: 0 }} />}
                         <div style={{ minWidth: 0 }}>
@@ -1516,6 +1597,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   />
                 )}
 
+                {/* Mesa + range do spot lado a lado (tela larga): depois de
+                    responder, a grade mostra onde a mão cai no range
+                    inteiro do GTO -- o padrão do spot, não só essa mão. */}
+                <div className="ps-tr-mesa-grid" style={{ flex: 1, minHeight: 0, display: "grid", gap: 10 }}>
                 <div
                   style={
                     isMobile
@@ -1552,8 +1637,29 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     chipAnimation={chipAnimation}
                     {...(isMobile ? {} : { cornerRadius: "34% / 54%" })}
                   />
-                  {chosen && verdict && displayLabel && displayColor && (
+                  {/* No computador o veredito ja aparece (com a explicacao)
+                      na faixa logo acima da mesa -- o selo repetido em cima
+                      da mesa so' duplicava a informacao. Fica so' no
+                      celular. */}
+                  {isMobile && chosen && verdict && displayLabel && displayColor && (
                     <VerdictFlash label={displayLabel} color={displayColor} isGood={isGoodVerdict} freqPct={chosenFreqPct} />
+                  )}
+                </div>
+                  {!isMobile && spot && round && currentPhase && (
+                    <RangeDoSpot
+                      hands={rangeDoSpot}
+                      destaque={round.label}
+                      revelado={Boolean(chosen)}
+                      titulo="Range do GTO"
+                      subtitulo={`${activeHeroSeat} decide · ${PHASES.find((p) => p.key === phaseKey)?.label ?? ""} · ${stackBb}bb`}
+                      legenda={[
+                        {
+                          cor: currentPhase.action === "allin" ? "#e0555a" : currentPhase.action === "call" ? "#3b82f6" : "#22c55e",
+                          rotulo: actionLabel,
+                        },
+                        { cor: "#c4c7c855", rotulo: "Fold" },
+                      ]}
+                    />
                   )}
                 </div>
 
@@ -1599,7 +1705,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                           ("Você jogou X — resumo acima"), em vez de só
                           o botão sozinho. */}
                       <div style={{ fontFamily: F, flex: 1, padding: "10px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12, color: "rgba(255,255,255,0.5)", textAlign: "center" }}>
-                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : chosen === "distractor" ? distractorLabel ?? "outra" : actionLabel}</span> — resumo acima.
+                        Você jogou <span style={{ color: "rgba(255,255,255,0.85)", fontWeight: 600 }}>{chosen === "fold" ? "Fold" : chosen === "distractor" ? distractorLabel ?? "outra" : actionLabel}</span>
                       </div>
                       <button
                         onClick={bump}
