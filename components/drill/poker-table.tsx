@@ -1,11 +1,12 @@
 "use client";
 
-import { useEffect, useRef, useState } from "react";
-import { Info, Target } from "lucide-react";
+import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { Info, Target, Trophy } from "lucide-react";
 import { Card, sortCardsDesc } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
 import type { OpponentStats } from "@/lib/services/opponent-stats-service";
+import { usePreferenciasMesa, type CorFeltro, type UnidadeValor, type VelocidadeAnimacao } from "@/lib/hooks/use-preferencias-mesa";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -82,6 +83,18 @@ function formatStack(value: number): string {
   return rounded.toLocaleString("pt-BR", { maximumFractionDigits: 1 });
 }
 
+// Duração das animações da mesa, na velocidade escolhida no Treino (M10):
+// --ps-vel vale 1 (normal) ou menos (rápida), definido na raiz da mesa.
+// "Sem animação" desliga tudo por CSS (ver data-ps-animacao em PokerTable).
+function dur(ms: number): string {
+  return `calc(${ms}ms * var(--ps-vel, 1))`;
+}
+
+// Sufixo dos valores da mesa: "BB" (padrão) ou nada quando a mesa está em
+// fichas (opção BB/Fichas do Revisor) -- as salas mostram ficha sem sufixo.
+// Os números já chegam na unidade certa (ver projectHandAtStep emFichas).
+const SufixoValor = createContext<"BB" | "">("BB");
+
 export interface HistoryStep {
   street: string;
   current?: boolean;
@@ -91,6 +104,15 @@ export interface HistoryStep {
 export interface TableHand {
   pot: number;
   spr: number | null;
+  // Diante de uma aposta: quanto de equidade você precisa pra pagar
+  // (o que você paga ÷ pote final). No lugar do SPR, que quase não diz
+  // nada no pré-flop.
+  potOddsPct?: number | null;
+  // Placar embaixo do board (Revisor), como as salas mostram no all-in e
+  // no showdown: chance de vitória de cada um ("76%") enquanto o board sai,
+  // e o nome da jogada no fim ("Par de Reis"), marcando quem levou o pote.
+  // Fica no centro da mesa de propósito -- os assentos não mudam.
+  placar?: { pos: string; voce: boolean; texto: string; vencedor?: boolean }[] | null;
   board: (string | null)[];
   history: HistoryStep[];
   seats: Record<string, SeatState>;
@@ -129,6 +151,21 @@ const FELT_PALETTES = {
 } as const;
 
 export type TableVariant = keyof typeof FELT_PALETTES;
+
+// Cor do feltro escolhida nas Configurações (M9) -- vale pro Treino e pro
+// Revisor. "padrao" = a cor de cada tela (azul no Treino, vinho no Revisor).
+const FELTROS_ESCOLHIDOS: Record<Exclude<CorFeltro, "padrao">, { background: string; glow: string }> = {
+  verde: {
+    background: "radial-gradient(65% 75% at 50% 40%, #1E6B41 0%, #165332 30%, #0E3A22 60%, #061D11 100%)",
+    glow: "rgba(34,139,84,.35)",
+  },
+  azul: FELT_PALETTES.treino,
+  vinho: FELT_PALETTES.replay,
+  grafite: {
+    background: "radial-gradient(65% 75% at 50% 40%, #3A3F47 0%, #2C3037 30%, #1D2025 60%, #0D0E11 100%)",
+    glow: "rgba(150,160,175,.22)",
+  },
+};
 
 function ChipStackIcon({ size = 13 }: { size?: number }) {
   const disc = (bottom: number, z: number) => (
@@ -191,6 +228,7 @@ function formatPotPct(size: number, pot: number): string | null {
 }
 
 function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: number }) {
+  const sufixo = useContext(SufixoValor);
   if (!action) return null;
   const a = ACT[action.type.toLowerCase()] || ACT.check;
   // All-in nao mostra "% do pote" (pedido explicito) -- o valor em bb ja
@@ -211,11 +249,11 @@ function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: numbe
         fontSize: 10.5,
         fontWeight: 500,
         ...num,
-        animation: "fadeInUp 200ms ease-out",
+        animation: `fadeInUp ${dur(200)} ease-out`,
       }}
     >
       {a.label}
-      {action.size ? ` ${formatStack(action.size)} BB` : ""}
+      {action.size ? ` ${formatStack(action.size)}${sufixo ? ` ${sufixo}` : ""}` : ""}
       {potPct && <span style={{ opacity: 0.7 }}> · {potPct} pot</span>}
     </div>
   );
@@ -240,6 +278,7 @@ const HERO_COMMITTED_OFFSET_PX = 104;
 const ABOVE_SEAT_EXTRA_OFFSET_PX = 14;
 
 function CommittedPill({ amount }: { amount: number }) {
+  const sufixo = useContext(SufixoValor);
   return (
     <div
       style={{
@@ -251,20 +290,23 @@ function CommittedPill({ amount }: { amount: number }) {
         borderRadius: 999,
         padding: "3px 10px 3px 5px",
         boxShadow: "0 3px 8px rgba(0,0,0,.5)",
-        animation: "fadeInUp 220ms ease-out both",
+        animation: `fadeInUp ${dur(220)} ease-out both`,
         whiteSpace: "nowrap",
       }}
     >
       <ChipStackIcon size={13} />
       <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>
         {formatStack(amount)}
-        <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>BB</span>
+        {sufixo && <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>{sufixo}</span>}
       </span>
     </div>
   );
 }
 
-function CommittedChip({ seat, amount, scale, heroScale = 1 }: { seat: SeatLayoutSlot; amount: number; scale: number; heroScale?: number }) {
+// `subir` (px): o mesmo deslocamento que o assento ganha no alinhamento
+// pela placa (ver Seat.centrarNaPlaca) -- a ficha acompanha o bloco do
+// assento pra continuar na mesma distância das cartas dele.
+function CommittedChip({ seat, amount, scale, heroScale = 1, subir = 0 }: { seat: SeatLayoutSlot; amount: number; scale: number; heroScale?: number; subir?: number }) {
   const dx = TABLE_CENTER.x - seat.x;
   const dy = TABLE_CENTER.y - seat.y;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -294,7 +336,7 @@ function CommittedChip({ seat, amount, scale, heroScale = 1 }: { seat: SeatLayou
         position: "absolute",
         left: `${seat.x}%`,
         top: `${seat.y}%`,
-        transform: `translate(-50%,-50%) translate(${ux * offsetPx}px, ${uy * offsetPx}px) scale(${scale})`,
+        transform: `translate(-50%,-50%) translate(${ux * offsetPx}px, ${uy * offsetPx - subir}px) scale(${scale})`,
         zIndex: 3,
         pointerEvents: "none",
       }}
@@ -336,7 +378,7 @@ function CardFan({ cards, size, fanDeg = 16 }: { cards: (string | null)[]; size:
         // roda — a carta ficava sempre reta, mesmo com o angulo certo no
         // codigo. Separando, cada div cuida de UM transform só.
         <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - (cards.length - 1) / 2) * fanDeg}deg)` }}>
-          <div style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+          <div style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
             <Card card={c} size={size} />
           </div>
         </div>
@@ -400,7 +442,7 @@ function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
     <div style={{ display: "flex" }}>
       {[0, 1].map((i) => (
         <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - 0.5) * fanDeg}deg)` }}>
-          <div style={{ animation: "fadeInUp 260ms ease-out both", animationDelay: `${i * 60}ms` }}>
+          <div style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
             <CardSilhouette />
           </div>
         </div>
@@ -409,14 +451,33 @@ function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
   );
 }
 
+// Altura (px, antes da escala) do bloco de cartas que fica EM CIMA da
+// placa do assento -- tamanhos fixos do Card: "hero" 90 de altura + os 6
+// de espaço até a placa; "villain" e a silhueta virada, 66. O translateY
+// que joga as cartas pra trás do nome não conta (transform não ocupa
+// espaço no layout).
+function alturaCartasAcima(seat: SeatLayoutSlot, state: SeatState): number {
+  const { status = "empty", cards } = state;
+  if (seat.isHero) return cards && cards.length > 0 ? 90 + 6 : 0;
+  const reveladas = !!cards && cards.length > 0 && cards.every(Boolean);
+  const silhueta = !reveladas && status !== "empty" && status !== "folded";
+  return reveladas || silhueta ? 66 : 0;
+}
+
 function Seat({
-  seat, state, isDealer, pot, scale, heroScale = 1, opponentStats, onOpponentClick,
+  seat, state, isDealer, pot, scale, heroScale = 1, centrarNaPlaca = false, opponentStats, onOpponentClick,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
   isDealer?: boolean;
   pot: number;
   scale: number;
+  // Alinhamento pela placa (Revisor no computador): o ponto do anel fica
+  // no centro de posição+placa+chip, não no centro do bloco inteiro. Sem
+  // isso, quem tem cartas (em cima da placa) ficava com a placa mais
+  // baixa que quem não tem -- os assentos saíam desalinhados na borda.
+  // O visual do assento não muda, só onde ele encosta na mesa.
+  centrarNaPlaca?: boolean;
   // Escala extra so' pro assento do heroi (pedido explicito: "o layout
   // do hero pode ser um pouco maior") -- multiplica em cima do `scale`
   // geral (responsivo por largura da mesa), nao o substitui.
@@ -438,6 +499,10 @@ function Seat({
 
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = SEAT_OPACITY[status];
+  // Metade da altura das cartas, já na escala do assento: é quanto o bloco
+  // sobe pra placa (e não o bloco inteiro) ficar no ponto do anel.
+  const subirPelaCarta = centrarNaPlaca ? (alturaCartasAcima(seat, state) * effectiveScale) / 2 : 0;
+  const sufixo = useContext(SufixoValor);
 
   // Cartas sempre EM CIMA do nome do seat, pra todas as posicoes da mesa
   // (pedido explicito: "as cartas de todas as posicoes precisam ficar em
@@ -647,7 +712,7 @@ function Seat({
                 />
               </>
             )}
-            <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack} BB</span>
+            <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack}{sufixo ? ` ${sufixo}` : ""}</span>
           </div>
         </div>
       )}
@@ -667,7 +732,7 @@ function Seat({
         // torno do proprio centro (transform-origin default) — o ponto
         // de ancoragem na mesa nunca se move, so' o conteudo do assento
         // (carta+placa+texto) fica menor quando a mesa e' estreita.
-        transform: `translate(-50%,-50%) scale(${effectiveScale})`,
+        transform: `translate(-50%, calc(-50% - ${subirPelaCarta}px)) scale(${effectiveScale})`,
         opacity,
         filter: status === "folded" ? "grayscale(0.5)" : "none",
         transition: "opacity 220ms ease, filter 220ms ease, transform 150ms ease",
@@ -739,6 +804,7 @@ function ChipAnimation({
 }) {
   const dx = TABLE_CENTER.x - fromSeat.x;
   const dy = TABLE_CENTER.y - fromSeat.y;
+  const sufixo = useContext(SufixoValor);
   return (
     // Dois niveis, mesmo motivo do CardFan: a animacao chipTravel ja mexe
     // em `transform` (translate+scale) nos seus proprios keyframes — numa
@@ -764,13 +830,13 @@ function ChipAnimation({
           position: "absolute",
           left: 0,
           top: 0,
-          animation: "chipTravel 600ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
+          animation: `chipTravel ${dur(600)} cubic-bezier(0.22, 1, 0.36, 1) forwards`,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <ChipStackIcon size={13} />
           <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 500, color: TEXT.critical, ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-            +{formatStack(amount)} BB
+            +{formatStack(amount)}{sufixo ? ` ${sufixo}` : ""}
           </span>
         </div>
       </div>
@@ -799,6 +865,7 @@ function PotAwardAnimation({
 }) {
   const dx = toSeat.x - TABLE_CENTER.x;
   const dy = toSeat.y - TABLE_CENTER.y;
+  const sufixo = useContext(SufixoValor);
   return (
     <div
       key={animKey}
@@ -818,13 +885,13 @@ function PotAwardAnimation({
           position: "absolute",
           left: 0,
           top: 0,
-          animation: "chipTravel 700ms cubic-bezier(0.22, 1, 0.36, 1) forwards",
+          animation: `chipTravel ${dur(700)} cubic-bezier(0.22, 1, 0.36, 1) forwards`,
         }}
       >
         <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
           <PotChipStack />
           <span style={{ fontFamily: F, fontSize: 13, fontWeight: 700, color: "#FCD34D", ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-            +{formatStack(amount)} BB
+            +{formatStack(amount)}{sufixo ? ` ${sufixo}` : ""}
           </span>
         </div>
       </div>
@@ -861,6 +928,62 @@ function SprBadge({ spr }: { spr: number }) {
   );
 }
 
+// "Pra pagar precisa de 44%" -- a conta que todo jogador faz de cabeça
+// diante de um all-in (quanto vou pagar ÷ tamanho do pote final),
+// mostrada pronta. Mesmo formato do selo de SPR.
+function PotOddsBadge({ pct }: { pct: number }) {
+  return (
+    <div
+      title="Equidade mínima pra pagar: o que você paga ÷ o pote no final"
+      style={{
+        display: "inline-flex",
+        alignItems: "baseline",
+        gap: 5,
+        padding: "3px 11px",
+        borderRadius: 999,
+        fontFamily: F,
+        background: "rgba(0,0,0,0.62)",
+        border: "1px solid rgba(96,165,250,0.45)",
+        boxShadow: "0 3px 10px rgba(0,0,0,.5)",
+        pointerEvents: "none",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: 0.4, color: TEXT.decorative }}>PRA PAGAR PRECISA DE</span>
+      <span style={{ fontSize: 14, fontWeight: 700, color: "#93C5FD", ...num }}>{Math.round(pct)}%</span>
+    </div>
+  );
+}
+
+// Um jogador no placar do centro: posição (na cor da posição, igual o
+// chip do assento), "Você" no herói e o valor -- chance de vitória ou o
+// nome da jogada. Quem levou o pote ganha o troféu e o valor dourado.
+function PlacarItem({ pos, voce, texto, vencedor }: NonNullable<TableHand["placar"]>[number]) {
+  return (
+    <div
+      style={{
+        display: "inline-flex",
+        alignItems: "center",
+        gap: 6,
+        padding: "3px 10px 3px 4px",
+        borderRadius: 999,
+        fontFamily: F,
+        background: "rgba(0,0,0,0.62)",
+        border: vencedor ? "1px solid rgba(212,175,55,0.65)" : "1px solid rgba(255,255,255,0.14)",
+        boxShadow: "0 3px 10px rgba(0,0,0,.5)",
+        pointerEvents: "none",
+        whiteSpace: "nowrap",
+        animation: `fadeInUp ${dur(200)} ease-out`,
+      }}
+    >
+      <span style={{ fontSize: 10, fontWeight: 700, padding: "1px 6px", borderRadius: 999, color: "#FFFFFF", background: `${POS[pos]?.base ?? NEUTRAL}CC` }}>{pos}</span>
+      {voce && <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary }}>Você</span>}
+      <span style={{ fontSize: 13, fontWeight: 700, color: vencedor ? "#F5D76E" : TEXT.critical, ...num }}>{texto}</span>
+      {vencedor && <Trophy size={12} color="#F5D76E" style={{ flexShrink: 0 }} />}
+    </div>
+  );
+}
+
 export function PokerTable({
   hand,
   seats,
@@ -881,6 +1004,17 @@ export function PokerTable({
   minSeatScale,
   // Multiplicador extra so' pro assento do heroi -- ver Seat.heroScale.
   heroScale = 1,
+  // Alinhamento pela placa (ver Seat.centrarNaPlaca) -- so' o Revisor no
+  // computador liga; Treino e celular continuam como sempre.
+  centrarNaPlaca = false,
+  // Multiplicador do tamanho dos assentos e do centro da mesa, em cima
+  // do auto-encolhimento por largura -- 1 = de sempre.
+  escalaAssentos = 1,
+  // Valores em BB (padrão) ou em fichas (opção do Revisor, M8) -- só muda
+  // o sufixo; os números já chegam na unidade certa.
+  unidade = "bb",
+  // Velocidade das animações (opção do Treino, M10).
+  animacao = "normal",
   // FIX (pedido explicito: "melhorar formato da mesa, nao pode ter
   // aquela 'ponta' em cima e embaixo") -- "10% / 16%" foi calibrado pro
   // retangulo DEITADO (8/5): nessa proporcao, 10% da LARGURA e 16% da
@@ -910,6 +1044,10 @@ export function PokerTable({
   aspectRatio?: string;
   minSeatScale?: number;
   heroScale?: number;
+  centrarNaPlaca?: boolean;
+  escalaAssentos?: number;
+  unidade?: UnidadeValor;
+  animacao?: VelocidadeAnimacao;
   cornerRadius?: string;
   opponentStats?: Record<string, OpponentStats>;
   onOpponentClick?: (playerName: string) => void;
@@ -918,14 +1056,20 @@ export function PokerTable({
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
   const awardToSeat = potAwardAnimation ? seats.find((s) => s.posLabel === potAwardAnimation.toPosLabel) : null;
-  const felt = FELT_PALETTES[variant];
+  const { feltro } = usePreferenciasMesa();
+  const felt = feltro === "padrao" ? FELT_PALETTES[variant] : FELTROS_ESCOLHIDOS[feltro];
+  const sufixo = unidade === "fichas" ? "" : "BB";
+  const semAnimacao = animacao === "sem";
   const tableBoxRef = useRef<HTMLDivElement>(null);
-  const seatScale = useSeatScale(tableBoxRef, minSeatScale);
+  const seatScale = useSeatScale(tableBoxRef, minSeatScale) * escalaAssentos;
   const aspectRatioValue = parseAspectRatio(aspectRatio);
 
   return (
+    <SufixoValor.Provider value={sufixo}>
     <div
+      data-ps-animacao={animacao}
       style={{
+        ["--ps-vel" as string]: animacao === "rapida" ? 0.4 : 1,
         position: "relative",
         display: "flex",
         flexDirection: "column",
@@ -942,6 +1086,7 @@ export function PokerTable({
         @keyframes seatPulse { 0%, 100% { filter: drop-shadow(0 0 0px rgba(255,255,255,0)); } 50% { filter: drop-shadow(0 0 6px rgba(255,255,255,0.15)); } }
         @keyframes cardDeal { from { opacity: 0; transform: translateY(-8px) rotate(-4deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
+        [data-ps-animacao="sem"] *, [data-ps-animacao="sem"] *::before, [data-ps-animacao="sem"] *::after { animation: none !important; transition: none !important; }
         @keyframes chipTravel {
           0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
           15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
@@ -1094,7 +1239,7 @@ export function PokerTable({
             // flutuam ACIMA do board sem empurrar o centro dele pra baixo.
             <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
               <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
-                {hand.spr != null && <SprBadge spr={hand.spr} />}
+                {hand.potOddsPct != null ? <PotOddsBadge pct={hand.potOddsPct} /> : hand.spr != null && <SprBadge spr={hand.spr} />}
                 <div
                   style={{
                     display: "flex",
@@ -1111,16 +1256,25 @@ export function PokerTable({
                 >
                   <PotChipStack />
                   <span style={{ color: TEXT.critical, fontWeight: 500, fontSize: 15, ...num }}>{formatStack(hand.pot)}</span>
-                  <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>BB</span>
+                  {sufixo && <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>{sufixo}</span>}
                 </div>
               </div>
               <div style={{ display: "flex", gap: 7 }}>
                 {hand.board.map((c, i) => (
-                  <div key={i} style={{ animation: "cardDeal 300ms ease-out both", animationDelay: `${i * 70}ms` }}>
+                  <div key={i} style={{ animation: `cardDeal ${dur(300)} ease-out both`, animationDelay: dur(i * 70) }}>
                     <Card card={c} />
                   </div>
                 ))}
               </div>
+              {/* Placar logo abaixo do board, também absolute: não empurra o
+                  board pra cima (ele continua centralizado na mesa). */}
+              {hand.placar && hand.placar.length > 0 && (
+                <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", marginTop: 12, display: "flex", gap: 8 }}>
+                  {hand.placar.map((p) => (
+                    <PlacarItem key={p.pos} {...p} />
+                  ))}
+                </div>
+              )}
             </div>
           ) : (
             <div style={{ textAlign: "center", maxWidth: 290, fontFamily: F }}>
@@ -1146,6 +1300,7 @@ export function PokerTable({
             pot={hand?.pot ?? 0}
             scale={seatScale}
             heroScale={heroScale}
+            centrarNaPlaca={centrarNaPlaca}
             opponentStats={s.playerName ? opponentStats?.[s.playerName] : undefined}
             onOpponentClick={onOpponentClick}
           />
@@ -1154,17 +1309,19 @@ export function PokerTable({
         {seats.map((s) => {
           const amt = streetCommitments?.[s.posLabel];
           if (!amt || amt < MIN_COMMITTED_TO_SHOW) return null;
-          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} scale={seatScale} heroScale={heroScale} />;
+          const subir = centrarNaPlaca ? (alturaCartasAcima(s, seatData(s.posLabel)) * seatScale * (s.isHero ? heroScale : 1)) / 2 : 0;
+          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} scale={seatScale} heroScale={heroScale} subir={subir} />;
         })}
 
-        {chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
+        {!semAnimacao && chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
           <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} scale={seatScale} />
         )}
 
-        {potAwardAnimation && awardToSeat && potAwardAnimation.amount > 0 && (
+        {!semAnimacao && potAwardAnimation && awardToSeat && potAwardAnimation.amount > 0 && (
           <PotAwardAnimation toSeat={awardToSeat} amount={potAwardAnimation.amount} animKey={potAwardAnimation.key} scale={seatScale} />
         )}
       </div>
     </div>
+    </SufixoValor.Provider>
   );
 }

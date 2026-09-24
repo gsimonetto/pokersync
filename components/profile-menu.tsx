@@ -2,11 +2,12 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
-import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock3, ImagePlus } from "lucide-react";
+import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock3, ImagePlus, Spade, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Avatar, AVATARS } from "./avatar";
 import { AvatarNivel } from "./avatar-nivel";
 import { ModalPortal } from "./modal-portal";
+import { PreferenciasMesaPainel } from "./preferencias-mesa";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import {
   updateAvatarIcon,
@@ -37,7 +38,7 @@ export function ProfileMenu({
   onClose: () => void;
 }) {
   const router = useRouter();
-  const [tab, setTab] = useState<"home" | "password">("home");
+  const [tab, setTab] = useState<"home" | "password" | "mesa">("home");
   const [pass, setPass] = useState("");
   const [pass2, setPass2] = useState("");
   const [msg, setMsg] = useState<{ type: "" | "ok" | "err"; text: string }>({ type: "", text: "" });
@@ -373,6 +374,14 @@ export function ProfileMenu({
                 </div>
               </div>
 
+              {/* Preferências da mesa (cor, baralho, BB/fichas, animações,
+                  tempo) -- numa aba própria, como a troca de senha. */}
+              <button
+                onClick={() => setTab("mesa")}
+                className="flex w-full items-center gap-2.5 border-b border-hairline px-4 py-3 text-left text-[13px] text-ink hover:bg-white/[0.03]"
+              >
+                <Spade size={16} /> <span>Mesa (Treino e Revisor)</span>
+              </button>
               <button
                 onClick={() => {
                   setMsg({ type: "", text: "" });
@@ -385,6 +394,18 @@ export function ProfileMenu({
               <button onClick={handleLogout} className="flex w-full items-center gap-2.5 px-4 py-3 text-left text-[13px] text-negative hover:bg-white/[0.03]">
                 <LogOut size={16} /> <span>Sair</span>
               </button>
+            </>
+          )}
+
+          {tab === "mesa" && (
+            <>
+              <button
+                onClick={() => setTab("home")}
+                className="flex w-full items-center gap-1.5 border-b border-hairline px-4 py-3 text-left text-[13px] font-semibold text-ink hover:bg-white/[0.03]"
+              >
+                <ChevronLeft size={16} /> Mesa (Treino e Revisor)
+              </button>
+              <PreferenciasMesaPainel />
             </>
           )}
 

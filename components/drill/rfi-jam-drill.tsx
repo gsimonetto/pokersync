@@ -26,6 +26,7 @@ import {
 } from "@/lib/services/rfi-jam-service";
 import { RangeDoSpot } from "@/components/drill/range-do-spot";
 import { BotaoAcao, SeloAcao, TECLAS, fmtBB, ordenarOpcoes, type OpcaoAcao } from "@/components/drill/barra-de-acao";
+import { salvarPreferenciaMesa, usePreferenciasMesa, type TempoDecisao, type VelocidadeAnimacao } from "@/lib/hooks/use-preferencias-mesa";
 
 const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 const F = '"Space Grotesk", sans-serif';
@@ -291,7 +292,7 @@ function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color:
           background: "rgba(5,5,5,0.9)",
           border: `1.5px solid ${color}`,
           boxShadow: `0 0 28px ${color}55, 0 6px 16px rgba(0,0,0,.6)`,
-          animation: "fadeInUp 220ms ease-out both",
+          animation: "fadeInUp calc(220ms * var(--ps-vel, 1)) ease-out both",
         }}
       >
         <Icon size={17} color={color} strokeWidth={2.2} />
@@ -343,7 +344,7 @@ function VerdictCenterFlash({
   const Icon = isGood ? CheckCircle2 : XCircle;
   return (
     <div style={{ position: "absolute", top: "29%", left: "50%", transform: "translate(-50%, -50%)", display: "flex", flexDirection: "column", alignItems: "center", gap: 8, pointerEvents: "none", zIndex: 60 }}>
-      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, animation: "verdictPop 320ms cubic-bezier(0.22, 1.4, 0.36, 1) both" }}>
+      <div style={{ position: "relative", display: "flex", alignItems: "center", gap: 9, animation: "verdictPop calc(320ms * var(--ps-vel, 1)) cubic-bezier(0.22, 1.4, 0.36, 1) both" }}>
         {/* FIX (pedido explicito, 2a rodada: "feedback vindo com brilho
             que esta sendo cortado em volta da nomenclatura, pode tirar
             ele e manter apenas o glow na tipografia") -- o circulo de
@@ -404,6 +405,33 @@ function fsActionBtnStyle(bg: string, color = "#FFFFFF"): React.CSSProperties {
     cursor: "pointer",
     boxShadow: "0 4px 14px rgba(0,0,0,.45)",
   };
+}
+
+// Barra do modo com tempo (M11), em cima dos botões: esvazia em
+// `segundos` e fica amarela e depois vermelha no fim. Contada no JS (não
+// em animação CSS) pra continuar andando com "Sem animação" ligado.
+function BarraDeTempo({ segundos }: { segundos: number }) {
+  const [restanteMs, setRestanteMs] = useState(segundos * 1000);
+  useEffect(() => {
+    const inicio = Date.now();
+    const id = window.setInterval(() => {
+      const r = Math.max(0, segundos * 1000 - (Date.now() - inicio));
+      setRestanteMs(r);
+      if (r <= 0) window.clearInterval(id);
+    }, 100);
+    return () => window.clearInterval(id);
+  }, [segundos]);
+  const frac = restanteMs / (segundos * 1000);
+  const cor = frac > 0.5 ? "#34D399" : frac > 0.25 ? "#FBBF24" : "#F87171";
+  const seg = Math.ceil(restanteMs / 1000);
+  return (
+    <div role="timer" aria-label={`${seg} segundos pra decidir`} style={{ display: "flex", alignItems: "center", gap: 8, width: "100%" }}>
+      <div style={{ flex: 1, height: 4, borderRadius: 999, background: "rgba(255,255,255,0.08)", overflow: "hidden" }}>
+        <div style={{ width: `${frac * 100}%`, height: "100%", borderRadius: 999, background: cor, transition: "width 100ms linear, background-color 300ms ease" }} />
+      </div>
+      <span style={{ fontFamily: F, fontSize: 11, fontWeight: 700, color: cor, minWidth: 24, textAlign: "right", fontVariantNumeric: "tabular-nums" }}>{seg}s</span>
+    </div>
+  );
 }
 
 function FilterSection({ label, children }: { label: string; children: React.ReactNode }) {
@@ -629,6 +657,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
   const [round, setRound] = useState<Round | null>(null);
   const [chosen, setChosen] = useState<Escolha | null>(null);
+  // Velocidade das animações (M10) e tempo pra decidir (M11) -- escolhas
+  // guardadas na conta (Configurações > Mesa, ou nos filtros).
+  const pref = usePreferenciasMesa();
   // Placar ACUMULADO de todo o historico do jogador (nao e' por sessao/
   // pagina) -- comeca em 0/0 so' ate a busca no banco responder, depois
   // nunca mais reinicia sozinho (nem em novo login, nem ao trocar
@@ -1064,6 +1095,31 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   }, [currentPhase, spot, phaseKey, activeHeroSeat, distractorLabel, seatBlind]);
   const opcaoEscolhida = chosen ? opcoes.find((o) => o.id === chosen) ?? null : null;
 
+  // O vilão já está all-in quando você decide? (vs All-in, e o vs RFI dos
+  // spots de push/fold, onde o BB responde a um all-in do SB.)
+  const vilaoAllIn = phaseKey === "sbCallJam" || (phaseKey === "bbJam" && currentPhase?.action === "call");
+
+  // Depois da resposta a mesa mostra a SUA jogada também, como a sala: a
+  // ficha na sua frente vira o valor do call/raise/all-in e o pote cresce.
+  const commitsNaMesa = useMemo(() => {
+    if (!streetCommitments || !opcaoEscolhida || opcaoEscolhida.tipo === "fold" || opcaoEscolhida.valorBb == null) return streetCommitments;
+    const antes = streetCommitments[activeHeroSeat] ?? 0;
+    const total = opcaoEscolhida.tipo === "call" ? antes + opcaoEscolhida.valorBb : opcaoEscolhida.valorBb;
+    return { ...streetCommitments, [activeHeroSeat]: total };
+  }, [streetCommitments, opcaoEscolhida, activeHeroSeat]);
+  const potNaMesa = commitsNaMesa ? Object.values(commitsNaMesa).reduce((a, b) => a + b, 0) : potBb;
+
+  // Diante de um all-in: quanto de equidade você precisa pra pagar (o que
+  // você paga ÷ pote depois do call) -- a conta que todo jogador faz de
+  // cabeça nessa hora, pronta no meio da mesa.
+  const potOddsPct = useMemo(() => {
+    if (!streetCommitments || !vilaoAllIn) return null;
+    const paga = (streetCommitments[activeVillainSeat] ?? 0) - (streetCommitments[activeHeroSeat] ?? 0);
+    if (paga <= 0) return null;
+    const potFinal = Object.values(streetCommitments).reduce((a, b) => a + b, 0) + paga;
+    return (paga / potFinal) * 100;
+  }, [streetCommitments, vilaoAllIn, activeHeroSeat, activeVillainSeat]);
+
   // O que aconteceu antes da sua decisão, no jeito que a sala narra.
   const situacaoTexto = !spot
     ? ""
@@ -1095,22 +1151,68 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     return () => window.removeEventListener("keydown", onKey);
   }, [chosen, bump, opcoes]);
 
+  // Modo com tempo (M11): cada mão tem N segundos; acabou, conta como
+  // Fold, igual à mesa de verdade (o resultado é avaliado como Fold). Com
+  // os filtros abertos o relógio para -- e recomeça inteiro ao fechar.
+  const [tempoEsgotado, setTempoEsgotado] = useState(false);
+  useEffect(() => {
+    setTempoEsgotado(false);
+  }, [round]);
+  const relogioLigado = pref.tempo > 0 && !!round && !chosen && !filtersOpen;
+  useEffect(() => {
+    if (!relogioLigado) return;
+    const t = window.setTimeout(() => {
+      setTempoEsgotado(true);
+      setChosen("fold");
+    }, pref.tempo * 1000);
+    return () => window.clearTimeout(t);
+  }, [relogioLigado, pref.tempo, round]);
+  const chaveRelogio = `${roundSeed}-${round?.label ?? ""}`;
+  // Frase do resultado com o aviso de tempo esgotado na frente.
+  const feedbackComTempo = tempoEsgotado && plainFeedback ? `Tempo esgotado, contou como Fold. ${plainFeedback}` : plainFeedback;
+
+  // Mesa que conta a história, no padrão das salas (com o MESMO assento
+  // de sempre -- posição, placa com o stack e o chip de ação):
+  // - stack mostra o que SOBRA atrás (stack - o que já está na mesa);
+  // - quem foi all-in fica com 0 BB e o chip "All-in X BB";
+  // - quem agiu antes de você aparece com o chip Fold (antes: assento
+  //   vazio, como se a mesa tivesse só 2 jogadores);
+  // - depois da resposta, o seu assento mostra a sua jogada.
   const tableHand: TableHand | null = useMemo(() => {
     if (!spot || !round) return null;
     const heroCards = classToDisplayCards(round.label);
+    const stack = spot.effectiveStack;
+    const naMesa = (pos: string) => commitsNaMesa?.[pos] ?? 0;
+    const idxDecisor = ALL_POSITIONS.indexOf(activeHeroSeat);
     const seats: Record<string, SeatState> = {};
-    ALL_POSITIONS.forEach((pos) => {
+    ALL_POSITIONS.forEach((pos, i) => {
       if (pos === activeHeroSeat) {
-        seats[pos] = { status: chosen ? "live" : "acting", stack: spot.effectiveStack, cards: heroCards };
+        const restante = Math.max(0, stack - naMesa(pos));
+        const foldou = chosen === "fold";
+        // Pagar um all-in do mesmo tamanho também deixa você all-in.
+        const heroAllIn = !!chosen && !foldou && restante <= 0.05;
+        seats[pos] = {
+          status: foldou ? "folded" : chosen ? "live" : "acting",
+          stack: heroAllIn ? 0 : restante,
+          cards: heroCards,
+          action: foldou ? { type: "fold" } : heroAllIn ? { type: "allin", size: stack } : null,
+        };
       } else if (pos === activeVillainSeat) {
-        seats[pos] = { status: "live", stack: spot.effectiveStack };
+        seats[pos] = vilaoAllIn
+          ? { status: "live", stack: 0, action: { type: "allin", size: stack } }
+          : { status: "live", stack: Math.max(0, stack - naMesa(pos)) };
+      } else if (phaseKey === "sbOpen" && i > idxDecisor) {
+        // Ainda não agiu (ex.: o SB quando o BTN abre) -- o spot assume
+        // que ele larga, mas nessa hora ele ainda está com cartas.
+        seats[pos] = { status: "live", stack: Math.max(0, stack - naMesa(pos)) };
       } else {
-        seats[pos] = { status: "empty" };
+        seats[pos] = { status: "folded", stack: Math.max(0, stack - naMesa(pos)), action: { type: "fold" } };
       }
     });
-    const spr = potBb > 0 ? Math.round((spot.effectiveStack / potBb) * 10) / 10 : null;
-    return { pot: potBb, spr, board: [], history: [], seats };
-  }, [spot, round, chosen, activeHeroSeat, activeVillainSeat, potBb]);
+    const spr = potNaMesa > 0 ? Math.round((stack / potNaMesa) * 10) / 10 : null;
+    // SPR e "pra pagar" só fazem sentido ANTES da sua decisão.
+    return { pot: Math.round(potNaMesa * 10) / 10, spr: chosen ? null : spr, potOddsPct: chosen ? null : potOddsPct, board: [], history: [], seats };
+  }, [spot, round, chosen, activeHeroSeat, activeVillainSeat, commitsNaMesa, potNaMesa, vilaoAllIn, phaseKey, potOddsPct]);
 
   // Ficha voando do assento que ja agiu (activeVillainSeat) ate' o pote —
   // so' nas fases onde alguem ja jogou antes do jogador decidir (bbJam:
@@ -1228,7 +1330,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   }, [isMobile]);
 
   return (
-    <div style={{ display: "grid", gridTemplateRows: "auto 1fr", gap: 8, height: "100%", minHeight: 0, position: "relative" }}>
+    <div
+      data-ps-animacao={pref.animacao}
+      style={{ ["--ps-vel" as string]: pref.animacao === "rapida" ? 0.4 : 1, display: "grid", gridTemplateRows: "auto 1fr", gap: 8, height: "100%", minHeight: 0, position: "relative" }}
+    >
       <TreinoResponsiveStyles />
 
       {/* Modo mesa-cheia (celular, pedido explicito: "ao aplicar, quero
@@ -1241,7 +1346,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
           filtro antes do spot carregar. */}
       {fullscreenMode && isMobile && round && currentPhase && tableHand && fullscreenSeatLayout && (
         <ModalPortal>
-          <div style={{ position: "fixed", inset: 0, zIndex: 100, background: "#000", display: "flex", flexDirection: "column", fontFamily: F }}>
+          <div
+            data-ps-animacao={pref.animacao}
+            style={{ ["--ps-vel" as string]: pref.animacao === "rapida" ? 0.4 : 1, position: "fixed", inset: 0, zIndex: 100, background: "#000", display: "flex", flexDirection: "column", fontFamily: F }}
+          >
             <div style={{ display: "flex", alignItems: "center", gap: 10, padding: "10px 12px", flexShrink: 0 }}>
               <button
                 onClick={() => {
@@ -1271,6 +1379,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
               </button>
               <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
                 {heroPos} vs {villainPos} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>· {fmtBB(stackBb)}</span>
+                {round && <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 5, background: "rgba(255,255,255,0.08)", color: "#FFFFFF" }}>{round.label}</span>}
               </span>
               <div style={{ marginLeft: "auto", display: "flex", alignItems: "center", gap: 6 }}>
                 {blockProgress && (
@@ -1298,8 +1407,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                 cornerRadius="10% / 6%"
                 minSeatScale={0.75}
                 heroScale={1.4}
-                streetCommitments={streetCommitments}
+                streetCommitments={commitsNaMesa}
                 chipAnimation={chipAnimation}
+                animacao={pref.animacao}
               />
 
               {chosen && verdict && displayLabel && displayColor && (
@@ -1309,7 +1419,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   isGood={isGoodVerdict}
                   freqPct={chosenFreqPct}
                   onDetails={() => setDetailsOpen(true)}
-                  mensagem={plainFeedback}
+                  mensagem={feedbackComTempo}
                 />
               )}
 
@@ -1332,6 +1442,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   ancorada perto da linha do heroi (y:88% no seat layout),
                   entao o ultimo botao cai alinhado com o assento. */}
               <div style={{ position: "absolute", right: 10, top: "90%", transform: "translateY(-100%)", display: "flex", flexDirection: "column", gap: 8, zIndex: 40 }}>
+                {relogioLigado && <BarraDeTempo key={chaveRelogio} segundos={pref.tempo} />}
                 {!chosen ? (
                   // Mesma ordem das salas, só que em pé: a jogada mais
                   // agressiva em cima e o Fold embaixo (perto do polegar).
@@ -1557,6 +1668,26 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   />
                 )}
               </FilterSection>
+
+              {/* Preferências do treino (também em Configurações > Mesa):
+                  tempo pra decidir (M11) e velocidade das animações (M10). */}
+              <FilterSection label="Tempo pra decidir">
+                {([0, 10, 15, 20] as TempoDecisao[]).map((t) => (
+                  <FilterChip key={t} label={t === 0 ? "Sem tempo" : `${t} s`} active={pref.tempo === t} onClick={() => salvarPreferenciaMesa("tempo", t)} />
+                ))}
+              </FilterSection>
+
+              <FilterSection label="Animações">
+                {(
+                  [
+                    ["normal", "Normal"],
+                    ["rapida", "Rápida"],
+                    ["sem", "Sem animação"],
+                  ] as [VelocidadeAnimacao, string][]
+                ).map(([v, rotulo]) => (
+                  <FilterChip key={v} label={rotulo} active={pref.animacao === v} onClick={() => salvarPreferenciaMesa("animacao", v)} />
+                ))}
+              </FilterSection>
             </div>
 
             {/* Rodapé fixo no fim do card -- ocupa o espaço que sobra
@@ -1626,7 +1757,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     (que continuam existindo, intactos) foram pro
                     EvDetailsModal, atrás do botão "Ver detalhes". */}
                 <div style={{ minHeight: 60, flexShrink: 0, display: "flex", alignItems: "center" }}>
-                  {chosen && verdict && displayLabel && displayColor && plainFeedback && (
+                  {chosen && verdict && displayLabel && displayColor && feedbackComTempo && (
                     // Tingida na cor do veredito: agora que o selo em cima da
                     // mesa saiu (no computador), essa faixa e' o UNICO lugar
                     // do resultado -- precisa chamar a atencao sozinha.
@@ -1635,7 +1766,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                         {isGoodVerdict ? <CheckCircle2 size={18} color={displayColor} style={{ flexShrink: 0 }} /> : <XCircle size={18} color={displayColor} style={{ flexShrink: 0 }} />}
                         <div style={{ minWidth: 0 }}>
                           <div style={{ fontSize: 13.5, fontWeight: 700, color: displayColor }}>{displayLabel}</div>
-                          <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)", marginTop: 1 }}>{plainFeedback}</div>
+                          <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)", marginTop: 1 }}>{feedbackComTempo}</div>
                         </div>
                       </div>
                       <button
@@ -1701,8 +1832,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     hand={tableHand}
                     seats={seatLayout}
                     variant="treino"
-                    streetCommitments={streetCommitments}
+                    streetCommitments={commitsNaMesa}
                     chipAnimation={chipAnimation}
+                    animacao={pref.animacao}
                     {...(isMobile ? {} : { cornerRadius: "34% / 54%" })}
                   />
                   {/* No computador o veredito ja aparece (com a explicacao)
@@ -1737,6 +1869,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     cada um com o valor em BB e a tecla de atalho. */}
                 {/* paddingRight no computador: o botão flutuante de ajuda
                     (canto inferior direito da tela) cobria o último botão. */}
+                {/* Modo com tempo (M11): barra em cima dos botões. Altura
+                    reservada enquanto o modo está ligado, pra mesa não
+                    pular quando a barra some depois da resposta. */}
+                {pref.tempo > 0 && (
+                  <div style={{ height: 14, flexShrink: 0, display: "flex", alignItems: "center", paddingRight: isMobile ? 0 : 60 }}>
+                    {relogioLigado && <BarraDeTempo key={chaveRelogio} segundos={pref.tempo} />}
+                  </div>
+                )}
                 <div className="ps-tr-actions" style={{ minHeight: 68, display: "flex", alignItems: "center", gap: 14, flexShrink: 0, paddingRight: isMobile ? 0 : 60 }}>
                   {!chosen ? (
                     <>
@@ -1744,7 +1884,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                         <div style={{ fontSize: 10.5, fontWeight: 600, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
                           Sua vez · {activeHeroSeat} · {fmtBB(stackBb)}
                         </div>
-                        <div style={{ fontSize: 13.5, color: "rgba(255,255,255,0.85)", marginTop: 3 }}>{situacaoTexto}</div>
+                        <div style={{ fontSize: 13.5, color: "rgba(255,255,255,0.85)", marginTop: 3, display: "flex", alignItems: "center", gap: 8 }}>
+                          {round && (
+                            <span title="Sua mão (classe usada no range)" style={{ fontSize: 12, fontWeight: 700, padding: "2px 8px", borderRadius: 6, background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.14)", color: "#FFFFFF" }}>
+                              {round.label}
+                            </span>
+                          )}
+                          {situacaoTexto}
+                        </div>
                       </div>
                       <div style={{ display: "flex", gap: 8, flexShrink: 0, flexWrap: "wrap", justifyContent: isMobile ? "center" : "flex-end", flex: isMobile ? 1 : undefined }}>
                         {opcoes.map((o, i) => (
@@ -1755,7 +1902,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   ) : (
                     <>
                       <div style={{ fontFamily: F, flex: 1, display: "flex", alignItems: "center", justifyContent: "center", gap: 8, padding: "10px 16px", borderRadius: 10, background: "rgba(255,255,255,0.02)", border: "1px solid rgba(255,255,255,0.06)", fontSize: 12.5, color: "rgba(255,255,255,0.55)" }}>
-                        Você jogou {opcaoEscolhida ? <SeloAcao opcao={opcaoEscolhida} /> : null}
+                        {tempoEsgotado ? "Tempo esgotado · contou como" : "Você jogou"} {opcaoEscolhida ? <SeloAcao opcao={opcaoEscolhida} /> : null}
                       </div>
                       <button
                         onClick={bump}

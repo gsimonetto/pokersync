@@ -5,6 +5,7 @@ import { Target } from "lucide-react";
 import { F, SUITS, num } from "@/lib/poker/drill-theme";
 import { formatarBb } from "@/lib/poker/hand-summary";
 import type { HistoryStep } from "@/components/drill/poker-table";
+import { usePreferenciasMesa } from "@/lib/hooks/use-preferencias-mesa";
 
 // Linha do tempo da mão, embaixo da mesa: as 4 ruas lado a lado com as
 // ações que JÁ aconteceram até o passo atual (o replayer continua
@@ -22,7 +23,7 @@ export const FATIA_BOARD: Record<string, [number, number]> = { FLOP: [0, 3], TUR
 
 // "raise to 8.25bb" -> "raise 8,3" (o "bb" fica implícito na faixa toda).
 export function rotuloAcao(label: string): string {
-  const m = label.match(/^(raise to|bet|call|posts) ([\d.]+)bb$/);
+  const m = label.match(/^(raise to|bet|call|posts|all-in) ([\d.]+)bb$/);
   if (!m) return label;
   const verbo = m[1] === "raise to" ? "raise" : m[1];
   const valor = Number(m[2]).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
@@ -30,11 +31,15 @@ export function rotuloAcao(label: string): string {
 }
 
 export function CartaTexto({ card }: { card: string }) {
+  const { baralho } = usePreferenciasMesa();
   const rank = card.slice(0, -1).replace("T", "10");
+  // Baralho de 2 cores (Configurações): ouros com a cor de copas e paus
+  // com a de espadas, igual às cartas da mesa.
+  const naipe = baralho === "2cores" ? ({ d: "h", c: "s" } as Record<string, string>)[card.slice(-1)] ?? card.slice(-1) : card.slice(-1);
   const s = SUITS[card.slice(-1)];
   // Espadas: a cor do baralho é quase preta (feita pra carta branca) --
   // sobre o fundo escuro vira cinza claro.
-  const cor = card.slice(-1) === "s" ? "#E5E7EB" : s?.c ?? "#E5E7EB";
+  const cor = naipe === "s" ? "#E5E7EB" : SUITS[naipe]?.c ?? "#E5E7EB";
   return (
     <span style={{ color: cor, fontWeight: 700 }}>
       {rank}
@@ -48,14 +53,17 @@ export function LinhaDoTempo({
   board,
   heroPos,
   resultadoBb,
+  emFichas = false,
   trainHref,
 }: {
   ruas: HistoryStep[];
   /** 5 posições; carta ainda não revelada = null. */
   board: (string | null)[];
   heroPos: string | null;
-  /** Só no último passo da mão: lucro/prejuízo do herói em bb. */
+  /** Só no último passo da mão: lucro/prejuízo do herói em bb (ou em fichas, com emFichas). */
   resultadoBb: number | null;
+  /** Mesa em fichas (opção BB/Fichas): ações e resultado já chegam em fichas. */
+  emFichas?: boolean;
   trainHref: string | null;
 }) {
   return (
@@ -102,11 +110,14 @@ export function LinhaDoTempo({
           }
           soltarFolds();
           return (
-            <div key={r.street} style={{ minWidth: 0, display: "flex", flexDirection: "column", gap: 4, opacity: alcancada ? 1 : 0.35 }}>
-              <div style={{ display: "flex", alignItems: "baseline", gap: 6, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
+            <div key={r.street} style={{ minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 4, opacity: alcancada ? 1 : 0.35 }}>
+              {/* flexWrap: com a faixa estreita (tela de ~1024) as cartas
+                  da rua passavam por cima da coluna do lado -- agora
+                  descem pra linha de baixo. */}
+              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 6, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
                 <span style={{ color: r.current ? "#FFFFFF" : "rgba(255,255,255,0.45)" }}>{NOME_RUA[r.street] ?? r.street}</span>
                 {cartas.length > 0 && (
-                  <span style={{ display: "flex", gap: 3, fontSize: 11, letterSpacing: 0, textTransform: "none" }}>
+                  <span style={{ display: "flex", flexWrap: "wrap", gap: 3, fontSize: 11, letterSpacing: 0, textTransform: "none" }}>
                     {cartas.map((c) => (
                       <CartaTexto key={c} card={c} />
                     ))}
@@ -161,7 +172,9 @@ export function LinhaDoTempo({
             }}
           >
             {resultadoBb >= 0 ? "Você ganhou " : "Você perdeu "}
-            {formatarBb(Math.abs(resultadoBb)).replace(/^\+/, "")}
+            {emFichas
+              ? `${Math.abs(resultadoBb).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} fichas`
+              : formatarBb(Math.abs(resultadoBb)).replace(/^\+/, "")}
           </span>
         )}
         {trainHref && (

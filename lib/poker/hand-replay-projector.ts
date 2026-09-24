@@ -113,12 +113,14 @@ function actionLabel(a: ParsedAction, bbUnit: number): string {
       return "fold";
     case "checks":
       return "check";
+    // Aposta/aumento que coloca a pessoa all-in aparece como "all-in",
+    // igual o histórico das salas (antes: "raise to 12.6bb").
     case "bets":
-      return `bet ${bb(a.amount)}bb`;
+      return a.isAllIn ? `all-in ${bb(a.amount)}bb` : `bet ${bb(a.amount)}bb`;
     case "calls":
       return `call ${bb(a.amount)}bb`;
     case "raises":
-      return `raise to ${bb(a.raiseTo)}bb`;
+      return a.isAllIn ? `all-in ${bb(a.raiseTo)}bb` : `raise to ${bb(a.raiseTo)}bb`;
     default:
       return a.action;
   }
@@ -354,17 +356,21 @@ function computeCurrentStreet(events: StepEvent[], throughStep: number): StreetN
 // `borderRing` (opcional): repassado direto pra computeRealSeatLayout --
 // omitido, mantem o anel de sempre (usado no celular). Ver comentario em
 // seat-layout.ts sobre por que o desktop agora passa isso.
+// `emFichas` (opcional, opção "Fichas" do Revisor): todos os valores saem
+// em fichas cruas, sem converter pra BB (bbUnit = 1) -- exatos, em vez de
+// BB arredondado vezes o big blind.
 export function projectHandAtStep(
   hand: ParsedHand,
   stepIndex: number,
   previousStepIndex?: number,
-  borderRing?: BorderRingConfig
+  borderRing?: BorderRingConfig,
+  emFichas = false
 ): ReplayState {
   const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat ?? 0, hand.maxSeats ?? hand.seats.length, borderRing);
   // bbUnit calculado ANTES de montar a lista de eventos — precisa estar
   // disponivel pra actionLabel converter os valores da history bar pra BB
   // no momento em que cada evento e' criado.
-  const bbUnit = hand.bigBlind && hand.bigBlind > 0 ? hand.bigBlind : 1;
+  const bbUnit = !emFichas && hand.bigBlind && hand.bigBlind > 0 ? hand.bigBlind : 1;
   const events = buildEventList(hand, seatLayout, bbUnit);
   const stepCount = events.length + 1; // +1 pro step 0 (estado inicial)
 
