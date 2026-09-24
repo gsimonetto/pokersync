@@ -87,13 +87,46 @@ export function ResumoDaMao({ hand, historicoBruto }: { hand: ParsedHand; histor
         </div>
       </div>
 
-      {/* Rua por rua -- só as ruas que existiram na mão. */}
+      {/* Rua por rua -- só as ruas que existiram na mão. Depois de um
+          all-in, as ruas sem ação nenhuma viram UM bloco só com as cartas
+          que saíram (antes eram 3 blocos "Sem ação" iguais em sequência). */}
       {dados && (
         <ol className="mt-3.5 flex flex-col gap-2">
-          {dados.ruas.map((r) => {
+          {(() => {
+            const cartasDa = (street: string) => {
+              const fatia = FATIA_BOARD[street];
+              return fatia ? dados.board.slice(fatia[0], fatia[1]).filter((c): c is string => Boolean(c)) : [];
+            };
+            const primeiraSemAcao = dados.ruas.findIndex(
+              (r, i) => r.street !== "PREFLOP" && dados.ruas.slice(i).every((x) => x.actions.length === 0)
+            );
+            if (primeiraSemAcao < 0) return null;
+            const resto = dados.ruas.slice(primeiraSemAcao).filter((r) => cartasDa(r.street).length > 0);
+            if (resto.length === 0) return null;
+            return (
+              <li key="sem-acao" className="painel-bloco order-last rounded-xl border border-white/5 px-3 py-2">
+                <div className="flex flex-wrap items-baseline gap-x-3 gap-y-1 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted">
+                  {resto.map((r) => (
+                    <span key={r.street} className="flex items-baseline gap-1.5">
+                      {NOME_RUA[r.street] ?? r.street}
+                      <span className="flex gap-1.5 text-[12.5px] normal-case tracking-normal">
+                        {cartasDa(r.street).map((c) => (
+                          <CartaTexto key={c} card={c} />
+                        ))}
+                      </span>
+                    </span>
+                  ))}
+                </div>
+                <p className="m-0 mt-1 text-[12px] leading-relaxed text-ink/85">Sem mais ações: as cartas saíram com todo mundo all-in.</p>
+              </li>
+            );
+          })()}
+          {dados.ruas.map((r, idx) => {
             const fatia = FATIA_BOARD[r.street];
             const cartas = fatia ? dados.board.slice(fatia[0], fatia[1]).filter((c): c is string => Boolean(c)) : [];
             if (r.street !== "PREFLOP" && cartas.length === 0 && r.actions.length === 0) return null;
+            // Rua sem ação depois do all-in: já está no bloco único acima.
+            if (r.street !== "PREFLOP" && dados.ruas.slice(idx).every((x) => x.actions.length === 0)) return null;
             return (
               <li key={r.street} className="painel-bloco rounded-xl border border-white/5 px-3 py-2">
                 <div className="flex items-baseline gap-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted">

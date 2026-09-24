@@ -9,7 +9,17 @@ import { getThumbUrl, listReviews, type ReviewListItem } from "@/lib/services/ha
 // bookmark em cada mão) — separada da fila normal porque misturar tudo
 // junto faz o que realmente vale a pena revisar se perder no meio de
 // mãos já concluídas ou sem interesse de voltar.
-export function RevisorSpotsSalvos({ onOpen }: { onOpen: (id: string) => void }) {
+// Clicar numa mão com hand history abre a MESA com a lista dos salvos (ver
+// uma a uma, como num torneio) -- pedido explícito: lista de mãos não abre
+// mais direto o "Analisar mão". Mão só com print (sem nada pra mostrar na
+// mesa) continua abrindo a análise.
+export function RevisorSpotsSalvos({
+  onOpen,
+  onOpenNaMesa,
+}: {
+  onOpen: (id: string) => void;
+  onOpenNaMesa: (id: string, ids: string[]) => void;
+}) {
   const [items, setItems] = useState<ReviewListItem[]>([]);
   const [thumbs, setThumbs] = useState<Record<string, string | null>>({});
   const [loading, setLoading] = useState(true);
@@ -49,6 +59,8 @@ export function RevisorSpotsSalvos({ onOpen }: { onOpen: (id: string) => void })
     return <div className="rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{error}</div>;
   }
 
+  const naMesa = items.filter((r) => (r.parsed_data as { kind?: string } | null | undefined)?.kind === "parsed").map((r) => r.id);
+
   if (items.length === 0) {
     return (
       <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-hairline bg-void p-10 text-center">
@@ -65,7 +77,7 @@ export function RevisorSpotsSalvos({ onOpen }: { onOpen: (id: string) => void })
       {items.map((r) => (
         <li
           key={r.id}
-          onClick={() => onOpen(r.id)}
+          onClick={() => (naMesa.includes(r.id) ? onOpenNaMesa(r.id, naMesa) : onOpen(r.id))}
           className="flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-colors hover:border-ink/40"
         >
           <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">

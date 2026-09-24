@@ -437,6 +437,25 @@ export async function fetchStreetEvals(reviewId: string): Promise<StreetEval[]> 
   return data ?? [];
 }
 
+// Nota rápida de UMA rua (botões ao lado da mesa, no Revisor): grava só
+// essa rua, sem apagar as outras nem o motivo/anotação já escritos no
+// "Analisar mão" (upsert pela chave única review_id+street, só com as
+// colunas enviadas). Nota diferente de "errei" limpa o motivo do erro,
+// igual saveStreetEvals. Não apaga nota: sem nota a linha da rua sumiria
+// e levaria junto a anotação (notes) escrita no "Analisar mão".
+export async function salvarAvaliacaoDaRua(reviewId: string, street: Street, rating: string): Promise<void> {
+  if (!rating) return;
+  const supabase = createClient();
+  const {
+    data: { session },
+  } = await supabase.auth.getSession();
+  if (!session) throw new Error("NO_SESSION");
+  const row: Record<string, unknown> = { review_id: reviewId, user_id: session.user.id, street, self_rating: rating };
+  if (rating !== "errei") row.reason_code = null;
+  const { error } = await supabase.from("hand_review_street_evals").upsert(row, { onConflict: "review_id,street" });
+  if (error) throw error;
+}
+
 export async function saveStreetEvals(reviewId: string, userId: string, evals: StreetEval[]) {
   const supabase = createClient();
   const { error: eDel } = await supabase.from("hand_review_street_evals").delete().eq("review_id", reviewId);

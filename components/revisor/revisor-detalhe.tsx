@@ -1,7 +1,7 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { Save, CheckCircle2, Lightbulb, Target, Loader2, Scale, Share2, Trophy, Tag as TagIcon, Plus, Link2, Wallet, Gauge, Bookmark } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
+import { Save, CheckCircle2, Check, Loader2, Scale, Share2, Trophy, Tag as TagIcon, Plus, Wallet, Gauge, Bookmark } from "lucide-react";
 import Link from "next/link";
 import { createClient } from "@/lib/supabase/client";
 import { verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
@@ -39,6 +39,8 @@ import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility"
 import { computeHandEv, fetchHandEvResult, type HandEvResult } from "@/lib/services/hand-ev-service";
 import { CoachThread } from "./coach-thread";
 import { ResumoDaMao } from "./resumo-da-mao";
+import { CartaTexto, NOME_RUA, rotuloAcao } from "./linha-do-tempo";
+import { projectHandAtStep } from "@/lib/poker/hand-replay-projector";
 import { ShareHandModal } from "./share-hand-modal";
 
 const FORMATS = ["MTT", "Cash", "SNG", "Spin"];
@@ -55,6 +57,11 @@ function ruasComDecisao(mao: ParsedHand | null): string[] {
   return STREETS.filter((s, i) => i === 0 || comAcao.has(s));
 }
 const ACTIONS = ["Fold", "Call", "Raise", "Check", "Bet", "All-in"];
+// Notas da autoavaliação (mesmos códigos de sempre). "N/A" não aparece mais
+// como opção: rua sem decisão sua já entra sozinha como N/A e nem aparece.
+const OPCOES_AVALIACAO = RATINGS.filter((r) => r.code !== "nao_se_aplica").map((r) =>
+  r.code === "duvida" ? { ...r, label: "Fiquei na dúvida" } : { ...r }
+);
 
 export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack: () => void }) {
   const [userId, setUserId] = useState<string | null>(null);
@@ -67,13 +74,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   const [streetEvals, setStreetEvals] = useState<StreetEval[]>(
     STREETS.map((s) => ({ street: s, self_rating: "", reason_code: "", notes: "" }))
   );
-  // Qual street esta expandida no fluxo unificado abaixo. null = segue o
-  // padrao automatico (primeira street ainda sem nota); um numero fixa a
-  // escolha manual do jogador; -1 = tudo recolhido (fluxo concluido ou
-  // fechado por vontade propria). Existe pra permitir avancar sozinho
-  // (toque na nota = ja abre a proxima) sem travar o jogador se ele quiser
-  // voltar numa street anterior.
-  const [openIdx, setOpenIdx] = useState<number | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState("");
@@ -113,7 +113,6 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
   // revisao, reusando o mesmo padrao de chip.
   const [allTags, setAllTags] = useState<Tag[]>([]);
   const [reviewTagIds, setReviewTagIds] = useState<string[]>([]);
-  const [tagEditorOpen, setTagEditorOpen] = useState(false);
   const [newTagLabel, setNewTagLabel] = useState("");
   const [savingTags, setSavingTags] = useState(false);
 
@@ -410,12 +409,35 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
     }
   }
 
+  // O que aconteceu em cada rua até a sua última decisão nela, sem os
+  // folds dos outros: "MP raise 2,4 · CO all-in 23,8 · Você all-in 50,8".
+  // É o que o passo 1 avalia -- antes a tela só dizia "Pré-flop".
+  const lancesPorRua = useMemo(() => {
+    const mapa: Record<string, { texto: string; voce: boolean }[]> = {};
+    if (!parsedHandForTable) return mapa;
+    try {
+      const st = projectHandAtStep(parsedHandForTable, Number.MAX_SAFE_INTEGER);
+      const heroPos = st.seatLayout.find((sl) => sl.isHero)?.posLabel;
+      for (const r of st.tableHand.history) {
+        const acoes = r.actions.filter((a) => !a.label.startsWith("posts"));
+        const ultimaMinha = acoes.map((a) => a.pos).lastIndexOf(heroPos ?? "");
+        if (ultimaMinha < 0) continue;
+        const inicio = Math.max(0, acoes.findIndex((a) => a.label !== "fold"));
+        mapa[r.street.toLowerCase()] = acoes
+          .slice(inicio, ultimaMinha + 1)
+          .filter((a) => a.label !== "fold" || a.pos === heroPos)
+          .map((a) => ({ texto: `${a.pos === heroPos ? "Você" : a.pos} ${rotuloAcao(a.label)}`, voce: a.pos === heroPos }));
+      }
+    } catch {
+      // replay não montou -- o passo 1 mostra só o nome da rua
+    }
+    return mapa;
+  }, [parsedHandForTable]);
+
   if (loading) return <p className="text-muted">Carregando…</p>;
   if (!review) return <p className="text-muted">Mão não encontrada.</p>;
 
   const ruasJogadas = ruasComDecisao(parsedHandForTable);
-  const perguntasVisiveis = qas.filter((_, i) => i >= STREETS.length || ruasJogadas.includes(STREETS[i]));
-  const answeredCount = perguntasVisiveis.filter((q) => q.answer.trim()).length;
   // Sugestao automatica de drill (em vez de so' um campo de texto em
   // branco): posicao + stack do heroi viram um atalho pro Modo Treino
   // ja no stack certo (?stack=, que o Treino ja entende).
@@ -438,29 +460,255 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
         }
       : null;
   const canConclude = learning.trim().length > 0;
-  // Fluxo unificado de autoavaliacao (rating + pergunta guiada por street,
-  // sem modal): a street aberta e' a escolha manual do jogador (openIdx),
-  // ou por padrao a primeira ainda sem nota -- assim que ele bate uma nota
-  // a proxima abre sozinha (a "acao rapida": um toque avanca, nao precisa
-  // abrir/fechar nada a parte). O gate de "so' pode enviar ao coach com
-  // as 4 streets avaliadas" mora dentro do proprio ShareHandModal agora
-  // (ver share-hand-modal.tsx) -- essa tela so' precisa abrir a modal.
-  const firstUnratedIdx = streetEvals.findIndex((e) => !e.self_rating);
-  const effectiveOpenIdx = openIdx !== null ? openIdx : firstUnratedIdx;
   const isPrintOnly = review.source === "print" || (!review.hand_history && review.parsed_data?.kind !== "parsed");
 
-  // Secoes mais compactas (pedido explicito: "diminua as perguntas") —
-  // padding p-4->p-3, margens mb-3.5->mb-2.5, chips e textarea menores.
-  // Objetivo: sobrar mais espaco visual pra coluna da mesa, que ficou
-  // maior (ver grid abaixo).
-  // Duas colunas no computador (pedido: "Analisar mão" era uma coluna
-  // comprida so'): a MAO a esquerda (resumo legivel, prints, EV/ICM) e a
-  // AVALIACAO a direita (ruas, aprendizado, drill, botoes). No celular
-  // vira uma coluna, com a mao primeiro.
-  const colunaMao = (
+  // Os 3 passos da análise (pedido explícito: a tela antiga era "confusa e
+  // sem nexo" -- avaliação por street com "toque pra avaliar", N/A, dois
+  // campos de texto soltos e um "Concluir" apagado sem dizer por quê):
+  // 1. Como você jogou -- uma linha por rua em que VOCÊ decidiu algo,
+  //    mostrando o que aconteceu nela ("MP raise 2,4 · CO all-in 23,8 ·
+  //    Você all-in 50,8"), com Acertei / Errei / Fiquei na dúvida;
+  // 2. O que você leva dessa mão -- a frase que conclui a análise;
+  // 3. Treinar o spot -- atalho pro Modo Treino (opcional).
+  const ruasParaAvaliar = streetEvals.map((ev, idx) => ({ ev, idx })).filter(({ ev }) => ruasJogadas.includes(ev.street));
+  const passo1Ok = ruasParaAvaliar.length > 0 && ruasParaAvaliar.every(({ ev }) => ev.self_rating && ev.self_rating !== "nao_se_aplica");
+  const passo2Ok = canConclude;
+  const passosFeitos = (passo1Ok ? 1 : 0) + (passo2Ok ? 1 : 0);
+  const cartasDaRua = (street: string): string[] => {
+    const board = parsedHandForTable?.board ?? [];
+    return street === "flop" ? board.slice(0, 3) : street === "turn" ? board.slice(3, 4) : street === "river" ? board.slice(4, 5) : [];
+  };
+
+  const avaliarRua = (idx: number, code: string) =>
+    setStreetEvals((prev) => prev.map((e, i) => (i === idx ? { ...e, self_rating: code, reason_code: code === "errei" ? e.reason_code : "" } : e)));
+
+  const passo1 = (
+    <Passo numero={1} titulo="Como você jogou?" feito={passo1Ok}>
+      {ruasParaAvaliar.map(({ ev, idx }) => {
+        const lances = lancesPorRua[ev.street] ?? [];
+        const cartas = cartasDaRua(ev.street);
+        const question = qas[idx];
+        return (
+          <div key={ev.street} className="painel-bloco rounded-xl border border-white/5 p-3">
+            <div className="flex items-baseline gap-2 text-[10.5px] font-semibold uppercase tracking-[0.08em] text-muted">
+              {NOME_RUA[ev.street.toUpperCase()] ?? ev.street}
+              {cartas.length > 0 && (
+                <span className="flex gap-1.5 text-[12px] normal-case tracking-normal">
+                  {cartas.map((c) => (
+                    <CartaTexto key={c} card={c} />
+                  ))}
+                </span>
+              )}
+            </div>
+            {/* O que aconteceu nessa rua até a sua última decisão -- é
+                isso que está sendo avaliado. */}
+            {lances.length > 0 ? (
+              <p className="m-0 mt-1 text-[12.5px] leading-relaxed text-ink/85">
+                {lances.map((l, i) => (
+                  <span key={i}>
+                    {i > 0 && <span className="text-muted"> · </span>}
+                    <span className={l.voce ? "font-semibold text-[#d4af37]" : undefined}>{l.texto}</span>
+                  </span>
+                ))}
+              </p>
+            ) : (
+              <p className="m-0 mt-1 text-[12px] text-muted">Avalie pelo que você lembra da sua decisão nessa rua.</p>
+            )}
+
+            <div className="mt-2.5 flex flex-wrap gap-1.5" role="group" aria-label={`Sua decisão no ${NOME_RUA[ev.street.toUpperCase()] ?? ev.street}`}>
+              {OPCOES_AVALIACAO.map((r) => {
+                const ativo = ev.self_rating === r.code;
+                return (
+                  <button
+                    key={r.code}
+                    type="button"
+                    aria-pressed={ativo}
+                    onClick={() => avaliarRua(idx, r.code)}
+                    className="flex-1 rounded-lg border px-2 py-1.5 text-[12px] transition-colors"
+                    style={{
+                      borderColor: ativo ? r.color : "rgba(255,255,255,0.12)",
+                      background: ativo ? r.color : "transparent",
+                      color: ativo ? "#000" : "#fff",
+                      fontWeight: ativo ? 700 : 500,
+                    }}
+                  >
+                    {r.label}
+                  </button>
+                );
+              })}
+            </div>
+
+            {ev.self_rating === "errei" && (
+              <select
+                value={ev.reason_code}
+                onChange={(e) => {
+                  const val = e.target.value;
+                  setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: val } : x)));
+                }}
+                className="mt-2 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[12px] text-ink outline-none"
+              >
+                <option value="">O que deu errado? (opcional)</option>
+                {reasons.map((r) => (
+                  <option key={r.code} value={r.code}>
+                    {r.label}
+                  </option>
+                ))}
+              </select>
+            )}
+
+            {/* Veredito objetivo do solver, so' quando a mao veio da
+                Aderencia a Range -- compara sua autoavaliacao com o que o
+                GTO realmente recomenda, em vez de confiar so no auto-relato. */}
+            {ev.street === "preflop" && objectiveVerdict && (
+              <div
+                className="mt-2 flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10.5px]"
+                style={{ borderColor: `${verdictColor(objectiveVerdict.verdict)}40`, background: `${verdictColor(objectiveVerdict.verdict)}12` }}
+              >
+                <Gauge size={11} style={{ color: verdictColor(objectiveVerdict.verdict) }} />
+                <span style={{ color: verdictColor(objectiveVerdict.verdict) }} className="font-semibold">
+                  GTO: {objectiveVerdict.verdict.replace("_", " ")}
+                </span>
+                <span className="text-muted">
+                  fold {objectiveVerdict.decision.fold}% · call {objectiveVerdict.decision.call}% · raise {objectiveVerdict.decision.raise}%
+                  {objectiveVerdict.rangeName ? ` · vs ${objectiveVerdict.rangeName} (${objectiveVerdict.position})` : ""}
+                </span>
+              </div>
+            )}
+
+            {/* "Por quê?" só depois de escolher -- a pergunta guiada vira a
+                dica do campo, em vez de mais um bloco de texto na tela. */}
+            {ev.self_rating && question && (
+              <label className="mt-2 block">
+                <span className="text-[11px] text-muted">Por quê? (opcional)</span>
+                <textarea
+                  value={question.answer}
+                  onChange={(e) => updateAnswer(idx, e.target.value)}
+                  rows={2}
+                  placeholder={question.question}
+                  className="mt-1 w-full resize-y rounded-lg border border-hairline bg-surface p-2 text-[12px] text-ink outline-none focus:border-ink/40"
+                />
+              </label>
+            )}
+          </div>
+        );
+      })}
+
+      {/* Perguntas extras (marcadores como ICM/3-bet/PKO) -- recolhidas,
+          pra não pesar a tela de quem só quer avaliar e seguir. */}
+      {qas.length > STREETS.length && (
+        <details className="group rounded-xl border border-white/5 px-3 py-2">
+          <summary className="cursor-pointer list-none text-[12px] font-semibold text-muted transition-colors hover:text-ink">
+            Perguntas extras pra aprofundar (opcional)
+          </summary>
+          <div className="mt-2 flex flex-col gap-2">
+            {qas.slice(STREETS.length).map((q, i) => {
+              const idx = i + STREETS.length;
+              return (
+                <label key={idx} className="block">
+                  <span className="text-[11.5px] font-medium text-ink/80">{q.question}</span>
+                  <textarea
+                    value={q.answer}
+                    onChange={(e) => updateAnswer(idx, e.target.value)}
+                    rows={2}
+                    placeholder="Sua resposta…"
+                    className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12px] text-ink outline-none focus:border-ink/40"
+                  />
+                </label>
+              );
+            })}
+          </div>
+        </details>
+      )}
+    </Passo>
+  );
+
+  const analise = (
+    <section className="painel-vidro rounded-2xl border border-white/10 p-4">
+      <header className="flex items-center justify-between gap-3">
+        <div className="flex items-center gap-2">
+          <Scale size={15} className="icon-glow text-review" />
+          <h3 className="m-0 text-sm font-semibold text-ink">Sua análise</h3>
+        </div>
+        <span className="tnum text-[11px] text-muted">{passosFeitos} de 2 passos</span>
+      </header>
+      <p className="m-0 mt-1 text-[12px] leading-snug text-muted">
+        Avalie o que você fez e escreva o que aprendeu. O treino no fim é opcional.
+      </p>
+
+      <div className="mt-3.5 flex flex-col gap-4">
+        {passo1}
+
+        <Passo numero={2} titulo="O que você leva dessa mão?" feito={passo2Ok}>
+          <textarea
+            value={learning}
+            onChange={(e) => setLearning(e.target.value)}
+            rows={2}
+            placeholder="Uma frase curta. Ex.: com KK no BTN, all-in em cima de shove curto é sempre call."
+            className="w-full resize-y rounded-lg border border-hairline bg-void p-2.5 text-[12.5px] text-ink outline-none focus:border-ink/40"
+          />
+          <p className="m-0 text-[11px] text-muted">É essa frase que conclui a análise e fica guardada pra você rever depois.</p>
+        </Passo>
+
+        <Passo numero={3} titulo="Treinar esse spot" opcional>
+          {drillAuto ? (
+            <Link
+              href={drillAuto.href}
+              className="flex items-center justify-between gap-2 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/[0.08] px-3 py-2.5 text-[12.5px] text-ink transition hover:border-[#d4af37]/60"
+            >
+              <span className="min-w-0 truncate">{drillAuto.texto}</span>
+              <span className="shrink-0 text-[12px] font-semibold text-[#d4af37]">Treinar →</span>
+            </Link>
+          ) : (
+            <p className="m-0 text-[12px] text-muted">Ainda não tem treino pronto pra esse spot.</p>
+          )}
+          <details className="group" open={drill.trim().length > 0}>
+            <summary className="cursor-pointer list-none text-[11.5px] text-muted transition-colors hover:text-ink">
+              + Anotar outro spot pra treinar
+            </summary>
+            <textarea
+              value={drill}
+              onChange={(e) => setDrill(e.target.value)}
+              rows={2}
+              placeholder="Ex.: BB defendendo contra open do BTN, 20–30 bb."
+              className="mt-1.5 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
+            />
+          </details>
+        </Passo>
+      </div>
+
+      {error && <div className="mt-3 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{error}</div>}
+
+      <footer className="mt-4 flex flex-col gap-2">
+        {!canConclude && <p className="m-0 text-center text-[11.5px] text-muted">Pra concluir, falta o passo 2: escrever o que você aprendeu.</p>}
+        <div className="flex gap-2.5">
+          <button
+            onClick={() => persist("em_revisao")}
+            disabled={saving}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-ink transition hover:border-white/20 disabled:opacity-50"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
+            Salvar e continuar depois
+          </button>
+          <button
+            onClick={() => persist("concluida")}
+            disabled={saving || !canConclude}
+            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#d4af37] px-4 py-3 text-sm font-semibold text-black transition hover:bg-[#e2c35a] disabled:opacity-40"
+          >
+            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
+            Concluir análise
+          </button>
+        </div>
+      </footer>
+    </section>
+  );
+
+  // Coisas da mão que não são a análise em si: prints, EV/ICM do all-in,
+  // ficha rápida (mão só com print) e, recolhidos no fim, marcadores e
+  // vínculo com a Banca (antes ficavam no topo, competindo com o título).
+  const extras = (
     <>
       {imgUrls.length > 0 && (
-        <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
+        <section className="painel-vidro rounded-2xl border border-white/10 p-3.5">
           <h3 className="m-0 text-sm font-semibold text-ink">Prints</h3>
           <div className="mt-2 grid grid-cols-3 gap-2">
             {imgUrls.map(
@@ -477,22 +725,19 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       )}
 
       {parsedHandForTable && findEligibleAllInConfrontation(parsedHandForTable) && (
-        <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
-          <div className="mb-2 flex items-center gap-2">
+        <section className="painel-vidro rounded-2xl border border-white/10 p-3.5">
+          <div className="flex items-center gap-2">
             <Gauge size={15} className="icon-glow text-review" />
-            <h3 className="m-0 text-sm font-semibold text-ink">EV/ICM desse all-in</h3>
+            <h3 className="m-0 text-sm font-semibold text-ink">Esse all-in foi bom no longo prazo?</h3>
           </div>
-          <p className="mb-2.5 text-xs text-muted">
-            Calculado pelo motor do PokerSync (equity real + ICM da premiação do torneio) — compara o resultado
-            esperado com o que aconteceu de fato.
-          </p>
+          <p className="mb-2.5 mt-1 text-xs text-muted">Sua chance de ganhar e o valor em $ considerando a premiação do torneio (ICM).</p>
 
           {evError && <p className="mb-2.5 text-xs text-negative">{evError}</p>}
 
           {evResult ? (
             <div className="grid grid-cols-2 gap-2 text-xs">
               <div className="rounded-lg border border-hairline bg-void p-2">
-                <span className="block text-[10px] uppercase tracking-wide text-muted">Equity</span>
+                <span className="block text-[10px] uppercase tracking-wide text-muted">Chance de ganhar</span>
                 <span className="font-semibold text-ink">{evResult.heroEquityPct?.toFixed(1)}%</span>
               </div>
               <div className="rounded-lg border border-hairline bg-void p-2">
@@ -500,14 +745,13 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                 <span className="font-semibold text-ink">{evResult.chipsAtRisk}</span>
               </div>
               <div className="rounded-lg border border-hairline bg-void p-2">
-                <span className="block text-[10px] uppercase tracking-wide text-muted">$ICM esperado</span>
+                <span className="block text-[10px] uppercase tracking-wide text-muted">$ esperado (ICM)</span>
                 <span className="font-semibold text-ink">${evResult.heroExpectedIcmDollars?.toFixed(2)}</span>
               </div>
               <div className="rounded-lg border border-hairline bg-void p-2">
-                <span className="block text-[10px] uppercase tracking-wide text-muted">Delta $ICM</span>
+                <span className="block text-[10px] uppercase tracking-wide text-muted">Ganho/perda esperado</span>
                 <span className="font-semibold text-ink">
-                  {evResult.heroExpectedIcmDeltaDollars != null && evResult.heroExpectedIcmDeltaDollars >= 0 ? "+" : ""}
-                  ${evResult.heroExpectedIcmDeltaDollars?.toFixed(2)}
+                  {evResult.heroExpectedIcmDeltaDollars != null && evResult.heroExpectedIcmDeltaDollars >= 0 ? "+" : ""}${evResult.heroExpectedIcmDeltaDollars?.toFixed(2)}
                 </span>
               </div>
               <button
@@ -522,21 +766,20 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             <button
               onClick={handleComputeEv}
               disabled={evLoading}
-              className="flex w-full items-center justify-center gap-2 rounded-lg bg-ink px-3 py-2 text-xs font-semibold text-void disabled:opacity-50"
+              className="flex w-full items-center justify-center gap-2 rounded-lg border border-white/15 bg-white/[0.05] px-3 py-2 text-xs font-semibold text-ink transition hover:border-white/30 disabled:opacity-50"
             >
               {evLoading ? <Loader2 size={13} className="animate-spin" /> : <Gauge size={13} />}
-              {evLoading ? "Calculando…" : "Calcular EV/ICM"}
+              {evLoading ? "Calculando…" : "Calcular"}
             </button>
           )}
         </section>
       )}
 
       {isPrintOnly && (
-        <section className="mb-2.5 rounded-xl border border-evolution/40 bg-evolution/[0.06] p-3">
+        <section className="rounded-xl border border-evolution/40 bg-evolution/[0.06] p-3">
           <h3 className="m-0 text-sm font-semibold text-ink">Ficha rápida</h3>
           <p className="mb-3 mt-1 text-xs text-muted">
-            Sem hand history pra ancorar o contexto — classifique em 3 toques pra essa mão entrar nas suas
-            estatísticas de leak.
+            Sem hand history pra ancorar o contexto — classifique em 3 toques pra essa mão entrar nas suas estatísticas de leak.
           </p>
 
           <div className="mb-3">
@@ -590,381 +833,113 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             </div>
           </div>
 
-          {ticketSaved && ticket.format && ticket.action && (
-            <p className="mt-3 text-[11px] text-positive">Ficha salva.</p>
-          )}
+          {ticketSaved && ticket.format && ticket.action && <p className="mt-3 text-[11px] text-positive">Ficha salva.</p>}
         </section>
       )}
 
-    </>
-  );
-
-  const colunaAvaliacao = (
-    <>
-      {/* Fluxo unificado (pedido explicito): antes eram tres pecas soltas
-          -- rating por street aqui, perguntas guiadas atras de um botao que
-          abria modal, compartilhar com coach atras de outro botao com
-          dropdown. Virou uma coisa so: cada street e' um cartao que abre
-          sozinho na sequencia (bate a nota, avanca pra proxima -- a "acao
-          rapida" pedida, sem precisar abrir/fechar nada a parte), com a
-          pergunta guiada correspondente ja dentro do cartao (texto sempre
-          visivel, sem o gesto extra de clicar pra revelar). O botao de
-          enviar ao coach aparece no final, depois que as 4 streets tem
-          nota -- e' a conclusao natural do fluxo, nao mais uma acao solta
-          no cabecalho. */}
-      <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
-        <div className="mb-2 flex items-center justify-between gap-2">
-          <div className="flex items-center gap-2">
-            <Scale size={15} className="icon-glow text-review" />
-            <h3 className="m-0 text-sm font-semibold text-ink">Avaliação por street</h3>
-          </div>
-          {perguntasVisiveis.length > 0 && (
-            <span className="text-[10.5px] text-muted">
-              {answeredCount}/{perguntasVisiveis.length} perguntas
-            </span>
-          )}
-        </div>
-
-        <div className="flex flex-col gap-1.5">
-          {streetEvals.map((ev, idx) => {
-            // Rua sem decisao sua nao aparece -- ja entra como "N/A"
-            // sozinha (ver load), em vez de pedir avaliacao de flop numa
-            // mao que terminou (ou foi all-in) no pre-flop.
-            if (!ruasJogadas.includes(ev.street)) return null;
-            const isOpen = effectiveOpenIdx === idx;
-            const rating = RATINGS.find((r) => r.code === ev.self_rating);
-            const question = qas[idx];
-
-            return (
-              <div key={ev.street} className="painel-bloco overflow-hidden rounded-xl border border-white/5">
-                <button
-                  type="button"
-                  onClick={() => setOpenIdx(isOpen ? -1 : idx)}
-                  className="flex w-full items-center justify-between gap-2 px-2.5 py-2 text-left"
-                >
-                  <span className="text-xs font-semibold uppercase text-ink/85">{ev.street}</span>
-                  {rating ? (
-                    <span
-                      className="rounded-md px-1.5 py-0.5 text-[10.5px] font-semibold"
-                      style={{ background: rating.color, color: "#000" }}
-                    >
-                      {rating.label}
-                    </span>
-                  ) : (
-                    <span className="text-[10.5px] text-muted">Toque pra avaliar</span>
-                  )}
-                </button>
-
-                {isOpen && (
-                  <div className="flex flex-col gap-2 border-t border-hairline p-2.5">
-                    <div className="flex gap-1.5">
-                      {RATINGS.map((r) => {
-                        const active = ev.self_rating === r.code;
-                        return (
-                          <button
-                            key={r.code}
-                            type="button"
-                            onClick={() => {
-                              setStreetEvals((prev) => prev.map((e, i) => (i === idx ? { ...e, self_rating: r.code } : e)));
-                              // So' "errei" fica esperando o motivo antes de
-                              // avancar -- as outras notas ja levam direto
-                              // pra proxima street, um toque = feito.
-                              if (r.code !== "errei") setOpenIdx(idx + 1 < STREETS.length ? idx + 1 : -1);
-                            }}
-                            className="flex-1 rounded-md border px-1.5 py-1 text-[11px] transition-colors"
-                            style={{
-                              borderColor: active ? r.color : "#2a2a2a",
-                              background: active ? r.color : "transparent",
-                              color: active ? "#000" : "#fff",
-                              fontWeight: active ? 600 : 400,
-                            }}
-                          >
-                            {r.label}
-                          </button>
-                        );
-                      })}
-                    </div>
-
-                    {ev.self_rating === "errei" && (
-                      <select
-                        value={ev.reason_code}
-                        onChange={(e) => {
-                          const val = e.target.value;
-                          setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: val } : x)));
-                          if (val) setOpenIdx(idx + 1 < STREETS.length ? idx + 1 : -1);
-                        }}
-                        className="w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[11.5px] text-ink outline-none"
-                      >
-                        <option value="">Motivo do erro…</option>
-                        {reasons.map((r) => (
-                          <option key={r.code} value={r.code}>
-                            {r.label}
-                          </option>
-                        ))}
-                      </select>
-                    )}
-
-                    {/* Veredito objetivo do solver, so' quando a mao veio da
-                        Aderencia a Range -- compara sua autoavaliacao com o
-                        que o GTO realmente recomenda, em vez de confiar so
-                        no auto-relato. */}
-                    {ev.street === "preflop" && objectiveVerdict && (
-                      <div
-                        className="flex items-center gap-1.5 rounded-md border px-2 py-1 text-[10.5px]"
-                        style={{ borderColor: `${verdictColor(objectiveVerdict.verdict)}40`, background: `${verdictColor(objectiveVerdict.verdict)}12` }}
-                      >
-                        <Gauge size={11} style={{ color: verdictColor(objectiveVerdict.verdict) }} />
-                        <span style={{ color: verdictColor(objectiveVerdict.verdict) }} className="font-semibold">
-                          GTO: {objectiveVerdict.verdict.replace("_", " ")}
-                        </span>
-                        <span className="text-muted">
-                          fold {objectiveVerdict.decision.fold}% · call {objectiveVerdict.decision.call}% · raise{" "}
-                          {objectiveVerdict.decision.raise}%
-                          {objectiveVerdict.rangeName ? ` · vs ${objectiveVerdict.rangeName} (${objectiveVerdict.position})` : ""}
-                        </span>
-                      </div>
-                    )}
-
-                    {question && (
-                      <div>
-                        <p className="text-[11.5px] font-medium text-ink/80">{question.question}</p>
-                        <textarea
-                          value={question.answer}
-                          onChange={(e) => updateAnswer(idx, e.target.value)}
-                          rows={2}
-                          placeholder="Sua análise…"
-                          className="mt-1 w-full resize-y rounded-lg border border-hairline bg-surface p-2 text-[12px] text-ink outline-none focus:border-ink/40"
-                        />
-                      </div>
-                    )}
-                  </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
-
-        {/* Perguntas extras (baseadas em marcadores como ICM/3-bet/PKO) que
-            sobram das 4 primeiras, ja distribuidas 1 por street acima --
-            ficam aqui como aprofundamento opcional, sempre visiveis (sem
-            clique pra revelar). */}
-        {qas.length > STREETS.length && (
-          <div className="mt-2 flex flex-col gap-2 border-t border-hairline pt-2">
-            <span className="text-[10.5px] uppercase tracking-wide text-muted">Aprofundamento (opcional)</span>
-            {qas.slice(STREETS.length).map((q, i) => {
-              const idx = i + STREETS.length;
-              return (
-                <div key={idx}>
-                  <p className="text-[11.5px] font-medium text-ink/80">{q.question}</p>
-                  <textarea
-                    value={q.answer}
-                    onChange={(e) => updateAnswer(idx, e.target.value)}
-                    rows={2}
-                    placeholder="Sua análise…"
-                    className="mt-1 w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12px] text-ink outline-none focus:border-ink/40"
-                  />
-                </div>
-              );
-            })}
-          </div>
-        )}
-
-      </section>
-
-      <ShareHandModal
-        open={shareModalOpen}
-        reviewId={reviewId}
-        onClose={() => setShareModalOpen(false)}
-        onShared={() => {
-          // As respostas foram salvas pela propria modal (mesmo reviewId) --
-          // recarrega pra essa tela refletir o que acabou de ser enviado
-          // (ex: CoachThread aparecendo com a conversa nova).
-          load();
+      <details
+        className="painel-vidro group rounded-2xl border border-white/10 px-3.5 py-3"
+        onToggle={(e) => {
+          if ((e.currentTarget as HTMLDetailsElement).open) setSessionEditorOpen(true);
         }}
-      />
+      >
+        <summary className="cursor-pointer list-none text-[12.5px] font-semibold text-muted transition-colors hover:text-ink">
+          Marcadores e sessão da Banca
+          <span className="ml-1.5 font-normal">
+            {review.tags.length > 0 ? `· ${review.tags.length} marcador${review.tags.length > 1 ? "es" : ""}` : ""}
+            {linkedSession ? " · vinculada à Banca" : ""}
+          </span>
+        </summary>
 
-      <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
-        <div className="mb-2 flex items-center gap-2">
-          <Lightbulb size={15} className="icon-glow text-review" />
-          <h3 className="m-0 text-sm font-semibold text-ink">Registro de aprendizado</h3>
-        </div>
-        <textarea
-          value={learning}
-          onChange={(e) => setLearning(e.target.value)}
-          rows={2}
-          placeholder="Ex.: Subestimei blockers do vilão no river em spot 3B pot OOP."
-          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
-        />
-      </section>
-
-      <section className="painel-vidro mb-2.5 rounded-2xl border border-white/10 p-3.5">
-        <div className="mb-2 flex items-center gap-2">
-          <Target size={15} className="icon-glow text-review" />
-          <h3 className="m-0 text-sm font-semibold text-ink">Sugestão de drill</h3>
-        </div>
-        {drillAuto && (
-          <Link
-            href={drillAuto.href}
-            className="mb-2 flex items-center justify-between gap-2 rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/[0.08] px-3 py-2 text-[12px] text-ink transition hover:border-[#d4af37]/60"
-          >
-            <span className="min-w-0">
-              <span className="block text-[10px] font-semibold uppercase tracking-[0.08em] text-[#d4af37]">Sugestão automática</span>
-              <span className="block truncate">{drillAuto.texto}</span>
+        <div className="mt-2.5 flex flex-col gap-3">
+          <div>
+            <span className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-muted">
+              <TagIcon size={11} /> Marcadores
             </span>
-            <span className="shrink-0 text-[11.5px] font-semibold text-[#d4af37]">Treinar →</span>
-          </Link>
-        )}
-        <textarea
-          value={drill}
-          onChange={(e) => setDrill(e.target.value)}
-          rows={2}
-          placeholder={drillAuto ? "Ou descreva outro spot pra treinar…" : "Ex.: BB defense vs BTN open — 20–30bb."}
-          className="w-full resize-y rounded-lg border border-hairline bg-void p-2 text-[12.5px] text-ink outline-none focus:border-ink/40"
-        />
-      </section>
+            <div className="flex flex-wrap gap-1.5">
+              {allTags.map((t) => {
+                const active = reviewTagIds.includes(t.id);
+                return (
+                  <button
+                    key={t.id}
+                    type="button"
+                    onClick={() => toggleReviewTag(t.id)}
+                    disabled={savingTags}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                      active ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
+                    }`}
+                  >
+                    {t.label}
+                  </button>
+                );
+              })}
+            </div>
+            <div className="mt-2 flex items-center gap-1.5">
+              <input
+                value={newTagLabel}
+                onChange={(e) => setNewTagLabel(e.target.value)}
+                onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
+                placeholder="Criar marcador"
+                className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-ink outline-none focus:border-ink/40"
+              />
+              <button onClick={handleCreateTag} className="flex shrink-0 items-center gap-1 rounded-md bg-ink px-2 py-1 text-[11px] font-semibold text-void">
+                <Plus size={11} /> Criar
+              </button>
+            </div>
+          </div>
 
-      {error && (
-        <div className="mb-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">
-          {error}
+          <div>
+            <span className="mb-1.5 flex items-center gap-1.5 text-[11px] uppercase tracking-[0.08em] text-muted">
+              <Wallet size={11} /> Sessão da Banca
+            </span>
+            {linkedSession && (
+              <Link
+                href="/banca"
+                className="mb-1.5 inline-flex items-center gap-1 rounded border border-training/30 bg-training/[0.12] px-1.5 py-0.5 text-[11px] text-training transition-colors hover:border-training/60"
+              >
+                <Wallet size={10} />
+                {[linkedSession.format, linkedSession.stake, linkedSession.date].filter(Boolean).join(" · ")}
+              </Link>
+            )}
+            <div className="flex flex-wrap gap-1.5">
+              {recentSessions.length === 0 && <p className="m-0 text-[11px] text-muted">Nenhuma sessão recente na Banca.</p>}
+              {recentSessions.map((s) => {
+                const active = linkedSession?.id === s.id;
+                return (
+                  <button
+                    key={s.id}
+                    type="button"
+                    onClick={() => handleLinkSession(active ? null : s.id)}
+                    disabled={savingSession}
+                    className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-50 ${
+                      active ? "border-training bg-training text-void" : "border-hairline bg-transparent text-ink"
+                    }`}
+                  >
+                    {[s.format, s.stake, s.date].filter(Boolean).join(" · ")}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
         </div>
-      )}
-
-      <footer className="mt-4 flex flex-col gap-2.5">
-        <div className="flex gap-2.5">
-          <button
-            onClick={() => persist("em_revisao")}
-            disabled={saving}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] px-4 py-3 text-sm text-ink transition hover:border-white/20 disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <Save size={16} />}
-            Salvar rascunho
-          </button>
-          <button
-            onClick={() => persist("concluida")}
-            disabled={saving || !canConclude}
-            className="flex flex-1 items-center justify-center gap-2 rounded-xl bg-[#d4af37] px-4 py-3 text-sm font-semibold text-black transition hover:bg-[#e2c35a] disabled:opacity-50"
-          >
-            {saving ? <Loader2 size={16} className="animate-spin" /> : <CheckCircle2 size={16} />}
-            Concluir revisão
-          </button>
-        </div>
-      </footer>
+      </details>
     </>
   );
 
   return (
     <div>
+      {/* Cabeçalho enxuto: o nome da mão e as duas ações (salvar spot e
+          mandar pro coach). Marcadores e Banca foram pro fim da tela. */}
       <div className="mb-4 flex items-start justify-between gap-3">
         <div className="min-w-0 flex-1">
           <h2 className="m-0 text-xl font-semibold tracking-tight text-ink">{review.title || "Mão sem título"}</h2>
-          <div className="mt-1.5 flex flex-wrap items-center gap-1">
-            {review.tags.map((t) => (
-              <span key={t.id} className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
-                {t.label}
-              </span>
-            ))}
-            {/* Marcadores totalmente editaveis (pedido explicito) — abre
-                o mesmo padrao de chip usado na criacao da mao avulsa,
-                agora tambem disponivel aqui na revisao. */}
-            <button
-              onClick={() => setTagEditorOpen((v) => !v)}
-              className="flex items-center gap-1 rounded border border-dashed border-hairline px-1.5 py-0.5 text-[10px] text-muted transition-colors hover:border-ink/40 hover:text-review"
-            >
-              <TagIcon size={10} /> {review.tags.length === 0 ? "Marcar" : "Editar"}
-            </button>
-          </div>
-
-          {tagEditorOpen && (
-            <div className="mt-2 rounded-lg border border-hairline bg-void p-2.5">
-              <div className="flex flex-wrap gap-1.5">
-                {allTags.map((t) => {
-                  const active = reviewTagIds.includes(t.id);
-                  return (
-                    <button
-                      key={t.id}
-                      type="button"
-                      onClick={() => toggleReviewTag(t.id)}
-                      disabled={savingTags}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-50 ${
-                        active ? "border-ink bg-ink text-void" : "border-hairline bg-transparent text-ink"
-                      }`}
-                    >
-                      {t.label}
-                    </button>
-                  );
-                })}
-              </div>
-              <div className="mt-2 flex items-center gap-1.5">
-                <input
-                  value={newTagLabel}
-                  onChange={(e) => setNewTagLabel(e.target.value)}
-                  onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
-                  placeholder="Criar marcador"
-                  className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-ink outline-none focus:border-ink/40"
-                />
-                <button
-                  onClick={handleCreateTag}
-                  className="flex shrink-0 items-center gap-1 rounded-md bg-ink px-2 py-1 text-[11px] font-semibold text-void"
-                >
-                  <Plus size={11} /> Criar
-                </button>
-              </div>
-            </div>
-          )}
-
-          {/* Vinculo com sessao de banca -- editavel a qualquer momento
-              agora (antes so' dava pra escolher na criacao da mao, sem
-              jeito de corrigir depois). */}
-          <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
-            {linkedSession ? (
-              <Link
-                href="/banca"
-                className="flex items-center gap-1 rounded border border-training/30 bg-training/[0.12] px-1.5 py-0.5 text-training transition-colors hover:border-training/60"
-              >
-                <Wallet size={10} />
-                {[linkedSession.format, linkedSession.stake, linkedSession.date].filter(Boolean).join(" · ")}
-              </Link>
-            ) : (
-              <span className="text-muted">Sem sessão de banca vinculada</span>
-            )}
-            <button
-              onClick={() => setSessionEditorOpen((v) => !v)}
-              className="flex items-center gap-1 rounded border border-dashed border-hairline px-1.5 py-0.5 text-muted transition-colors hover:border-training/50 hover:text-training"
-            >
-              <Link2 size={10} /> {linkedSession ? "Trocar" : "Vincular"}
-            </button>
-          </div>
-
-          {sessionEditorOpen && (
-            <div className="mt-2 rounded-lg border border-hairline bg-void p-2.5">
-              <div className="flex flex-wrap gap-1.5">
-                {recentSessions.length === 0 && <p className="text-[11px] text-muted">Nenhuma sessão recente encontrada.</p>}
-                {recentSessions.map((s) => {
-                  const active = linkedSession?.id === s.id;
-                  return (
-                    <button
-                      key={s.id}
-                      type="button"
-                      onClick={() => handleLinkSession(active ? null : s.id)}
-                      disabled={savingSession}
-                      className={`rounded-full border px-2.5 py-1 text-[11px] transition-colors disabled:opacity-50 ${
-                        active ? "border-training bg-training text-void" : "border-hairline bg-transparent text-ink"
-                      }`}
-                    >
-                      {[s.format, s.stake, s.date].filter(Boolean).join(" · ")}
-                    </button>
-                  );
-                })}
-              </div>
-              {linkedSession && (
-                <button
-                  onClick={() => handleLinkSession(null)}
-                  disabled={savingSession}
-                  className="mt-2 text-[11px] text-negative disabled:opacity-50"
-                >
-                  Desvincular
-                </button>
-              )}
+          {review.tags.length > 0 && (
+            <div className="mt-1.5 flex flex-wrap items-center gap-1">
+              {review.tags.map((t) => (
+                <span key={t.id} className="rounded border border-review/30 bg-review/[0.15] px-1.5 py-0.5 text-[10px] text-review">
+                  {t.label}
+                </span>
+              ))}
             </div>
           )}
         </div>
@@ -983,13 +958,9 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
             <Bookmark size={15} fill={review.saved ? "currentColor" : "none"} />
           </button>
 
-          {/* Compartilhar -- unico jeito de compartilhar mao nessa tela
-              agora (pedido explicito: "existem 2 botões de compartilhar"
-              -- o botao generico de compartilhamento nativo saiu, essa e'
-              a MESMA modal usada em toda a Revisor de Mãos, ver
-              share-hand-modal.tsx). Ela mesma busca os coaches do time e
-              mostra um aviso se nao houver nenhum -- essa tela nao
-              precisa checar isso de antemao. */}
+          {/* Compartilhar com o coach -- a mesma modal de toda a Revisor
+              de Mãos (share-hand-modal.tsx), que já avisa se não houver
+              coach no time. */}
           <button
             onClick={() => setShareModalOpen(true)}
             className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-[13px] text-ink transition hover:border-white/20"
@@ -1004,13 +975,23 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
           envolvendo quem esta olhando (o proprio componente decide). */}
       <CoachThread reviewId={reviewId} reviewTitle={review.title || "Mão sem título"} />
 
-      {/* A mesa visual (RevisorHandTable) saiu daqui de vez -- pedido
-          explicito: "no replayer no celular está todo quebrado, acho que
-          não precisamos mostrar ali, pode retirar tanto do desktop quanto
-          celular". No lugar do hand history cru, um resumo legivel da mao
-          (ResumoDaMao); o texto original continua la', recolhido. */}
-      <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)]">
-        <div className="flex min-w-0 flex-col gap-2.5">
+      <ShareHandModal
+        open={shareModalOpen}
+        reviewId={reviewId}
+        onClose={() => setShareModalOpen(false)}
+        onShared={() => {
+          // As respostas foram salvas pela propria modal (mesmo reviewId) --
+          // recarrega pra essa tela refletir o que acabou de ser enviado
+          // (ex: CoachThread aparecendo com a conversa nova).
+          load();
+        }}
+      />
+
+      {/* Computador: a mão à esquerda (resumo + extras) e a análise à
+          direita, do começo ao fim. Celular: uma coluna na ordem de uso --
+          resumo da mão, análise, e só depois os extras. */}
+      <div className="grid items-start gap-3.5 lg:grid-cols-[minmax(0,0.9fr)_minmax(0,1.1fr)] lg:grid-rows-[auto_1fr]">
+        <div className="flex min-w-0 flex-col gap-2.5 lg:col-start-1 lg:row-start-1">
           {parsedHandForTable && <ResumoDaMao hand={parsedHandForTable} historicoBruto={review.hand_history} />}
           {(review.free_text || (!parsedHandForTable && review.hand_history)) && (
             <section className="painel-vidro rounded-2xl border border-white/10 p-4">
@@ -1023,9 +1004,9 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
               )}
             </section>
           )}
-          {colunaMao}
         </div>
-        <div className="flex min-w-0 flex-col">{colunaAvaliacao}</div>
+        <div className="min-w-0 lg:col-start-2 lg:row-span-2 lg:row-start-1">{analise}</div>
+        <div className="flex min-w-0 flex-col gap-2.5 lg:col-start-1 lg:row-start-2">{extras}</div>
       </div>
 
       {xpFeedback && (
@@ -1040,6 +1021,41 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       )}
 
       {showChampion && <ChampionOverlay />}
+    </div>
+  );
+}
+
+// Um passo da análise: número (vira ✓ quando feito), título e o conteúdo.
+function Passo({
+  numero,
+  titulo,
+  feito = false,
+  opcional = false,
+  children,
+}: {
+  numero: number;
+  titulo: string;
+  feito?: boolean;
+  opcional?: boolean;
+  children: React.ReactNode;
+}) {
+  return (
+    <div className="flex gap-3">
+      <span
+        className={`mt-0.5 grid size-6 shrink-0 place-items-center rounded-full text-[11px] font-bold ${
+          feito ? "bg-positive text-void" : "border border-white/20 text-muted"
+        }`}
+        aria-hidden
+      >
+        {feito ? <Check size={13} strokeWidth={3} /> : numero}
+      </span>
+      <div className="flex min-w-0 flex-1 flex-col gap-2">
+        <h4 className="m-0 text-[13px] font-semibold text-ink">
+          {titulo}
+          {opcional && <span className="ml-1.5 text-[11px] font-normal text-muted">(opcional)</span>}
+        </h4>
+        {children}
+      </div>
     </div>
   );
 }

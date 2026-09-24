@@ -36,31 +36,14 @@ export function RevisorFila({
   onNova,
   onOpen,
   onOpenSession,
-  filterHandIds,
-  filterLabel,
-  onClearFilter,
 }: {
   onNova: () => void;
   onOpen: (id: string) => void;
   onOpenSession: (sessionId: string) => void;
-  // Deep-link "?hands=id1,id2&label=..." (vem de Análise: clicar numa
-  // posição/matchup/leak leva direto pra cá já filtrado, em vez de expandir
-  // uma lista solta na própria tela de Análise) — quando presente, substitui
-  // as abas Sessões/Avulsas por uma lista flat só com essas mãos.
-  filterHandIds?: string[];
-  filterLabel?: string;
-  onClearFilter?: () => void;
 }) {
   const confirm = useConfirm();
   const [userId, setUserId] = useState<string | null>(null);
   const [tab, setTab] = useState<Tab>("sessoes");
-
-  // ---- Lista filtrada (deep-link de Análise) ----
-  const [filteredItems, setFilteredItems] = useState<ReviewListItem[]>([]);
-  const [filteredThumbs, setFilteredThumbs] = useState<Record<string, string | null>>({});
-  const [filteredLoading, setFilteredLoading] = useState(true);
-  const [filteredError, setFilteredError] = useState("");
-  const hasFilter = !!filterHandIds && filterHandIds.length > 0;
 
   // ---- Sessões ----
   const [sessionsList, setSessionsList] = useState<HandSessionWithCount[]>([]);
@@ -122,10 +105,10 @@ export function RevisorFila({
   }, []);
 
   useEffect(() => {
-    if (!userId || tab !== "sessoes" || hasFilter) return;
+    if (!userId || tab !== "sessoes") return;
     loadSessions();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, tab, hasFilter]);
+  }, [userId, tab]);
 
   // Recalcula quais torneios/sessões ficam visíveis sempre que a lista ou
   // o corte mudam -- consulta enxuta (só hand_session_id/source/created_at),
@@ -172,56 +155,10 @@ export function RevisorFila({
   }, [userId, radarSince, sessionsList]);
 
   useEffect(() => {
-    if (!userId || tab !== "avulsas" || hasFilter) return;
+    if (!userId || tab !== "avulsas") return;
     load();
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, filter, tab, hasFilter, radarSince]);
-
-  useEffect(() => {
-    if (!userId || !hasFilter) return;
-    loadFiltered();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [userId, filterHandIds?.join(",")]);
-
-  async function loadFiltered() {
-    setFilteredLoading(true);
-    setFilteredError("");
-    try {
-      const supabase = createClient();
-      const { data, error: qErr } = await supabase
-        .from("hand_reviews")
-        .select(
-          `
-          id, title, free_text, status, created_at, updated_at, concluded_at,
-          hand_review_tag_links ( tag_id, hand_review_tags ( id, label ) ),
-          hand_review_images ( id, storage_path, position )
-        `
-        )
-        .eq("user_id", userId!)
-        .in("id", filterHandIds!)
-        .order("created_at", { ascending: false });
-      if (qErr) throw qErr;
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
-      const rows: ReviewListItem[] = (data ?? []).map((r: any) => ({
-        ...r,
-        // eslint-disable-next-line @typescript-eslint/no-explicit-any
-        tags: (r.hand_review_tag_links ?? []).map((l: any) => l.hand_review_tags).filter(Boolean),
-        thumb: r.hand_review_images?.[0]?.storage_path || null,
-      }));
-      setFilteredItems(rows);
-      const urls: Record<string, string | null> = {};
-      await Promise.all(
-        rows.map(async (r) => {
-          if (r.thumb) urls[r.id] = await getThumbUrl(r.thumb);
-        })
-      );
-      setFilteredThumbs(urls);
-    } catch {
-      setFilteredError("Erro ao carregar as mãos desse filtro.");
-    } finally {
-      setFilteredLoading(false);
-    }
-  }
+  }, [userId, filter, tab, radarSince]);
 
   async function loadSessions() {
     setSessionsLoading(true);
@@ -332,50 +269,6 @@ export function RevisorFila({
     });
     return acc;
   }, [items]);
-
-  if (hasFilter) {
-    return (
-      <div>
-        <div className="mb-4 flex items-center justify-between gap-3">
-          <div>
-            <p className="text-sm font-semibold text-ink">{filterLabel || "Mãos filtradas"}</p>
-            <p className="text-[11px] text-muted">
-              {filterHandIds!.length} {filterHandIds!.length === 1 ? "mão" : "mãos"} — vindas da Análise
-            </p>
-          </div>
-          {onClearFilter && (
-            <button
-              onClick={onClearFilter}
-              className="inline-flex shrink-0 items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-1.5 text-[11.5px] font-semibold text-muted transition-colors hover:border-white/20 hover:text-ink"
-            >
-              <X size={13} />
-              Limpar filtro
-            </button>
-          )}
-        </div>
-
-        {filteredError && (
-          <div className="mb-2.5 rounded-lg border border-negative/40 bg-negative/10 p-2.5 text-[13px] text-negative">{filteredError}</div>
-        )}
-
-        {filteredLoading ? (
-          <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center text-muted">
-            Carregando…
-          </div>
-        ) : filteredItems.length === 0 ? (
-          <div className="painel-vidro flex flex-col items-center justify-center rounded-2xl border border-dashed border-white/10 p-10 text-center text-muted">
-            Nenhuma mão encontrada pra esse filtro.
-          </div>
-        ) : (
-          <ul className="flex flex-col gap-2.5">
-            {filteredItems.map((r, idx) => (
-              <ReviewCard key={r.id} item={r} thumb={filteredThumbs[r.id]} onOpen={() => onOpen(r.id)} delayMs={Math.min(idx, 10) * 30} />
-            ))}
-          </ul>
-        )}
-      </div>
-    );
-  }
 
   const pctVistas = totalHands > 0 ? Math.round((resumoProgresso.vistas / totalHands) * 100) : 0;
 
