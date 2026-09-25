@@ -228,7 +228,7 @@ export default function LoginForm() {
     if (!name || !nickname || !email || !pass || !whatsapp) {
       return setErr("Preencha nome, apelido, WhatsApp, e-mail e senha.");
     }
-    if (pass.length < 6) return setErr("A senha precisa ter ao menos 6 caracteres.");
+    if (pass.length < 8) return setErr("A senha precisa ter ao menos 8 caracteres.");
     if (!aceitouTermos) return setErr("Você precisa aceitar os Termos de Uso e a Política de Privacidade.");
     setIsLoading(true);
     try {

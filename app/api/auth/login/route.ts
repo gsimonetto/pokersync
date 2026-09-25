@@ -13,7 +13,28 @@ import { NextResponse } from "next/server";
 import { createClient } from "@/lib/supabase/server";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
+// Só aceita pedido vindo do próprio site. Sem isso, outro site podia
+// montar um formulário escondido que envia e-mail/senha DO ATACANTE pra
+// cá: o navegador da vítima recebia os cookies e ela passava a usar,
+// sem perceber, a conta do atacante (tudo que registrasse -- mãos,
+// banca -- ia parar lá). Formulário HTML não consegue mandar
+// Content-Type: application/json, e o Origin diz de qual site veio.
+function mesmaOrigem(request: Request): boolean {
+  if (!request.headers.get("content-type")?.toLowerCase().startsWith("application/json")) return false;
+  const origin = request.headers.get("origin");
+  if (!origin) return true; // navegadores antigos não mandam em mesma origem
+  try {
+    return new URL(origin).host === new URL(request.url).host;
+  } catch {
+    return false;
+  }
+}
+
 export async function POST(request: Request) {
+  if (!mesmaOrigem(request)) {
+    return NextResponse.json({ ok: false, error: "Pedido recusado." }, { status: 403 });
+  }
+
   let body: { email?: unknown; password?: unknown };
   try {
     body = await request.json();

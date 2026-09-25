@@ -200,8 +200,8 @@ export async function salvarPreferenciasMesaNaConta(dados: Record<string, unknow
 }
 
 export async function updatePassword(newPassword: string) {
-  if (!newPassword || newPassword.length < 6) {
-    throw new Error("A senha precisa ter ao menos 6 caracteres.");
+  if (!newPassword || newPassword.length < 8) {
+    throw new Error("A senha precisa ter ao menos 8 caracteres.");
   }
   const supabase = createClient();
   const { error } = await supabase.auth.updateUser({ password: newPassword });

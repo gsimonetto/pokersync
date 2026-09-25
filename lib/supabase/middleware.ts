@@ -113,6 +113,8 @@ export async function updateSession(request: NextRequest) {
 
     response.cookies.set(LAST_ACTIVITY_COOKIE, String(Date.now()), {
       httpOnly: true,
+      // Só viaja por HTTPS em produção (no localhost não há HTTPS).
+      secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
     });
