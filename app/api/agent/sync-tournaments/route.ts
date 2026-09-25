@@ -4,7 +4,8 @@
 // grava buy-in/colocação/premiação via
 // lib/services/agent-tournament-sync-service.ts em vez de mãos.
 import { authenticateAgentRequest, AgentAuthError } from "@/lib/supabase/agent";
-import { fetchRadarImportScopeFor } from "@/lib/supabase/agent-import-scope";
+import { fetchRadarImportConfigFor } from "@/lib/supabase/agent-import-scope";
+import { fetchRadarLiberadoFor, RADAR_FORA_DO_PLANO } from "@/lib/supabase/agent-radar-access";
 import { processAgentTournamentSync, type AgentTournamentSyncInput } from "@/lib/services/agent-tournament-sync-service";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -54,9 +55,19 @@ export async function POST(request: Request) {
   const userLimit = rateLimit(`agent-sync-tournaments:user:${user.id}`, 20, 60_000);
   if (!userLimit.allowed) return rateLimitResponse(userLimit.retryAfterSeconds);
 
-  // Mesmo gate de app/api/agent/sync/route.ts -- ver comentário lá.
-  const importScope = await fetchRadarImportScopeFor(supabase, user.id);
-  if (!importScope) {
+  // Mesmos gates de app/api/agent/sync/route.ts (plano, escolha do que
+  // importar e corte do "só a partir de agora") -- ver comentário lá.
+  let importConfig;
+  try {
+    if (!(await fetchRadarLiberadoFor(supabase, user.id))) {
+      return Response.json(RADAR_FORA_DO_PLANO, { status: 403 });
+    }
+    importConfig = await fetchRadarImportConfigFor(supabase, user.id);
+  } catch (e) {
+    console.error("[agent/sync-tournaments] plano/escopo", e);
+    return Response.json({ ok: false, error: "Erro interno." }, { status: 500 });
+  }
+  if (!importConfig.scope) {
     return Response.json(
       { ok: false, error: "IMPORT_SCOPE_NAO_DEFINIDO", message: "Escolha, na tela do Radar dentro do Performance, o que importar antes de continuar." },
       { status: 409 }
@@ -89,7 +100,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await processAgentTournamentSync(supabase, user.id, body);
+    const result = await processAgentTournamentSync(supabase, user.id, body, importConfig.since);
     return Response.json({ ok: true, ...result });
   } catch (e) {
     console.error("[agent/sync-tournaments] process", e);

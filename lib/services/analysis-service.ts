@@ -651,7 +651,13 @@ async function fetchTotalBountiesWon(): Promise<{ count: number; cash: number }>
 // de novo o trigger hand_reviews_sync_tags_trigger → sync_hand_tags(),
 // recriando a linha daquela mão específica. Isso é esperado (mesmo
 // mecanismo que já existe pro resto do produto), não um bug do reset.
-export async function resetPerformanceStats(): Promise<void> {
+//
+// `voltarAPerguntar: false` = "Apagar o que o Radar trouxe pra cá" do
+// seletor dentro do Performance (components/radar/radar-module-menu.tsx):
+// zera só as estatísticas daqui, sem mexer na escolha do que o Radar
+// importa — limpar essa escolha pausa o Radar inteiro até o jogador
+// responder de novo, o que não faz sentido pra quem só quis zerar uma tela.
+export async function resetPerformanceStats({ voltarAPerguntar = true }: { voltarAPerguntar?: boolean } = {}): Promise<void> {
   const supabase = createClient();
   const { data: userData, error: userErr } = await supabase.auth.getUser();
   if (userErr) throw userErr;
@@ -663,9 +669,13 @@ export async function resetPerformanceStats(): Promise<void> {
   const { error: eProfile } = await supabase
     .from("profiles")
     // radar_scope_performance/_since junto: mesmo pedido de "volta a
-    // perguntar" agora vale também pro corte de exibição do botão do
+    // perguntar" agora vale também pro corte de exibição do seletor do
     // Radar dentro do Performance (ver radar-module-scope-service.ts).
-    .update({ radar_import_scope: null, radar_scope_performance: null, radar_scope_performance_since: null })
+    .update({
+      ...(voltarAPerguntar ? { radar_import_scope: null } : {}),
+      radar_scope_performance: null,
+      radar_scope_performance_since: null,
+    })
     .eq("id", userData.user.id);
   if (eProfile) throw eProfile;
 }

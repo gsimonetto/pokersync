@@ -2,7 +2,8 @@
 // arquivos de hand history encontrados no computador do usuário e grava as
 // mãos via lib/services/agent-sync-service.ts.
 import { authenticateAgentRequest, AgentAuthError } from "@/lib/supabase/agent";
-import { fetchRadarImportScopeFor } from "@/lib/supabase/agent-import-scope";
+import { fetchRadarImportConfigFor } from "@/lib/supabase/agent-import-scope";
+import { fetchRadarLiberadoFor, RADAR_FORA_DO_PLANO } from "@/lib/supabase/agent-radar-access";
 import { processAgentSync, type AgentSyncInput } from "@/lib/services/agent-sync-service";
 import { clientIp, rateLimit, rateLimitResponse } from "@/lib/rate-limit";
 
@@ -52,12 +53,24 @@ export async function POST(request: Request) {
   const userLimit = rateLimit(`agent-sync:user:${user.id}`, 20, 60_000);
   if (!userLimit.allowed) return rateLimitResponse(userLimit.retryAfterSeconds);
 
-  // Pedido explícito: nenhuma mão entra antes de o jogador escolher, na
+  // Radar só pra quem tem no plano (Individual, Team, avulso ou jogador
+  // ativo num time) -- mesma regra da rota /radar, ver agent-radar-access.ts.
+  // E, pedido explícito: nenhuma mão entra antes de o jogador escolher, na
   // tela do Radar (Player Evolution), se quer só o que acontecer a partir
   // de agora ou também o histórico já existente no computador. Recusa o
-  // corpo inteiro em vez de importar parcialmente.
-  const importScope = await fetchRadarImportScopeFor(supabase, user.id);
-  if (!importScope) {
+  // corpo inteiro em vez de importar parcialmente; com "só a partir de
+  // agora", o que foi jogado antes da escolha fica de fora (importConfig.since).
+  let importConfig;
+  try {
+    if (!(await fetchRadarLiberadoFor(supabase, user.id))) {
+      return Response.json(RADAR_FORA_DO_PLANO, { status: 403 });
+    }
+    importConfig = await fetchRadarImportConfigFor(supabase, user.id);
+  } catch (e) {
+    console.error("[agent/sync] plano/escopo", e);
+    return Response.json({ ok: false, error: "Erro interno." }, { status: 500 });
+  }
+  if (!importConfig.scope) {
     return Response.json(
       { ok: false, error: "IMPORT_SCOPE_NAO_DEFINIDO", message: "Escolha, na tela do Radar dentro do Performance, o que importar antes de continuar." },
       { status: 409 }
@@ -90,7 +103,7 @@ export async function POST(request: Request) {
   }
 
   try {
-    const result = await processAgentSync(supabase, user.id, body);
+    const result = await processAgentSync(supabase, user.id, body, importConfig.since);
     return Response.json({ ok: true, ...result });
   } catch (e) {
     console.error("[agent/sync] process", e);

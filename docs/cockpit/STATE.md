@@ -34,8 +34,8 @@ qualquer um pode reproduzir.
 
 ## POKERSYNC — Progresso Geral: 80%
 
-🟢 Main    ██████████████░░░░░░ 72%  (25 itens rastreados)
-🔵 Radar   ████████████████░░░░ 80%  (4 itens rastreados)
+🟢 Main    ████████████████░░░░ 80%  (28 itens rastreados)
+🔵 Radar   ███████████████░░░░░ 74%  (9 itens rastreados)
 🟣 Solver  █████████████████░░░ 87%  (20 itens rastreados)
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -63,30 +63,35 @@ bugs graves corrigidos nesta janela, falta validar num spot real.
 **Próximo:** 🟠 P1 — validar squeeze multiway num spot real (SOLVER-016).
 **Bloqueio:** nenhum.
 
-### Radar PokerSync (addon + agente desktop) — 80% completo
-**Trabalho atual:** primeira instalação real confirmada em 14/09/2026 —
-device Windows real (dono do produto, PokerStars) sincronizou com
-sucesso ponta a ponta, verificado direto no banco (RADAR-003/MAIN-012
-concluídos). No mesmo dia, parser dedicado de PartyPoker e 888poker
-implementado (RADAR-004), ainda não validado contra hand history real
-dessas duas salas.
-**Próximo:** 🟡 P2 — validar os parsers novos contra hand history real
-e confirmar a instalação do agente com outros usuários/plataformas.
-**Bloqueio:** nenhum — depende de tempo de uso real, não de código.
+### Radar PokerSync (addon + agente desktop) — 74% completo
+**Trabalho atual (25/09/2026):** auditoria ponta a ponta com o repositório
+`pokersync-radar` anexado e lido linha a linha (a primeira desde que o
+agente existe). Achados: a única versão publicada era a 0.1.0 de 08-09/09,
+marcada como pré-lançamento, sem nenhuma das correções de 10-20/09 e sem
+atualização automática; o site encerrava TODAS as sessões da conta no
+"Sair", na saída por inatividade e no próprio login com Google do Radar
+(o Radar caía quase todo dia); o link de volta do navegador nunca foi
+registrado (configuração no lugar errado); "só a partir de agora" não
+filtrava nada; o envio não conferia o plano; o seletor do Radar nos
+módulos estava quebrado (migration de 21/09 nunca aplicada); ícone era um
+quadrado azul provisório. Tudo corrigido (RADAR-002 e RADAR-005 a 008);
+versão 0.2.0 testada ponta a ponta contra servidor de teste.
+**Próximo:** 🔴 P0 — publicar a 0.2.0 (RADAR-006) e o dono reinstalar uma
+vez; depois 🟡 P2 — leitor da ACR (RADAR-009, precisa de arquivo real).
+**Bloqueio:** a publicação depende dos secrets de assinatura da
+atualização (`TAURI_SIGNING_PRIVATE_KEY`/`_PASSWORD`) no repositório do
+Radar — conferir antes de rodar a release.
 
-**Nota de nomenclatura:** "Radar" não é um terceiro produto/repositório
-separado. É um addon pago dentro do Main (`/radar`, painel reaproveitado
-em Player Evolution) mais o agente desktop que o alimenta — o agente foi
-renomeado de "PokerSync Agent" para "Radar PokerSync" em 11/09/2026, mas
-seu código vive no repositório `pokersync-agent`, que não está anexado a
-esta sessão. Tratamos como frente própria no Cockpit porque é assim que
-o dono pensa o produto, mas a fonte de verdade do agente em si só pode
-ser auditada numa sessão com acesso a esse repositório.
+**Nota de nomenclatura:** "Radar" não é um terceiro produto. É um addon
+pago dentro do Main (`/radar`, painel reaproveitado em Performance) mais o
+programa desktop que o alimenta (repositório `gsimonetto/pokersync-radar`,
+ex-`pokersync-agent`, renomeado pra "Radar PokerSync" em 11/09/2026).
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## PRÓXIMOS PASSOS (ordem de prioridade)
 
+🔴 P0 — Publicar o Radar 0.2.0 (RADAR-006 — sem isso o Radar dos jogadores continua na 0.1.0, que cai e não se atualiza)
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
 🔴 P0 — Reconstruir a UI de cEV/ICM no produto (MAIN-007 — motor pronto, falta a tela)
 🟠 P1 — Validar squeeze multiway num spot real (SOLVER-016)

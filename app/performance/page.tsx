@@ -233,7 +233,7 @@ export default function PerformancePage() {
                     loadAll(since);
                   }}
                   onReset={async () => {
-                    await resetPerformanceStats();
+                    await resetPerformanceStats({ voltarAPerguntar: false });
                     setRadarSince(null);
                     await loadAll(null);
                   }}

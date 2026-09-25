@@ -2,6 +2,7 @@
 
 import { useEffect, useRef } from "react";
 import { createClient } from "@/lib/supabase/client";
+import { sairDesteAparelho } from "@/lib/supabase/sair-deste-aparelho";
 
 // Mesmo teto de lib/supabase/middleware.ts -- os dois precisam bater
 // pro comportamento ser consistente entre "sentou parado numa tela" e
@@ -69,7 +70,7 @@ export function useInactivityLogout() {
       saindoRef.current = true;
       try {
         const supabase = createClient();
-        await supabase.auth.signOut();
+        await sairDesteAparelho(supabase);
       } catch {
         // segue o redirect mesmo se a chamada falhar
       }

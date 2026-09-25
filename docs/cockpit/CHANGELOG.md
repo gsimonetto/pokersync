@@ -4,6 +4,34 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 25/09/2026 — Radar: auditoria ponta a ponta e versão 0.2.0
+
+Primeira auditoria com o código do Radar (repo `pokersync-radar`) aberto.
+O que estava errado e foi corrigido:
+
+- **Radar caindo quase todo dia:** o site encerrava todas as sessões da
+  conta no "Sair", na saída por 2h de inatividade e no login com Google
+  do próprio Radar. Agora sai só do aparelho atual
+  (`lib/supabase/sair-deste-aparelho.ts`) e o login do Radar não grava
+  nem encerra sessão no navegador (`app/auth/confirm`).
+- **Correções nunca publicadas:** só existia a 0.1.0 (pré-lançamento, de
+  08-09/09). Versão 0.2.0 pronta: renova o login ao abrir, uma cópia só,
+  link de volta do navegador registrado de verdade, abre com o computador
+  por padrão, avisa quando precisa entrar de novo, envio em lotes que cabem
+  no servidor, só o trecho novo de arquivo que cresceu, sinal de vida,
+  ícone definitivo (cartas do logo). Workflow de release publica versão
+  oficial com atualização automática e instalador de nome fixo pro botão
+  "Baixar" do site. Falta rodar a release (RADAR-006).
+- **Regras que não batiam:** "só a partir de agora" não filtrava nada —
+  agora são 3 opções (só de agora / últimos 3 meses / tudo), escolhidas no
+  Radar ou no site, com corte aplicado no servidor; o envio passou a
+  conferir o plano (`RADAR_FORA_DO_PLANO`); textos do site só prometem o
+  que o Radar faz (ACR marcado "em teste" — RADAR-009).
+- **Seletor do Radar nos módulos quebrado desde 22/09:** a migration
+  `20260921120000_radar_module_scope` nunca tinha sido aplicada. Refeito
+  como seletor com a opção ativa visível e "?" explicando o que o Radar
+  traz pra cada módulo.
+
 ## 14/09/2026 — RADAR-004: parser dedicado de PartyPoker e 888poker
 
 A pedido do dono, implementado suporte a mais duas salas em

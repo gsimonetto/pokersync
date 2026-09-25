@@ -125,6 +125,38 @@ documentação vire ficção conforme o código evolui.
 final.
 **Data:** 11/09/2026
 
+### ADR-016 — "Sair" encerra só a sessão daquele aparelho
+**Decisão:** o "Sair" do site, a saída automática por inatividade e a
+confirmação de e-mail encerram só a sessão do navegador atual
+(`signOut({ scope: "local" })`, via `lib/supabase/sair-deste-aparelho.ts`).
+Encerrar todas as sessões fica só pra exclusão de conta.
+**Motivo:** o padrão do Supabase (global) derrubava o Radar PokerSync e o
+site no celular a cada "Sair" e a cada 2h de inatividade.
+**Impacto:** não existe hoje um "sair de todos os aparelhos"; se for
+preciso, vira um botão explícito no perfil.
+**Data:** 25/09/2026
+
+### ADR-017 — O que o Radar importa: 3 opções, no Radar e no site
+**Decisão:** o jogador escolhe "só de agora em diante", "últimos 3 meses"
+ou "tudo" — no próprio Radar (primeiro login, com os números do que ele
+achou no computador) ou na página do Radar no site; é a mesma escolha
+(`profiles.radar_import_scope`). O corte é aplicado no servidor
+(`radar_import_scope_since`, gravado por trigger, com folga de fuso) e,
+quando a escolha amplia, o Radar reenvia o histórico. O seletor dentro de
+Banca/Revisor/Performance ("Tudo" / "De hoje em diante") é só filtro de
+exibição, com a opção ativa sempre visível e um "?" explicando.
+**Motivo:** pedido do dono; antes "só a partir de agora" não filtrava nada.
+**Data:** 25/09/2026
+
+### ADR-018 — Radar só pra quem tem no plano, inclusive no envio
+**Decisão:** `/api/agent/sync*` recusa o envio (403
+`RADAR_FORA_DO_PLANO`) de quem não tem o Radar no plano (Individual, Team,
+avulso ou jogador ativo num time — mesma regra da rota `/radar`); o
+sinal de vida (`/api/agent/ping`) informa `radarLiberado` e o Radar
+mostra "seu plano não inclui o Radar".
+**Motivo:** quem cancelava o plano continuava importando pelo Radar.
+**Data:** 25/09/2026
+
 ---
 
 ## Regras de evolução do produto

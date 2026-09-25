@@ -1,4 +1,5 @@
 import { createServerClient, type CookieOptions } from "@supabase/ssr";
+import { sairDesteAparelho } from "@/lib/supabase/sair-deste-aparelho";
 import { NextResponse, type NextRequest } from "next/server";
 import { isAddonUnlocked, isModuleUnlocked, resolveAddonForRoute, resolveModuleForRoute, toPlanId } from "@/lib/plans/plans-data";
 
@@ -96,7 +97,7 @@ export async function updateSession(request: NextRequest) {
     );
 
     if (last && Date.now() - last > INACTIVITY_LIMIT_MS) {
-      await supabase.auth.signOut();
+      await sairDesteAparelho(supabase);
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("expirado", "1");
       if (pathname !== "/") loginUrl.searchParams.set("redirectTo", pathname);
