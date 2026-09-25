@@ -19,6 +19,7 @@ import {
 import { createClient } from "@/lib/supabase/client";
 import { sairDesteAparelho } from "@/lib/supabase/sair-deste-aparelho";
 import { Logo } from "@/components/logo";
+import { Captcha, CAPTCHA_ATIVO, type CaptchaHandle } from "@/components/captcha";
 
 type Mode = "login" | "register";
 
@@ -153,6 +154,11 @@ export default function LoginForm() {
   // relevante, pra distinguir quem aceitou qual versão em user_consents.
   const TERMS_VERSION = "2026-09";
   const [aceitouTermos, setAceitouTermos] = useState(false);
+  // Token do CAPTCHA (components/captcha.tsx) -- vale uma tentativa só.
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
+  const semCaptcha = () => CAPTCHA_ATIVO && !captchaToken;
+  const MSG_CAPTCHA = "Aguarde a verificação de segurança terminar e tente de novo.";
 
   const [err, setErr] = useState(
     expirado
@@ -194,6 +200,7 @@ export default function LoginForm() {
   async function handleLogin() {
     reset();
     if (!email || !pass) return setErr("Informe e-mail e senha.");
+    if (semCaptcha()) return setErr(MSG_CAPTCHA);
     setIsLoading(true);
     try {
       // Passa pelo nosso servidor (não mais supabase.auth.signInWithPassword
@@ -203,11 +210,12 @@ export default function LoginForm() {
       const res = await fetch("/api/auth/login", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password: pass }),
+        body: JSON.stringify({ email, password: pass, captchaToken }),
       });
       const data = await res.json().catch(() => ({ ok: false }));
       if (!res.ok || !data.ok) {
         setErr(data.error || "Não foi possível entrar. Verifique suas credenciais.");
+        captchaRef.current?.reset();
         setIsLoading(false);
         return;
       }
@@ -219,6 +227,7 @@ export default function LoginForm() {
       window.location.href = redirectTo;
     } catch {
       setErr("Não foi possível entrar. Tente de novo.");
+      captchaRef.current?.reset();
       setIsLoading(false);
     }
   }
@@ -230,13 +239,14 @@ export default function LoginForm() {
     }
     if (pass.length < 8) return setErr("A senha precisa ter ao menos 8 caracteres.");
     if (!aceitouTermos) return setErr("Você precisa aceitar os Termos de Uso e a Política de Privacidade.");
+    if (semCaptcha()) return setErr(MSG_CAPTCHA);
     setIsLoading(true);
     try {
       const supabase = createClient();
       const { data, error } = await supabase.auth.signUp({
         email,
         password: pass,
-        options: { data: { nome: name, apelido: nickname, whatsapp } },
+        options: { data: { nome: name, apelido: nickname, whatsapp }, captchaToken: captchaToken ?? undefined },
       });
       if (error) throw error;
 
@@ -271,6 +281,7 @@ export default function LoginForm() {
         setErr("Não foi possível criar a conta.");
       }
     } finally {
+      captchaRef.current?.reset();
       setIsLoading(false);
     }
   }
@@ -462,6 +473,8 @@ export default function LoginForm() {
                 </motion.p>
               )}
             </AnimatePresence>
+
+            <Captcha ref={captchaRef} onToken={setCaptchaToken} />
 
             <motion.button
               whileHover={{ scale: isLoading ? 1 : 1.01 }}
