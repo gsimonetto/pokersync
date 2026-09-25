@@ -4,6 +4,25 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 25/09/2026 — Radar 0.2.0 publicado
+
+- **Versão oficial no ar:** release v0.2.0 é a "latest" do repositório
+  `pokersync-radar`; o botão "Baixar" do site entrega o instalador certo
+  nos 3 sistemas (testado).
+- **Chave de assinatura refeita:** a primeira tentativa falhou porque a
+  chave das atualizações nunca tinha sido cadastrada no GitHub. Par de
+  chaves novo, cadastrado pelo dono (ver `TAURI_UPDATER_SETUP.md` no repo
+  do Radar). Sem a chave, o workflow agora gera os instaladores do mesmo
+  jeito (só sem atualização automática daquela versão), em vez de falhar
+  tudo (pokersync-radar PR #10). 0.2.0 republicada já assinada.
+- **Site e banco:** migrations do Radar aplicadas em produção e site no ar
+  (PR #282).
+- **Falta:** o dono instalar a 0.2.0 uma vez pelo site; leitor da ACR
+  (RADAR-009); assinatura de código do Windows (aviso do SmartScreen) fica
+  pra depois.
+
+Radar 74%→81%, Geral 80%→83%.
+
 ## 25/09/2026 — Radar: auditoria ponta a ponta e versão 0.2.0
 
 Primeira auditoria com o código do Radar (repo `pokersync-radar`) aberto.

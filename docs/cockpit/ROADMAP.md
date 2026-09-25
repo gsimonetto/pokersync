@@ -103,24 +103,25 @@ Achados na mesma auditoria de 22/09/2026, todos já em produção:
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## RADAR POKERSYNC (addon + agente desktop) — 74%
+## RADAR POKERSYNC (addon + agente desktop) — 81%
 
 | ID | Item | Status | Prioridade | Próximo passo |
 |---|---|---|---|---|
 | RADAR-001 | Painel in-app (RadarPanel + gating) | 🟢 | 🟡 P2 | — |
-| RADAR-002 | Agente desktop (repo `pokersync-radar`) | 🟠 | 🟠 P1 | publicar a 0.2.0 e reinstalar uma vez |
+| RADAR-002 | Agente desktop (repo `pokersync-radar`) | 🟠 | 🟠 P1 | 0.2.0 publicada — o dono instalar uma vez pelo site e confirmar no PC real |
 | RADAR-003 | Sync automático (`/api/agent/sync`) | 🟢 | 🟠 P1 | — |
 | RADAR-004 | Suporte a mais salas de poker | 🟠 | 🟡 P2 | validar parser contra hand history real de cada sala |
-| RADAR-005 | Sessão do Radar que não cai | 🟠 | 🔴 P0 | publicar a 0.2.0 |
-| RADAR-006 | Publicação e atualização automática | 🟠 | 🔴 P0 | conferir secrets de assinatura e rodar a release v0.2.0 |
-| RADAR-007 | Escolha do que importar valendo (3 opções, no Radar e no site) | 🟠 | 🟠 P1 | aplicar migration + publicar a 0.2.0 |
-| RADAR-008 | Seletor do Radar por módulo | 🟠 | 🟡 P2 | aplicar as migrations no deploy |
+| RADAR-005 | Sessão do Radar que não cai | 🟠 | 🔴 P0 | confirmar no uso real (alguns dias sem cair) com a 0.2.0 |
+| RADAR-006 | Publicação e atualização automática | 🟠 | 🔴 P0 | confirmar a primeira atualização automática (0.2.0 → próxima) |
+| RADAR-007 | Escolha do que importar valendo (3 opções, no Radar e no site) | 🟠 | 🟠 P1 | confirmar no uso real com a 0.2.0 |
+| RADAR-008 | Seletor do Radar por módulo | 🟠 | 🟡 P2 | conferir na tela em produção |
 | RADAR-009 | Leitor de mãos da ACR | ⚪ | 🟡 P2 | conseguir hand history real da ACR |
 
 *Nota: auditado com o código do Radar (Rust/Tauri) aberto em 25/09/2026 —
 antes disso, RADAR-002/003 tinham sido confirmados só por evidência no
 banco. A 0.1.0 instalada no PC do dono não recebe atualização automática
-(ela veio depois); a 0.2.0 precisa ser instalada uma vez à mão.*
+(ela veio depois); a 0.2.0 (publicada em 25/09/2026) precisa ser instalada
+uma vez à mão, e daí em diante atualiza sozinha.*
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
@@ -180,7 +181,7 @@ Solver: SOLVER-018 Deploy Railway (🟢 confirmado ativo)
    ↓
 Main: MAIN-007 cEV/ICM (🟢 UI reconstruída no Revisor de Mãos, heads-up + multiway)
 
-Radar: RADAR-002 Agente desktop (🟢 concluído, validado com instalação Windows real e no PC do dono)
+Radar: RADAR-002 Agente desktop (🟠 0.2.0 publicada em 25/09/2026; a 0.1.0 já tinha sido validada numa instalação Windows real)
    ↓
 Main: MAIN-012 Sync com agente (🟢 tráfego real confirmado 14/09/2026)
    ↓
