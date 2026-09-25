@@ -35,7 +35,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: "Pedido recusado." }, { status: 403 });
   }
 
-  let body: { email?: unknown; password?: unknown };
+  let body: { email?: unknown; password?: unknown; captchaToken?: unknown };
   try {
     body = await request.json();
   } catch {
@@ -59,7 +59,10 @@ export async function POST(request: Request) {
   if (!emailLimit.allowed) return rateLimitResponse(emailLimit.retryAfterSeconds);
 
   const supabase = await createClient();
-  const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+  // Token do CAPTCHA (components/captcha.tsx): quem valida é o próprio
+  // Supabase, quando o CAPTCHA está ligado lá. Sem token, ele recusa.
+  const captchaToken = typeof body.captchaToken === "string" && body.captchaToken ? body.captchaToken : undefined;
+  const { data, error } = await supabase.auth.signInWithPassword({ email, password, options: { captchaToken } });
   if (error) {
     return NextResponse.json(
       { ok: false, error: "Não foi possível entrar. Verifique suas credenciais." },

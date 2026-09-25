@@ -1,10 +1,11 @@
 "use client";
 
-import { useState, type ComponentType } from "react";
+import { useRef, useState, type ComponentType } from "react";
 import Link from "next/link";
 import { AtSign, ArrowLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { Logo } from "@/components/logo";
+import { Captcha, CAPTCHA_ATIVO, type CaptchaHandle } from "@/components/captcha";
 
 interface FieldProps {
   icon: ComponentType<{ size?: number; className?: string }>;
@@ -35,6 +36,8 @@ export default function EsqueciSenhaPage() {
   const [err, setErr] = useState("");
   const [ok, setOk] = useState("");
   const [loading, setLoading] = useState(false);
+  const [captchaToken, setCaptchaToken] = useState<string | null>(null);
+  const captchaRef = useRef<CaptchaHandle>(null);
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -45,18 +48,24 @@ export default function EsqueciSenhaPage() {
       setErr("Informe seu e-mail.");
       return;
     }
+    if (CAPTCHA_ATIVO && !captchaToken) {
+      setErr("Aguarde a verificação de segurança terminar e tente de novo.");
+      return;
+    }
 
     setLoading(true);
     try {
       const supabase = createClient();
       const { error } = await supabase.auth.resetPasswordForEmail(email, {
         redirectTo: `${window.location.origin}/redefinir-senha`,
+        captchaToken: captchaToken ?? undefined,
       });
       if (error) throw error;
       setOk("Link de recuperação enviado! Verifique seu e-mail.");
     } catch {
       setErr("Não foi possível enviar o link. Verifique o e-mail informado.");
     } finally {
+      captchaRef.current?.reset();
       setLoading(false);
     }
   }
@@ -93,6 +102,8 @@ export default function EsqueciSenhaPage() {
               </span>
               <Field icon={AtSign} value={email} onChange={setEmail} placeholder="exemplo@pokersync.com" />
             </div>
+
+            <Captcha ref={captchaRef} onToken={setCaptchaToken} />
 
             {err && <p className="text-sm text-negative">{err}</p>}
             {ok && <p className="text-sm text-positive">{ok}</p>}

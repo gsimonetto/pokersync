@@ -34,7 +34,8 @@ const nextConfig = {
             key: "Content-Security-Policy",
             value: [
               "default-src 'self'",
-              "script-src 'self' 'unsafe-inline'",
+              // challenges.cloudflare.com: CAPTCHA do login (components/captcha.tsx)
+              "script-src 'self' 'unsafe-inline' https://challenges.cloudflare.com",
               "style-src 'self' 'unsafe-inline'",
               "img-src 'self' data: blob: https://*.supabase.co",
               "font-src 'self' data:",
@@ -42,6 +43,7 @@ const nextConfig = {
               // -- sem ela aqui o navegador bloqueava a consulta, e a banca
               // em dólar nunca era convertida pra reais.
               "connect-src 'self' https://*.supabase.co wss://*.supabase.co https://api.stripe.com https://economia.awesomeapi.com.br",
+              "frame-src https://challenges.cloudflare.com",
               "frame-ancestors 'none'",
               "base-uri 'self'",
               "form-action 'self'",
