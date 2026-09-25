@@ -12,6 +12,10 @@ type CookieToSet = { name: string; value: string; options?: CookieOptions };
 
 const INACTIVITY_LIMIT_MS = 2 * 60 * 60 * 1000; // 2 horas
 const LAST_ACTIVITY_COOKIE = "pokersync_last_activity";
+// Janela pra considerar "acabou de entrar" quando ainda não há relógio de
+// atividade (primeira página depois do login). Curta de propósito.
+const LOGIN_RECENTE_MS = 10 * 60 * 1000; // 10 minutos
+const RELOGIO_MAX_AGE_S = 400 * 24 * 60 * 60; // mesmo teto dos cookies do Supabase
 const PUBLIC_ROUTES = [
   "/login",
   "/esqueci-senha",
@@ -96,7 +100,19 @@ export async function updateSession(request: NextRequest) {
       request.cookies.get(LAST_ACTIVITY_COOKIE)?.value ?? 0
     );
 
-    if (last && Date.now() - last > INACTIVITY_LIMIT_MS) {
+    // Sem o relógio de atividade, só deixa passar se o login ACABOU de
+    // acontecer (senha, Google ou link de recuperação -- todos atualizam
+    // last_sign_in_at). Antes, "sem relógio" era tratado como "tudo
+    // bem": o cookie morria ao fechar o navegador, a sessão do Supabase
+    // não, e quem reabria o navegador dias depois entrava direto em
+    // qualquer módulo digitando o endereço, sem senha (bug relatado).
+    const ultimoLogin = user.last_sign_in_at ? new Date(user.last_sign_in_at).getTime() : 0;
+    const loginRecente = Date.now() - ultimoLogin < LOGIN_RECENTE_MS;
+    // Login mais novo que o relógio (saiu e entrou de novo) conta como
+    // atividade: sem isso o relógio velho expulsava logo após o login.
+    const expirou = last ? Date.now() - Math.max(last, ultimoLogin) > INACTIVITY_LIMIT_MS : !loginRecente;
+
+    if (expirou) {
       await sairDesteAparelho(supabase);
       const loginUrl = new URL("/login", request.url);
       loginUrl.searchParams.set("expirado", "1");
@@ -117,6 +133,9 @@ export async function updateSession(request: NextRequest) {
       secure: process.env.NODE_ENV === "production",
       sameSite: "lax",
       path: "/",
+      // Persistente (sobrevive a fechar o navegador), igual à sessão do
+      // Supabase -- se sumisse antes dela, voltava o bug acima.
+      maxAge: RELOGIO_MAX_AGE_S,
     });
 
     // Trava real de plano: o menu (components/app-shell.tsx) so' esconde
