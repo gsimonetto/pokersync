@@ -32,10 +32,10 @@ qualquer um pode reproduzir.
 
 ━━━━━━━━━━━━━━━━━━━━━━
 
-## POKERSYNC — Progresso Geral: 80%
+## POKERSYNC — Progresso Geral: 83%
 
 🟢 Main    ████████████████░░░░ 80%  (28 itens rastreados)
-🔵 Radar   ███████████████░░░░░ 74%  (9 itens rastreados)
+🔵 Radar   ████████████████░░░░ 81%  (9 itens rastreados)
 🟣 Solver  █████████████████░░░ 87%  (20 itens rastreados)
 
 ━━━━━━━━━━━━━━━━━━━━━━
@@ -63,7 +63,7 @@ bugs graves corrigidos nesta janela, falta validar num spot real.
 **Próximo:** 🟠 P1 — validar squeeze multiway num spot real (SOLVER-016).
 **Bloqueio:** nenhum.
 
-### Radar PokerSync (addon + agente desktop) — 74% completo
+### Radar PokerSync (addon + agente desktop) — 81% completo
 **Trabalho atual (25/09/2026):** auditoria ponta a ponta com o repositório
 `pokersync-radar` anexado e lido linha a linha (a primeira desde que o
 agente existe). Achados: a única versão publicada era a 0.1.0 de 08-09/09,
@@ -75,12 +75,17 @@ registrado (configuração no lugar errado); "só a partir de agora" não
 filtrava nada; o envio não conferia o plano; o seletor do Radar nos
 módulos estava quebrado (migration de 21/09 nunca aplicada); ícone era um
 quadrado azul provisório. Tudo corrigido (RADAR-002 e RADAR-005 a 008);
-versão 0.2.0 testada ponta a ponta contra servidor de teste.
-**Próximo:** 🔴 P0 — publicar a 0.2.0 (RADAR-006) e o dono reinstalar uma
-vez; depois 🟡 P2 — leitor da ACR (RADAR-009, precisa de arquivo real).
-**Bloqueio:** a publicação depende dos secrets de assinatura da
-atualização (`TAURI_SIGNING_PRIVATE_KEY`/`_PASSWORD`) no repositório do
-Radar — conferir antes de rodar a release.
+versão 0.2.0 testada ponta a ponta contra servidor de teste, site e
+migrations no ar, e **0.2.0 publicada como versão oficial no mesmo dia**
+(botão "Baixar" do site testado nos 3 sistemas; atualização automática
+assinada, com chave nova — RADAR-006).
+**Próximo:** 🔴 P0 — o dono instalar a 0.2.0 uma vez pelo botão do site (a
+0.1.0 não se atualiza sozinha) e confirmar no uso real; depois 🟡 P2 —
+leitor da ACR (RADAR-009, precisa de arquivo real).
+**Bloqueio:** nenhum. A chave de assinatura das atualizações foi refeita e
+cadastrada nos secrets em 25/09 (ver `TAURI_UPDATER_SETUP.md` no repo do
+Radar); assinatura de código do Windows (aviso do SmartScreen) fica pra
+depois.
 
 **Nota de nomenclatura:** "Radar" não é um terceiro produto. É um addon
 pago dentro do Main (`/radar`, painel reaproveitado em Performance) mais o
@@ -91,7 +96,7 @@ ex-`pokersync-agent`, renomeado pra "Radar PokerSync" em 11/09/2026).
 
 ## PRÓXIMOS PASSOS (ordem de prioridade)
 
-🔴 P0 — Publicar o Radar 0.2.0 (RADAR-006 — sem isso o Radar dos jogadores continua na 0.1.0, que cai e não se atualiza)
+🔴 P0 — Instalar o Radar 0.2.0 no PC do dono, uma vez, pelo botão "Baixar" do site (RADAR-002/005 — a 0.1.0 cai e não se atualiza sozinha; da 0.2.0 em diante, sim)
 🔴 P0 — Pipeline pós-flop ponta a ponta (destrava o loop leak → treino)
 🔴 P0 — Reconstruir a UI de cEV/ICM no produto (MAIN-007 — motor pronto, falta a tela)
 🟠 P1 — Validar squeeze multiway num spot real (SOLVER-016)
@@ -115,6 +120,15 @@ Nenhum bloqueio ativo (ver `BLOCKERS.md`). Há 1 item em "atenção"
 ━━━━━━━━━━━━━━━━━━━━━━
 
 ## ÚLTIMA ATUALIZAÇÃO
+
+25/09/2026 — Radar 0.2.0 publicado como versão oficial (a "latest" do
+repositório `pokersync-radar`). A primeira tentativa falhou porque a chave
+de assinatura das atualizações nunca tinha sido cadastrada no GitHub: par
+de chaves novo, cadastrado pelo dono, e o workflow passou a gerar os
+instaladores mesmo sem a chave em vez de falhar tudo (pokersync-radar PR
+#10). 0.2.0 republicada já assinada. Radar 74%→81% (RADAR-002/005/007/008
+90→95, RADAR-006 50→90), Geral 80%→83%. Detalhes da auditoria do Radar na
+seção dele acima e no `CHANGELOG.md`.
 
 14/09/2026 — RADAR-004: parser dedicado de PartyPoker e 888poker
 implementado em `lib/poker/hand-parser.ts`, a partir de uma amostra de
