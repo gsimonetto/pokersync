@@ -1,7 +1,6 @@
 "use client";
 
 import { useMemo, useState } from "react";
-import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
 import { Search, ArrowUpDown, Flame, X } from "lucide-react";
 import { EASE } from "@/components/painel/painel-card";
@@ -35,7 +34,6 @@ export function TabJogadores({
   jogadores,
   labels,
   isAdmin,
-  podeConversar,
   coaches,
   onChange,
   onErro,
@@ -44,26 +42,16 @@ export function TabJogadores({
   labels: TeamLabel[];
   isAdmin: boolean;
   /** Admin ou coach: quem pode abrir o menu de ações (ao menos pra conversar). */
-  podeConversar: boolean;
   coaches: { userId: string; nome: string }[];
   onChange: () => void;
   onErro: (s: string) => void;
 }) {
-  const router = useRouter();
   const [filtroLabel, setFiltroLabel] = useState<string>("todas");
   const [busca, setBusca] = useState("");
   const [ordem, setOrdem] = useState<Ordem>("nome");
   // Ficha cadastral abre em modal em vez de navegar pra fora da lista --
   // preserva filtro e busca ao fechar.
   const [fichaAberta, setFichaAberta] = useState<string | null>(null);
-
-  // Conversar nunca abre um chat solto -- sempre manda pra Central de
-  // Conversas (topbar, components/chat/chat-center.tsx), que ja sabe
-  // ler ?chat=<userId> e abrir a thread certa (mesmo mecanismo do
-  // deep-link da notificacao).
-  function abrirConversa(userId: string) {
-    router.push(`/modulos?chat=${userId}`);
-  }
 
   const lista = useMemo(() => {
     const filtrada = jogadores.filter((j) => {
@@ -178,8 +166,6 @@ export function TabJogadores({
           labels={labels}
           coaches={coaches}
           isAdmin={isAdmin}
-          podeConversar={podeConversar}
-          onAbrirConversa={() => abrirConversa(fichaAberta)}
           onChange={onChange}
           onErro={onErro}
         />

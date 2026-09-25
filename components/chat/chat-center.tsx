@@ -1,36 +1,21 @@
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
-import { ArrowLeft, Check, Copy, MessageCircle, Plus, UserPlus, X } from "lucide-react";
+import { ArrowLeft, Check, Copy, MessageCircle, UserPlus, Users } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { AvatarNivel } from "@/components/avatar-nivel";
 import { Chip } from "@/components/chip";
-import { ModalPortal } from "@/components/modal-portal";
-import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
+import { JanelaVidro, BotaoFechar } from "@/components/ui/janela-vidro";
 import { MessageBubble, type ChatMessageLike } from "@/components/chat/message-bubble";
 import { MessageComposer } from "@/components/chat/message-composer";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
-import {
-  fetchContactTeamNames,
-  fetchMyTeamCached,
-  fetchTeamThread,
-  fetchTeamThreads,
-  getTeamAudioUrl,
-  markThreadRead,
-  sendTeamAudioMessage,
-  sendTeamMessage,
-  traduzErroTime,
-  uploadTeamAudio,
-  type MyTeam,
-  type TeamThreadSummary,
-} from "@/lib/services/team-service";
+import { fetchContactTeamNames } from "@/lib/services/team-service";
 import {
   acceptFriendRequest,
   fetchFriendThread,
   fetchFriendThreads,
   fetchFriends,
   fetchIncomingFriendRequests,
-  fetchLastSeenMap,
   getFriendAudioUrl,
   isOnline,
   markFriendThreadRead,
@@ -46,19 +31,14 @@ import {
 } from "@/lib/services/friend-service";
 
 const POLL_MS = 6000;
-
-type Relacao = "time" | "amigo";
+const OURO = "#d4af37";
 
 interface Contato {
   id: string;
   nome: string;
   avatarId: number;
   avatarUrl: string | null;
-  relacao: Relacao;
-  role?: string;
-  /** Time atual do contato -- null quando ele nao tem time. Sempre
-      mostrado como chip (pedido explicito), inclusive na aba Time (o
-      mesmo time de quem esta vendo, mas reforca visualmente). */
+  /** Time atual do contato -- null quando ele nao tem time. */
   teamName: string | null;
   online: boolean;
   lastMessage?: string;
@@ -73,21 +53,15 @@ function ordenarContatos(a: Contato, b: Contato) {
   return a.nome.localeCompare(b.nome, "pt-BR");
 }
 
-// Central de Conversas: dois filtros -- "Time" (todo mundo do time,
-// mesmo sem historico ainda, tipo lista de contatos) e "Amigos" (fora
-// do time, por @apelido#codigo). O filtro "Time" so' aparece se o
-// usuario tiver time; sem time, cai direto pra Amigos. Bolinha verde
-// no avatar = online (last_seen_at recente, heartbeat do client --
-// ver lib/hooks/use-presence-heartbeat.ts).
+// Central de Conversas: só amigos (por @apelido#codigo). O chat com o
+// time saiu daqui (pedido explícito) -- as tabelas/funções do time
+// continuam no banco, só não aparecem mais no chat. Bolinha verde no
+// avatar = online (last_seen_at recente, heartbeat do client -- ver
+// lib/hooks/use-presence-heartbeat.ts).
 export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => void; initialOtherUserId?: string | null }) {
-  useEscapeToClose(onClose);
-
   const [meId, setMeId] = useState<string | null>(null);
   const [meuPerfil, setMeuPerfil] = useState<Profile | null>(null);
 
-  const [team, setTeam] = useState<MyTeam | null>(null);
-  const [teamThreads, setTeamThreads] = useState<TeamThreadSummary[]>([]);
-  const [presenceMap, setPresenceMap] = useState<Map<string, string | null>>(new Map());
   const [friends, setFriends] = useState<Friend[]>([]);
   const [friendThreads, setFriendThreads] = useState<FriendThreadSummary[]>([]);
   const [pedidos, setPedidos] = useState<FriendRequest[]>([]);
@@ -95,11 +69,9 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
   const [carregandoLista, setCarregandoLista] = useState(true);
   const [erro, setErro] = useState<string | null>(null);
 
-  const [filtro, setFiltro] = useState<Relacao>("time");
   const [mostrarAdicionar, setMostrarAdicionar] = useState(false);
 
   const [ativoId, setAtivoId] = useState<string | null>(null);
-  const [ativoRelacao, setAtivoRelacao] = useState<Relacao>("time");
   const [mensagens, setMensagens] = useState<ChatMessageLike[]>([]);
   const [carregandoThread, setCarregandoThread] = useState(false);
 
@@ -126,25 +98,14 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
 
   async function carregarTudo() {
     try {
-      const [myTeam, tThreads, fList, fThreads, fReqs] = await Promise.all([
-        fetchMyTeamCached(),
-        fetchTeamThreads().catch(() => []),
-        fetchFriends().catch(() => []),
+      const [fList, fThreads, fReqs] = await Promise.all([
+        fetchFriends(),
         fetchFriendThreads().catch(() => []),
         fetchIncomingFriendRequests().catch(() => []),
       ]);
-      setTeam(myTeam);
-      setTeamThreads(tThreads);
       setFriends(fList);
       setFriendThreads(fThreads);
       setPedidos(fReqs);
-
-      const idsTime = (myTeam?.members ?? []).filter((m) => !m.isMe).map((m) => m.userId);
-      if (idsTime.length) {
-        fetchLastSeenMap(idsTime)
-          .then(setPresenceMap)
-          .catch(() => {});
-      }
 
       const idsAmigos = fList.map((f) => f.userId);
       if (idsAmigos.length) {
@@ -153,7 +114,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
           .catch(() => {});
       }
     } catch (e) {
-      setErro(traduzErroTime(e));
+      setErro(traduzErroAmigos(e));
     } finally {
       setCarregandoLista(false);
     }
@@ -165,32 +126,7 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
     return () => clearInterval(id);
   }, []);
 
-  const contatosTime = useMemo<Contato[]>(() => {
-    if (!team) return [];
-    const threadsMap = new Map(teamThreads.map((t) => [t.otherUserId, t]));
-    return team.members
-      .filter((m) => !m.isMe)
-      .map((m) => {
-        const t = threadsMap.get(m.userId);
-        return {
-          id: m.userId,
-          nome: m.name,
-          avatarId: m.avatarId,
-          avatarUrl: m.avatarUrl,
-          relacao: "time" as const,
-          role: m.role,
-          teamName: team.team.name,
-          online: isOnline(presenceMap.get(m.userId) ?? null),
-          lastMessage: t?.lastMessage,
-          lastAt: t?.lastAt,
-          lastIsMine: t?.lastIsMine,
-          unreadCount: t?.unreadCount ?? 0,
-        };
-      })
-      .sort(ordenarContatos);
-  }, [team, teamThreads, presenceMap]);
-
-  const contatosAmigos = useMemo<Contato[]>(() => {
+  const contatos = useMemo<Contato[]>(() => {
     const threadsMap = new Map(friendThreads.map((t) => [t.otherUserId, t]));
     return friends
       .map((f) => {
@@ -200,7 +136,6 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
           nome: f.nome,
           avatarId: f.avatarId,
           avatarUrl: f.avatarUrl,
-          relacao: "amigo" as const,
           teamName: amigoTeamNames.get(f.userId) ?? null,
           online: isOnline(f.lastSeenAt),
           lastMessage: t?.lastMessage,
@@ -212,60 +147,40 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
       .sort(ordenarContatos);
   }, [friends, friendThreads, amigoTeamNames]);
 
-  const filtroEfetivo: Relacao = team ? filtro : "amigo";
-  const contatos = filtroEfetivo === "time" ? contatosTime : contatosAmigos;
-
-  async function abrirConversa(contato: Contato) {
-    setAtivoId(contato.id);
-    setAtivoRelacao(contato.relacao);
+  async function abrirConversa(id: string) {
+    setAtivoId(id);
     setMostrarAdicionar(false);
     setCarregandoThread(true);
     try {
-      if (contato.relacao === "time") {
-        const thread = await fetchTeamThread(contato.id);
-        setMensagens(thread);
-        await markThreadRead(contato.id).catch(() => {});
-        setTeamThreads((prev) => prev.map((t) => (t.otherUserId === contato.id ? { ...t, unreadCount: 0 } : t)));
-      } else {
-        const thread = await fetchFriendThread(contato.id);
-        setMensagens(thread);
-        await markFriendThreadRead(contato.id).catch(() => {});
-        setFriendThreads((prev) => prev.map((t) => (t.otherUserId === contato.id ? { ...t, unreadCount: 0 } : t)));
-      }
+      const thread = await fetchFriendThread(id);
+      setMensagens(thread);
+      await markFriendThreadRead(id).catch(() => {});
+      setFriendThreads((prev) => prev.map((t) => (t.otherUserId === id ? { ...t, unreadCount: 0 } : t)));
     } catch (e) {
-      setErro(contato.relacao === "time" ? traduzErroTime(e) : traduzErroAmigos(e));
+      setErro(traduzErroAmigos(e));
     } finally {
       setCarregandoThread(false);
     }
   }
 
+  // Deep link (?chat=<userId>) -- abre direto a conversa com esse amigo.
   useEffect(() => {
-    if (initialOtherUserId) {
-      // Deep link (?chat=) sempre chega como contato de time -- unico
-      // fluxo que gera esse link hoje (notificacao de mensagem de time).
-      abrirConversa({ id: initialOtherUserId, relacao: "time" } as Contato);
-    }
+    if (initialOtherUserId) abrirConversa(initialOtherUserId);
   }, [initialOtherUserId]);
 
   useEffect(() => {
     if (!ativoId) return;
     const id = setInterval(async () => {
       try {
-        if (ativoRelacao === "time") {
-          const thread = await fetchTeamThread(ativoId);
-          setMensagens(thread);
-          await markThreadRead(ativoId).catch(() => {});
-        } else {
-          const thread = await fetchFriendThread(ativoId);
-          setMensagens(thread);
-          await markFriendThreadRead(ativoId).catch(() => {});
-        }
+        const thread = await fetchFriendThread(ativoId);
+        setMensagens(thread);
+        await markFriendThreadRead(ativoId).catch(() => {});
       } catch {
         // silencioso -- proxima janela tenta de novo
       }
     }, POLL_MS);
     return () => clearInterval(id);
-  }, [ativoId, ativoRelacao]);
+  }, [ativoId]);
 
   useEffect(() => {
     scrollRef.current?.scrollTo({ top: scrollRef.current.scrollHeight });
@@ -273,264 +188,256 @@ export function ChatCenter({ onClose, initialOtherUserId }: { onClose: () => voi
 
   async function recarregarThreadAtiva() {
     if (!ativoId) return;
-    const thread = ativoRelacao === "time" ? await fetchTeamThread(ativoId) : await fetchFriendThread(ativoId);
-    setMensagens(thread);
+    setMensagens(await fetchFriendThread(ativoId));
   }
 
   async function enviarTexto(body: string) {
     if (!ativoId) return;
     try {
-      if (ativoRelacao === "time") await sendTeamMessage(ativoId, body);
-      else await sendFriendMessage(ativoId, body);
+      await sendFriendMessage(ativoId, body);
       await recarregarThreadAtiva();
       carregarTudo();
     } catch (e) {
-      setErro(ativoRelacao === "time" ? traduzErroTime(e) : traduzErroAmigos(e));
+      setErro(traduzErroAmigos(e));
     }
   }
 
   async function enviarAudio(blob: Blob, seconds: number) {
     if (!ativoId) return;
     try {
-      if (ativoRelacao === "time") {
-        if (!team) return;
-        const path = await uploadTeamAudio(team.team.id, blob);
-        await sendTeamAudioMessage(ativoId, path, seconds);
-      } else {
-        const path = await uploadFriendAudio(blob);
-        await sendFriendAudioMessage(ativoId, path, seconds);
-      }
+      const path = await uploadFriendAudio(blob);
+      await sendFriendAudioMessage(ativoId, path, seconds);
       await recarregarThreadAtiva();
       carregarTudo();
     } catch (e) {
-      setErro(ativoRelacao === "time" ? traduzErroTime(e) : traduzErroAmigos(e));
+      setErro(traduzErroAmigos(e));
     }
   }
 
-  // Busca nas duas listas (nao so' na do filtro atual): o usuario pode
-  // trocar de aba (Time/Amigos) com uma conversa ja aberta -- o painel
-  // da direita deve continuar mostrando ela normalmente.
-  const contatoAtivo = useMemo(
-    () => contatosTime.find((c) => c.id === ativoId) ?? contatosAmigos.find((c) => c.id === ativoId),
-    [contatosTime, contatosAmigos, ativoId]
-  );
+  const contatoAtivo = useMemo(() => contatos.find((c) => c.id === ativoId), [contatos, ativoId]);
   const mostrarListaMobile = !ativoId && !mostrarAdicionar;
+  const naoLidas = contatos.reduce((t, c) => t + c.unreadCount, 0);
 
   return (
-    <ModalPortal>
-      <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/70 p-4" onClick={onClose}>
-        <div
-          className="flex h-[min(760px,90vh)] w-full max-w-4xl overflow-hidden rounded-2xl border border-hairline bg-surface shadow-2xl shadow-black/60"
-          onClick={(e) => e.stopPropagation()}
-        >
-          {/* Coluna de conversas */}
-          <div
-            className={`flex w-full shrink-0 flex-col border-r border-hairline sm:w-72 ${
-              mostrarListaMobile || mostrarAdicionar ? "flex" : "hidden sm:flex"
-            }`}
-          >
-            <div className="border-b border-hairline p-4">
-              <div className="flex items-center gap-2">
-                <MessageCircle size={18} className="text-training" />
-                <h2 className="flex-1 text-sm font-bold text-ink">Conversas</h2>
-                <button onClick={onClose} className="grid size-7 place-items-center rounded-lg text-muted hover:text-ink sm:hidden" aria-label="Fechar">
-                  <X size={16} />
+    <JanelaVidro onClose={onClose} rotulo="Conversas" centro className="flex h-[min(760px,90vh)] max-w-4xl">
+      {/* Coluna de conversas */}
+      <div
+        className={`flex w-full shrink-0 flex-col border-r border-white/[0.07] sm:w-80 ${
+          mostrarListaMobile || mostrarAdicionar ? "flex" : "hidden sm:flex"
+        }`}
+      >
+        <div className="border-b border-white/[0.07] p-4">
+          <div className="flex items-center gap-3">
+            <span className="grid size-9 shrink-0 place-items-center rounded-xl border border-[#d4af37]/25 bg-[#d4af37]/10 text-[#d4af37]">
+              <MessageCircle size={17} />
+            </span>
+            <div className="min-w-0 flex-1">
+              <h2 className="text-[15px] font-semibold tracking-tight text-ink">Conversas</h2>
+              <p className="text-[11.5px] text-muted">{naoLidas > 0 ? `${naoLidas} não lida${naoLidas === 1 ? "" : "s"}` : "Seus amigos"}</p>
+            </div>
+            <BotaoFechar onClose={onClose} className="sm:hidden" />
+          </div>
+          {/* Tag propria sempre visivel ao abrir o chat, pra passar
+              pra um amigo adicionar sem precisar entrar no painel
+              de "Adicionar amigo". */}
+          <MinhaTag perfil={meuPerfil} />
+        </div>
+
+        {/* Alterna entre a lista e o painel de adicionar amigo. */}
+        <div className="flex items-center gap-1 border-b border-white/[0.07] p-2">
+          <AbaChat ativa={!mostrarAdicionar} onClick={() => setMostrarAdicionar(false)} icone={<Users size={14} />}>
+            Amigos
+          </AbaChat>
+          <AbaChat ativa={mostrarAdicionar} onClick={() => setMostrarAdicionar(true)} icone={<UserPlus size={14} />}>
+            Adicionar
+            {pedidos.length > 0 && (
+              <span className="rounded-full px-1.5 text-[10px] font-bold leading-4 text-black" style={{ background: OURO }}>
+                {pedidos.length}
+              </span>
+            )}
+          </AbaChat>
+        </div>
+
+        {mostrarAdicionar ? (
+          <AdicionarAmigo
+            meuPerfil={meuPerfil}
+            pedidos={pedidos}
+            onPedidoRespondido={carregarTudo}
+            onAdicionado={carregarTudo}
+          />
+        ) : (
+          <div className="painel-scroll min-h-0 flex-1 overflow-y-auto p-2">
+            {carregandoLista ? (
+              <div className="flex flex-col gap-1.5 p-1" aria-hidden>
+                {[0, 1, 2, 3].map((i) => (
+                  <div key={i} className="painel-esqueleto h-14 rounded-2xl" />
+                ))}
+              </div>
+            ) : contatos.length === 0 ? (
+              <div className="flex flex-col items-center gap-2 px-4 py-10 text-center">
+                <span className="grid size-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.03] text-[#d4af37]">
+                  <Users size={20} />
+                </span>
+                <p className="text-[13px] font-medium text-ink">Nenhum amigo ainda</p>
+                <p className="text-[12px] text-muted">Adicione alguém pela tag (@apelido#0000) pra começar a conversar.</p>
+                <button
+                  onClick={() => setMostrarAdicionar(true)}
+                  className="mt-1 flex items-center gap-1.5 rounded-xl bg-[#d4af37] px-3.5 py-2 text-[12.5px] font-semibold text-black transition hover:bg-[#e2c35a]"
+                >
+                  <UserPlus size={14} /> Adicionar amigo
                 </button>
               </div>
-              {/* Tag propria sempre visivel ao abrir o chat, pra passar
-                  pra um amigo adicionar sem precisar entrar no painel
-                  de "Adicionar amigo". */}
-              <MinhaTag perfil={meuPerfil} />
-            </div>
-
-            {/* Filtros: Time (so' com time) / Amigos */}
-            <div className="flex items-center gap-1 border-b border-hairline p-2">
-              {team && (
-                <button
-                  onClick={() => {
-                    setFiltro("time");
-                    setMostrarAdicionar(false);
-                  }}
-                  className={`flex-1 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
-                    filtroEfetivo === "time" ? "bg-ink text-void" : "text-muted hover:text-ink"
-                  }`}
-                >
-                  Time
-                </button>
-              )}
-              <button
-                onClick={() => {
-                  setFiltro("amigo");
-                  setMostrarAdicionar(false);
-                }}
-                className={`flex-1 rounded-lg px-2.5 py-1.5 text-[12px] font-semibold transition-colors ${
-                  filtroEfetivo === "amigo" ? "bg-ink text-void" : "text-muted hover:text-ink"
-                }`}
-              >
-                Amigos
-                {pedidos.length > 0 && (
-                  <span className="ml-1.5 rounded-full bg-evolution px-1.5 py-0.5 text-[10px] font-bold text-void">{pedidos.length}</span>
-                )}
-              </button>
-              {filtroEfetivo === "amigo" && (
-                <button
-                  onClick={() => setMostrarAdicionar((v) => !v)}
-                  className={`grid size-7 shrink-0 place-items-center rounded-lg transition-colors ${
-                    mostrarAdicionar ? "bg-ink text-void" : "text-muted hover:bg-white/[0.06] hover:text-ink"
-                  }`}
-                  aria-label="Adicionar amigo"
-                  title="Adicionar amigo"
-                >
-                  <Plus size={15} />
-                </button>
-              )}
-            </div>
-
-            {mostrarAdicionar ? (
-              <AdicionarAmigo
-                meuPerfil={meuPerfil}
-                pedidos={pedidos}
-                onPedidoRespondido={carregarTudo}
-                onAdicionado={carregarTudo}
-              />
             ) : (
-              <div className="min-h-0 flex-1 overflow-y-auto p-2">
-                {carregandoLista ? (
-                  <p className="px-2 py-3 text-xs text-muted">Carregando…</p>
-                ) : contatos.length === 0 ? (
-                  <div className="px-3 py-6 text-center">
-                    <p className="text-sm text-muted">
-                      {filtroEfetivo === "time" ? "Ninguém mais no time ainda." : "Nenhum amigo adicionado ainda."}
-                    </p>
-                    {filtroEfetivo === "amigo" && (
-                      <button onClick={() => setMostrarAdicionar(true)} className="mt-2 text-xs font-medium text-training hover:underline">
-                        Adicionar amigo
-                      </button>
-                    )}
-                  </div>
-                ) : (
-                  contatos.map((c) => (
-                    <button
-                      key={c.id}
-                      onClick={() => abrirConversa(c)}
-                      className={`flex w-full items-center gap-2.5 rounded-lg px-2 py-2 text-left transition-colors ${
-                        ativoId === c.id ? "bg-white/[0.06]" : "hover:bg-white/[0.04]"
-                      }`}
-                    >
-                      <div className="relative shrink-0">
-                        <AvatarNivel userId={c.id} avatarId={c.avatarId} avatarUrl={c.avatarUrl} tamanho={38} />
-                        {c.online && (
-                          <span
-                            className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface bg-positive"
-                            aria-label="Online"
-                            title="Online"
-                          />
-                        )}
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-[13px] font-medium text-ink">{c.nome}</p>
-                          {c.lastAt && <span className="shrink-0 text-[10px] text-muted">{formatarQuando(c.lastAt)}</span>}
-                        </div>
-                        {c.teamName && (
-                          <Chip color="#5AA6E0" size="sm" className="mt-0.5">
-                            {c.teamName}
-                          </Chip>
-                        )}
-                        <div className="flex items-center justify-between gap-2">
-                          <p className="truncate text-[12px] text-muted">
-                            {c.lastMessage ? `${c.lastIsMine ? "Você: " : ""}${c.lastMessage}` : "Sem mensagens ainda"}
-                          </p>
-                          {c.unreadCount > 0 && (
-                            <span className="grid min-w-[18px] shrink-0 place-items-center rounded-full bg-evolution px-1 text-[10px] font-bold leading-[18px] text-void">
-                              {c.unreadCount > 9 ? "9+" : c.unreadCount}
-                            </span>
+              <ul className="flex flex-col gap-1">
+                {contatos.map((c) => {
+                  const ativo = ativoId === c.id;
+                  return (
+                    <li key={c.id}>
+                      <button
+                        onClick={() => abrirConversa(c.id)}
+                        className={`flex w-full items-center gap-3 rounded-2xl border px-2.5 py-2.5 text-left transition-colors ${
+                          ativo ? "border-[#d4af37]/25 bg-[#d4af37]/[0.07]" : "border-transparent hover:bg-white/[0.04]"
+                        }`}
+                      >
+                        <div className="relative shrink-0">
+                          <AvatarNivel userId={c.id} avatarId={c.avatarId} avatarUrl={c.avatarUrl} tamanho={40} />
+                          {c.online && (
+                            <span
+                              className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#111] bg-positive"
+                              aria-label="Online"
+                              title="Online"
+                            />
                           )}
                         </div>
-                      </div>
-                    </button>
-                  ))
-                )}
-              </div>
+                        <div className="min-w-0 flex-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className={`truncate text-[13px] ${c.unreadCount > 0 ? "font-semibold text-ink" : "font-medium text-ink"}`}>{c.nome}</p>
+                            {c.lastAt && (
+                              <span className={`shrink-0 text-[10.5px] tabular-nums ${c.unreadCount > 0 ? "text-[#d4af37]" : "text-muted"}`}>
+                                {formatarQuando(c.lastAt)}
+                              </span>
+                            )}
+                          </div>
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="truncate text-[12px] text-muted">
+                              {c.lastMessage ? `${c.lastIsMine ? "Você: " : ""}${c.lastMessage}` : "Sem mensagens ainda"}
+                            </p>
+                            {c.unreadCount > 0 && (
+                              <span
+                                className="grid min-w-[18px] shrink-0 place-items-center rounded-full px-1 text-[10px] font-bold leading-[18px] text-black"
+                                style={{ background: OURO }}
+                              >
+                                {c.unreadCount > 9 ? "9+" : c.unreadCount}
+                              </span>
+                            )}
+                          </div>
+                          {c.teamName && (
+                            <Chip color="#5AA6E0" size="sm" className="mt-1">
+                              {c.teamName}
+                            </Chip>
+                          )}
+                        </div>
+                      </button>
+                    </li>
+                  );
+                })}
+              </ul>
             )}
           </div>
+        )}
+      </div>
 
-          {/* Conversa ativa */}
-          <div className={`flex min-w-0 flex-1 flex-col ${mostrarListaMobile || mostrarAdicionar ? "hidden sm:flex" : "flex"}`}>
-            {!ativoId || !contatoAtivo ? (
-              <div className="grid flex-1 place-items-center p-6 text-center">
-                <div>
-                  <MessageCircle size={28} className="mx-auto mb-2 text-muted/50" />
-                  <p className="text-sm text-muted">Escolha uma conversa ao lado.</p>
-                </div>
-              </div>
-            ) : (
-              <>
-                <div className="flex items-center gap-3 border-b border-hairline p-4">
-                  <button
-                    onClick={() => setAtivoId(null)}
-                    className="grid size-7 shrink-0 place-items-center rounded-lg text-muted hover:text-ink sm:hidden"
-                    aria-label="Voltar"
-                  >
-                    <ArrowLeft size={16} />
-                  </button>
+      {/* Conversa ativa */}
+      <div className={`flex min-w-0 flex-1 flex-col ${mostrarListaMobile || mostrarAdicionar ? "hidden sm:flex" : "flex"}`}>
+        {!ativoId ? (
+          <div className="relative grid flex-1 place-items-center p-6 text-center">
+            <BotaoFechar onClose={onClose} className="absolute right-4 top-4 hidden sm:grid" />
+            <div className="flex flex-col items-center gap-2">
+              <span className="grid size-12 place-items-center rounded-2xl border border-white/10 bg-white/[0.03] text-muted">
+                <MessageCircle size={22} />
+              </span>
+              <p className="text-[13px] text-muted">Escolha uma conversa ao lado.</p>
+            </div>
+          </div>
+        ) : (
+          <>
+            <div className="flex items-center gap-3 border-b border-white/[0.07] px-4 py-3.5">
+              <button
+                onClick={() => setAtivoId(null)}
+                className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.03] text-muted hover:text-ink sm:hidden"
+                aria-label="Voltar"
+              >
+                <ArrowLeft size={15} />
+              </button>
+              {contatoAtivo ? (
+                <>
                   <div className="relative shrink-0">
-                    <AvatarNivel userId={contatoAtivo.id} avatarId={contatoAtivo.avatarId} avatarUrl={contatoAtivo.avatarUrl} tamanho={34} />
+                    <AvatarNivel userId={contatoAtivo.id} avatarId={contatoAtivo.avatarId} avatarUrl={contatoAtivo.avatarUrl} tamanho={36} />
                     {contatoAtivo.online && (
-                      <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-surface bg-positive" />
+                      <span className="absolute -bottom-0.5 -right-0.5 size-3 rounded-full border-2 border-[#111] bg-positive" />
                     )}
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex flex-wrap items-center gap-1.5">
-                      <p className="truncate text-sm font-semibold text-ink">{contatoAtivo.nome}</p>
+                      <p className="truncate text-[14px] font-semibold text-ink">{contatoAtivo.nome}</p>
                       {contatoAtivo.teamName && (
                         <Chip color="#5AA6E0" size="sm">
                           {contatoAtivo.teamName}
                         </Chip>
                       )}
                     </div>
-                    <p className="text-xs text-muted">
-                      {contatoAtivo.online ? "Online" : contatoAtivo.relacao === "time" ? "Time" : "Amigo"}
+                    <p className={`text-[11.5px] ${contatoAtivo.online ? "text-positive" : "text-muted"}`}>
+                      {contatoAtivo.online ? "Online agora" : "Amigo"}
                     </p>
                   </div>
-                  <button onClick={onClose} className="hidden size-7 shrink-0 place-items-center rounded-lg text-muted hover:text-ink sm:grid" aria-label="Fechar">
-                    <X size={16} />
-                  </button>
-                </div>
+                </>
+              ) : (
+                <div className="painel-esqueleto h-9 flex-1 rounded-xl" aria-hidden />
+              )}
+              <BotaoFechar onClose={onClose} className="hidden sm:grid" />
+            </div>
 
-                <div ref={scrollRef} className="flex-1 space-y-2 overflow-y-auto p-4">
-                  {carregandoThread ? (
-                    <p className="text-sm text-muted">Carregando…</p>
-                  ) : mensagens.length === 0 ? (
-                    <p className="text-sm text-muted">Nenhuma mensagem ainda. Diga oi.</p>
-                  ) : (
-                    mensagens.map((m) => (
-                      <MessageBubble
-                        key={m.id}
-                        message={m}
-                        isMine={m.senderId === meId}
-                        getAudioUrl={ativoRelacao === "time" ? getTeamAudioUrl : getFriendAudioUrl}
-                      />
-                    ))
-                  )}
-                </div>
+            <div ref={scrollRef} className="painel-scroll flex-1 space-y-2 overflow-y-auto p-4">
+              {carregandoThread ? (
+                <p className="text-[13px] text-muted">Carregando…</p>
+              ) : mensagens.length === 0 ? (
+                <p className="py-8 text-center text-[13px] text-muted">Nenhuma mensagem ainda. Diga oi 👋</p>
+              ) : (
+                mensagens.map((m) => (
+                  <MessageBubble key={m.id} message={m} isMine={m.senderId === meId} getAudioUrl={getFriendAudioUrl} />
+                ))
+              )}
+            </div>
 
-                <MessageComposer onSendText={enviarTexto} onSendAudio={enviarAudio} />
-              </>
-            )}
-          </div>
-        </div>
+            <MessageComposer onSendText={enviarTexto} onSendAudio={enviarAudio} disabled={!contatoAtivo} />
+          </>
+        )}
       </div>
 
       {erro && (
-        <div
-          className="fixed bottom-6 left-1/2 z-[60] -translate-x-1/2 rounded-lg border border-negative/40 bg-surface px-4 py-2 text-sm text-negative shadow-lg"
+        <button
+          type="button"
+          className="absolute bottom-4 left-1/2 z-10 -translate-x-1/2 rounded-xl border border-negative/40 bg-black/80 px-4 py-2 text-[13px] text-negative shadow-lg backdrop-blur"
           onClick={() => setErro(null)}
         >
           {erro}
-        </div>
+        </button>
       )}
-    </ModalPortal>
+    </JanelaVidro>
+  );
+}
+
+function AbaChat({ ativa, onClick, icone, children }: { ativa: boolean; onClick: () => void; icone: React.ReactNode; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className={`flex flex-1 items-center justify-center gap-1.5 rounded-xl px-2.5 py-2 text-[12.5px] font-medium transition-colors ${
+        ativa ? "bg-white/[0.06] text-ink" : "text-muted hover:bg-white/[0.03] hover:text-ink"
+      }`}
+    >
+      <span className={ativa ? "text-[#d4af37]" : undefined}>{icone}</span>
+      {children}
+    </button>
   );
 }
 
@@ -559,9 +466,10 @@ function MinhaTag({ perfil }: { perfil: Profile | null }) {
     <button
       onClick={copiar}
       title="Copiar sua tag"
-      className="mt-2 flex w-full items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-left transition-colors hover:border-ink/40"
+      className="mt-3 flex w-full items-center gap-1.5 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-left transition-colors hover:border-[#d4af37]/40"
     >
-      <span className="min-w-0 flex-1 truncate text-[11.5px] font-semibold text-ink">{tag}</span>
+      <span className="shrink-0 text-[10.5px] text-muted">Sua tag</span>
+      <span className="min-w-0 flex-1 truncate text-[12px] font-semibold text-ink">{tag}</span>
       {copiado ? <Check size={12} className="shrink-0 text-positive" /> : <Copy size={12} className="shrink-0 text-muted" />}
     </button>
   );
@@ -639,15 +547,15 @@ function AdicionarAmigo({
   }
 
   return (
-    <div className="min-h-0 flex-1 overflow-y-auto p-3">
+    <div className="painel-scroll min-h-0 flex-1 overflow-y-auto p-3">
       {minhaTag && (
-        <div className="mb-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
-          <p className="text-[10px] font-bold uppercase tracking-wider text-muted/70">Sua tag</p>
+        <div className="painel-bloco mb-4 rounded-2xl border border-white/[0.06] px-3.5 py-3">
+          <p className="text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted/60">Sua tag</p>
           <div className="mt-1 flex items-center gap-2">
             <p className="min-w-0 flex-1 truncate text-[13px] font-semibold text-ink">{minhaTag}</p>
             <button
               onClick={copiarTag}
-              className="grid size-7 shrink-0 place-items-center rounded-md text-muted transition-colors hover:text-ink"
+              className="grid size-8 shrink-0 place-items-center rounded-lg border border-white/10 bg-white/[0.03] text-muted transition hover:border-white/20 hover:text-ink"
               aria-label="Copiar tag"
               title="Copiar tag"
             >
@@ -659,7 +567,7 @@ function AdicionarAmigo({
       )}
 
       <div className="mb-3">
-        <p className="mb-1.5 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
+        <p className="mb-2 flex items-center gap-1.5 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted/60">
           <UserPlus size={12} /> Adicionar por tag
         </p>
         <div className="flex gap-2">
@@ -668,14 +576,14 @@ function AdicionarAmigo({
             onChange={(e) => setTag(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && adicionar()}
             placeholder="@apelido#0000"
-            className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
+            className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2.5 text-[13px] text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-[#d4af37]/60"
           />
           <button
             onClick={adicionar}
             disabled={enviando || !tag.trim()}
-            className="shrink-0 rounded-lg bg-ink px-3 py-2 text-[13px] font-semibold text-void disabled:opacity-50"
+            className="shrink-0 rounded-xl bg-[#d4af37] px-3.5 py-2 text-[13px] font-semibold text-black transition hover:bg-[#e2c35a] disabled:opacity-50"
           >
-            {enviando ? "…" : "Add"}
+            {enviando ? "…" : "Adicionar"}
           </button>
         </div>
         {msg && (
@@ -684,11 +592,11 @@ function AdicionarAmigo({
       </div>
 
       {pedidos.length > 0 && (
-        <div className="border-t border-hairline pt-3">
-          <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Pedidos recebidos</p>
+        <div className="border-t border-white/[0.07] pt-4">
+          <p className="mb-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted/60">Pedidos recebidos</p>
           <ul className="space-y-1.5">
             {pedidos.map((p) => (
-              <li key={p.friendshipId} className="rounded-lg border border-hairline bg-elevated px-2.5 py-2">
+              <li key={p.friendshipId} className="painel-bloco rounded-2xl border border-[#d4af37]/20 px-3 py-2.5">
                 <div className="flex items-center gap-2">
                   <AvatarNivel userId={p.userId} avatarId={p.avatarId} avatarUrl={p.avatarUrl} tamanho={28} />
                   <div className="min-w-0 flex-1">
@@ -700,14 +608,14 @@ function AdicionarAmigo({
                   <button
                     onClick={() => responder(p, true)}
                     disabled={respondendo === p.friendshipId}
-                    className="flex-1 rounded-md bg-ink py-1.5 text-[11.5px] font-semibold text-void disabled:opacity-50"
+                    className="flex-1 rounded-lg bg-[#d4af37] py-1.5 text-[12px] font-semibold text-black transition hover:bg-[#e2c35a] disabled:opacity-50"
                   >
                     Aceitar
                   </button>
                   <button
                     onClick={() => responder(p, false)}
                     disabled={respondendo === p.friendshipId}
-                    className="flex-1 rounded-md border border-hairline py-1.5 text-[11.5px] text-muted hover:text-ink disabled:opacity-50"
+                    className="flex-1 rounded-lg border border-white/10 bg-white/[0.03] py-1.5 text-[12px] text-muted transition hover:border-white/20 hover:text-ink disabled:opacity-50"
                   >
                     Recusar
                   </button>

@@ -7,7 +7,6 @@ import { usePathname } from "next/navigation";
 import { Bell, CircleHelp, CreditCard, Crown, House, Trophy } from "lucide-react";
 import { Logo } from "./logo";
 import { AvatarNivel } from "./avatar-nivel";
-import { ProfileMenu } from "./profile-menu";
 import { NotificationsMenu } from "./notifications-menu";
 import { HelpMenu } from "./help-menu";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
@@ -26,7 +25,7 @@ const TABS = [
   { label: "Tarefas", href: "/hub", icon: Trophy },
 ] as const;
 
-type OpenMenu = "profile" | "notifications" | "help" | null;
+type OpenMenu = "notifications" | "help" | null;
 
 const HIDDEN_ROUTES = ["/login", "/esqueci-senha", "/redefinir-senha", "/agent-login"];
 
@@ -45,7 +44,7 @@ function isHiddenRoute(pathname: string) {
 // "/revisor/admin" tambem fica de fora: painel oculto (sem link no fluxo
 // do jogador, acesso direto por URL restrito a um unico e-mail) que
 // nunca foi migrado pro AppShell.
-const APP_SHELL_ROUTE_PREFIXES = ["/inicio", "/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace"];
+const APP_SHELL_ROUTE_PREFIXES = ["/inicio", "/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace", "/configuracoes", "/notificacoes"];
 const APP_SHELL_EXCLUDED_PREFIXES = ["/time/convite", "/revisor/admin"];
 
 function usaAppShell(pathname: string) {
@@ -110,7 +109,7 @@ export function TopNav() {
   }
 
   return (
-    <header className="relative sm:sticky sm:top-0 z-30 border-b border-hairline bg-void/80 backdrop-blur-xl">
+    <header className="relative sm:sticky sm:top-0 z-30 border-b border-white/[0.06] bg-[#0c0c0c]/80 backdrop-blur-xl">
       {/* Full-width igual ao resto do app (px-6, padrao em toda pagina) —
           antes o header usava max-w-[1280px] centralizado, o que deixava
           logo/icones "recuados" enquanto o corpo da pagina foi esticado
@@ -137,7 +136,7 @@ export function TopNav() {
                 aria-label={tab.label}
                 title={tab.label}
                 className={`grid size-8 place-items-center rounded-lg transition-colors sm:size-9 ${
-                  isActive ? "bg-white/[0.08] text-ink" : "text-muted hover:bg-white hover:text-void"
+                  isActive ? "bg-white/[0.08] text-ink" : "text-muted hover:bg-white/[0.06] hover:text-ink"
                 }`}
               >
                 <Icon className="size-[18px]" />
@@ -165,7 +164,7 @@ export function TopNav() {
               aria-current={pathname === "/minha-conta" ? "page" : undefined}
               aria-label="Meu Plano"
               title="Meu Plano"
-              className={`grid size-8 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void sm:size-9 ${
+              className={`grid size-8 place-items-center rounded-lg transition-colors hover:bg-white/[0.06] hover:text-ink sm:size-9 ${
                 pathname === "/minha-conta" ? "text-ink" : "text-muted"
               }`}
             >
@@ -177,12 +176,12 @@ export function TopNav() {
             <button
               type="button"
               onClick={() => toggle("notifications")}
-              className="relative grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void sm:size-9"
+              className="relative grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-ink sm:size-9"
               aria-label="Notificações"
             >
               <Bell className="size-[18px]" />
               {unread > 0 && (
-                <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
+                <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-[#d4af37] px-1 text-[9px] font-bold leading-[15px] text-black">
                   {unread > 9 ? "9+" : unread}
                 </span>
               )}
@@ -194,7 +193,7 @@ export function TopNav() {
             <button
               type="button"
               onClick={() => toggle("help")}
-              className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void sm:size-9"
+              className="grid size-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-ink sm:size-9"
               aria-label="Ajuda"
             >
               <CircleHelp className="size-[18px]" />
@@ -202,20 +201,18 @@ export function TopNav() {
             {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
           </div>
 
+          {/* Foto leva pras Configurações (página própria, /configuracoes). */}
           <div className="relative">
-            <button
-              type="button"
-              onClick={() => toggle("profile")}
-              className="ml-1 flex items-center gap-1.5 rounded-full border border-hairline bg-white/[0.04] py-1 pl-1 pr-1.5 transition-colors hover:bg-white/[0.08] sm:ml-1.5 sm:gap-2 sm:pr-2.5"
-              aria-label="Perfil"
+            <Link
+              href="/configuracoes"
+              className="ml-1 flex items-center gap-1.5 rounded-full border border-white/10 bg-white/[0.04] py-1 pl-1 pr-1.5 transition-colors hover:border-[#d4af37]/40 hover:bg-white/[0.08] sm:ml-1.5 sm:gap-2 sm:pr-2.5"
+              aria-label="Configurações"
+              title="Configurações"
             >
               {/* Anel de nível (cor da patente + quanto falta pro próximo),
                   o mesmo de toda foto de jogador no app. */}
               <AvatarNivel avatarId={profile?.avatar_id ?? 1} avatarUrl={profile?.avatar_url} tamanho={36} nivel={level} xpAtual={xpNivel} />
-            </button>
-            {openMenu === "profile" && profile && (
-              <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />
-            )}
+            </Link>
           </div>
         </div>
       </div>

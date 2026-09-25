@@ -34,9 +34,9 @@ const BARALHOS: { valor: Baralho; rotulo: string }[] = [
 function Secao({ titulo, ajuda, children }: { titulo: string; ajuda?: string; children: React.ReactNode }) {
   return (
     <div className="flex flex-col gap-2">
-      <span className="text-[11px] uppercase tracking-[0.08em] text-muted">{titulo}</span>
+      <span className="text-[12.5px] font-medium text-ink">{titulo}</span>
       {children}
-      {ajuda && <p className="m-0 text-[11px] leading-snug text-muted">{ajuda}</p>}
+      {ajuda && <p className="m-0 text-[11.5px] leading-snug text-muted">{ajuda}</p>}
     </div>
   );
 }
@@ -53,8 +53,8 @@ function Opcoes<T extends string | number>({ opcoes, valor, onChange }: { opcoes
             type="button"
             aria-pressed={ativo}
             onClick={() => onChange(o.valor)}
-            className={`rounded-md border px-2.5 py-1.5 text-[11px] font-semibold transition-colors ${
-              ativo ? "border-ink bg-ink text-void" : "border-hairline bg-void text-muted hover:text-ink"
+            className={`rounded-xl border px-3 py-2 text-[12px] font-semibold transition-colors ${
+              ativo ? "border-[#d4af37]/50 bg-[#d4af37]/15 text-[#f1d78a]" : "border-white/10 bg-white/[0.03] text-muted hover:border-white/20 hover:text-ink"
             }`}
           >
             {o.rotulo}
@@ -68,7 +68,7 @@ function Opcoes<T extends string | number>({ opcoes, valor, onChange }: { opcoes
 export function PreferenciasMesaPainel() {
   const pref = usePreferenciasMesa();
   return (
-    <div className="flex flex-col gap-5 p-4">
+    <div className="flex flex-col gap-5">
       <Secao titulo="Cor da mesa" ajuda="Vale no Treino e no Revisor. Padrão: azul no Treino e vinho no Revisor.">
         <div className="flex flex-wrap gap-3">
           {FELTROS.map((f) => {
@@ -82,7 +82,7 @@ export function PreferenciasMesaPainel() {
                 className="flex flex-col items-center gap-1.5 text-[11px] font-semibold text-muted hover:text-ink"
               >
                 <span
-                  className={`relative grid h-9 w-14 place-items-center rounded-full border-2 ${ativo ? "border-ink" : "border-transparent"}`}
+                  className={`relative grid h-9 w-14 place-items-center rounded-full border-2 ${ativo ? "border-[#d4af37]" : "border-transparent"}`}
                   style={{ background: f.fundo, boxShadow: "inset 0 0 0 3px rgba(0,0,0,.55)" }}
                 >
                   {ativo && <Check size={14} className="text-ink" strokeWidth={3} />}
@@ -105,7 +105,7 @@ export function PreferenciasMesaPainel() {
                 aria-pressed={ativo}
                 onClick={() => salvarPreferenciaMesa("baralho", b.valor)}
                 className={`flex flex-col items-center gap-2 rounded-xl border p-2.5 transition-colors ${
-                  ativo ? "border-ink bg-white/[0.06]" : "border-hairline bg-void hover:border-white/30"
+                  ativo ? "border-[#d4af37]/50 bg-[#d4af37]/[0.08]" : "border-white/10 bg-white/[0.03] hover:border-white/20"
                 }`}
               >
                 <span className="flex gap-1">

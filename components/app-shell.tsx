@@ -7,40 +7,44 @@ import { Bell, CircleHelp, CreditCard, Crown, Home, Lock, LogOut, MessageCircle,
 import { Logo } from "@/components/logo";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { HelpMenu } from "@/components/help-menu";
-import { ProfileMenu } from "@/components/profile-menu";
 import { ChatCenter } from "@/components/chat/chat-center";
 import { PlanLockModal } from "@/components/plan-lock-modal";
+import { PainelStyles } from "@/components/painel/painel-styles";
 import { createClient } from "@/lib/supabase/client";
 import { sairDesteAparelho } from "@/lib/supabase/sair-deste-aparelho";
-import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
-import { fetchTeamUnreadCount, fetchMyMembership } from "@/lib/services/team-service";
+import { fetchMyMembership } from "@/lib/services/team-service";
 import { fetchFriendUnreadCount } from "@/lib/services/friend-service";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
-import { ABRIR_CONFIGURACOES, PERFIL_MUDOU } from "@/lib/eventos-perfil";
+import { ABRIR_CONFIGURACOES } from "@/lib/eventos-perfil";
 import { isAddonUnlockedFor, isModuleUnlockedFor, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
 import { modules } from "@/lib/modules-data";
 
-type OpenMenu = "notifications" | "help" | "profile" | "chats" | null;
+type OpenMenu = "notifications" | "help" | "chats" | null;
 
-// Badge do icone de Conversas soma as duas fontes -- time e amigos sao
-// tabelas separadas (team_messages/friend_messages), ver
-// components/chat/chat-center.tsx.
+// Badge do chat: só conversas com amigos -- o chat com o time saiu da
+// Central de Conversas (pedido explícito), ver components/chat/chat-center.tsx.
 async function fetchAllChatUnread(): Promise<number> {
-  const [time, amigos] = await Promise.all([
-    fetchTeamUnreadCount().catch(() => 0),
-    fetchFriendUnreadCount().catch(() => 0),
-  ]);
-  return time + amigos;
+  return fetchFriendUnreadCount().catch(() => 0);
 }
 
 const SIDEBAR_COLLAPSE_KEY = "pokersync:sidebar-collapsed";
-// Nenhum modulo/accent existente usa laranja (ver ACCENT em lib/modules-data.tsx).
-// Mesmo azul ja usado no icone do chat dentro do ChatCenter (--color-training)
-// -- antes o botao flutuante tinha fundo solido amarelo/laranja, sem nada a
-// ver com o resto da identidade do chat; agora fica translucido com borda,
-// no mesmo tom.
-const CHAT_ACCENT = "#3b82f6";
+// Dourado do visual de vidro (mesmo dos botões principais, ver
+// BOTAO_OURO em components/banca/util.ts) -- destaque do topo, do chat e
+// dos contadores.
+const OURO = "#d4af37";
+
+// Botão de ícone do topo no visual de vidro: sem o "flash" branco antigo
+// no hover; a tela atual ganha fundo sutil e um risquinho dourado embaixo.
+function iconeTopo(ativo: boolean) {
+  return `relative grid size-9 place-items-center rounded-xl transition-colors hover:bg-white/[0.06] hover:text-ink ${
+    ativo ? "bg-white/[0.06] text-ink" : "text-muted"
+  }`;
+}
+function MarcaAtivo({ ativo }: { ativo: boolean }) {
+  if (!ativo) return null;
+  return <span className="absolute -bottom-[3px] left-1/2 h-[2px] w-4 -translate-x-1/2 rounded-full" style={{ background: OURO }} aria-hidden="true" />;
+}
 
 // Casca compartilhada (sidebar + topbar) entre os módulos que já migraram
 // pro layout novo -- hoje /modulos e /banca. Cada módulo continua dono do
@@ -83,7 +87,6 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   // que a gente le uma unica vez no mount.
   const [pendingChatId, setPendingChatId] = useState<string | null>(null);
 
-  const [profile, setProfile] = useState<Profile | null>(null);
   const [unread, setUnread] = useState(0);
   const [unreadChats, setUnreadChats] = useState(0);
   const [openMenu, setOpenMenu] = useState<OpenMenu>(null);
@@ -122,15 +125,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
       } catch {
         return;
       }
-      const [profileRes, unreadRes, unreadChatsRes, planRes, membershipRes] = await Promise.allSettled([
-        fetchProfile(),
+      const [unreadRes, unreadChatsRes, planRes, membershipRes] = await Promise.allSettled([
         fetchUnreadCount(),
         fetchAllChatUnread(),
         fetchMyPlanState(),
         fetchMyMembership(),
       ]);
       if (!alive) return;
-      if (profileRes.status === "fulfilled") setProfile(profileRes.value);
       if (unreadRes.status === "fulfilled") setUnread(unreadRes.value);
       if (unreadChatsRes.status === "fulfilled") setUnreadChats(unreadChatsRes.value);
       if (planRes.status === "fulfilled") {
@@ -158,12 +159,13 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   }, []);
 
   // Outra tela pediu pra abrir as Configurações (ex.: "Preencher" no
-  // cartão das Vagas) -- ver lib/eventos-perfil.ts.
+  // cartão das Vagas) -- ver lib/eventos-perfil.ts. Configurações virou
+  // página própria: leva direto pra aba de disponibilidade.
   useEffect(() => {
-    const abrir = () => setOpenMenu("profile");
+    const abrir = () => router.push("/configuracoes?aba=disponibilidade");
     window.addEventListener(ABRIR_CONFIGURACOES, abrir);
     return () => window.removeEventListener(ABRIR_CONFIGURACOES, abrir);
-  }, []);
+  }, [router]);
 
   // Chegou aqui via redirect do middleware (rota bloqueada pro plano
   // atual, ver lib/supabase/middleware.ts) -- abre a mesma modal de
@@ -215,11 +217,11 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         .filter((m) => m.key !== "hub" && m.key !== "radar")
         .map((m) => {
         const Icon = m.icon;
-        const active = pathname === m.href;
-        // Hover usa a cor do proprio modulo (m.accent) com o mesmo
-        // tratamento do Chip (fundo translucido + glow) em vez de um
-        // hover cinza generico -- pedido explicito pra ficar "nitido",
-        // igual ao resto do produto ja associa cor a cada modulo.
+        const active = pathname === m.href || (!!m.href && m.href !== "/" && pathname.startsWith(`${m.href}/`));
+        // Cada modulo continua com a propria cor (m.accent) no item ativo
+        // e no hover (pedido explicito) -- so' o acabamento mudou pro
+        // vidro: fundo translucido na cor do modulo, borda fina e o
+        // risco lateral, sem o glow forte antigo.
         const hovered = hoverKey === m.key;
         // "radar" nao e' ModuleKey -- e' addon, vendido a parte do plano
         // base (ver lib/plans/plans-data.ts) -- checa hasAddon() em vez
@@ -250,95 +252,121 @@ export function AppShell({ children }: { children: React.ReactNode }) {
               }}
               onMouseEnter={() => setHoverKey(m.key)}
               onMouseLeave={() => setHoverKey((k) => (k === m.key ? null : k))}
-              className={`relative flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted/70 transition-all duration-150 ${
+              className={`relative flex w-full items-center gap-3 rounded-xl border border-transparent px-3 py-2.5 text-left text-[13.5px] font-medium text-muted/60 transition-colors duration-150 ${
                 collapsed ? "justify-center" : ""
-              } ${hovered ? "bg-white/[0.04]" : ""}`}
+              } ${hovered ? "bg-white/[0.03]" : ""}`}
             >
-              <Icon size={18} strokeWidth={1.75} className="shrink-0 opacity-50" />
+              <Icon size={18} className="shrink-0 opacity-50" />
               {!collapsed && <span className="flex-1 truncate">{m.title}</span>}
-              <Lock size={13} strokeWidth={2} className="shrink-0 text-muted/60" />
+              <Lock size={12} className="shrink-0 text-[#d4af37]/70" />
             </button>
           );
         }
 
+        const aceso = active || hovered;
         return (
           <Link
             key={m.key}
             href={m.href ?? "#"}
             title={collapsed ? m.title : undefined}
+            aria-current={active ? "page" : undefined}
             onClick={() => setMobileOpen(false)}
             onMouseEnter={() => setHoverKey(m.key)}
             onMouseLeave={() => setHoverKey((k) => (k === m.key ? null : k))}
-            className={`relative flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-150 ${
+            className={`relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[13.5px] font-medium transition-colors duration-150 ${
               collapsed ? "justify-center" : ""
-            } ${active || hovered ? "text-ink" : "text-muted"}`}
+            } ${aceso ? "text-ink" : "border-transparent text-muted"}`}
             style={{
-              background: hovered ? `${m.accent}1A` : active ? "rgba(255,255,255,0.06)" : undefined,
-              boxShadow: hovered ? `0 0 14px ${m.accent}55, 0 0 2px ${m.accent}` : undefined,
+              background: active ? `${m.accent}1F` : hovered ? `${m.accent}12` : undefined,
+              borderColor: active ? `${m.accent}40` : hovered ? `${m.accent}24` : undefined,
             }}
           >
             <span
-              className="absolute inset-y-1.5 left-0 w-[3px] rounded-full transition-opacity"
-              style={{ background: m.accent, opacity: active || hovered ? 1 : 0 }}
+              className="absolute inset-y-2 -left-3 w-[3px] rounded-r-full transition-opacity"
+              style={{ background: m.accent, opacity: active ? 1 : 0, boxShadow: `0 0 10px ${m.accent}` }}
             />
-            <Icon size={18} strokeWidth={1.75} className="shrink-0" style={{ color: active || hovered ? m.accent : undefined }} />
-            {!collapsed && m.title}
+            <Icon size={18} className="shrink-0 transition-colors" style={{ color: aceso ? m.accent : undefined }} />
+            {!collapsed && <span className="truncate">{m.title}</span>}
           </Link>
         );
       })}
     </>
   );
 
-  // Ajuda, Configurações (o antigo botão de perfil/avatar, que saiu do
-  // topo -- ver header abaixo) e Sair moram juntos no rodapé do menu
-  // lateral, pedido explícito. Os três abrem modais centralizados (não
-  // dropdown ancorado), então funcionam normalmente mesmo vindo do
-  // rodapé em vez do topo.
+  // Ajuda, Configurações e Sair moram juntos no rodapé do menu lateral.
+  // Ajuda abre uma janela por cima da tela; Configurações virou página
+  // própria (/configuracoes, com abas).
+  const itemRodape = `flex items-center gap-3 rounded-xl border px-3 py-2.5 text-left text-[13.5px] font-medium transition-colors ${
+    collapsed ? "justify-center" : ""
+  }`;
+  const configAtiva = pathname === "/configuracoes";
   const footer = (
     <>
       <button
-        onClick={() => toggleMenu("help")}
+        onClick={() => {
+          setMobileOpen(false);
+          toggleMenu("help");
+        }}
         title={collapsed ? "Ajuda" : undefined}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.06] hover:text-ink ${
-          collapsed ? "justify-center" : ""
+        className={`${itemRodape} ${
+          openMenu === "help" ? "border-white/10 bg-white/[0.06] text-ink" : "border-transparent text-muted hover:bg-white/[0.04] hover:text-ink"
         }`}
       >
-        <CircleHelp size={18} strokeWidth={1.75} className="shrink-0" />
+        <CircleHelp size={18} className="shrink-0" />
         {!collapsed && "Ajuda"}
       </button>
-      <button
-        onClick={() => toggleMenu("profile")}
+      <Link
+        href="/configuracoes"
+        onClick={() => setMobileOpen(false)}
         title={collapsed ? "Configurações" : undefined}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-white/[0.06] hover:text-ink ${
-          collapsed ? "justify-center" : ""
+        aria-current={configAtiva ? "page" : undefined}
+        className={`${itemRodape} ${
+          configAtiva ? "border-[#d4af37]/30 bg-[#d4af37]/10 text-ink" : "border-transparent text-muted hover:bg-white/[0.04] hover:text-ink"
         }`}
       >
-        <Settings size={18} strokeWidth={1.75} className="shrink-0" />
+        <Settings size={18} className="shrink-0" style={{ color: configAtiva ? OURO : undefined }} />
         {!collapsed && "Configurações"}
-      </button>
+      </Link>
       <button
         onClick={handleLogout}
         title={collapsed ? "Sair" : undefined}
-        className={`flex items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm font-medium text-muted transition-colors hover:bg-negative/[0.08] hover:text-negative ${
-          collapsed ? "justify-center" : ""
-        }`}
+        className={`${itemRodape} border-transparent text-muted hover:bg-negative/[0.08] hover:text-negative`}
       >
-        <LogOut size={18} strokeWidth={1.75} className="shrink-0" />
+        <LogOut size={18} className="shrink-0" />
         {!collapsed && "Sair"}
       </button>
     </>
   );
 
+  const rotuloModulos = (
+    <p className="px-3 pb-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-muted/50">Módulos</p>
+  );
+
   return (
-    <div className="flex h-screen w-full overflow-hidden bg-void">
+    <div className="casca flex h-screen w-full overflow-hidden bg-void">
+      {/* Define o vidro fosco (.painel-vidro), a barra de rolagem fina e o
+          traço fino dos ícones pra toda tela que usa a casca -- antes só
+          existiam nas telas que já tinham migrado pro visual novo. */}
+      <PainelStyles />
+      <style>{`
+        .casca svg.lucide { stroke-width: 1.6; }
+        /* Brilho dourado bem suave no alto do menu lateral: o vidro
+           precisa de algo atrás pra não virar caixa chapada. */
+        .casca-lateral {
+          background:
+            radial-gradient(22rem 16rem at 0% 0%, rgba(212, 175, 55, 0.07), transparent 70%),
+            rgba(12, 12, 12, 0.9);
+        }
+      `}</style>
+
       {/* ============ SIDEBAR (desktop) ============ */}
       <aside
-        className={`hidden md:flex h-full shrink-0 flex-col border-r border-hairline bg-surface transition-[width] duration-200 ease-in-out ${
-          collapsed ? "w-[76px]" : "w-[264px]"
+        className={`casca-lateral hidden md:flex h-full shrink-0 flex-col border-r border-white/[0.06] transition-[width] duration-200 ease-in-out ${
+          collapsed ? "w-[76px]" : "w-[252px]"
         }`}
       >
         <div
-          className={`flex h-16 shrink-0 items-center border-b border-hairline ${
+          className={`flex h-16 shrink-0 items-center border-b border-white/[0.06] ${
             collapsed ? "justify-center px-2" : "justify-between px-5"
           }`}
         >
@@ -349,28 +377,28 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           )}
           <button
             onClick={toggleCollapsed}
-            className="grid size-8 shrink-0 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.06] hover:text-ink"
+            className="grid size-8 shrink-0 place-items-center rounded-lg border border-transparent text-muted transition-colors hover:border-white/10 hover:bg-white/[0.04] hover:text-ink"
             aria-label={collapsed ? "Expandir menu" : "Recolher menu"}
             title={collapsed ? "Expandir menu" : "Recolher menu"}
           >
-            {collapsed ? <PanelLeftOpen size={18} strokeWidth={1.75} /> : <PanelLeftClose size={18} strokeWidth={1.75} />}
+            {collapsed ? <PanelLeftOpen size={18} /> : <PanelLeftClose size={18} />}
           </button>
         </div>
 
-        <nav className="flex flex-1 flex-col gap-0.5 overflow-hidden px-3 py-4">
-          {!collapsed && <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>}
+        <nav className="painel-scroll flex flex-1 flex-col gap-1 overflow-y-auto overflow-x-hidden px-3 py-4">
+          {!collapsed && rotuloModulos}
           {nav}
         </nav>
 
-        <div className="flex shrink-0 flex-col gap-0.5 border-t border-hairline px-3 py-3">{footer}</div>
+        <div className="flex shrink-0 flex-col gap-1 border-t border-white/[0.06] px-3 py-3">{footer}</div>
       </aside>
 
       {/* ============ SIDEBAR (mobile drawer) ============ */}
       {mobileOpen && (
         <div className="fixed inset-0 z-50 flex md:hidden">
-          <div className="fixed inset-0 bg-black/60" onClick={() => setMobileOpen(false)} aria-hidden="true" />
-          <div className="relative flex h-full w-[264px] flex-col border-r border-hairline bg-surface">
-            <div className="flex h-16 shrink-0 items-center justify-between border-b border-hairline px-5">
+          <div className="fixed inset-0 bg-black/60 backdrop-blur-sm" onClick={() => setMobileOpen(false)} aria-hidden="true" />
+          <div className="casca-lateral relative flex h-full w-[264px] flex-col border-r border-white/[0.06]">
+            <div className="flex h-16 shrink-0 items-center justify-between border-b border-white/[0.06] px-5">
               <Link href="/inicio" aria-label="Ir para Início" onClick={() => setMobileOpen(false)}>
                 <Logo className="h-10 w-auto" />
               </Link>
@@ -379,61 +407,55 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 className="grid size-8 place-items-center rounded-lg text-muted hover:bg-white/[0.06] hover:text-ink"
                 aria-label="Fechar menu"
               >
-                <X size={18} strokeWidth={1.75} />
+                <X size={18} />
               </button>
             </div>
-            <nav className="flex flex-1 flex-col gap-0.5 overflow-y-auto px-3 py-4">
-              <p className="px-3 pb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Módulos</p>
+            <nav className="painel-scroll flex flex-1 flex-col gap-1 overflow-y-auto px-3 py-4">
+              {rotuloModulos}
               {nav}
             </nav>
-            <div className="flex shrink-0 flex-col gap-0.5 border-t border-hairline px-3 py-3">{footer}</div>
+            <div className="flex shrink-0 flex-col gap-1 border-t border-white/[0.06] px-3 py-3">{footer}</div>
           </div>
         </div>
       )}
 
       {/* ============ MAIN ============ */}
       <div className="flex h-full min-w-0 flex-1 flex-col">
-        <header className="flex h-16 shrink-0 items-center justify-center gap-2 border-b border-hairline px-4 md:px-6">
+        <header className="flex h-16 shrink-0 items-center justify-center gap-2 border-b border-white/[0.06] bg-[#0c0c0c]/80 px-4 backdrop-blur-xl md:px-6">
           <button
             onClick={() => setMobileOpen(true)}
-            className="mr-auto grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void md:hidden"
+            className="mr-auto grid size-9 place-items-center rounded-xl text-muted transition-colors hover:bg-white/[0.06] hover:text-ink md:hidden"
             aria-label="Abrir menu"
           >
             <Menu className="size-[18px]" />
           </button>
-          <div className="flex items-center gap-1.5">
-            <Link
-              href="/inicio"
-              className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
-                pathname === "/inicio" ? "text-ink" : "text-muted"
-              }`}
-              aria-label="Início"
-              title="Início"
-            >
+          {/* Os ícones do topo ficam juntos numa "pílula" de vidro. */}
+          <div className="flex items-center gap-1 rounded-2xl border border-white/[0.07] bg-white/[0.02] p-1">
+            <Link href="/inicio" className={iconeTopo(pathname === "/inicio")} aria-label="Início" title="Início">
               <Home className="size-[18px]" />
+              <MarcaAtivo ativo={pathname === "/inicio"} />
             </Link>
-            <Link
-              href="/hub"
-              className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
-                pathname === "/hub" ? "text-ink" : "text-muted"
-              }`}
-              aria-label="Hub de Evolução"
-              title="Hub de Evolução"
-            >
+            <Link href="/hub" className={iconeTopo(pathname === "/hub")} aria-label="Hub de Evolução" title="Hub de Evolução">
               <Trophy className="size-[18px]" />
+              <MarcaAtivo ativo={pathname === "/hub"} />
             </Link>
             <div className="relative">
               <button
                 onClick={() => toggleMenu("notifications")}
-                className="relative grid size-9 place-items-center rounded-lg text-muted transition-colors hover:bg-white hover:text-void"
-                aria-label="Notificações"
+                className={iconeTopo(openMenu === "notifications" || pathname === "/notificacoes")}
+                aria-label={unread > 0 ? `Notificações, ${unread} por ler` : "Notificações"}
+                title="Notificações"
               >
                 <Bell className="size-[18px]" />
                 {unread > 0 && (
-                  <span className="absolute right-1 top-1 grid min-w-[15px] place-items-center rounded-full bg-evolution px-1 text-[9px] font-bold leading-[15px] text-void">
+                  <span
+                    className="absolute -right-0.5 -top-0.5 grid min-w-[16px] place-items-center rounded-full border-2 border-[#0c0c0c] px-1 text-[9px] font-bold leading-[12px] text-black"
+                    style={{ background: OURO }}
+                  >
                     {unread > 9 ? "9+" : unread}
                   </span>
                 )}
+                <MarcaAtivo ativo={pathname === "/notificacoes"} />
               </button>
               {openMenu === "notifications" && (
                 <NotificationsMenu
@@ -452,24 +474,20 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             {plan === "free" ? (
               <Link
                 href="/planos"
-                className={`grid size-9 place-items-center rounded-lg text-[#E8B93C] transition-colors hover:bg-[#E8B93C]/10 ${
-                  pathname === "/planos" ? "bg-[#E8B93C]/10" : ""
+                className={`relative grid size-9 place-items-center rounded-xl transition-colors hover:bg-[#d4af37]/10 ${
+                  pathname === "/planos" ? "bg-[#d4af37]/10" : ""
                 }`}
+                style={{ color: OURO }}
                 aria-label="Planos"
                 title="Planos"
               >
                 <Crown className="size-[18px]" />
+                <MarcaAtivo ativo={pathname === "/planos"} />
               </Link>
             ) : (
-              <Link
-                href="/minha-conta"
-                className={`grid size-9 place-items-center rounded-lg transition-colors hover:bg-white hover:text-void ${
-                  pathname === "/minha-conta" ? "text-ink" : "text-muted"
-                }`}
-                aria-label="Meu Plano"
-                title="Meu Plano"
-              >
+              <Link href="/minha-conta" className={iconeTopo(pathname === "/minha-conta")} aria-label="Meu Plano" title="Meu Plano">
                 <CreditCard className="size-[18px]" />
+                <MarcaAtivo ativo={pathname === "/minha-conta"} />
               </Link>
             )}
           </div>
@@ -481,22 +499,24 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         <div className="flex flex-1 flex-col overflow-y-auto">{children}</div>
       </div>
 
-      {/* Chat virou botao flutuante (pedido explicito) em vez de item de
-          menu -- fica disponivel por cima de qualquer modulo, nao so' das
-          telas que tem espaco na sidebar pra ele. Some enquanto o
-          ChatCenter esta aberto (o proprio modal ja cobre a tela). */}
+      {/* Chat em botão flutuante, disponível por cima de qualquer módulo.
+          Vidro com o dourado do visual novo. Some enquanto o ChatCenter
+          está aberto (a própria janela já cobre a tela). */}
       {openMenu !== "chats" && (
         <button
           type="button"
           onClick={() => toggleMenu("chats")}
           aria-label={unreadChats > 0 ? `Abrir chat, ${unreadChats} mensagem${unreadChats === 1 ? "" : "s"} não lida${unreadChats === 1 ? "" : "s"}` : "Abrir chat"}
           title="Chat"
-          className="fixed bottom-5 right-5 z-40 grid size-14 place-items-center rounded-full border shadow-lg shadow-black/40 backdrop-blur-md transition-transform hover:scale-105 print:hidden"
-          style={{ background: `${CHAT_ACCENT}1A`, borderColor: `${CHAT_ACCENT}55`, color: CHAT_ACCENT }}
+          className="painel-vidro fixed bottom-5 right-5 z-40 grid size-14 place-items-center rounded-full border shadow-lg shadow-black/50 transition-transform hover:scale-105 active:scale-95 print:hidden"
+          style={{ borderColor: `${OURO}55`, color: OURO, boxShadow: `0 10px 30px rgba(0,0,0,0.5), 0 0 18px ${OURO}22` }}
         >
-          <MessageCircle size={24} strokeWidth={2} />
+          <MessageCircle size={24} />
           {unreadChats > 0 && (
-            <span className="absolute -right-1 -top-1 grid min-w-[22px] place-items-center rounded-full border-2 border-void bg-evolution px-1 text-[11px] font-bold leading-[19px] text-void">
+            <span
+              className="absolute -right-1 -top-1 grid min-w-[22px] place-items-center rounded-full border-2 border-black px-1 text-[11px] font-bold leading-[19px] text-black"
+              style={{ background: OURO }}
+            >
               {unreadChats > 9 ? "9+" : unreadChats}
             </span>
           )}
@@ -514,22 +534,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
         />
       )}
 
-      {/* Ajuda e Configuracoes agora abrem a partir dos botoes no rodape
-          do menu lateral (junto com Sair), entao os modais em si moram
-          aqui soltos na arvore -- ambos sao overlays fullscreen
-          centralizados, nao dropdowns ancorados, entao funcionam igual
-          vindo de qualquer lugar. */}
       {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
-      {openMenu === "profile" && profile && (
-        <ProfileMenu
-          profile={profile}
-          onProfileChange={(p) => {
-            setProfile(p);
-            window.dispatchEvent(new Event(PERFIL_MUDOU));
-          }}
-          onClose={() => setOpenMenu(null)}
-        />
-      )}
 
       <PlanLockModal moduleKey={lockedModule} onClose={() => setLockedModule(null)} />
     </div>

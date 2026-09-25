@@ -48,8 +48,10 @@ export function MessageBubble({
   return (
     <div className={`flex ${isMine ? "justify-end" : "justify-start"}`}>
       <div
-        className={`max-w-[80%] rounded-lg px-3 py-2 text-[13px] ${
-          isMine ? "bg-ink text-void" : "border border-hairline bg-elevated text-ink"
+        className={`max-w-[80%] px-3.5 py-2 text-[13px] ${
+          isMine
+            ? "rounded-2xl rounded-br-md bg-[#d4af37] text-black"
+            : "painel-bloco rounded-2xl rounded-bl-md border border-white/[0.07] text-ink"
         }`}
       >
         {message.kind === "audio" ? (
@@ -60,7 +62,7 @@ export function MessageBubble({
               <Mic size={14} className="shrink-0 opacity-70" />
               <audio controls preload="none" src={audioUrl} className="h-8 max-w-[220px]" />
               {message.durationSeconds != null && (
-                <span className={`shrink-0 text-[10px] tabular-nums ${isMine ? "text-void/60" : "text-muted"}`}>
+                <span className={`shrink-0 text-[10px] tabular-nums ${isMine ? "text-black/55" : "text-muted"}`}>
                   {message.durationSeconds}s
                 </span>
               )}
@@ -74,7 +76,7 @@ export function MessageBubble({
         ) : (
           <p className="whitespace-pre-wrap break-words">{message.body}</p>
         )}
-        <p className={`mt-1 text-[10px] ${isMine ? "text-void/60" : "text-muted"}`}>
+        <p className={`mt-1 text-[10px] ${isMine ? "text-black/55" : "text-muted"}`}>
           {new Date(message.createdAt).toLocaleString("pt-BR", {
             day: "2-digit",
             month: "2-digit",
