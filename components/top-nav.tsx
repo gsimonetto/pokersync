@@ -37,7 +37,7 @@ function isHiddenRoute(pathname: string) {
 // Modulos que ja migraram pro AppShell (sidebar/topbar propria,
 // components/app-shell.tsx) -- mostrar o TopNav global junto duplicaria
 // navegacao no topo da tela. Prefixo, nao rota exata: cobre sub-rotas
-// como /ranges/arvores/[id] ou /time/jogador/[id] sem listar cada uma.
+// como /time/jogador/[id] sem listar cada uma.
 //
 // "/time/convite" fica de fora de proposito: e' o fluxo de aceitar
 // convite, que nao usa o AppShell (pode rodar sem sessao/time ainda

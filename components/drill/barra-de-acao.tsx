@@ -28,7 +28,7 @@ export interface OpcaoAcao<Id extends string = string> {
   valorBb?: number | null;
 }
 
-// Paleta = a da grade de range (components/ranges/range-grid.tsx), um
+// Paleta = a da grade de range do solver (lib/poker/grade-gto.ts), um
 // tom mais fechado pra texto branco ter contraste em cima.
 export const COR_ACAO: Record<TipoAcao, { base: string; topo: string; borda: string }> = {
   fold: { base: "#2B3038", topo: "#3A404A", borda: "rgba(255,255,255,0.14)" },

@@ -1,4 +1,4 @@
-import type { Card } from "@/lib/poker/range-board-analyzer";
+import type { Card } from "@/lib/poker/card";
 
 // Escala de forca de maos, 0 (pior) a 8 (melhor) — ordem padrao de poker.
 export const HAND_TIERS = [

@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Trophy, Layers, ArrowLeft, Gauge } from "lucide-react";
+import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Trophy, Layers, ArrowLeft, Gauge, Grid3x3 } from "lucide-react";
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { OpponentStatsModal } from "./opponent-stats-modal";
@@ -16,6 +16,7 @@ import type { BorderRingConfig } from "@/lib/poker/seat-layout";
 import { classifyAndResolve } from "@/lib/poker/situation-classifier";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
 import { resumoDaMao } from "@/lib/poker/hand-summary";
+import { linkConstrutorDaMao } from "@/lib/ranges/link-da-mao";
 import { equidade, nomeDaJogada } from "@/lib/poker/jogada";
 import { F, T, num } from "@/lib/poker/drill-theme";
 import { salvarPreferenciaMesa, usePreferenciasMesa, type UnidadeValor } from "@/lib/hooks/use-preferencias-mesa";
@@ -437,6 +438,8 @@ export function RevisorHandTable({
   // de precisar abrir "Analisar mão" pra achar isso. So aparece pra mao
   // elegivel (all-in com showdown, ver hand-ev-eligibility.ts).
   const evEligible = useMemo(() => findEligibleAllInConfrontation(parsedHand) !== null, [parsedHand]);
+  // "Ver no Construtor": o range desse spot (posição, stack, ação) com o board da mão.
+  const linkConstrutor = useMemo(() => linkConstrutorDaMao(parsedHand), [parsedHand]);
   const [evResult, setEvResult] = useState<HandEvResult | null>(null);
   const [evLoading, setEvLoading] = useState(false);
   const [evError, setEvError] = useState("");
@@ -1095,6 +1098,9 @@ export function RevisorHandTable({
               {canAnalyze && (
                 <ChipButton icon={<Target size={13} />} label="Analisar mão" onClick={onOpenHand} title="Analisar essa mão em detalhe" iconOnly />
               )}
+              {linkConstrutor && (
+                <ChipButton icon={<Grid3x3 size={13} />} label="Ver no Construtor" href={linkConstrutor} title="Ver o range desse spot no Construtor de Ranges, com o board da mão" iconOnly />
+              )}
             </div>
           </div>
         )}
@@ -1284,6 +1290,9 @@ export function RevisorHandTable({
                 title="Analisar essa mão em detalhe"
                 iconOnly
               />
+            )}
+            {linkConstrutor && (
+              <ChipButton icon={<Grid3x3 size={15} />} label="Ver no Construtor" href={linkConstrutor} title="Ver o range desse spot no Construtor de Ranges" iconOnly />
             )}
           </>,
           actionsSlot
