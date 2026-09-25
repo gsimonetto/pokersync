@@ -510,7 +510,7 @@ function AbaConta({ onAviso }: { onAviso: (a: Aviso) => void }) {
   async function trocarSenha(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
-    if (senha.length < 6) return setErro("Mínimo 6 caracteres.");
+    if (senha.length < 8) return setErro("Mínimo 8 caracteres.");
     if (senha !== senha2) return setErro("As senhas não coincidem.");
     setSalvando(true);
     try {
@@ -543,7 +543,7 @@ function AbaConta({ onAviso }: { onAviso: (a: Aviso) => void }) {
             type="password"
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
-            placeholder="Nova senha (mínimo 6 caracteres)"
+            placeholder="Nova senha (mínimo 8 caracteres)"
             autoComplete="new-password"
             className={CAMPO}
           />

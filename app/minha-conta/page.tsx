@@ -398,7 +398,7 @@ function SenhaCard({ temSenha, onDefinida }: { temSenha: boolean; onDefinida: ()
   async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
     setErro(null);
-    if (senha.length < 6) return setErro("A senha precisa ter ao menos 6 caracteres.");
+    if (senha.length < 8) return setErro("A senha precisa ter ao menos 8 caracteres.");
     if (senha !== confirmar) return setErro("As senhas não conferem.");
     setSalvando(true);
     try {
