@@ -14,6 +14,7 @@ import { InfoHover } from "@/components/painel/info-hover";
 import { PerfEstilos } from "@/components/performance/perf-estilos";
 import { AbasAnimadas } from "@/components/performance/abas-animadas";
 import { RadarModuleMenu } from "@/components/radar/radar-module-menu";
+import { radarLigadoAgora } from "@/lib/services/agent-status-service";
 import { useBanca } from "@/components/banca/use-banca";
 import { ABAS_BANCA, type AbaBanca } from "@/components/banca/abas";
 import { AbaVisaoGeral } from "@/components/banca/aba-visao-geral";
@@ -311,24 +312,35 @@ export default function BancaPage() {
 }
 
 // Status do Radar PokerSync num selo pequeno (antes ocupava uma faixa
-// inteira da tela só pra dizer "Automático").
+// inteira da tela só pra dizer "Automático"). Verde só com sinal de vida
+// recente (o Radar avisa o site a cada ~5 min) — antes ficava verde só por
+// existir um Radar cadastrado, mesmo parado havia dias.
 function StatusRadar({ b }: { b: ReturnType<typeof useBanca> }) {
-  const ligado = Boolean(b.agente);
+  const agente = b.agente;
+  const ligado = radarLigadoAgora(agente);
   const cor = b.importando ? "#f59e0b" : ligado ? "#22c55e" : "#6b7280";
   const texto = b.importando
     ? `Importando ${b.pendentesAgente.length} ${b.pendentesAgente.length === 1 ? "torneio" : "torneios"}…`
     : ligado
-      ? `Radar ${haQuanto(b.agente!.lastSyncAt)}`
-      : "Radar desligado";
+      ? "Radar ligado"
+      : agente?.lastSeenAt
+        ? `Radar visto ${haQuanto(agente.lastSeenAt)}`
+        : "Radar desligado";
   return (
     <InfoHover
       explicacao={{
         titulo: "Importação automática",
-        oQueE: ligado
-          ? `Mãos e torneios chegam sozinhos pelo Radar PokerSync rodando em “${b.agente!.deviceName}”. Torneios viram sessão aqui, convertidos de dólar pra real pela cotação do dia.`
+        oQueE: agente
+          ? `Mãos e torneios chegam sozinhos pelo Radar PokerSync rodando em “${agente.deviceName}”. Torneios viram sessão aqui, convertidos de dólar pra real pela cotação do dia.`
           : "Instale o Radar PokerSync no seu computador pra importar mãos e torneios automaticamente, sem colar hand history.",
         origem: "Radar PokerSync",
-        comoCalcula: ligado ? `Última sincronização ${haQuanto(b.agente!.lastSyncAt)}.` : "Sem ele, dá pra colar hand history em Performance → Importar.",
+        comoCalcula: ligado
+          ? agente?.lastSyncAt
+            ? `Ligado agora. Última mão ou torneio recebido ${haQuanto(agente.lastSyncAt)}.`
+            : "Ligado agora, esperando mãos novas."
+          : agente
+            ? "O Radar avisa o PokerSync a cada 5 minutos enquanto o computador está ligado. Se o computador está ligado e isso não muda, abra o Radar e confira se ele pede pra entrar de novo."
+            : "Sem ele, dá pra colar hand history em Performance → Importar.",
       }}
     >
       <span className="flex items-center gap-2 whitespace-nowrap rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-[12.5px] text-ink/85">

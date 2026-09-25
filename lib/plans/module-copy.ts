@@ -121,17 +121,21 @@ export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
   },
 };
 
-// Radar PokerSync = o agente desktop (repo proprio gsimonetto/pokersync-agent,
-// Tauri + Rust). Varre o computador do jogador atras de hand history
-// (PokerStars, GGPoker, PartyPoker, 888poker, ACR) e sincroniza sozinho com
-// o Revisor/Player Evolution -- sem precisar colar mao por mao na mao.
+// Radar PokerSync = o agente desktop (repo proprio gsimonetto/pokersync-radar,
+// Tauri + Rust). Varre o computador do jogador atras de hand history e
+// sincroniza sozinho com o Revisor/Player Evolution -- sem precisar colar
+// mao por mao na mao. Os textos abaixo so' prometem o que o Radar faz de
+// verdade: leitura validada com mao real so' de PokerStars e GGPoker
+// (PartyPoker/888poker a partir de exemplo, ACR sem leitor no site ainda --
+// ver lib/poker/hand-parser.ts), e "segundo plano" depende de ele abrir com
+// o computador (ligado por padrao desde a versao 0.2.0 do Radar).
 export const RADAR_COPY: ModuleCopy = {
   title: "Radar PokerSync",
-  blurb: "O agente desktop que varre suas hand histories sozinho e sincroniza com o PokerSync em segundo plano.",
+  blurb: "O programa do seu computador que encontra suas hand histories sozinho e sincroniza com o PokerSync em segundo plano.",
   benefits: [
-    "Detecta PokerStars, GGPoker, PartyPoker, 888poker e ACR automaticamente",
-    "Só reenvia o que mudou desde a última varredura",
+    "Encontra sozinho o histórico da PokerStars e da GGPoker (PartyPoker, 888poker e ACR em teste)",
+    "Só envia as mãos novas desde a última varredura",
     "Sincroniza direto com Revisor e Performance",
-    "Roda em segundo plano, sem precisar abrir o app",
+    "Abre junto com o computador e roda em segundo plano",
   ],
 };

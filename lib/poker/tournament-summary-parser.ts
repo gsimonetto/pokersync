@@ -1,7 +1,7 @@
 // Parser do arquivo de "Tournament Summary" (buy-in, colocação e
 // premiação) — arquivo SEPARADO da hand history, exportado pelo cliente
 // de poker numa pasta própria (ver `tournament_summary_subfolder_names`
-// em pokersync-agent/crates/scanner/src/room.rs). Não é o parser de mãos
+// em pokersync-radar/crates/scanner/src/room.rs). Não é o parser de mãos
 // (hand-parser.ts): não há mão nenhuma aqui, só o resumo final do
 // torneio.
 //
@@ -111,4 +111,18 @@ export function parseTournamentSummary(text: string): ParsedTournamentSummary {
     heroPayoutAmount: parseHeroPayoutAmount(text),
     heroName: null,
   };
+}
+
+// Quando o torneio começou, pelo primeiro "AAAA/MM/DD HH:MM:SS" do resumo
+// (na PokerStars, a linha "Tournament started ..."/"Torneio iniciado ...").
+// Usado só pro corte do "só a partir de agora" do Radar
+// (profiles.radar_import_scope_since) — mesma leitura sem fuso de
+// handDateToISO, por isso o corte tem folga (ver jogadoAntesDoCorte em
+// lib/supabase/agent-import-scope.ts). Sem data no texto = null.
+export function parseTournamentStartDate(text: string): string | null {
+  const m = text.match(/(\d{4})\/(\d{2})\/(\d{2})[ T](\d{2}):(\d{2}):(\d{2})/);
+  if (!m) return null;
+  const [, y, mo, d, h, mi, s] = m;
+  const parsed = new Date(`${y}-${mo}-${d}T${h}:${mi}:${s}`);
+  return Number.isNaN(parsed.getTime()) ? null : parsed.toISOString();
 }

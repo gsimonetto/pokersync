@@ -17,6 +17,7 @@ import {
   CheckCircle2,
 } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { sairDesteAparelho } from "@/lib/supabase/sair-deste-aparelho";
 import { Logo } from "@/components/logo";
 
 type Mode = "login" | "register";
@@ -256,7 +257,7 @@ export default function LoginForm() {
       }
 
       if (data.session) {
-        await supabase.auth.signOut();
+        await sairDesteAparelho(supabase);
       }
 
       setPass("");

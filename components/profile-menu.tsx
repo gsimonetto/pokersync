@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { LogOut, KeyRound, Check, Camera, Loader2, X, Cake, GraduationCap, Clock3, ImagePlus, Spade, ChevronLeft } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
+import { sairDesteAparelho } from "@/lib/supabase/sair-deste-aparelho";
 import { Avatar, AVATARS } from "./avatar";
 import { AvatarNivel } from "./avatar-nivel";
 import { ModalPortal } from "./modal-portal";
@@ -155,7 +156,7 @@ export function ProfileMenu({
   async function handleLogout() {
     const supabase = createClient();
     try {
-      await supabase.auth.signOut();
+      await sairDesteAparelho(supabase);
     } catch {
       // segue o logout mesmo se a chamada falhar
     }

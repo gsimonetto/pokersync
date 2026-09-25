@@ -8,6 +8,7 @@ import type { SupabaseClient } from "@supabase/supabase-js";
 import { createHash } from "node:crypto";
 import { splitHands, parseHand, validateParsedHand, handDateToISO, type ParsedHand } from "@/lib/poker/hand-parser";
 import { extractTournamentInfo } from "@/lib/services/hand-session-service";
+import { jogadoAntesDoCorte } from "@/lib/supabase/agent-import-scope";
 
 export interface AgentDeviceInfo {
   deviceId: string;
@@ -33,6 +34,8 @@ export interface AgentSyncResult {
   imported: number;
   duplicates: number;
   errors: number;
+  /** Mãos jogadas antes do "só a partir de agora" escolhido na tela do Radar. */
+  ignoradasPorData: number;
 }
 
 // Fallback quando o parser não acha um handId no texto (ex.: formato de sala
@@ -131,12 +134,27 @@ async function applyTournamentSignals(supabase: SupabaseClient, sessionId: strin
 // Exportado: reaproveitado por agent-tournament-sync-service.ts (mesmo
 // dispositivo, mesma tabela hand_sync_devices — o sync de torneio também
 // deve atualizar "última vez visto", só não cria um hand_sync_batches
-// próprio, ver comentário lá).
+// próprio, ver comentário lá) e pelo sinal de vida de /api/agent/ping
+// (`sincronizou: false` — o Radar está ligado, mas não mandou nada).
 export async function upsertDevice(
   supabase: SupabaseClient,
   userId: string,
-  device: AgentDeviceInfo
+  device: AgentDeviceInfo,
+  { sincronizou = true }: { sincronizou?: boolean } = {}
 ): Promise<void> {
+  const agora = new Date().toISOString();
+  // last_seen_at: o Radar está ligado (a cada ciclo, ~5 min). last_sync_at:
+  // chegou mão/torneio de fato. Antes só existia o segundo, e a Gestão de
+  // Banca mostrava "Radar" verde mesmo com ele parado havia dias.
+  const campos = {
+    device_name: device.deviceName,
+    platform: device.platform,
+    agent_version: device.agentVersion,
+    last_seen_at: agora,
+    active: true,
+    ...(sincronizou ? { last_sync_at: agora } : {}),
+  };
+
   const { data: existing, error: eSel } = await supabase
     .from("hand_sync_devices")
     .select("id")
@@ -146,16 +164,7 @@ export async function upsertDevice(
   if (eSel) throw eSel;
 
   if (existing) {
-    const { error } = await supabase
-      .from("hand_sync_devices")
-      .update({
-        device_name: device.deviceName,
-        platform: device.platform,
-        agent_version: device.agentVersion,
-        last_sync_at: new Date().toISOString(),
-        active: true,
-      })
-      .eq("id", existing.id);
+    const { error } = await supabase.from("hand_sync_devices").update(campos).eq("id", existing.id);
     if (error) throw error;
     return;
   }
@@ -163,11 +172,7 @@ export async function upsertDevice(
   const { error } = await supabase.from("hand_sync_devices").insert({
     user_id: userId,
     device_id: device.deviceId,
-    device_name: device.deviceName,
-    platform: device.platform,
-    agent_version: device.agentVersion,
-    last_sync_at: new Date().toISOString(),
-    active: true,
+    ...campos,
   });
   if (error) throw error;
 }
@@ -175,7 +180,10 @@ export async function upsertDevice(
 export async function processAgentSync(
   supabase: SupabaseClient,
   userId: string,
-  input: AgentSyncInput
+  input: AgentSyncInput,
+  // "Só a partir de agora" (profiles.radar_import_scope_since): mão jogada
+  // antes disso não entra — ver jogadoAntesDoCorte.
+  corte: Date | null = null
 ): Promise<AgentSyncResult> {
   await upsertDevice(supabase, userId, input.device);
 
@@ -238,6 +246,15 @@ export async function processAgentSync(
 
   let imported = 0;
   let duplicates = 0;
+  let ignoradasPorData = 0;
+
+  if (corte) {
+    const dentro = candidates.filter((c) => !jogadoAntesDoCorte(c.parsed ? handDateToISO(c.parsed.date) : null, corte));
+    ignoradasPorData = candidates.length - dentro.length;
+    // Sem espalhar (`...dentro`) numa chamada: um lote grande tem milhares de mãos.
+    candidates.length = 0;
+    for (const c of dentro) candidates.push(c);
+  }
 
   if (candidates.length > 0) {
     const ids = Array.from(new Set(candidates.map((c) => c.externalHandId)));
@@ -326,5 +343,5 @@ export async function processAgentSync(
     .eq("id", batchId);
   if (eUp) throw eUp;
 
-  return { batchId, totalHands, imported, duplicates, errors };
+  return { batchId, totalHands, imported, duplicates, errors, ignoradasPorData };
 }

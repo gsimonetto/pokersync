@@ -11,6 +11,7 @@ import { ProfileMenu } from "@/components/profile-menu";
 import { ChatCenter } from "@/components/chat/chat-center";
 import { PlanLockModal } from "@/components/plan-lock-modal";
 import { createClient } from "@/lib/supabase/client";
+import { sairDesteAparelho } from "@/lib/supabase/sair-deste-aparelho";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
 import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { fetchTeamUnreadCount, fetchMyMembership } from "@/lib/services/team-service";
@@ -194,7 +195,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
   async function handleLogout() {
     try {
       const supabase = createClient();
-      await supabase.auth.signOut();
+      await sairDesteAparelho(supabase);
     } catch {
       // segue o logout mesmo se a chamada falhar (inclusive se
       // createClient() lancar por env do Supabase ausente)

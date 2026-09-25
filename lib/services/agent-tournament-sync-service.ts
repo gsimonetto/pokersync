@@ -1,6 +1,6 @@
 // Serviço consumido pela rota app/api/agent/sync-tournaments — recebe o
 // texto bruto de Tournament Summary que o agente desktop leu do disco
-// (ver crates/scanner em pokersync-agent, FileKind::TournamentSummary),
+// (ver crates/scanner em pokersync-radar, FileKind::TournamentSummary),
 // extrai buy-in/colocação/premiação (lib/poker/tournament-summary-parser.ts,
 // best-effort — ver aviso lá) e grava em `tournament_payouts` com
 // `source: "agent"`. É a automação que faltava pro card "Estrutura de
@@ -16,8 +16,9 @@
 // hand_sync_devices.last_sync_at, reaproveitando upsertDevice).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
-import { parseTournamentSummary, parseHeroFinishPlaceFromList } from "@/lib/poker/tournament-summary-parser";
+import { parseTournamentSummary, parseHeroFinishPlaceFromList, parseTournamentStartDate } from "@/lib/poker/tournament-summary-parser";
 import { upsertDevice, type AgentDeviceInfo } from "@/lib/services/agent-sync-service";
+import { jogadoAntesDoCorte } from "@/lib/supabase/agent-import-scope";
 
 // FIX (2026-09, bug reportado: "o radar achou torneios no pc mas nao
 // subiu no meu usuario") -- amostras reais mostraram que em torneios de
@@ -71,18 +72,24 @@ export interface AgentTournamentSyncResult {
   imported: number;
   duplicates: number;
   errors: number;
+  /** Torneios de antes do "só a partir de agora" escolhido na tela do Radar. */
+  ignoradasPorData: number;
 }
 
 export async function processAgentTournamentSync(
   supabase: SupabaseClient,
   userId: string,
-  input: AgentTournamentSyncInput
+  input: AgentTournamentSyncInput,
+  // "Só a partir de agora" (profiles.radar_import_scope_since) — ver
+  // jogadoAntesDoCorte. Resumo sem data entra (não dá pra saber).
+  corte: Date | null = null
 ): Promise<AgentTournamentSyncResult> {
   await upsertDevice(supabase, userId, input.device);
 
   let imported = 0;
   let duplicates = 0;
   let errors = 0;
+  let ignoradasPorData = 0;
   const seenThisBatch = new Set<string>();
 
   for (const file of input.files) {
@@ -95,6 +102,10 @@ export async function processAgentTournamentSync(
     }
     if (seenThisBatch.has(parsed.tournamentIdPs)) {
       duplicates += 1;
+      continue;
+    }
+    if (jogadoAntesDoCorte(parseTournamentStartDate(file.rawText), corte)) {
+      ignoradasPorData += 1;
       continue;
     }
     seenThisBatch.add(parsed.tournamentIdPs);
@@ -157,5 +168,6 @@ export async function processAgentTournamentSync(
     imported,
     duplicates,
     errors,
+    ignoradasPorData,
   };
 }

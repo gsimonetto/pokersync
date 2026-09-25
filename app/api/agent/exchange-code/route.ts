@@ -37,6 +37,10 @@ export async function POST(request: Request) {
 
   const supabase = createServiceClient();
 
+  // Faxina: códigos vencidos e nunca trocados (o jogador fechou o
+  // navegador no meio do login) não ficam guardados pra sempre.
+  await supabase.from("agent_login_codes").delete().lt("expires_at", new Date().toISOString());
+
   // Apaga e devolve na mesma operação -- garante uso único mesmo sob
   // corrida (duas trocas concorrentes do mesmo código): só uma delas
   // recebe a linha de volta, a outra recebe array vazio.
