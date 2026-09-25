@@ -1,4 +1,4 @@
-import { parseCard, type Card } from "./range-board-analyzer";
+import { parseCard, type Card } from "./card";
 import { scoreHand, tierFromScore } from "./hand-evaluator";
 
 // Nome da jogada e chance de vitória -- o que as salas mostram na mesa

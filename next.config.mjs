@@ -1,6 +1,20 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
+  // Construtor de Ranges refeito numa tela só (/ranges, com abas): links
+  // antigos (favoritos, notificações) caem no lugar certo em vez de 404.
+  async redirects() {
+    return [
+      { source: "/ranges/biblioteca", destination: "/ranges?aba=meus", permanent: false },
+      { source: "/ranges/time", destination: "/ranges?aba=meus", permanent: false },
+      { source: "/ranges/equidade", destination: "/ranges", permanent: false },
+      { source: "/ranges/compare", destination: "/ranges", permanent: false },
+      { source: "/ranges/journal", destination: "/ranges", permanent: false },
+      { source: "/ranges/arvores/:rest*", destination: "/ranges", permanent: false },
+      { source: "/ranges/novo", destination: "/ranges", permanent: false },
+      { source: "/ranges/:id", destination: "/ranges?range=:id", permanent: false },
+    ];
+  },
   async headers() {
     return [
       {

@@ -1,8 +1,9 @@
 "use client";
 
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { motion } from "framer-motion";
-import { ArrowUpRight, MapPin } from "lucide-react";
+import { ArrowUpRight, Grid3x3, MapPin } from "lucide-react";
 import { revisorHandsHref } from "@/components/dashboard/kit";
 import { EASE, PainelCard } from "@/components/painel/painel-card";
 import { HERO_POSITION_ORDER, type AnalysisHandRow, type PreflopMetricsByPosition } from "@/types/analysis";
@@ -122,6 +123,17 @@ export function BarrasPosicao({
         &quot;raise&quot; = quanto do seu VPIP naquela posição foi aumento (perto de 100% = você quase não entra só de call).
         Posição apagada: menos de {MIN_POSICAO} mãos. Clique pra ver as mãos no Revisor.
       </p>
+      {/* A mesma leitura, mão por mão: o range de verdade de cada posição na
+          grade do Construtor (e dá pra comparar com o GTO de lá). */}
+      {lista.length > 0 && (
+        <Link
+          href="/ranges?aba=meus"
+          className="mt-2 inline-flex items-center gap-1.5 text-[12px] font-semibold text-[#e8cb6a] transition-colors hover:text-[#f0d67a]"
+        >
+          <Grid3x3 size={13} /> Ver mão por mão o que você joga em cada posição, no Construtor de Ranges
+          <ArrowUpRight size={12} />
+        </Link>
+      )}
     </PainelCard>
   );
 }

@@ -62,9 +62,8 @@ const CHAT_ACCENT = "#3b82f6";
 //      empurrar o conteúdo abaixo quando aparece.
 //   3. Prefira UM container único (`rounded-2xl border border-hairline
 //      bg-surface p-4 sm:p-5`) envolvendo toda ferramenta de tela única
-//      (Treino, Construtor de Ranges, Comparar, Equidade, Árvores) --
-//      exceção: telas de galeria/lista (Biblioteca, Time, Journal,
-//      lista de Árvores) usam cards por item, não um envelope único.
+//      (Treino) -- exceção: telas de galeria/lista (Meus ranges do
+//      Construtor, Time) usam cards por item, não um envelope único.
 //   4. Uma barra de utilidade fixa (AppHeader com abas/toggle/período --
 //      Hub, Performance, Revisor, abas do Construtor de Ranges) é a
 //      única exceção aceita à distância idêntica ao Treino: ela precisa

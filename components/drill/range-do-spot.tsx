@@ -1,6 +1,6 @@
 "use client";
 
-import { RANKS, cellBackground, getDecision, getHandLabel, type RangeHands } from "@/components/ranges/range-grid";
+import { RANKS, cellBackground, getDecision, getHandLabel, type RangeHands } from "@/lib/poker/grade-gto";
 
 // Range do GTO do spot que está sendo treinado -- grade 13x13 com a mão
 // da rodada destacada. Aparece ao lado da mesa depois que o jogador

@@ -1,10 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
-import type { RangeHands } from "@/components/ranges/range-grid";
+import type { RangeHands } from "@/lib/poker/grade-gto";
 
 // Formato compacto que o motor novo (pokersync-solver) grava:
 // cada mão vira [freq, ev_da_ação, gap] em vez de um objeto — bem mais
-// leve pro Supabase, mas precisa ser convertido pro formato que o
-// RangeGrid já entende (fold/call/raise em %) antes de renderizar.
+// leve pro Supabase, mas precisa ser convertido pro formato que a
+// grade do spot (RangeDoSpot) entende (fold/call/raise em %) antes de renderizar.
 export interface RfiJamPhaseRaw {
   ev_fold: number;
   action: "open" | "allin" | "call";
