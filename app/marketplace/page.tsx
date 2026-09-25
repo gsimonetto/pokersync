@@ -1,422 +1,340 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
+import { useCallback, useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { Plus, Users2, ChevronRight, Loader2, Star, SlidersHorizontal, Clock, BellRing } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
-import { Chip } from "@/components/chip";
-import { FilterChip } from "@/components/ui/filter-chip";
-import { FilterPopover } from "@/components/ui/filter-popover";
-import { MarketplaceTabs } from "@/components/marketplace/marketplace-tabs";
+import { Briefcase, Check, Plus, Search, SlidersHorizontal, Star } from "lucide-react";
+import { CascaVagas } from "@/components/marketplace/casca-vagas";
+import { CartaoVaga } from "@/components/marketplace/cartao-vaga";
+import { FaixaCartao, SeuCartao } from "@/components/marketplace/meu-cartao";
+import { VagasDoTime } from "@/components/marketplace/vagas-do-time";
+import { Chip } from "@/components/ranges/pecas";
+import { BOTAO_OURO, BOTAO_VIDRO, CAMPO } from "@/components/banca/util";
+import { PERFIL_MUDOU } from "@/lib/eventos-perfil";
 import { fetchMyTeam, type MyTeam } from "@/lib/services/team-service";
 import {
-  fetchOpenListings,
-  fetchMyTeamListings,
-  fetchMatchScore,
+  bateTudo,
+  fetchContagemCandidatos,
+  fetchMeuCartao,
+  fetchMeusMatches,
+  fetchMyApplications,
   fetchMyFavoriteIds,
-  toggleFavorite,
-  fetchLookingForTeam,
+  fetchMyTeamListings,
+  fetchNaoLidas,
+  fetchOpenListings,
   setLookingForTeam,
-  isListingOpen,
   stakeTierOf,
+  toggleFavorite,
   STAKE_TIER_LABEL,
   STAKE_TIER_ORDER,
+  type ApplicationStatus,
+  type ContagemCandidatos,
   type Listing,
   type ListingFormat,
-  FORMAT_LABEL,
+  type MeuCartao,
+  type MeuMatch,
 } from "@/lib/services/marketplace-service";
 
-const UM_DIA_MS = 86_400_000;
+const FORMATOS: ListingFormat[] = ["MTT", "Cash", "SNG", "Spin"];
 
-function diasParaExpirar(expiresAt: string | null): number | null {
-  if (!expiresAt) return null;
-  return Math.ceil((new Date(expiresAt).getTime() - Date.now()) / UM_DIA_MS);
-}
-
-const FORMATS: ListingFormat[] = ["MTT", "Cash", "SNG", "Spin"];
-
-interface Filtros {
-  formats: ListingFormat[];
-  buyInMax: string;
-  stakingMin: string;
-  somenteFavoritos: boolean;
-}
-
-const FILTROS_VAZIOS: Filtros = { formats: [], buyInMax: "", stakingMin: "", somenteFavoritos: false };
-
-// Feed do Marketplace de vagas: qualquer jogador navega e ve o match
-// score dele contra cada vaga aberta (calculado em RPC, nao inventado
-// no cliente). Quem gerencia um time ve tambem as proprias vagas
-// (abertas e fechadas) numa segunda secao, com atalho pra criar uma
-// nova. Filtros seguem o mesmo padrao do resto do produto (FilterChip +
-// FilterPopover, ver Player Evolution/Gestao de Banca) em vez de
-// inventar um componente novo so' pra essa tela.
-export default function MarketplacePage() {
-  const [listings, setListings] = useState<Listing[] | null>(null);
-  const [scores, setScores] = useState<Record<string, number | null>>({});
-  const [myTeam, setMyTeam] = useState<MyTeam | null>(null);
-  const [minhasVagas, setMinhasVagas] = useState<Listing[]>([]);
+// Feed das Vagas: cada vaga já mostra, requisito por requisito, se o
+// jogador bate (o match vem do banco, marketplace_meus_matches). Separado
+// por faixa de stakes (pedido explícito), melhor match primeiro dentro de
+// cada faixa. Quem é admin/coach vê as vagas do próprio time na coluna
+// da esquerda; quem procura time vê ali o próprio cartão.
+export default function VagasPage() {
+  const [vagas, setVagas] = useState<Listing[] | null>(null);
+  const [matches, setMatches] = useState<Map<string, MeuMatch> | null>(null);
+  const [time, setTime] = useState<MyTeam | null | undefined>(undefined);
+  const [cartao, setCartao] = useState<MeuCartao | null | undefined>(undefined);
   const [favoritos, setFavoritos] = useState<Set<string>>(new Set());
-  const [filtros, setFiltros] = useState<Filtros>(FILTROS_VAZIOS);
-  const [procurando, setProcurando] = useState<boolean | null>(null);
+  const [minhas, setMinhas] = useState<Map<string, { id: string; status: ApplicationStatus }>>(new Map());
+  const [naoLidas, setNaoLidas] = useState<Map<string, number>>(new Map());
+  const [vagasDoTime, setVagasDoTime] = useState<Listing[]>([]);
+  const [contagem, setContagem] = useState<Map<string, ContagemCandidatos>>(new Map());
   const [salvandoProcurando, setSalvandoProcurando] = useState(false);
   const [erro, setErro] = useState<string | null>(null);
 
-  const podeGerenciar = myTeam?.role === "admin" || myTeam?.role === "coach";
+  const [busca, setBusca] = useState("");
+  const [formato, setFormato] = useState<ListingFormat | "todos">("todos");
+  const [soBato, setSoBato] = useState(false);
+  const [soFavoritas, setSoFavoritas] = useState(false);
+
+  const gerente = time?.role === "admin" || time?.role === "coach";
 
   useEffect(() => {
-    let alive = true;
+    let vivo = true;
     (async () => {
       try {
-        const [open, team, favs, lookingForTeam] = await Promise.all([
+        const [abertas, meuTime, favs, meuCartao, apps, lidas] = await Promise.all([
           fetchOpenListings(),
           fetchMyTeam().catch(() => null),
           fetchMyFavoriteIds().catch(() => new Set<string>()),
-          fetchLookingForTeam().catch(() => false),
+          fetchMeuCartao().catch(() => null),
+          fetchMyApplications().catch(() => []),
+          fetchNaoLidas()
+            .then((n) => n.porCandidatura)
+            .catch(() => new Map<string, number>()),
         ]);
-        if (!alive) return;
-        setListings(open);
-        setMyTeam(team);
+        if (!vivo) return;
+        setVagas(abertas);
+        setTime(meuTime);
         setFavoritos(favs);
-        setProcurando(lookingForTeam);
-        if (team && (team.role === "admin" || team.role === "coach")) {
-          fetchMyTeamListings(team.team.id).then((l) => alive && setMinhasVagas(l));
+        setCartao(meuCartao);
+        setMinhas(new Map(apps.map((a) => [a.listingId, { id: a.id, status: a.status }])));
+        setNaoLidas(lidas);
+        fetchMeusMatches()
+          .then((m) => vivo && setMatches(m))
+          .catch(() => vivo && setMatches(new Map()));
+        if (meuTime && (meuTime.role === "admin" || meuTime.role === "coach")) {
+          const doTime = await fetchMyTeamListings(meuTime.team.id);
+          if (!vivo) return;
+          setVagasDoTime(doTime);
+          setContagem(await fetchContagemCandidatos(doTime.map((l) => l.id)).catch(() => new Map()));
         }
-        const entries = await Promise.all(
-          open.map(async (l) => [l.id, await fetchMatchScore(l.id).catch(() => null)] as const)
-        );
-        if (alive) setScores(Object.fromEntries(entries));
       } catch (e) {
-        if (alive) setErro((e as Error)?.message ?? "Não foi possível carregar o marketplace.");
+        if (vivo) setErro((e as Error)?.message ?? "Não foi possível carregar as vagas.");
       }
     })();
     return () => {
-      alive = false;
+      vivo = false;
     };
   }, []);
 
-  async function onToggleFavorite(listingId: string) {
-    const favoritado = favoritos.has(listingId);
-    setFavoritos((prev) => {
-      const next = new Set(prev);
-      if (favoritado) next.delete(listingId);
-      else next.add(listingId);
-      return next;
-    });
-    try {
-      await toggleFavorite(listingId, !favoritado);
-    } catch {
-      // reverte se a chamada falhar
-      setFavoritos((prev) => {
-        const next = new Set(prev);
-        if (favoritado) next.add(listingId);
-        else next.delete(listingId);
-        return next;
-      });
-    }
-  }
+  // Mudou horário/dias em Configurações: o cartão acompanha.
+  useEffect(() => {
+    const recarregar = () => fetchMeuCartao().then(setCartao).catch(() => {});
+    window.addEventListener(PERFIL_MUDOU, recarregar);
+    return () => window.removeEventListener(PERFIL_MUDOU, recarregar);
+  }, []);
 
-  const outrasVagas = useMemo(() => {
-    let base = (listings ?? []).filter((l) => !myTeam || l.teamId !== myTeam.team.id);
-    if (filtros.formats.length > 0) base = base.filter((l) => filtros.formats.includes(l.format));
-    if (filtros.buyInMax.trim() !== "") {
-      const max = Number(filtros.buyInMax);
-      base = base.filter((l) => l.buyInMin === null || l.buyInMin <= max);
-    }
-    if (filtros.stakingMin.trim() !== "") {
-      const min = Number(filtros.stakingMin);
-      base = base.filter((l) => l.stakingPct !== null && l.stakingPct >= min);
-    }
-    if (filtros.somenteFavoritos) base = base.filter((l) => favoritos.has(l.id));
-    return base;
-  }, [listings, myTeam, filtros, favoritos]);
-
-  const filtrosAtivos =
-    filtros.formats.length + (filtros.buyInMax ? 1 : 0) + (filtros.stakingMin ? 1 : 0) + (filtros.somenteFavoritos ? 1 : 0);
-
-  async function onToggleProcurando() {
-    if (procurando === null) return;
-    const novo = !procurando;
-    setSalvandoProcurando(true);
-    setProcurando(novo);
-    try {
-      await setLookingForTeam(novo);
-    } catch {
-      setProcurando(!novo);
-    } finally {
-      setSalvandoProcurando(false);
-    }
-  }
-
-  const encerrandoEmBreve = useMemo(
-    () => outrasVagas.filter((l) => { const d = diasParaExpirar(l.expiresAt); return d !== null && d <= 3; }),
-    [outrasVagas]
+  const onProcurando = useCallback(
+    async (v: boolean) => {
+      if (!cartao) return;
+      setSalvandoProcurando(true);
+      setCartao({ ...cartao, procurandoVaga: v });
+      try {
+        await setLookingForTeam(v);
+      } catch {
+        setCartao({ ...cartao, procurandoVaga: !v });
+      } finally {
+        setSalvandoProcurando(false);
+      }
+    },
+    [cartao],
   );
 
-  // Feed principal separado por faixa de stakes (pedido explicito) --
-  // MICRO / LOW / MEDIUM / HIGH STAKES vêm do buy-in de MTT/SNG, CASH GAME
-  // e SPIN são o próprio formato (ver stakeTierOf em marketplace-service).
-  const vagasPorTier = useMemo(() => {
-    const grupos = new Map<string, Listing[]>();
-    for (const l of outrasVagas) {
-      const tier = stakeTierOf(l);
-      const atual = grupos.get(tier) ?? [];
-      atual.push(l);
-      grupos.set(tier, atual);
+  async function onFavoritar(id: string) {
+    const era = favoritos.has(id);
+    const troca = (s: Set<string>, ligar: boolean) => {
+      const n = new Set(s);
+      if (ligar) n.add(id);
+      else n.delete(id);
+      return n;
+    };
+    setFavoritos((s) => troca(s, !era));
+    try {
+      await toggleFavorite(id, !era);
+    } catch {
+      setFavoritos((s) => troca(s, era));
     }
-    return STAKE_TIER_ORDER.map((tier) => ({ tier, vagas: grupos.get(tier) ?? [] })).filter((g) => g.vagas.length > 0);
-  }, [outrasVagas]);
+  }
+
+  // Vagas de outros times (as do próprio time ficam na coluna da esquerda).
+  const outras = useMemo(() => (vagas ?? []).filter((l) => !time || l.teamId !== time.team.id), [vagas, time]);
+
+  const filtradas = useMemo(() => {
+    const termo = busca.trim().toLocaleLowerCase("pt-BR");
+    return outras.filter((l) => {
+      if (formato !== "todos" && l.format !== formato) return false;
+      if (soFavoritas && !favoritos.has(l.id)) return false;
+      if (soBato) {
+        const m = matches?.get(l.id);
+        if (!m || !bateTudo(m)) return false;
+      }
+      if (termo && !`${l.title} ${l.teamName}`.toLocaleLowerCase("pt-BR").includes(termo)) return false;
+      return true;
+    });
+  }, [outras, busca, formato, soFavoritas, soBato, favoritos, matches]);
+
+  const porFaixa = useMemo(() => {
+    const grupos = new Map<string, Listing[]>();
+    for (const l of filtradas) {
+      const faixa = stakeTierOf(l);
+      grupos.set(faixa, [...(grupos.get(faixa) ?? []), l]);
+    }
+    const nota = (l: Listing) => matches?.get(l.id)?.match ?? -1;
+    return STAKE_TIER_ORDER.map((tier) => ({ tier, vagas: [...(grupos.get(tier) ?? [])].sort((a, b) => nota(b) - nota(a)) })).filter(
+      (g) => g.vagas.length > 0,
+    );
+  }, [filtradas, matches]);
+
+  const filtrosAtivos = formato !== "todos" || soBato || soFavoritas || busca.trim() !== "";
+  const nomeTime = time?.team.name ?? null;
 
   return (
-    <AppShell>
-      <main className="w-full px-6 py-10 text-ink">
-        {erro && (
-          <p className="mb-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>
+    <CascaVagas
+      titulo="Vagas"
+      subtitulo={
+        gerente
+          ? "Publique vagas do seu time e veja quem combina com cada uma."
+          : "Times procurando jogadores — veja na hora se você combina com cada vaga."
+      }
+      acoes={
+        gerente ? (
+          <Link href="/marketplace/nova" className={`${BOTAO_OURO} whitespace-nowrap`}>
+            <Plus size={16} strokeWidth={2.2} /> Nova vaga
+          </Link>
+        ) : null
+      }
+      aba="vagas"
+    >
+      {erro && <p className="mb-3 rounded-xl border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>}
+
+      <div className="grid items-start gap-3 lg:grid-cols-[320px_minmax(0,1fr)]">
+        {/* Coluna da esquerda: vagas do time (admin/coach) ou o cartão. */}
+        {gerente && time ? (
+          <VagasDoTime nomeTime={time.team.name} vagas={vagasDoTime} contagem={contagem} naoLidas={naoLidas} />
+        ) : cartao ? (
+          <>
+            <FaixaCartao cartao={cartao} nomeTime={nomeTime} onProcurando={onProcurando} salvando={salvandoProcurando} />
+            <div className="hidden lg:block">
+              <SeuCartao cartao={cartao} nomeTime={nomeTime} onProcurando={onProcurando} salvando={salvandoProcurando} />
+            </div>
+          </>
+        ) : (
+          <div className="painel-vidro h-[88px] animate-pulse rounded-2xl border border-white/10 lg:h-[420px]" aria-hidden />
         )}
 
-        <div className="mx-auto max-w-6xl rounded-2xl border border-hairline bg-surface p-5 sm:p-6">
-          <MarketplaceTabs active="vagas" podeGerenciar={podeGerenciar} />
-
-          <div className="mt-5">
-          {podeGerenciar && (
-            <div className="mb-6 flex justify-end">
-              <Link
-                href="/marketplace/nova"
-                className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
-              >
-                <Plus size={14} /> Nova vaga
-              </Link>
+        <div className="flex min-w-0 flex-col gap-3">
+          <section className="painel-vidro flex flex-col gap-2 rounded-2xl border border-white/10 p-3 lg:flex-row lg:flex-wrap lg:items-center lg:gap-1.5">
+            <label className="relative mr-1 flex min-w-[180px] flex-1">
+              <Search size={14} className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-muted" />
+              <input
+                value={busca}
+                onChange={(e) => setBusca(e.target.value)}
+                placeholder="Buscar time ou vaga"
+                aria-label="Buscar time ou vaga"
+                className={`${CAMPO} !py-2 !pl-8`}
+              />
+            </label>
+            <div className="painel-scroll -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pb-0.5 lg:contents">
+              <Chip ativo={formato === "todos"} onClick={() => setFormato("todos")}>
+                Todos
+              </Chip>
+              {FORMATOS.map((f) => (
+                <Chip key={f} ativo={formato === f} onClick={() => setFormato(formato === f ? "todos" : f)}>
+                  {f}
+                </Chip>
+              ))}
+              <span className="mx-1 w-px shrink-0 self-stretch bg-white/10" aria-hidden />
+              <Chip ativo={soBato} onClick={() => setSoBato((v) => !v)} title="Só as vagas em que você bate todos os requisitos">
+                <Check size={11} /> Só as que eu bato
+              </Chip>
+              <Chip ativo={soFavoritas} onClick={() => setSoFavoritas((v) => !v)}>
+                <Star size={11} /> Favoritas
+              </Chip>
             </div>
-          )}
+            <span className="inline-flex items-center gap-1 text-[12px] text-muted lg:ml-auto">
+              <SlidersHorizontal size={13} /> Melhor match primeiro
+            </span>
+          </section>
 
-          {!myTeam && procurando !== null && (
-            <div className="mb-6 flex items-center justify-between gap-4 rounded-lg border border-hairline bg-elevated p-4">
-              <div className="flex items-start gap-3">
-                <BellRing size={18} className={`mt-0.5 shrink-0 ${procurando ? "text-evolution" : "text-muted"}`} />
-                <div>
-                  <p className="text-sm font-semibold text-ink">Procurando time?</p>
-                  <p className="text-xs text-muted">
-                    Ativado, você recebe notificação só quando surgir uma vaga nova com bom match com o seu perfil —
-                    sem isso, ninguém te avisa automaticamente.
-                  </p>
-                </div>
-              </div>
-              <button
-                type="button"
-                role="switch"
-                aria-checked={procurando}
-                onClick={onToggleProcurando}
-                disabled={salvandoProcurando}
-                className={`relative h-6 w-11 shrink-0 rounded-full transition-colors disabled:opacity-60 ${
-                  procurando ? "bg-evolution" : "bg-hairline"
-                }`}
-              >
-                <span
-                  className={`absolute top-0.5 size-5 rounded-full bg-white transition-transform ${
-                    procurando ? "translate-x-[22px]" : "translate-x-0.5"
-                  }`}
-                />
-              </button>
+          {vagas === null ? (
+            <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,22.5rem),1fr))]" aria-hidden>
+              {[0, 1, 2, 3].map((i) => (
+                <div key={i} className="painel-vidro h-[210px] animate-pulse rounded-2xl border border-white/10" />
+              ))}
             </div>
-          )}
-
-          {podeGerenciar && minhasVagas.length > 0 && (
-            <section>
-              <h2 className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/70">Vagas do seu time</h2>
-              <div className="flex flex-col gap-3">
-                {minhasVagas.map((l) => (
-                  <ListingCard key={l.id} listing={l} showStatus />
-                ))}
-              </div>
+          ) : outras.length === 0 ? (
+            <SemVagas
+              gerente={gerente}
+              procurando={cartao?.procurandoVaga ?? false}
+              temTime={Boolean(time)}
+              onLigar={() => onProcurando(true)}
+            />
+          ) : filtradas.length === 0 ? (
+            <section className="painel-vidro flex flex-col items-center gap-2 rounded-2xl border border-dashed border-white/15 p-8 text-center">
+              <p className="m-0 text-[14px] font-semibold">Nenhuma vaga com esses filtros.</p>
+              {filtrosAtivos && (
+                <button
+                  type="button"
+                  className={BOTAO_VIDRO}
+                  onClick={() => {
+                    setBusca("");
+                    setFormato("todos");
+                    setSoBato(false);
+                    setSoFavoritas(false);
+                  }}
+                >
+                  Limpar filtros
+                </button>
+              )}
             </section>
-          )}
-
-          {encerrandoEmBreve.length > 0 && (
-            <section className={podeGerenciar && minhasVagas.length > 0 ? "mt-6" : undefined}>
-              <h2 className="mb-3 flex items-center gap-1.5 text-[10px] font-bold uppercase tracking-[0.14em] text-evolution">
-                <Clock size={12} /> Encerrando em breve
-              </h2>
-              <div className="flex flex-col gap-3">
-                {encerrandoEmBreve.map((l) => (
-                  <ListingCard key={l.id} listing={l} matchScore={scores[l.id] ?? null} favorito={favoritos.has(l.id)} onToggleFavorite={() => onToggleFavorite(l.id)} />
-                ))}
-              </div>
-            </section>
-          )}
-
-          <section className={(podeGerenciar && minhasVagas.length > 0) || encerrandoEmBreve.length > 0 ? "mt-6" : undefined}>
-            <div className="mb-3 flex items-center justify-between gap-2">
-              <h2 className="text-[10px] font-bold uppercase tracking-[0.14em] text-muted/70">Vagas abertas</h2>
-              <FilterPopover active={filtrosAtivos > 0} label="Filtros" icon={SlidersHorizontal}>
-                <div className="flex flex-wrap gap-1.5">
-                  {FORMATS.map((f) => (
-                    <FilterChip
-                      key={f}
-                      label={f}
-                      active={filtros.formats.includes(f)}
-                      onClick={() =>
-                        setFiltros((prev) => ({
-                          ...prev,
-                          formats: prev.formats.includes(f) ? prev.formats.filter((x) => x !== f) : [...prev.formats, f],
-                        }))
-                      }
+          ) : (
+            porFaixa.map(({ tier, vagas: lista }) => (
+              <section key={tier} className="flex flex-col gap-2">
+                <h2 className="m-0 px-1 text-[10.5px] font-semibold uppercase tracking-[0.12em] text-muted">
+                  {STAKE_TIER_LABEL[tier]} <span className="text-muted/60">({lista.length})</span>
+                </h2>
+                <div className="grid gap-3 grid-cols-[repeat(auto-fill,minmax(min(100%,22.5rem),1fr))]">
+                  {lista.map((l) => (
+                    <CartaoVaga
+                      key={l.id}
+                      vaga={l}
+                      meu={matches?.get(l.id)}
+                      carregandoMatch={matches === null}
+                      favorita={favoritos.has(l.id)}
+                      onFavoritar={() => onFavoritar(l.id)}
+                      candidatura={minhas.get(l.id)?.status ?? null}
                     />
                   ))}
                 </div>
-                <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
-                  Buy-in máximo (R$)
-                  <input
-                    type="number"
-                    min="0"
-                    value={filtros.buyInMax}
-                    onChange={(e) => setFiltros((prev) => ({ ...prev, buyInMax: e.target.value }))}
-                    className="rounded-md border border-hairline bg-elevated px-2 py-1 text-sm text-ink"
-                  />
-                </label>
-                <label className="flex flex-col gap-1 text-[11px] font-semibold text-muted">
-                  Staking mínimo (%)
-                  <input
-                    type="number"
-                    min="0"
-                    max="100"
-                    value={filtros.stakingMin}
-                    onChange={(e) => setFiltros((prev) => ({ ...prev, stakingMin: e.target.value }))}
-                    className="rounded-md border border-hairline bg-elevated px-2 py-1 text-sm text-ink"
-                  />
-                </label>
-                <label className="flex items-center gap-2 text-[11px] font-semibold text-muted">
-                  <input
-                    type="checkbox"
-                    checked={filtros.somenteFavoritos}
-                    onChange={(e) => setFiltros((prev) => ({ ...prev, somenteFavoritos: e.target.checked }))}
-                  />
-                  Somente favoritos
-                </label>
-                {filtrosAtivos > 0 && (
-                  <button
-                    type="button"
-                    onClick={() => setFiltros(FILTROS_VAZIOS)}
-                    className="text-left text-[11px] font-semibold text-muted underline-offset-2 hover:underline"
-                  >
-                    Limpar filtros
-                  </button>
-                )}
-              </FilterPopover>
-            </div>
-
-            {listings === null ? (
-              <div className="flex items-center justify-center rounded-lg border border-hairline bg-elevated p-10">
-                <Loader2 size={18} className="animate-spin text-muted" />
-              </div>
-            ) : outrasVagas.length === 0 ? (
-              <p className="rounded-lg border border-hairline bg-elevated p-6 text-sm text-muted">
-                {filtrosAtivos > 0 ? "Nenhuma vaga corresponde aos filtros." : "Nenhuma vaga aberta no momento. Volte mais tarde."}
-              </p>
-            ) : (
-              <div className="flex flex-col gap-6">
-                {vagasPorTier.map(({ tier, vagas }) => (
-                  <div key={tier}>
-                    <h3 className="mb-3 text-[10px] font-bold uppercase tracking-[0.14em] text-muted/50">
-                      {STAKE_TIER_LABEL[tier]}
-                    </h3>
-                    <div className="grid grid-cols-1 gap-3 xl:grid-cols-2">
-                      {vagas.map((l) => (
-                        <ListingCard
-                          key={l.id}
-                          listing={l}
-                          matchScore={scores[l.id] ?? null}
-                          favorito={favoritos.has(l.id)}
-                          onToggleFavorite={() => onToggleFavorite(l.id)}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            )}
-          </section>
-          </div>
+              </section>
+            ))
+          )}
         </div>
-      </main>
-    </AppShell>
+      </div>
+    </CascaVagas>
   );
 }
 
-function ListingCard({
-  listing,
-  matchScore,
-  showStatus,
-  favorito,
-  onToggleFavorite,
-}: {
-  listing: Listing;
-  matchScore?: number | null;
-  showStatus?: boolean;
-  favorito?: boolean;
-  onToggleFavorite?: () => void;
-}) {
+function SemVagas({ gerente, procurando, temTime, onLigar }: { gerente: boolean; procurando: boolean; temTime: boolean; onLigar: () => void }) {
   return (
-    <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated p-4 transition-colors hover:border-white/15">
-      <Link href={`/marketplace/${listing.id}`} className="flex min-w-0 flex-1 items-center gap-4">
-        {listing.teamBannerUrl ? (
-          // eslint-disable-next-line @next/next/no-img-element
-          <img
-            src={listing.teamBannerUrl}
-            alt={listing.teamName}
-            className="h-11 w-16 shrink-0 rounded-lg border border-hairline object-cover sm:h-12 sm:w-20"
-          />
+    <section className="painel-vidro flex flex-col items-center gap-3 rounded-2xl border border-dashed border-white/15 p-8 text-center">
+      <Briefcase size={30} className="text-[#e8cb6a]" />
+      <h2 className="m-0 text-[18px] font-semibold">Nenhuma vaga aberta agora</h2>
+      <p className="m-0 max-w-md text-[13px] leading-relaxed text-muted">
+        {gerente ? (
+          "Nenhum outro time está com vaga aberta. Publique a vaga do seu time: quem procura time e combina com ela recebe um aviso."
+        ) : temTime ? (
+          "Quando um time abrir vaga, ela aparece aqui com o seu match."
         ) : (
-          <div
-            className="grid size-11 shrink-0 place-items-center rounded-lg border"
-            style={{ borderColor: `${listing.teamAccent}55`, background: `${listing.teamAccent}1A`, color: listing.teamAccent }}
-          >
-            <Users2 size={18} />
-          </div>
+          <>
+            Com <b className="text-ink/90">Procurando time</b> ligado, a gente te avisa assim que um time abrir vaga que combine com você.
+            Enquanto isso, deixe seu cartão completo: é ele que os times olham primeiro.
+          </>
         )}
-        <div className="min-w-0 flex-1">
-          <div className="flex flex-wrap items-center gap-2">
-            <p className="truncate font-semibold text-ink">{listing.title}</p>
-            <Chip color="#5AA6E0" size="sm">
-              {FORMAT_LABEL[listing.format]}
-            </Chip>
-            {showStatus && (
-              <Chip color={isListingOpen(listing) ? "#2FB89A" : listing.status === "aberta" ? "#E0B24C" : "#8A94A3"} size="sm">
-                {isListingOpen(listing) ? "Aberta" : listing.status === "aberta" ? "Expirada" : "Fechada"}
-              </Chip>
+      </p>
+      <div className="flex flex-wrap justify-center gap-2">
+        {gerente ? (
+          <Link href="/marketplace/nova" className={BOTAO_OURO}>
+            <Plus size={15} /> Publicar vaga
+          </Link>
+        ) : (
+          <>
+            {!temTime && !procurando && (
+              <button type="button" onClick={onLigar} className={BOTAO_OURO}>
+                Ligar Procurando time
+              </button>
             )}
-          </div>
-          <p className="mt-0.5 truncate text-xs text-muted">
-            {listing.teamName}
-            {listing.buyInMin !== null && listing.buyInMax !== null && ` · Buy-in R$ ${listing.buyInMin} – R$ ${listing.buyInMax}`}
-            {listing.stakingPct !== null && ` · Staking ${listing.stakingPct}%`}
-            {isListingOpen(listing) &&
-              (() => {
-                const dias = diasParaExpirar(listing.expiresAt);
-                return dias !== null ? ` · Encerra em ${dias <= 0 ? "menos de 1 dia" : `${dias}d`}` : "";
-              })()}
-          </p>
-        </div>
-        {matchScore !== null && matchScore !== undefined && (
-          <div className="shrink-0 text-right">
-            <p className={`text-lg font-bold tabular-nums ${matchScore >= 70 ? "text-positive" : "text-negative"}`}>{matchScore}</p>
-            <p className="text-[9px] uppercase tracking-wider text-muted/60">match</p>
-          </div>
+            {!temTime && (
+              <Link href="/time" className={BOTAO_VIDRO}>
+                Tem um time? Publique uma vaga
+              </Link>
+            )}
+          </>
         )}
-        <ChevronRight size={16} className="shrink-0 text-muted" />
-      </Link>
-      {onToggleFavorite && (
-        <button
-          type="button"
-          onClick={onToggleFavorite}
-          title={favorito ? "Remover dos favoritos" : "Favoritar vaga"}
-          aria-label={favorito ? "Remover dos favoritos" : "Favoritar vaga"}
-          className={`grid size-8 shrink-0 place-items-center rounded-lg border transition-colors ${
-            favorito ? "border-evolution/50 bg-evolution/10 text-evolution" : "border-hairline text-muted hover:text-ink"
-          }`}
-        >
-          <Star size={14} fill={favorito ? "currentColor" : "none"} />
-        </button>
-      )}
-    </div>
+      </div>
+    </section>
   );
 }

@@ -16,6 +16,7 @@ import { fetchUnreadCount } from "@/lib/services/notification-service";
 import { fetchTeamUnreadCount, fetchMyMembership } from "@/lib/services/team-service";
 import { fetchFriendUnreadCount } from "@/lib/services/friend-service";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
+import { ABRIR_CONFIGURACOES, PERFIL_MUDOU } from "@/lib/eventos-perfil";
 import { isAddonUnlockedFor, isModuleUnlockedFor, type ModuleKey, type PlanId } from "@/lib/plans/plans-data";
 import { modules } from "@/lib/modules-data";
 
@@ -153,6 +154,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
     // limpa o parametro da URL pra nao reabrir num refresh/voltar
     router.replace(pathname);
     // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  // Outra tela pediu pra abrir as Configurações (ex.: "Preencher" no
+  // cartão das Vagas) -- ver lib/eventos-perfil.ts.
+  useEffect(() => {
+    const abrir = () => setOpenMenu("profile");
+    window.addEventListener(ABRIR_CONFIGURACOES, abrir);
+    return () => window.removeEventListener(ABRIR_CONFIGURACOES, abrir);
   }, []);
 
   // Chegou aqui via redirect do middleware (rota bloqueada pro plano
@@ -511,7 +520,14 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           vindo de qualquer lugar. */}
       {openMenu === "help" && <HelpMenu onClose={() => setOpenMenu(null)} />}
       {openMenu === "profile" && profile && (
-        <ProfileMenu profile={profile} onProfileChange={setProfile} onClose={() => setOpenMenu(null)} />
+        <ProfileMenu
+          profile={profile}
+          onProfileChange={(p) => {
+            setProfile(p);
+            window.dispatchEvent(new Event(PERFIL_MUDOU));
+          }}
+          onClose={() => setOpenMenu(null)}
+        />
       )}
 
       <PlanLockModal moduleKey={lockedModule} onClose={() => setLockedModule(null)} />

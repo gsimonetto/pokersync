@@ -3,7 +3,7 @@
 import { AvatarNivel } from "@/components/avatar-nivel";
 import { BRL, BRL_CURTO } from "@/lib/format";
 import { calcularScore, type PlayerDetail, type TeamDashboardRow } from "@/lib/services/team-service";
-import type { CandidateSnapshot } from "@/lib/services/marketplace-service";
+import type { CandidateSnapshot, MeuCartao } from "@/lib/services/marketplace-service";
 
 // ============================================================
 // Crachá do jogador -- a versão pequena da ficha. Um componente só pra
@@ -152,6 +152,34 @@ export function crachaDoCandidato(s: CandidateSnapshot): CrachaDados {
     estudo: {
       acertoPct: s.taxaAcertoTreinoPct == null ? null : Math.round(s.taxaAcertoTreinoPct),
       treinos: s.numDrills,
+      ajuda: "Acerto GTO e treinos feitos no PokerSync (carreira)",
+    },
+  };
+}
+
+// O próprio jogador nas Vagas ("como os times te veem"): os mesmos
+// números que o time vê quando ele se candidata.
+export function crachaDoMeuCartao(c: MeuCartao): CrachaDados {
+  return {
+    userId: c.userId,
+    nome: c.apelido || c.nome || "Você",
+    avatarId: c.avatarId,
+    avatarUrl: c.avatarUrl,
+    score: c.scoreGeral == null ? null : Math.round(c.scoreGeral),
+    resultado: {
+      rotulo: "Ganhos",
+      valor: c.lucroAcumulado,
+      roiPct: c.roiPct,
+      ajuda: "Ganhos e ROI de carreira (todas as sessões registradas)",
+    },
+    volume: {
+      abi: c.abiTorneio,
+      sessoes: c.numSessoes,
+      ajuda: "Buy-in médio de torneio e total de sessões registradas",
+    },
+    estudo: {
+      acertoPct: c.taxaAcertoTreinoPct == null ? null : Math.round(c.taxaAcertoTreinoPct),
+      treinos: c.numDrills,
       ajuda: "Acerto GTO e treinos feitos no PokerSync (carreira)",
     },
   };
