@@ -39,8 +39,7 @@ export function useInactivityLogout() {
     } catch {
       return;
     }
-    function marcarAtividade() {
-      if (!temSessao) return;
+    function gravar() {
       try {
         localStorage.setItem(STORAGE_KEY, String(Date.now()));
       } catch {
@@ -49,24 +48,54 @@ export function useInactivityLogout() {
       }
     }
 
+    function expirou(): boolean {
+      try {
+        const last = Number(localStorage.getItem(STORAGE_KEY) ?? Date.now());
+        return Date.now() - last > LIMIT_MS;
+      } catch {
+        return false;
+      }
+    }
+
+    // Movimento/tecla: ANTES de renovar o relógio, confere se ele já
+    // tinha estourado. Antes renovava direto -- aba esquecida aberta a
+    // noite toda (ou PC que hibernou) "voltava à vida" no primeiro
+    // movimento do mouse, antes da checagem periódica rodar, e a sessão
+    // nunca expirava (bug relatado).
+    function marcarAtividade() {
+      if (!temSessao || saindoRef.current) return;
+      if (expirou()) {
+        sair();
+        return;
+      }
+      gravar();
+    }
+
     supabase.auth.getUser().then(({ data }) => {
       if (!ativo) return;
       temSessao = Boolean(data.user);
-      marcarAtividade(); // baseline: abrir a pagina com sessao valida conta como atividade
+      // Baseline: a página acabou de carregar e o servidor
+      // (lib/supabase/middleware.ts) já conferiu a inatividade nesta
+      // requisição -- então vale como atividade, mesmo que o valor
+      // guardado aqui seja de um login antigo.
+      if (temSessao) gravar();
     });
 
     ACTIVITY_EVENTS.forEach((ev) => window.addEventListener(ev, marcarAtividade, { passive: true }));
 
-    const id = setInterval(async () => {
-      if (saindoRef.current || !temSessao) return;
-      let last: number;
-      try {
-        last = Number(localStorage.getItem(STORAGE_KEY) ?? Date.now());
-      } catch {
-        return;
-      }
-      if (Date.now() - last <= LIMIT_MS) return;
+    // A aba volta ao foco (PC acordou, trocou de aba): confere na hora.
+    function aoVoltar() {
+      if (document.visibilityState === "visible" && temSessao && !saindoRef.current && expirou()) sair();
+    }
+    document.addEventListener("visibilitychange", aoVoltar);
 
+    const id = setInterval(() => {
+      if (saindoRef.current || !temSessao) return;
+      if (expirou()) sair();
+    }, CHECK_INTERVAL_MS);
+
+    async function sair() {
+      if (saindoRef.current) return;
       saindoRef.current = true;
       try {
         const supabase = createClient();
@@ -83,11 +112,12 @@ export function useInactivityLogout() {
       // refletindo os cookies de verdade (ja limpos pelo signOut acima),
       // sem depender de estado do router client-side.
       window.location.href = "/login?expirado=1";
-    }, CHECK_INTERVAL_MS);
+    }
 
     return () => {
       ativo = false;
       ACTIVITY_EVENTS.forEach((ev) => window.removeEventListener(ev, marcarAtividade));
+      document.removeEventListener("visibilitychange", aoVoltar);
       clearInterval(id);
     };
   }, []);
