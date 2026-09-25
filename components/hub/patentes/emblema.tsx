@@ -19,16 +19,17 @@ import { levelColor, levelMaterial, levelSubTier } from "@/lib/services/xp-servi
 //   Ametista  drusa: cristais brutos saindo da rocha, como a pedra nasce
 //   Rubi      rubi em lapidação almofada (quadrado de cantos macios), vermelho
 //             "sangue de pombo", cravado em ouro, pulsando
-//   Platina   escudo de platina escovada, alado, com um brilhante no topo
-//   Diamante  diamante incolor visto de lado, alado, com o "fogo" -- as
-//             faíscas de arco-íris que a lapidação solta
-//   Lendário  o brasão supremo: escudo de obsidiana com céu estrelado,
-//             coroa cravejada, asas de ouro, raios de sol girando e as
-//             nove pedras de todas as patentes anteriores contornando o
-//             escudo -- quem chega lá carrega a jornada inteira no peito.
+//   Platina   escudo de platina escovada com um brilhante cravado no topo
+//   Diamante  brilhante incolor visto de cima, em 6 garras de platina, com
+//             o "fogo" -- as faíscas de arco-íris que a lapidação solta
+//   Lendário  o anel de campeão visto de cima: ônix polido, espada de ouro,
+//             auréola de diamantes e raios de sol girando atrás -- o troféu
+//             máximo do poker. As nove pedras da jornada (Bronze ao
+//             Diamante) ficam cravadas no aro: quem chega lá carrega a
+//             jornada inteira no dedo.
 //
-// Nível de detalhe por tamanho: abaixo de 60px somem textura, rebites,
-// penas finas e partículas (viram ruído); fica a silhueta e o material.
+// Nível de detalhe por tamanho: abaixo de 60px somem textura, rebites e
+// partículas (viram ruído); fica a silhueta e o material.
 //
 // Tudo em SVG + CSS (sem imagem). Quem pediu menos movimento no sistema
 // vê o emblema parado.
@@ -148,56 +149,14 @@ const RUBI = brilhante((t, s) => {
   return [60 + s * 36 * q(Math.cos(a)), 60 + s * 36 * q(Math.sin(a))];
 }, 8);
 
-// Brilhantes redondos pequenos (topo da Platina, coroa do Lendário).
+// Brilhantes redondos (Diamante e topo da Platina).
 const redondo = (cx: number, cy: number, r: number) =>
   brilhante((t, s) => {
     const a = t * Math.PI * 2 - Math.PI / 2;
     return [cx + s * r * Math.cos(a), cy + s * r * Math.sin(a)];
   }, 8);
 const BRILHANTE_PLATINA = redondo(60, 21, 9);
-
-// Diamante visto de lado: coroa (em cima da cintura) + pavilhão até a culaça.
-const DIAMANTE = (() => {
-  const g: P[] = [22, 34.7, 47.3, 60, 72.7, 85.3, 98].map((x) => [x, 49]);
-  const m: P[] = [42, 54, 66, 78].map((x) => [x, 30]);
-  const culaca: P = [60, 109];
-  const coroa: P[][] = [
-    [m[0], g[0], g[1]],
-    [m[0], g[1], g[2]],
-    [m[0], g[2], m[1]],
-    [m[1], g[2], g[3]],
-    [m[1], g[3], m[2]],
-    [m[2], g[3], g[4]],
-    [m[2], g[4], m[3]],
-    [m[3], g[4], g[5]],
-    [m[3], g[5], g[6]],
-  ];
-  const tc = [0.92, 0.62, 0.98, 0.42, 0.86, 0.36, 0.72, 0.3, 0.5];
-  const facetas: (Faceta & { fogo?: string })[] = coroa.map((pts, i) => ({
-    d: poli(pts),
-    t: tc[i],
-  }));
-  const tp = [0.72, 0.28, 0.5, 0.9, 0.2, 0.62, 0.38, 0.8, 0.16, 0.56, 0.3, 0.1, 0.46, 0.7, 0.22, 0.34, 0.12, 0.4];
-  const fogo = ["#7cd8ff", "#fff27c", "#9dffb0", "#c9a0ff", "#ffb07c"];
-  for (let i = 0; i < 6; i++) {
-    const meio: P = [(g[i][0] + g[i + 1][0]) / 2, 49];
-    const q: P = [meio[0] + (culaca[0] - meio[0]) * 0.42, 49 + (culaca[1] - 49) * 0.42];
-    [
-      [g[i], g[i + 1], q],
-      [g[i], q, culaca],
-      [g[i + 1], culaca, q],
-    ].forEach((pts, j) => {
-      const k = i * 3 + j;
-      facetas.push({
-        d: poli(pts as P[]),
-        t: tp[k],
-        fogo: k % 3 === 1 ? fogo[k % fogo.length] : undefined,
-      });
-    });
-  }
-  const contorno = poli([m[0], m[3], g[6], culaca, g[0]]);
-  return { facetas, contorno, mesa: `M${m[0][0]} 30 H${m[3][0]}` };
-})();
+const BRILHANTE_DIAMANTE = redondo(60, 60, 40);
 
 // Ametista: cristais hexagonais saindo da rocha (drusa).
 function cristal(cx: number, base: number, w: number, h: number, ponta: number, graus: number) {
@@ -236,47 +195,6 @@ const CRISTAIS = [
 ];
 const DRUSA = [[26, 101], [32, 97], [40, 103], [50, 99], [56, 104], [68, 100], [74, 104], [84, 99], [92, 102], [46, 106], [64, 107], [80, 106]];
 
-// Penas: cada asa é um leque de penas em fileiras (a de cima, mais curta,
-// cobre a base das compridas). Desenha a asa esquerda; a direita é espelho.
-interface Fileira {
-  n: number;
-  a0: number;
-  a1: number;
-  L: number;
-  w: number;
-}
-function asa(px: number, py: number, fileiras: Fileira[]) {
-  const penas: { d: string; eixo: string; t: number }[] = [];
-  fileiras.forEach((f, fi) => {
-    for (let k = 0; k < f.n; k++) {
-      const graus = f.a0 + ((f.a1 - f.a0) * k) / Math.max(1, f.n - 1);
-      const a = (graus * Math.PI) / 180;
-      const L = f.L * (0.62 + 0.38 * Math.sin((Math.PI * (k + 0.5)) / f.n));
-      const T = ([x, y]: P): string => `${r1(px + x * Math.cos(a) - y * Math.sin(a))} ${r1(py + x * Math.sin(a) + y * Math.cos(a))}`;
-      const w = f.w;
-      penas.push({
-        d: `M${T([0, 0])} C${T([L * 0.25, -w])} ${T([L * 0.72, -w * 0.95])} ${T([L, 0])} C${T([L * 0.72, w * 0.6])} ${T([L * 0.25, w * 0.75])} ${T([0, 0])} Z`,
-        eixo: `M${T([L * 0.08, 0])} L${T([L * 0.86, 0])}`,
-        t: fi / Math.max(1, fileiras.length - 1),
-      });
-    }
-  });
-  return penas;
-}
-const ASA_PLATINA = asa(40, 52, [
-  { n: 7, a0: 172, a1: 244, L: 42, w: 4.6 },
-  { n: 5, a0: 184, a1: 234, L: 27, w: 5 },
-]);
-const ASA_DIAMANTE = asa(38, 46, [
-  { n: 7, a0: 170, a1: 246, L: 42, w: 4.4 },
-  { n: 5, a0: 182, a1: 236, L: 26, w: 4.8 },
-]);
-const ASA_LENDARIO = asa(44, 60, [
-  { n: 9, a0: 168, a1: 262, L: 52, w: 4.4 },
-  { n: 7, a0: 176, a1: 252, L: 38, w: 4.8 },
-  { n: 5, a0: 188, a1: 242, L: 23, w: 5.2 },
-]);
-
 // Louros do Ouro: folhas ao longo de um ramo curvo, alternando os lados.
 const LOUROS = (() => {
   const A: P = [57, 112];
@@ -307,35 +225,17 @@ const RAIOS = Array.from({ length: 32 }, (_, i) => {
   return poli([p(a - d, 18), p(a, R), p(a + d, 18)]);
 }).join(" ");
 
-// Céu estrelado dentro do escudo de obsidiana.
-const ESTRELAS_CEU: [number, number, number][] = [
-  [44, 50, 0.6],
-  [52, 46, 0.4],
-  [71, 48, 0.7],
-  [78, 56, 0.4],
-  [42, 64, 0.5],
-  [79, 70, 0.6],
-  [48, 80, 0.4],
-  [70, 84, 0.5],
-  [58, 90, 0.4],
-  [64, 50, 0.35],
-  [40, 74, 0.35],
-  [76, 80, 0.3],
-];
+// Cores do "fogo" do diamante (a luz branca se abrindo em arco-íris).
+const FOGO = ["#7cd8ff", "#fff27c", "#9dffb0", "#c9a0ff", "#ffb07c"];
 
-// As nove pedras da jornada, contornando o escudo do Lendário
-// (Bronze no alto à esquerda, descendo, passando pela ponta e subindo até o Diamante).
-const JORNADA: { x: number; y: number; cor: string }[] = [
-  { x: 37.5, y: 49, cor: "#c98d52" },
-  { x: 37.5, y: 61, cor: "#aeb6bf" },
-  { x: 39.5, y: 74, cor: "#f2c94c" },
-  { x: 45, y: 86, cor: "#12a15a" },
-  { x: 60, y: 99, cor: "#2f63e0" },
-  { x: 75, y: 86, cor: "#9a4ee0" },
-  { x: 80.5, y: 74, cor: "#d42a3c" },
-  { x: 82.5, y: 61, cor: "#bfe9f2" },
-  { x: 82.5, y: 49, cor: "#ffffff" },
-];
+// Anel do Lendário: auréola de 22 diamantes. As nove pedras da jornada
+// (Bronze -> Diamante) tomam o lugar das nove de baixo e se leem da
+// esquerda pra direita, na ordem em que foram conquistadas.
+const JORNADA = ["#c98d52", "#aeb6bf", "#f2c94c", "#12a15a", "#2f63e0", "#9a4ee0", "#d42a3c", "#bfe9f2", "#ffffff"];
+const AUREOLA = Array.from({ length: 22 }, (_, i) => {
+  const a = ((i + 0.5) / 22) * Math.PI * 2;
+  return { x: r1(60 + 40 * Math.cos(a)), y: r1(60 + 40 * Math.sin(a)), cor: i >= 1 && i <= 9 ? JORNADA[9 - i] : null };
+});
 
 // ---------- Materiais ----------
 
@@ -366,7 +266,6 @@ const METAL: Record<string, [number, string][]> = {
   ouro: [[0, "#fff6cc"], [0.22, "#f5cf55"], [0.48, "#bd851c"], [0.55, "#9a6512"], [0.78, "#ecba42"], [1, "#6e4506"]],
   platina: [[0, "#fbfdff"], [0.26, "#dfe8ee"], [0.48, "#aebcc6"], [0.54, "#8b9ba6"], [0.78, "#d6e2e9"], [1, "#6f7f8a"]],
   lendario: [[0, "#fffbe6"], [0.2, "#ffe391"], [0.46, "#d9a431"], [0.55, "#a36b0e"], [0.8, "#f9d36e"], [1, "#6a4204"]],
-  gelo: [[0, "#ffffff"], [0.3, "#eef3f8"], [0.5, "#b9c4cf"], [0.56, "#8d99a6"], [0.8, "#e3eaf1"], [1, "#5f6b78"]],
 };
 const ARO: Record<string, string[]> = {
   bronze: ["#ffdcae", "#b07a41", "#35190a"],
@@ -374,7 +273,6 @@ const ARO: Record<string, string[]> = {
   ouro: ["#fff6cf", "#d9a531", "#5a3804"],
   platina: ["#ffffff", "#b4c2cc", "#46545e"],
   lendario: ["#fffbe6", "#e6b441", "#4d2f02"],
-  gelo: ["#ffffff", "#c3ced8", "#46525e"],
 };
 
 // Paletas das gemas: [profundo, escuro, base, claro, reflexo]
@@ -383,7 +281,7 @@ const GEMA = {
   safira: ["#040b36", "#0f2a8f", "#2f63e0", "#93b8ff", "#f0f5ff"],
   ametista: ["#230842", "#57209a", "#9a4ee0", "#d6b3ff", "#fbf3ff"],
   rubi: ["#1c0003", "#640612", "#b3122a", "#f24b5e", "#ffd2d7"],
-  diamante: ["#1a222c", "#5f6d7e", "#c6d2dd", "#eef4f9", "#ffffff"],
+  diamante: ["#0b1017", "#46526a", "#b9c8d8", "#f3f8fd", "#ffffff"],
   gelo: ["#0a3f4d", "#3a98ad", "#a7ecf7", "#eafcff", "#ffffff"],
 };
 
@@ -391,20 +289,18 @@ const ESCUDO = {
   bronze: "M24 22 Q60 12 96 22 V58 C96 84 80 99 60 108 C40 99 24 84 24 58 Z",
   prata: "M22 20 Q42 22 60 11 Q78 22 98 20 V58 C98 85 81 100 60 110 C39 100 22 85 22 58 Z",
   ouro: "M27 24 Q35 14 45 20 Q52 10 60 9 Q68 10 75 20 Q85 14 93 24 V58 C93 84 78 99 60 108 C42 99 27 84 27 58 Z",
-  platina: "M32 25 Q60 15 88 25 V60 C88 84 75 97 60 106 C45 97 32 84 32 60 Z",
-  lendario: "M36 41 Q60 35 84 41 V66 C84 86 73 97 60 105 C47 97 36 86 36 66 Z",
+  platina: "M26 24 Q60 13 94 24 V60 C94 85 79 99 60 108 C41 99 26 85 26 60 Z",
 };
-const COROA = "M36 42 L33 21 L40.5 29 L46 15 L53 26 L60 6 L67 26 L74 15 L79.5 29 L87 21 L84 42 Z";
 
 const VEL_VARRE = ["7s", "3.4s", "4.6s", "5s", "6s", "5.5s", "4.5s", "3.8s", "3.2s", "3.6s"];
-const NUMERO_Y = [62, 62, 62, 62, 62, 66, 62, 67, 63, 71];
+const NUMERO_Y = [62, 62, 62, 62, 62, 66, 62, 66, 62, 72];
 
 export function EmblemaEstilos() {
   return (
     <style>{`
       /* Só os elementos animados giram/escalam em torno do próprio centro;
-         uma regra geral mexeria também nos transform="" fixos (asa
-         espelhada, louros) e os tiraria do lugar. */
+         uma regra geral mexeria também nos transform="" fixos (louros
+         espelhados) e os tiraria do lugar. */
       .emb-sobe, .emb-pulsa, .emb-estrela { transform-box: fill-box; transform-origin: center; }
       @keyframes embVarre { 0% { transform: translateX(-90px) skewX(-18deg); } 60%, 100% { transform: translateX(200px) skewX(-18deg); } }
       @keyframes embSobe { 0% { transform: translateY(0) scale(1); opacity: 0; } 15% { opacity: 1; } 100% { transform: translateY(-38px) scale(.3); opacity: 0; } }
@@ -416,7 +312,6 @@ export function EmblemaEstilos() {
       @keyframes embAura { 0%, 100% { opacity: .55; transform: scale(1); } 50% { opacity: 1; transform: scale(1.08); } }
       @keyframes embIris { from { transform: rotate(0deg); filter: hue-rotate(0deg); } to { transform: rotate(360deg); filter: hue-rotate(360deg); } }
       @keyframes embFlutua { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-3px); } }
-      @keyframes embBate { 0%, 100% { transform: rotate(0deg); } 50% { transform: rotate(5deg); } }
       .emb-varre { animation: embVarre var(--vel, 5s) ease-in-out infinite; }
       .emb-sobe { animation: embSobe var(--vel, 2.6s) ease-out infinite; }
       .emb-pisca { animation: embPisca var(--vel, 2.8s) ease-in-out infinite; }
@@ -427,9 +322,8 @@ export function EmblemaEstilos() {
       .emb-aura { animation: embAura 2.8s ease-in-out infinite; }
       .emb-iris { animation: embIris 8s linear infinite; }
       .emb-flutua { animation: embFlutua 4s ease-in-out infinite; }
-      .emb-bate { animation: embBate 3.2s ease-in-out infinite; transform-box: view-box; }
       @media (prefers-reduced-motion: reduce) {
-        .emb-varre, .emb-sobe, .emb-pisca, .emb-onda, .emb-gira, .emb-pulsa, .emb-estrela, .emb-iris, .emb-aura, .emb-flutua, .emb-bate { animation: none !important; }
+        .emb-varre, .emb-sobe, .emb-pisca, .emb-onda, .emb-gira, .emb-pulsa, .emb-estrela, .emb-iris, .emb-aura, .emb-flutua { animation: none !important; }
       }
     `}</style>
   );
@@ -587,35 +481,6 @@ function Particulas({ c, cor, xs, y = 100, r = 1.4, v = "3s" }: { c: Ctx; cor: s
           style={{ animationDelay: `${(i * 0.43) % 2.6}s`, ...vel(v) }}
         />
       ))}
-    </>
-  );
-}
-
-function Asa({ penas, c, metal, animar = false, pivo }: { penas: ReturnType<typeof asa>; c: Ctx; metal: string; animar?: boolean; pivo: P }) {
-  const lado = (espelho: boolean) => (
-    <g transform={espelho ? "translate(120 0) scale(-1 1)" : undefined}>
-      <g className={animar && c.a ? "emb-bate" : undefined} style={animar ? { transformOrigin: `${pivo[0]}px ${pivo[1]}px` } : undefined}>
-        {penas.map((p, i) => (
-          <g key={i}>
-            <path d={p.d} fill={`url(#${c.id("pena")})`} stroke={ARO[metal]?.[2] ?? "#333"} strokeOpacity=".75" strokeWidth=".55" strokeLinejoin="round" />
-            {p.t > 0 && <path d={p.d} fill="#fff" opacity={0.08 * p.t} />}
-            {c.det && <path d={p.eixo} stroke="#fff" strokeOpacity=".35" strokeWidth=".45" strokeLinecap="round" />}
-          </g>
-        ))}
-      </g>
-    </g>
-  );
-  return (
-    <>
-      <defs>
-        <linearGradient id={c.id("pena")} x1="0" y1="0" x2="1" y2="1">
-          {METAL[metal].map(([o, cor]) => (
-            <stop key={o} offset={o} stopColor={cor} />
-          ))}
-        </linearGradient>
-      </defs>
-      {lado(false)}
-      {lado(true)}
     </>
   );
 }
@@ -952,7 +817,6 @@ function Platina({ c }: { c: Ctx }) {
   const b = BRILHANTE_PLATINA;
   return (
     <>
-      <Asa penas={ASA_PLATINA} c={c} metal="platina" pivo={[40, 52]} />
       <EscudoMetal c={c} d={d} metal="platina" aro="platina" k={0.9} />
       {c.det && (
         <>
@@ -987,80 +851,72 @@ function Platina({ c }: { c: Ctx }) {
 }
 
 function Diamante({ c }: { c: Ctx }) {
-  const g = DIAMANTE;
+  const g = BRILHANTE_DIAMANTE;
   const pal = GEMA.diamante;
+  const garras = Array.from({ length: 6 }, (_, i) => {
+    const a = (i / 6) * Math.PI * 2 - Math.PI / 2;
+    return [r1(60 + 42 * Math.cos(a)), r1(60 + 42 * Math.sin(a))] as P;
+  });
   return (
     <>
-      <Asa penas={ASA_DIAMANTE} c={c} metal="gelo" pivo={[38, 46]} />
-      <path d={g.contorno} fill={pal[1]} stroke="#1a222c" strokeWidth="1.2" strokeLinejoin="round" />
-      <g stroke="#ffffff" strokeOpacity=".45" strokeWidth=".4" strokeLinejoin="round">
-        {g.facetas.map((f, i) => (
-          <path key={i} d={f.d} fill={rampa(pal, f.t)} />
-        ))}
-      </g>
-      {/* Fogo: a luz se abre em cores dentro da pedra */}
+      <defs>
+        <GradAro id={c.id("aro")} cores={ARO.platina} />
+        <GradGarra id={c.id("garra")} cores={["#ffffff", "#c9d6de", "#4a5862"]} />
+      </defs>
+      {/* Aro de platina + a pedra */}
+      <circle cx="60" cy="60" r="43" fill="none" stroke={`url(#${c.id("aro")})`} strokeWidth="5" />
+      <path d={g.contorno} fill={pal[1]} />
+      <Facetas facetas={g.facetas} pal={pal} c={c} piscar={3} velPisca="2.4s" />
+      {/* Fogo: a luz branca se abre em cores nas facetas */}
       {g.facetas.map((f, i) =>
-        f.fogo ? (
+        i % 3 === 1 ? (
           <path
             key={`f${i}`}
             d={f.d}
-            fill={f.fogo}
-            opacity={c.a && c.det ? undefined : 0.45}
+            fill={FOGO[i % FOGO.length]}
+            opacity={c.a && c.det ? undefined : 0.6}
             className={c.a && c.det ? "emb-pisca" : undefined}
-            style={{
-              mixBlendMode: "screen",
-              animationDelay: `${(i * 0.41) % 2.4}s`,
-              ...vel("2.4s"),
-            }}
+            style={{ mixBlendMode: "screen", animationDelay: `${(i * 0.41) % 2.4}s`, ...vel("2.4s") }}
           />
         ) : null,
       )}
-      {c.a &&
-        c.det &&
-        g.facetas.map((f, i) =>
-          i % 5 === 2 ? (
-            <path key={`p${i}`} d={f.d} fill="#fff" className="emb-pisca" style={{ animationDelay: `${(i * 0.53) % 3}s`, ...vel("2.2s") }} />
-          ) : null,
-        )}
-      <path d={g.mesa} stroke="#fff" strokeWidth="1.4" strokeLinecap="round" />
-      <path d="M22 49 H98" stroke="#fff" strokeOpacity=".55" strokeWidth=".7" />
-      <path d={g.contorno} fill="none" stroke="#1a222c" strokeOpacity=".9" strokeWidth=".9" strokeLinejoin="round" />
-      <Estrela4 x={44} y={30} r={9} c={c} v="2.2s" />
-      <Estrela4 x={18} y={22} r={5} c={c} atraso={0.6} />
-      <Estrela4 x={102} y={30} r={6} c={c} atraso={1.2} />
-      <Estrela4 x={92} y={98} r={5} c={c} atraso={1.8} />
-      <Varredura c={c} faixa={8} forca={0.55} clip={<path d={g.contorno} />} />
+      <Mesa d={g.mesa} pal={pal} c={c} />
+      <path d={g.contorno} fill="none" stroke="#0b1017" strokeWidth=".9" />
+      <Garras pts={garras} id={c.id("garra")} r={3.6} />
+      <Estrela4 x={40} y={36} r={10} c={c} v="2.2s" />
+      <Estrela4 x={86} y={84} r={6} c={c} atraso={1.1} />
+      <Estrela4 x={100} y={22} r={5} c={c} atraso={1.7} />
+      <Varredura c={c} faixa={8} forca={0.5} clip={<path d={g.contorno} />} />
     </>
   );
 }
 
 function Lendario({ c, nivel, mostrarNumero }: { c: Ctx; nivel: number; mostrarNumero: boolean }) {
-  const d = ESCUDO.lendario;
   return (
     <>
       <defs>
         <radialGradient id={c.id("raio")} cx="60" cy="60" r="60" gradientUnits="userSpaceOnUse">
           <stop offset=".25" stopColor="#fff3c4" stopOpacity=".95" />
-          <stop offset=".6" stopColor="#f5c451" stopOpacity=".55" />
+          <stop offset=".6" stopColor="#f5c451" stopOpacity=".5" />
           <stop offset="1" stopColor="#f5c451" stopOpacity="0" />
         </radialGradient>
-        <radialGradient id={c.id("sol")} cx="60" cy="62" r="46" gradientUnits="userSpaceOnUse">
-          <stop offset="0" stopColor="#fff6d0" stopOpacity=".7" />
-          <stop offset=".45" stopColor="#ffd766" stopOpacity=".28" />
+        <radialGradient id={c.id("sol")} cx="60" cy="60" r="50" gradientUnits="userSpaceOnUse">
+          <stop offset="0" stopColor="#fff6d0" stopOpacity=".6" />
+          <stop offset=".5" stopColor="#ffd766" stopOpacity=".22" />
           <stop offset="1" stopColor="#ffb347" stopOpacity="0" />
         </radialGradient>
-        <radialGradient id={c.id("obsidiana")} cx=".45" cy=".3" r=".85">
-          <stop offset="0" stopColor="#3b2d63" />
-          <stop offset=".45" stopColor="#170f2e" />
-          <stop offset="1" stopColor="#040308" />
+        <radialGradient id={c.id("onix")} cx=".4" cy=".3" r=".8">
+          <stop offset="0" stopColor="#3a3a44" />
+          <stop offset=".4" stopColor="#101014" />
+          <stop offset="1" stopColor="#000" />
         </radialGradient>
-        <radialGradient id={c.id("nebulosa")} cx=".62" cy=".62" r=".45">
-          <stop offset="0" stopColor="#f5c451" stopOpacity=".28" />
-          <stop offset="1" stopColor="#f5c451" stopOpacity="0" />
+        <radialGradient id={c.id("pedra")} cx=".35" cy=".3" r=".8">
+          <stop offset="0" stopColor="#ffffff" />
+          <stop offset=".5" stopColor="#e6ecf2" />
+          <stop offset="1" stopColor="#7d8894" />
         </radialGradient>
         <GradMetal id={c.id("ouro")} stops={METAL.lendario} />
         <GradAro id={c.id("aro")} cores={ARO.lendario} />
-        <GradGarra id={c.id("perola")} cores={["#ffffff", "#f3ead8", "#9c8a66"]} />
         <linearGradient id={c.id("numero")} x1="0" y1="0" x2="0" y2="1">
           <stop offset="0" stopColor="#fffbe6" />
           <stop offset=".55" stopColor="#ffd766" />
@@ -1068,111 +924,75 @@ function Lendario({ c, nivel, mostrarNumero }: { c: Ctx; nivel: number; mostrarN
         </linearGradient>
       </defs>
 
-      {/* Raios de sol girando atrás de tudo + anel pontilhado no sentido contrário */}
+      {/* Raios de sol girando devagar + disco de luz que respira */}
       <g className={c.a ? "emb-gira" : undefined} style={vel("40s")}>
         <path d={RAIOS} fill={`url(#${c.id("raio")})`} />
       </g>
+      <circle
+        cx="60"
+        cy="60"
+        r="50"
+        fill={`url(#${c.id("sol")})`}
+        className={c.a ? "emb-aura" : undefined}
+        style={{ transformBox: "fill-box", transformOrigin: "center" }}
+      />
+
+      {/* Ombros do anel aparecendo em cima e embaixo */}
+      <path d="M46 12 Q60 2 74 12 L70 16 Q60 10 50 16 Z" fill={`url(#${c.id("ouro")})`} stroke="#4d2f02" strokeWidth=".7" />
+      <path d="M46 108 Q60 118 74 108 L70 104 Q60 110 50 104 Z" fill={`url(#${c.id("ouro")})`} stroke="#4d2f02" strokeWidth=".7" />
+
+      {/* Cabeça do anel: ouro com borda serrilhada */}
+      <circle cx="60" cy="60" r="49" fill={`url(#${c.id("aro")})`} stroke="#3a2302" strokeWidth="1" />
+      <circle cx="60" cy="60" r="46" fill={`url(#${c.id("ouro")})`} stroke="#4d2f02" strokeWidth=".6" />
       {c.det && (
-        <g className={c.a ? "emb-gira" : undefined} style={{ ...vel("60s"), animationDirection: "reverse" }}>
-          <circle cx="60" cy="60" r="53" fill="none" stroke="#ffe391" strokeOpacity=".55" strokeWidth=".8" strokeDasharray="0.6 4.2" strokeLinecap="round" />
-        </g>
+        <circle cx="60" cy="60" r="47.5" fill="none" stroke="#fffbe6" strokeOpacity=".7" strokeWidth=".8" strokeDasharray="0 2.4" strokeLinecap="round" />
       )}
 
-      {/* Disco de luz: o brasão parece sair de dentro do sol */}
-      <circle cx="60" cy="62" r="46" fill={`url(#${c.id("sol")})`} className={c.a ? "emb-aura" : undefined} style={{ transformBox: "fill-box", transformOrigin: "center" }} />
-
-      <Asa penas={ASA_LENDARIO} c={c} metal="lendario" animar pivo={[44, 60]} />
-
-      {/* Escudo: aro de ouro duplo com face de obsidiana e céu estrelado */}
-      <path d={d} fill={`url(#${c.id("aro")})`} stroke="#3a2302" strokeWidth="1.2" strokeLinejoin="round" transform={reduz(1.1, 60, 70)} />
-      <path d={d} fill={`url(#${c.id("ouro")})`} stroke="#4d2f02" strokeWidth=".8" transform={reduz(1.02, 60, 70)} />
-      <path d={d} fill={`url(#${c.id("obsidiana")})`} stroke="#8a5a0a" strokeWidth=".8" transform={reduz(0.9, 60, 70)} />
-      <g transform={reduz(0.9, 60, 70)}>
-        <path d={d} fill={`url(#${c.id("nebulosa")})`} />
-        {c.det &&
-          ESTRELAS_CEU.map(([x, y, r], i) => (
-            <circle
-              key={i}
-              cx={x}
-              cy={y}
-              r={r}
-              fill="#fff"
-              className={c.a && i % 3 === 0 ? "emb-pisca" : undefined}
-              style={{ animationDelay: `${i * 0.3}s`, ...vel("2.6s") }}
-              opacity={c.a && i % 3 === 0 ? undefined : 0.75}
-            />
-          ))}
-        <Domo d={d} id={c.id("domo")} forca={0.8} />
-      </g>
-      {/* Filigrana nos cantos */}
-      {c.det && (
-        <g fill="none" stroke="#ffe391" strokeWidth=".7" strokeLinecap="round" opacity=".85">
-          <path d="M42 50 q2 -5 8 -4 q-2 3 -5 2" />
-          <path d="M78 50 q-2 -5 -8 -4 q2 3 5 2" />
-        </g>
-      )}
-
-      {/* As nove pedras da jornada */}
-      {JORNADA.map((p, i) => (
+      {/* Auréola: diamantes, e as nove pedras da jornada na metade de baixo */}
+      {AUREOLA.map((p, i) => (
         <g key={i}>
-          <circle cx={p.x} cy={p.y} r={c.det ? 2.7 : 2.4} fill={p.cor} stroke="#4d2f02" strokeWidth=".7" />
-          <circle cx={p.x - 0.8} cy={p.y - 0.9} r=".9" fill="#fff" opacity=".85" />
-          {c.a && c.det && <circle cx={p.x - 0.6} cy={p.y - 0.7} r="1.3" fill="#fff" className="emb-pisca" style={{ animationDelay: `${i * 0.33}s`, ...vel("3s") }} />}
+          <circle cx={p.x} cy={p.y} r="3.6" fill={p.cor ?? `url(#${c.id("pedra")})`} stroke={p.cor ? "#4d2f02" : "#6b5a3a"} strokeWidth=".5" />
+          <circle cx={p.x - 1} cy={p.y - 1.1} r="1.1" fill="#fff" opacity={p.cor ? 0.8 : 0.95} />
+          {!p.cor && i % 5 === 2 && <circle cx={p.x + 0.6} cy={p.y + 0.5} r="1.3" fill={FOGO[i % FOGO.length]} opacity=".6" />}
+          {c.a && c.det && i % 3 === 0 && (
+            <circle cx={p.x} cy={p.y} r="2.2" fill="#fff" className="emb-pisca" style={{ animationDelay: `${(i * 0.27) % 2.4}s`, ...vel("2.4s") }} />
+          )}
         </g>
       ))}
 
-      {/* Coroa cravejada */}
-      <path d={COROA} fill={`url(#${c.id("ouro")})`} stroke="#4d2f02" strokeWidth=".9" strokeLinejoin="round" />
-      <path d="M35 36 H85 V42 H35 Z" fill={`url(#${c.id("aro")})`} stroke="#4d2f02" strokeWidth=".7" />
-      {c.det && <path d="M36 36 H84" stroke="#fffbe6" strokeOpacity=".8" strokeWidth=".6" />}
-      {(
-        [
-          [33, 21],
-          [46, 15],
-          [74, 15],
-          [87, 21],
-        ] as P[]
-      ).map(([x, y]) => (
-        <circle key={x} cx={x} cy={y} r="2.4" fill={`url(#${c.id("perola")})`} stroke="#4d2f02" strokeWidth=".5" />
-      ))}
-      <ellipse cx="46" cy="39" rx="2.4" ry="1.8" fill={GEMA.safira[2]} stroke="#4d2f02" strokeWidth=".5" />
-      <ellipse cx="74" cy="39" rx="2.4" ry="1.8" fill={GEMA.esmeralda[2]} stroke="#4d2f02" strokeWidth=".5" />
-      <ellipse cx="60" cy="31" rx="3.4" ry="4.4" fill={GEMA.rubi[2]} stroke="#4d2f02" strokeWidth=".6" />
-      <ellipse cx="59" cy="29.5" rx="1" ry="1.4" fill="#fff" opacity=".7" />
-      {/* Estrela-brilhante no topo */}
-      <path d="M60 0 L62.2 4.8 L67 7 L62.2 9.2 L60 14 L57.8 9.2 L53 7 L57.8 4.8 Z" fill="#fff" stroke="#f5c451" strokeWidth=".5" />
+      {/* Ônix polido com a espada de ouro */}
+      <circle cx="60" cy="60" r="34" fill={`url(#${c.id("aro")})`} stroke="#4d2f02" strokeWidth=".8" />
+      <circle cx="60" cy="60" r="31" fill={`url(#${c.id("onix")})`} />
+      <path d="M36 50 Q44 32 64 30 Q48 36 40 52 Z" fill="#fff" opacity=".18" />
+      <path
+        d="M60 32 C64 37 71 40 71 46 C71 51 66 52 62 49 C63 52 64 54 66 55 H54 C56 54 57 52 58 49 C54 52 49 51 49 46 C49 40 56 37 60 32 Z"
+        fill={`url(#${c.id("ouro")})`}
+        stroke="#4d2f02"
+        strokeWidth=".6"
+      />
 
       <Varredura
         c={c}
         faixa={9}
-        forca={0.7}
+        forca={0.6}
         clip={
           <>
-            <path d={COROA} />
-            <path d={d} transform={reduz(1.1, 60, 70)} />
+            <circle cx="60" cy="60" r="49" />
+            <path d="M46 12 Q60 2 74 12 L70 16 Q60 10 50 16 Z M46 108 Q60 118 74 108 L70 104 Q60 110 50 104 Z" />
           </>
         }
       />
 
-      {/* Brasas e brilhos */}
-      <Particulas c={c} cor={["#ffe391", "#ffffff", "#ffb347"]} xs={[14, 24, 34, 46, 56, 66, 76, 88, 98, 106]} y={98} r={1.6} v="2.4s" />
-      <Estrela4 x={60} y={7} r={11} c={c} v="2.4s" />
-      <Estrela4 x={14} y={26} r={6} c={c} atraso={0.5} />
-      <Estrela4 x={106} y={34} r={5} c={c} atraso={1.1} />
-      <Estrela4 x={100} y={100} r={6} c={c} atraso={1.7} />
-      <Estrela4 x={20} y={96} r={4} c={c} atraso={0.9} />
-
-      {/* O número em ouro */}
       {mostrarNumero && (
         <text
           x="60"
           y={NUMERO_Y[9]}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize={nivel >= 10 ? 26 : 30}
+          fontSize={24}
           fontWeight="900"
           fill={`url(#${c.id("numero")})`}
-          stroke="#1a1002"
+          stroke="#000"
           strokeWidth="3.6"
           paintOrder="stroke"
           style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-1px" }}
@@ -1180,6 +1000,12 @@ function Lendario({ c, nivel, mostrarNumero }: { c: Ctx; nivel: number; mostrarN
           {nivel}
         </text>
       )}
+
+      {/* Brasas subindo e brilhos */}
+      <Particulas c={c} cor={["#ffe391", "#ffffff", "#ffb347"]} xs={[10, 22, 34, 86, 98, 110]} y={96} r={1.5} v="2.6s" />
+      <Estrela4 x={30} y={26} r={9} c={c} v="2.4s" />
+      <Estrela4 x={94} y={88} r={6} c={c} atraso={0.9} />
+      <Estrela4 x={100} y={24} r={5} c={c} atraso={1.6} />
     </>
   );
 }
