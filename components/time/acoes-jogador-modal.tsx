@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { Tag, UserCog, UserMinus, MessageCircle, X } from "lucide-react";
+import { Tag, UserCog, UserMinus, X } from "lucide-react";
 import { AvatarNivel } from "@/components/avatar-nivel";
 import {
   assignCoach,
@@ -25,7 +25,6 @@ export function AcoesJogadorModal({
   coaches,
   isAdmin,
   onFechar,
-  onAbrirConversa,
   onChange,
   onRemoved,
   onErro,
@@ -35,7 +34,6 @@ export function AcoesJogadorModal({
   coaches: { userId: string; nome: string }[];
   isAdmin: boolean;
   onFechar: () => void;
-  onAbrirConversa: () => void;
   onChange: () => void;
   /** Chamado (além de onChange) quando o jogador é de fato removido do time. */
   onRemoved?: () => void;
@@ -138,16 +136,6 @@ export function AcoesJogadorModal({
               </button>
             </>
           )}
-
-          <div className={isAdmin ? "border-t border-hairline pt-4" : undefined}>
-            <button
-              onClick={onAbrirConversa}
-              className="flex w-full items-center justify-center gap-1.5 rounded-lg border border-hairline px-4 py-2 text-sm font-medium text-ink transition-colors hover:border-ink/40"
-            >
-              <MessageCircle size={14} />
-              Abrir conversa
-            </button>
-          </div>
 
           {isAdmin && (
             <div className="border-t border-hairline pt-4">

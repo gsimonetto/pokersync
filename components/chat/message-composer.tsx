@@ -46,21 +46,21 @@ export function MessageComposer({
     const mm = String(Math.floor(seconds / 60)).padStart(2, "0");
     const ss = String(seconds % 60).padStart(2, "0");
     return (
-      <div className="flex items-center gap-2 border-t border-hairline p-3">
+      <div className="flex items-center gap-2 border-t border-white/[0.07] p-3">
         <span className="flex size-2 shrink-0 animate-pulse rounded-full bg-negative" aria-hidden="true" />
         <span className="flex-1 text-sm tabular-nums text-ink">
           Gravando… {mm}:{ss}
         </span>
         <button
           onClick={cancel}
-          className="grid size-9 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:text-ink"
+          className="grid size-9 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-muted transition hover:border-white/20 hover:text-ink"
           aria-label="Cancelar gravação"
         >
           <X size={15} />
         </button>
         <button
           onClick={finish}
-          className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink text-void"
+          className="grid size-9 shrink-0 place-items-center rounded-xl bg-[#d4af37] text-black transition hover:bg-[#e2c35a]"
           aria-label="Enviar áudio"
         >
           <Check size={15} />
@@ -70,7 +70,7 @@ export function MessageComposer({
   }
 
   return (
-    <div className="border-t border-hairline">
+    <div className="border-t border-white/[0.07]">
       {status === "erro" && (
         <p className="px-3 pt-2 text-[11px] text-negative">
           Não foi possível acessar o microfone. Verifique a permissão do navegador.
@@ -84,13 +84,13 @@ export function MessageComposer({
           onKeyDown={(e) => e.key === "Enter" && enviarTexto()}
           placeholder="Escreva uma mensagem…"
           disabled={disabled || enviando}
-          className="flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none placeholder:text-muted/50 disabled:opacity-60"
+          className="min-w-0 flex-1 rounded-xl border border-white/10 bg-white/[0.04] px-3.5 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-[#d4af37]/60 disabled:opacity-60"
         />
         {texto.trim() ? (
           <button
             onClick={enviarTexto}
             disabled={enviando}
-            className="grid size-9 shrink-0 place-items-center rounded-lg bg-ink text-void disabled:opacity-50"
+            className="grid size-10 shrink-0 place-items-center rounded-xl bg-[#d4af37] text-black transition hover:bg-[#e2c35a] active:scale-95 disabled:opacity-50"
             aria-label="Enviar"
           >
             <Send size={15} />
@@ -99,7 +99,7 @@ export function MessageComposer({
           <button
             onClick={iniciarGravacao}
             disabled={disabled || enviando}
-            className="grid size-9 shrink-0 place-items-center rounded-lg border border-hairline text-muted transition-colors hover:border-ink/40 hover:text-ink disabled:opacity-50"
+            className="grid size-10 shrink-0 place-items-center rounded-xl border border-white/10 bg-white/[0.03] text-muted transition hover:border-[#d4af37]/40 hover:text-[#d4af37] disabled:opacity-50"
             aria-label="Gravar áudio"
           >
             <Mic size={15} />

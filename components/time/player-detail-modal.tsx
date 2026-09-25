@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, IdCard, MessageCircle, MoreVertical, X } from "lucide-react";
+import { ExternalLink, IdCard, MoreVertical, X } from "lucide-react";
 import { Esqueleto } from "@/components/painel/painel-card";
 import { PeriodSelector } from "@/components/period-selector";
 import { PlayerDetailBody } from "@/components/time/player-detail-body";
@@ -52,23 +52,19 @@ export function PlayerDetailModal({
   labels,
   coaches,
   isAdmin,
-  podeConversar,
-  onAbrirConversa,
   onChange,
   onErro: onErroPai,
 }: {
   playerId: string;
   onFechar: () => void;
   // Props opcionais abaixo: só quando a ficha é aberta a partir da aba
-  // Jogadores (lista de admin/coach), pra abrir "Conversar" e o menu de
+  // Jogadores (lista de admin/coach), pra abrir o menu de
   // ações (etiqueta, coach, remover) direto daqui — essas ações saíram
   // do card da lista e moraram todas pra dentro da ficha completa.
   jogador?: TeamDashboardRow;
   labels?: TeamLabel[];
   coaches?: { userId: string; nome: string }[];
   isAdmin?: boolean;
-  podeConversar?: boolean;
-  onAbrirConversa?: () => void;
   onChange?: () => void;
   onErro?: (s: string) => void;
 }) {
@@ -143,17 +139,8 @@ export function PlayerDetailModal({
             </div>
             <div className="flex items-center gap-2">
               <PeriodSelector value={dias} onChange={setDias} options={PERIODOS} />
-              {podeConversar && onAbrirConversa && (
-                <button
-                  onClick={onAbrirConversa}
-                  title="Conversar"
-                  aria-label="Conversar"
-                  className="grid h-8 w-8 shrink-0 place-items-center rounded-xl border border-white/10 text-muted transition-colors hover:border-white/25 hover:text-ink"
-                >
-                  <MessageCircle size={14} />
-                </button>
-              )}
-              {jogador && labels && coaches && onChange && onErroPai && (
+              {/* Etiqueta, coach e remover são só do dono do time. */}
+              {isAdmin && jogador && labels && coaches && onChange && onErroPai && (
                 <button
                   onClick={() => setAcoesAbertas(true)}
                   title="Ações do jogador"
@@ -235,10 +222,6 @@ export function PlayerDetailModal({
           coaches={coaches}
           isAdmin={Boolean(isAdmin)}
           onFechar={() => setAcoesAbertas(false)}
-          onAbrirConversa={() => {
-            setAcoesAbertas(false);
-            onAbrirConversa?.();
-          }}
           onChange={() => {
             onChange();
             carregar();

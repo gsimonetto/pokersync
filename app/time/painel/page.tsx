@@ -285,8 +285,7 @@ function PainelConteudo() {
                     )}
                     {aba === "jogadores" && time && (
                       <Moldura>
-                        <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)}
-                          podeConversar={time?.role === "admin" || time?.role === "coach"} coaches={coaches}
+                        <TabJogadores jogadores={jogadores} labels={labels} isAdmin={Boolean(isAdmin)} coaches={coaches}
                           onChange={carregar} onErro={setErro} />
                       </Moldura>
                     )}

@@ -1,10 +1,8 @@
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
 import { Check, X, Loader2, MessageCircle, Clock, CalendarDays, ChevronRight } from "lucide-react";
 import { AvatarNivel } from "@/components/avatar-nivel";
-import { BOTAO_VIDRO } from "@/components/banca/util";
 import { Modal } from "@/components/ui/modal";
 import { ModalPortal } from "@/components/modal-portal";
 import { Chip } from "@/components/chip";
@@ -274,16 +272,6 @@ function CandidateDetail({
       <div className="mt-5 border-t border-white/[0.07] pt-4">
         <ConversaCandidatura applicationId={snap.applicationId} lado="time" status={snap.status} nomeOutroLado={nome} onLidas={onLidas} compacta />
       </div>
-
-      {/* Aceito virou colega de time -- atalho pro chat do time (a
-          Central de Conversas abre na thread dele). */}
-      {snap.status === "aceita" && (
-        <div className="mt-3 flex justify-end">
-          <Link href={`/marketplace?chat=${snap.userId}`} className={BOTAO_VIDRO}>
-            <MessageCircle size={14} /> Abrir no chat do time
-          </Link>
-        </div>
-      )}
 
       {erro && <p className="mt-3 text-sm text-negative">{erro}</p>}
 
