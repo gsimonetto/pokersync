@@ -17,10 +17,11 @@ import { levelColor, levelMaterial, levelSubTier } from "@/lib/services/xp-servi
 //   Esmeralda pedra em lapidação "esmeralda" (degraus), cravada em ouro
 //   Safira    safira oval lapidada, com auréola de brilhantes em ouro branco
 //   Ametista  drusa: cristais brutos saindo da rocha, como a pedra nasce
-//   Rubi      rubi lapidado em coração -- o naipe de copas -- pulsando
+//   Rubi      rubi em lapidação almofada (quadrado de cantos macios), vermelho
+//             "sangue de pombo", cravado em ouro, pulsando
 //   Platina   escudo de platina escovada, alado, com um brilhante no topo
-//   Diamante  diamante rosa (o mais raro que existe) visto de lado, alado,
-//             com o "fogo" colorido que a lapidação solta
+//   Diamante  diamante incolor visto de lado, alado, com o "fogo" -- as
+//             faíscas de arco-íris que a lapidação solta
 //   Lendário  o brasão supremo: escudo de obsidiana com céu estrelado,
 //             coroa cravejada, asas de ouro, raios de sol girando e as
 //             nove pedras de todas as patentes anteriores contornando o
@@ -102,7 +103,7 @@ function brilhante(p: (t: number, s: number) => P, n: number, sMesa = 0.5, sEstr
     add([S(k), M(k), G(k + 1)], -0.18 * (((k * 5) % 3) - 1));
   }
   const mesa = poli(Array.from({ length: n }, (_, k) => T(k)));
-  const contorno = poli(Array.from({ length: n * 2 }, (_, k) => p(k / (n * 2), 1)));
+  const contorno = poli(Array.from({ length: 64 }, (_, k) => p(k / 64, 1)));
   return { facetas, mesa, contorno };
 }
 
@@ -140,20 +141,12 @@ const SAFIRA = brilhante((t, s) => {
   return [60 + s * 29 * Math.cos(a), 60 + s * 36 * Math.sin(a)];
 }, 8);
 
-// Rubi: coração (a curva clássica do coração, escalada pro quadro).
-function coracao(t: number): P {
-  const a = t * Math.PI * 2;
-  return [16 * Math.sin(a) ** 3, -(13 * Math.cos(a) - 5 * Math.cos(2 * a) - 2 * Math.cos(3 * a) - Math.cos(4 * a))];
-}
-const RUBI = brilhante(
-  (t, s) => {
-    const [x, y] = coracao(t);
-    return [60 + s * 2.55 * x, 58 + s * 2.55 * (y - 2.5)];
-  },
-  16,
-  0.48,
-  0.74,
-);
+// Rubi: almofada (superelipse -- quadrado com os cantos arredondados).
+const RUBI = brilhante((t, s) => {
+  const a = t * Math.PI * 2 - Math.PI / 2;
+  const q = (v: number) => Math.sign(v) * Math.abs(v) ** (2 / 3.4);
+  return [60 + s * 36 * q(Math.cos(a)), 60 + s * 36 * q(Math.sin(a))];
+}, 8);
 
 // Brilhantes redondos pequenos (topo da Platina, coroa do Lendário).
 const redondo = (cx: number, cy: number, r: number) =>
@@ -198,7 +191,7 @@ const DIAMANTE = (() => {
       facetas.push({
         d: poli(pts as P[]),
         t: tp[k],
-        fogo: k % 4 === 1 ? fogo[k % fogo.length] : undefined,
+        fogo: k % 3 === 1 ? fogo[k % fogo.length] : undefined,
       });
     });
   }
@@ -334,14 +327,14 @@ const ESTRELAS_CEU: [number, number, number][] = [
 // (Bronze no alto à esquerda, descendo, passando pela ponta e subindo até o Diamante).
 const JORNADA: { x: number; y: number; cor: string }[] = [
   { x: 37.5, y: 49, cor: "#c98d52" },
-  { x: 37.5, y: 61, cor: "#e9edf1" },
+  { x: 37.5, y: 61, cor: "#aeb6bf" },
   { x: 39.5, y: 74, cor: "#f2c94c" },
   { x: 45, y: 86, cor: "#12a15a" },
   { x: 60, y: 99, cor: "#2f63e0" },
   { x: 75, y: 86, cor: "#9a4ee0" },
   { x: 80.5, y: 74, cor: "#d42a3c" },
   { x: 82.5, y: 61, cor: "#bfe9f2" },
-  { x: 82.5, y: 49, cor: "#f06aa8" },
+  { x: 82.5, y: 49, cor: "#ffffff" },
 ];
 
 // ---------- Materiais ----------
@@ -361,7 +354,7 @@ const MATERIAIS: Material[] = [
   { claro: "#E9D5FF", base: "#A855F7", escuro: "#2A0A4A" }, // Ametista
   { claro: "#FECDD3", base: "#e0555a", escuro: "#3A0008" }, // Rubi
   { claro: "#ECFEFF", base: "#22d3ee", escuro: "#243640" }, // Platina
-  { claro: "#FFFFFF", base: "#f472b6", escuro: "#4A0B2C" }, // Diamante
+  { claro: "#FFFFFF", base: "#f472b6", escuro: "#1E2530" }, // Diamante
   { claro: "#FFF8DC", base: "#F5D48C", escuro: "#2A1A02" }, // Lendário
 ];
 
@@ -373,7 +366,7 @@ const METAL: Record<string, [number, string][]> = {
   ouro: [[0, "#fff6cc"], [0.22, "#f5cf55"], [0.48, "#bd851c"], [0.55, "#9a6512"], [0.78, "#ecba42"], [1, "#6e4506"]],
   platina: [[0, "#fbfdff"], [0.26, "#dfe8ee"], [0.48, "#aebcc6"], [0.54, "#8b9ba6"], [0.78, "#d6e2e9"], [1, "#6f7f8a"]],
   lendario: [[0, "#fffbe6"], [0.2, "#ffe391"], [0.46, "#d9a431"], [0.55, "#a36b0e"], [0.8, "#f9d36e"], [1, "#6a4204"]],
-  rosa: [[0, "#ffffff"], [0.3, "#f6e3ec"], [0.5, "#c7a3b5"], [0.56, "#9d7488"], [0.8, "#ecd3df"], [1, "#6e4a5c"]],
+  gelo: [[0, "#ffffff"], [0.3, "#eef3f8"], [0.5, "#b9c4cf"], [0.56, "#8d99a6"], [0.8, "#e3eaf1"], [1, "#5f6b78"]],
 };
 const ARO: Record<string, string[]> = {
   bronze: ["#ffdcae", "#b07a41", "#35190a"],
@@ -381,6 +374,7 @@ const ARO: Record<string, string[]> = {
   ouro: ["#fff6cf", "#d9a531", "#5a3804"],
   platina: ["#ffffff", "#b4c2cc", "#46545e"],
   lendario: ["#fffbe6", "#e6b441", "#4d2f02"],
+  gelo: ["#ffffff", "#c3ced8", "#46525e"],
 };
 
 // Paletas das gemas: [profundo, escuro, base, claro, reflexo]
@@ -389,7 +383,7 @@ const GEMA = {
   safira: ["#040b36", "#0f2a8f", "#2f63e0", "#93b8ff", "#f0f5ff"],
   ametista: ["#230842", "#57209a", "#9a4ee0", "#d6b3ff", "#fbf3ff"],
   rubi: ["#1c0003", "#640612", "#b3122a", "#f24b5e", "#ffd2d7"],
-  diamante: ["#4a0b2c", "#a3285f", "#f06aa8", "#ffc9e0", "#ffffff"],
+  diamante: ["#1a222c", "#5f6d7e", "#c6d2dd", "#eef4f9", "#ffffff"],
   gelo: ["#0a3f4d", "#3a98ad", "#a7ecf7", "#eafcff", "#ffffff"],
 };
 
@@ -403,7 +397,7 @@ const ESCUDO = {
 const COROA = "M36 42 L33 21 L40.5 29 L46 15 L53 26 L60 6 L67 26 L74 15 L79.5 29 L87 21 L84 42 Z";
 
 const VEL_VARRE = ["7s", "3.4s", "4.6s", "5s", "6s", "5.5s", "4.5s", "3.8s", "3.2s", "3.6s"];
-const NUMERO_Y = [62, 62, 62, 62, 62, 66, 56, 67, 63, 71];
+const NUMERO_Y = [62, 62, 62, 62, 62, 66, 62, 67, 63, 71];
 
 export function EmblemaEstilos() {
   return (
@@ -941,13 +935,13 @@ function Rubi({ c }: { c: Ctx }) {
       <path d={g.contorno} fill={pal[1]} />
       <Facetas facetas={g.facetas} pal={pal} c={c} piscar={7} velPisca="1.6s" />
       <Mesa d={g.mesa} pal={pal} c={c} />
-      <LuzInterna d={g.contorno} id={c.id("interna")} cor="#ff5a6e" cy=".5" />
+      <LuzInterna d={g.contorno} id={c.id("interna")} cor="#ff4058" cy=".55" />
       <path d={g.contorno} fill="none" stroke="#2e0006" strokeOpacity=".8" strokeWidth=".8" />
       <Garras
         id={c.id("garra")}
-        pts={[[36, 30], [84, 30], [60, 94]]}
+        pts={[[31, 31], [89, 31], [89, 89], [31, 89]]}
       />
-      <Estrela4 x={40} y={38} r={7} c={c} v="1.6s" />
+      <Estrela4 x={42} y={40} r={7} c={c} v="1.6s" />
       <Varredura c={c} faixa={6} forca={0.35} clip={<path d={g.contorno} />} />
     </>
   );
@@ -997,9 +991,9 @@ function Diamante({ c }: { c: Ctx }) {
   const pal = GEMA.diamante;
   return (
     <>
-      <Asa penas={ASA_DIAMANTE} c={c} metal="rosa" pivo={[38, 46]} />
-      <path d={g.contorno} fill={pal[1]} stroke="#4a0b2c" strokeWidth="1.2" strokeLinejoin="round" />
-      <g stroke="#ffe3ef" strokeOpacity=".4" strokeWidth=".4" strokeLinejoin="round">
+      <Asa penas={ASA_DIAMANTE} c={c} metal="gelo" pivo={[38, 46]} />
+      <path d={g.contorno} fill={pal[1]} stroke="#1a222c" strokeWidth="1.2" strokeLinejoin="round" />
+      <g stroke="#ffffff" strokeOpacity=".45" strokeWidth=".4" strokeLinejoin="round">
         {g.facetas.map((f, i) => (
           <path key={i} d={f.d} fill={rampa(pal, f.t)} />
         ))}
@@ -1011,7 +1005,7 @@ function Diamante({ c }: { c: Ctx }) {
             key={`f${i}`}
             d={f.d}
             fill={f.fogo}
-            opacity={c.a && c.det ? undefined : 0.3}
+            opacity={c.a && c.det ? undefined : 0.45}
             className={c.a && c.det ? "emb-pisca" : undefined}
             style={{
               mixBlendMode: "screen",
@@ -1030,7 +1024,7 @@ function Diamante({ c }: { c: Ctx }) {
         )}
       <path d={g.mesa} stroke="#fff" strokeWidth="1.4" strokeLinecap="round" />
       <path d="M22 49 H98" stroke="#fff" strokeOpacity=".55" strokeWidth=".7" />
-      <path d={g.contorno} fill="none" stroke="#4a0b2c" strokeOpacity=".9" strokeWidth=".9" strokeLinejoin="round" />
+      <path d={g.contorno} fill="none" stroke="#1a222c" strokeOpacity=".9" strokeWidth=".9" strokeLinejoin="round" />
       <Estrela4 x={44} y={30} r={9} c={c} v="2.2s" />
       <Estrela4 x={18} y={22} r={5} c={c} atraso={0.6} />
       <Estrela4 x={102} y={30} r={6} c={c} atraso={1.2} />
@@ -1233,7 +1227,7 @@ export function EmblemaPatente({
             background:
               faixa === 9
                 ? "radial-gradient(circle, #ffd76699, #f5a62333 45%, transparent 70%)"
-                : `radial-gradient(circle, ${cor}${faixa >= 7 ? "5c" : faixa >= 3 ? "40" : "2b"}, transparent 68%)`,
+                : `radial-gradient(circle, ${faixa === 8 ? "#dfe9ff" : cor}${faixa >= 7 ? "5c" : faixa >= 3 ? "40" : "2b"}, transparent 68%)`,
           }}
         />
         {faixa === 8 && (
