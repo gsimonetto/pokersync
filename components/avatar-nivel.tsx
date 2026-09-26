@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/avatar";
+import { EmblemaPatente } from "@/components/hub/patentes/emblema";
 import { MAX_LEVEL, levelColor, levelMaterial, levelSubTier, xpForNextLevel } from "@/lib/services/xp-service";
 import { useNivelDoJogador } from "@/lib/services/nivel-service";
 
@@ -18,7 +19,8 @@ export function progressoDoNivel(nivel: number, xpAtual: number) {
 //   * cor do anel = patente (a cor muda a cada 10 níveis: 11 prata,
 //     21 ouro ... 99 lendário), a mesma do RankChip e do Hub;
 //   * quanto do anel está preenchido = quanto falta pro próximo nível;
-//   * número embaixo = o nível.
+//   * selo embaixo = o escudo da patente em miniatura + o número do nível
+//     (pedido explícito: trocar a bolinha com o número pelo escudo).
 //
 // Quem já tem nível e XP em mãos (ranking) passa `nivel`/`xpAtual`;
 // quem só tem o id passa `userId` e o nível é buscado (em lote, com
@@ -42,7 +44,7 @@ export function AvatarNivel({
   tamanho?: number;
   nivel?: number | null;
   xpAtual?: number | null;
-  /** Número do nível embaixo da foto. Padrão: só a partir de 30px. */
+  /** Selo (escudo da patente + nível) embaixo da foto. Padrão: só a partir de 30px. */
   mostrarNivel?: boolean;
   animar?: boolean;
   /** Foto quadrada (cartão de perfil) com o anel acompanhando os cantos. */
@@ -61,7 +63,13 @@ export function AvatarNivel({
   const cor = nivel == null ? null : levelColor(nivel);
   const pct = nivel == null ? 0 : progressoDoNivel(nivel, xpAtual);
   const numero = (mostrarNivel ?? tamanho >= 30) && nivel != null;
-  const pequeno = tamanho < 48;
+  // Selo cresce com a foto: escudo e número sempre na mesma proporção.
+  const selo =
+    tamanho >= 96
+      ? { escudo: 26, caixa: "-bottom-2.5 pr-2 text-[13px]" }
+      : tamanho >= 48
+        ? { escudo: 20, caixa: "-bottom-2 pr-1.5 text-[10.5px]" }
+        : { escudo: 17, caixa: "-bottom-2 pr-1 text-[9.5px]" };
   const titulo =
     nivel == null
       ? undefined
@@ -132,13 +140,11 @@ export function AvatarNivel({
         )}
       </svg>
       <Avatar id={avatarId} url={avatarUrl} size={foto} shape={quadrado ? "square" : "circle"} />
-      {numero && cor && (
+      {numero && nivel != null && (
         <span
-          className={`absolute left-1/2 -translate-x-1/2 rounded-full border-2 border-[#111111] font-black tabular-nums text-black ${
-            pequeno ? "-bottom-1.5 px-1 text-[8.5px] leading-3" : tamanho >= 96 ? "-bottom-1.5 px-2 text-[12px] leading-5" : "-bottom-1 px-1.5 text-[10px] leading-4"
-          }`}
-          style={{ background: cor }}
+          className={`absolute left-1/2 flex -translate-x-1/2 items-center rounded-full border-2 border-[#111111] bg-[#050505] ring-1 ring-white/10 font-black leading-none tabular-nums text-white shadow-[0_2px_6px_rgba(0,0,0,0.6)] ${selo.caixa}`}
         >
+          <EmblemaPatente nivel={nivel} tamanho={selo.escudo} animar={false} mostrarNumero={false} halo={false} className="-my-[3px]" />
           {nivel}
         </span>
       )}

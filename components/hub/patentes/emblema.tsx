@@ -22,7 +22,7 @@ import { levelColor, levelMaterial, levelSubTier } from "@/lib/services/xp-servi
 //   Platina   escudo de platina escovada com um brilhante cravado no topo
 //   Diamante  brilhante incolor visto de cima, em 6 garras de platina, com
 //             o "fogo" -- as faíscas de arco-íris que a lapidação solta
-//   Lendário  o anel de campeão visto de cima: ônix polido, espada de ouro,
+//   Lendário  o anel de campeão visto de cima: ônix polido com o número em ouro,
 //             auréola de diamantes e raios de sol girando atrás -- o troféu
 //             máximo do poker. As nove pedras da jornada (Bronze ao
 //             Diamante) ficam cravadas no aro: quem chega lá carrega a
@@ -293,7 +293,7 @@ const ESCUDO = {
 };
 
 const VEL_VARRE = ["7s", "3.4s", "4.6s", "5s", "6s", "5.5s", "4.5s", "3.8s", "3.2s", "3.6s"];
-const NUMERO_Y = [62, 62, 62, 62, 62, 66, 62, 66, 62, 72];
+const NUMERO_Y = [62, 62, 62, 62, 62, 66, 62, 66, 62, 62];
 
 export function EmblemaEstilos() {
   return (
@@ -960,16 +960,10 @@ function Lendario({ c, nivel, mostrarNumero }: { c: Ctx; nivel: number; mostrarN
         </g>
       ))}
 
-      {/* Ônix polido com a espada de ouro */}
+      {/* Ônix polido: o centro fica limpo, só o número em ouro */}
       <circle cx="60" cy="60" r="34" fill={`url(#${c.id("aro")})`} stroke="#4d2f02" strokeWidth=".8" />
       <circle cx="60" cy="60" r="31" fill={`url(#${c.id("onix")})`} />
       <path d="M36 50 Q44 32 64 30 Q48 36 40 52 Z" fill="#fff" opacity=".18" />
-      <path
-        d="M60 32 C64 37 71 40 71 46 C71 51 66 52 62 49 C63 52 64 54 66 55 H54 C56 54 57 52 58 49 C54 52 49 51 49 46 C49 40 56 37 60 32 Z"
-        fill={`url(#${c.id("ouro")})`}
-        stroke="#4d2f02"
-        strokeWidth=".6"
-      />
 
       <Varredura
         c={c}
@@ -989,7 +983,7 @@ function Lendario({ c, nivel, mostrarNumero }: { c: Ctx; nivel: number; mostrarN
           y={NUMERO_Y[9]}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize={24}
+          fontSize={nivel >= 10 ? 30 : 34}
           fontWeight="900"
           fill={`url(#${c.id("numero")})`}
           stroke="#000"
@@ -1018,6 +1012,7 @@ export function EmblemaPatente({
   animar = true,
   mostrarNumero = true,
   mostrarDivisao = false,
+  halo = true,
   className = "",
 }: {
   nivel: number;
@@ -1026,6 +1021,8 @@ export function EmblemaPatente({
   mostrarNumero?: boolean;
   /** Marcas da divisão (IV..I) embaixo do emblema. */
   mostrarDivisao?: boolean;
+  /** Brilho de fundo na cor da patente. Desligado nas miniaturas (selo da foto). */
+  halo?: boolean;
   className?: string;
 }) {
   const uid = useId().replace(/:/g, "");
@@ -1045,6 +1042,7 @@ export function EmblemaPatente({
     >
       <span className={`relative block ${animar && faixa >= 7 ? "emb-flutua" : ""}`} style={{ width: tamanho, height: tamanho }}>
         {/* Halo de fundo na cor da patente; no Lendário vira aura viva. */}
+        {halo && (
         <span
           aria-hidden
           className={`pointer-events-none absolute rounded-full blur-xl ${animar && faixa === 9 ? "emb-aura" : ""}`}
@@ -1056,7 +1054,8 @@ export function EmblemaPatente({
                 : `radial-gradient(circle, ${faixa === 8 ? "#dfe9ff" : cor}${faixa >= 7 ? "5c" : faixa >= 3 ? "40" : "2b"}, transparent 68%)`,
           }}
         />
-        {faixa === 8 && (
+        )}
+        {halo && faixa === 8 && (
           <span
             aria-hidden
             className={`pointer-events-none absolute rounded-full opacity-50 ${animar ? "emb-iris" : ""}`}
