@@ -1,86 +1,289 @@
 "use client";
 
-import { useEffect } from "react";
-import { CalendarDays, Crown, Trophy, X } from "lucide-react";
+import { useEffect, useRef, useState } from "react";
+import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } from "framer-motion";
+import { Check, Share2, X } from "lucide-react";
+import { ModalPortal } from "@/components/modal-portal";
+import { SeloFundador } from "@/components/achievements/selo-fundador";
 
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
+const EASE = [0.22, 1, 0.36, 1] as const;
 
-// Card de detalhe da conquista Founder -- aberto ao clicar no selo
-// pequeno em app/modulos/page.tsx. Layout proprio (nao usa o <Modal>
-// generico de components/ui/modal.tsx) porque o design pedido tem um
-// cabecalho custom (logo + "FOUNDER"/"POKERSYNC") bem diferente do
-// padrao "titulo + X" dos outros modais do app -- mesmo assim repete o
-// comportamento de sempre (Esc fecha, clique fora fecha).
+// ============================================================
+// Carta de Membro Fundador -- aberta ao clicar no selo em
+// app/modulos/page.tsx. Desenhada como um certificado de fundação
+// (pedido explícito: "realista, única, rica em detalhes"), com os
+// elementos de segurança de uma cédula:
+//   * guilhochê: rosácea de linhas finas entrelaçadas no fundo;
+//   * micro-texto correndo pela moldura ("POKERSYNC · MEMBRO FUNDADOR");
+//   * faixa holográfica vertical que muda de cor com a luz;
+//   * cantos art déco em ouro e moldura dupla;
+//   * o lacre de cera com fitas de seda no centro.
+// Comportamento igual ao da carta de patente: no computador inclina
+// seguindo o mouse; no celular o brilho passa sozinho; com "menos
+// movimento" fica parada. Esc e clique fora fecham.
+// ============================================================
+
+const W = 320;
+const H = 448;
+
+// Rosácea de guilhochê: curvas de espirógrafo sobrepostas, levemente
+// defasadas -- é o desenho que impede cópia em cédulas e certificados.
+const GUILHOCHE = (() => {
+  const linhas: string[] = [];
+  const cx = W / 2;
+  const cy = 196;
+  for (let s = 0; s < 9; s++) {
+    const a = 70 + s * 3.2;
+    const b = 16 - s * 0.6;
+    const n = 18;
+    const pts: string[] = [];
+    for (let i = 0; i <= 720; i++) {
+      const t = (i / 720) * Math.PI * 2;
+      const x = cx + a * Math.cos(t) + b * Math.cos(n * t + s * 0.35);
+      const y = cy + a * Math.sin(t) - b * Math.sin(n * t + s * 0.35);
+      pts.push(`${x.toFixed(1)} ${y.toFixed(1)}`);
+    }
+    linhas.push(`M${pts.join(" L")} Z`);
+  }
+  return linhas;
+})();
+
+// Faixas onduladas no pé da carta (mesma família do guilhochê).
+const ONDAS = Array.from({ length: 7 }, (_, k) => {
+  const pts: string[] = [];
+  for (let x = 16; x <= W - 16; x += 4) pts.push(`${x} ${(H - 58 + k * 3 + 2.4 * Math.sin(x / 9 + k * 0.9)).toFixed(1)}`);
+  return `M${pts.join(" L")}`;
+});
+
+// Canto art déco (canto de cima-esquerda; os outros são espelhos).
+const CANTO = "M14 46 V20 Q14 14 20 14 H46 M20 38 V24 Q20 20 24 20 H38 M26 26 L32 32";
+
+const MICRO = "POKERSYNC · MEMBRO FUNDADOR · ".repeat(14);
+
 export function FounderCard({
   open,
   onClose,
   description,
   unlockedAt,
+  nome,
+  numero,
 }: {
   open: boolean;
   onClose: () => void;
   description: string;
   unlockedAt: string;
+  /** Nome que vai gravado na carta. */
+  nome?: string;
+  /** Número de ordem do fundador (1º, 2º...), quando conhecido. */
+  numero?: number;
 }) {
+  const reduzir = useReducedMotion();
+  const ref = useRef<HTMLDivElement>(null);
+  const [copiado, setCopiado] = useState(false);
+  const [interagiu, setInteragiu] = useState(false);
+
+  // -0.5..0.5 na horizontal e vertical
+  const px = useMotionValue(0);
+  const py = useMotionValue(0);
+  const rx = useSpring(useTransform(py, [-0.5, 0.5], [12, -12]), { stiffness: 180, damping: 18 });
+  const ry = useSpring(useTransform(px, [-0.5, 0.5], [-14, 14]), { stiffness: 180, damping: 18 });
+  const brilhoX = useTransform(px, [-0.5, 0.5], ["0%", "100%"]);
+  const brilhoY = useTransform(py, [-0.5, 0.5], ["0%", "100%"]);
+
   useEffect(() => {
     if (!open) return;
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") onClose();
-    }
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
+    const k = (e: KeyboardEvent) => e.key === "Escape" && onClose();
+    window.addEventListener("keydown", k);
+    return () => window.removeEventListener("keydown", k);
   }, [open, onClose]);
 
   if (!open) return null;
 
+  const desde = dateFmt.format(new Date(unlockedAt));
+
+  const compartilhar = async () => {
+    const texto = `Sou Membro Fundador do PokerSync${numero ? ` (nº ${numero})` : ""}, desde ${desde}.`;
+    try {
+      if (navigator.share) {
+        await navigator.share({ title: "Membro Fundador · PokerSync", text: texto, url: window.location.origin });
+        return;
+      }
+      await navigator.clipboard.writeText(texto);
+      setCopiado(true);
+      window.setTimeout(() => setCopiado(false), 1800);
+    } catch {
+      // cancelado pelo usuário: nada a fazer
+    }
+  };
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center overflow-y-auto bg-black/80 px-4 py-8 backdrop-blur-sm">
-      <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-sm animate-[modalIn_.16s_ease-out] overflow-hidden rounded-2xl border border-evolution/25 bg-gradient-to-b from-elevated/90 to-void/95 p-6 shadow-[0_0_70px_-18px_rgba(245,158,11,0.4)]">
-        <button
-          onClick={onClose}
-          className="absolute right-4 top-4 grid h-7 w-7 place-items-center rounded-md text-muted transition-colors hover:text-ink"
-          aria-label="Fechar"
-        >
-          <X size={16} />
-        </button>
+    <ModalPortal>
+      <div className="fixed inset-0 z-50 grid place-items-center overflow-y-auto p-4" role="dialog" aria-modal="true" aria-label="Carta de Membro Fundador">
+        <motion.div className="absolute inset-0 bg-black/85 backdrop-blur-md" initial={{ opacity: 0 }} animate={{ opacity: 1 }} onClick={onClose} aria-hidden />
 
-        <div className="flex items-center gap-3">
-          <div
-            className="grid size-11 shrink-0 place-items-center border border-evolution/40 bg-evolution/10 text-evolution"
-            style={{ clipPath: "polygon(25% 3%, 75% 3%, 100% 50%, 75% 97%, 25% 97%, 0% 50%)" }}
+        <div className="relative flex flex-col items-center gap-4" style={{ perspective: 900 }}>
+          <motion.div
+            ref={ref}
+            initial={{ opacity: 0, y: 30, rotateY: -25, scale: 0.9 }}
+            animate={{ opacity: 1, y: 0, rotateY: 0, scale: 1 }}
+            transition={{ duration: 0.6, ease: EASE }}
+            style={reduzir ? undefined : { rotateX: rx, rotateY: ry, transformStyle: "preserve-3d" }}
+            onPointerMove={(e) => {
+              if (e.pointerType !== "mouse" || reduzir) return;
+              const r = ref.current?.getBoundingClientRect();
+              if (!r) return;
+              setInteragiu(true);
+              px.set((e.clientX - r.left) / r.width - 0.5);
+              py.set((e.clientY - r.top) / r.height - 0.5);
+            }}
+            onPointerLeave={() => {
+              px.set(0);
+              py.set(0);
+            }}
+            className="relative aspect-[5/7] w-[min(82vw,320px)] rounded-[22px] p-[1.5px] shadow-[0_40px_90px_-20px_rgba(0,0,0,0.95),0_0_60px_-20px_rgba(242,198,90,0.35)]"
+            // Moldura externa em folha de ouro
           >
-            <Trophy size={20} strokeWidth={1.75} />
-          </div>
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquista</p>
-            <p className="text-lg font-extrabold leading-tight tracking-tight text-ink">Founder</p>
-            <p className="text-[10px] font-semibold uppercase tracking-[0.2em] text-muted/50">PokerSync</p>
-          </div>
-        </div>
+            <div aria-hidden className="absolute inset-0 rounded-[22px]" style={{ background: "linear-gradient(145deg, #fff1c1, #c8912c 30%, #5a3a08 55%, #f2c65a 80%, #8a5a12)" }} />
 
-        <div className="relative my-6 flex h-44 items-center justify-center" style={{ perspective: "700px" }}>
-          <div className="orbit-spin-slow absolute size-36 rounded-full border border-evolution/20" />
-          <div className="orbit-spin-slow-reverse absolute size-44 rounded-full border border-evolution/10" />
-          <div className="absolute bottom-1 h-4 w-28 rounded-full bg-evolution/15 blur-md" />
+            <div className="relative h-full w-full overflow-hidden rounded-[20.5px]" style={{ background: "radial-gradient(120% 70% at 50% 38%, #2a0a10 0%, #120608 45%, #070405 100%)" }}>
+              {/* Gravuras: guilhochê, ondas, micro-texto, moldura e cantos */}
+              <svg viewBox={`0 0 ${W} ${H}`} className="absolute inset-0 h-full w-full" preserveAspectRatio="none" aria-hidden>
+                <defs>
+                  <linearGradient id="fund-ouro" x1="0" y1="0" x2="1" y2="1">
+                    <stop offset="0" stopColor="#fff1c1" />
+                    <stop offset=".45" stopColor="#d9a33a" />
+                    <stop offset="1" stopColor="#8a5a12" />
+                  </linearGradient>
+                  <path id="fund-moldura" d={`M30 18 H${W - 30} Q${W - 18} 18 ${W - 18} 30 V${H - 30} Q${W - 18} ${H - 18} ${W - 30} ${H - 18} H30 Q18 ${H - 18} 18 ${H - 30} V30 Q18 18 30 18 Z`} />
+                </defs>
+                <g fill="none" stroke="#f2c65a" strokeOpacity=".09" strokeWidth=".45">
+                  {GUILHOCHE.map((d, i) => (
+                    <path key={i} d={d} />
+                  ))}
+                </g>
+                <g fill="none" stroke="#f2c65a" strokeOpacity=".12" strokeWidth=".4">
+                  {ONDAS.map((d, i) => (
+                    <path key={i} d={d} />
+                  ))}
+                </g>
+                {/* Moldura dupla gravada */}
+                <rect x="10" y="10" width={W - 20} height={H - 20} rx="14" fill="none" stroke="url(#fund-ouro)" strokeOpacity=".7" strokeWidth=".8" />
+                <use href="#fund-moldura" fill="none" stroke="url(#fund-ouro)" strokeOpacity=".35" strokeWidth=".5" />
+                {/* Micro-texto correndo pela moldura */}
+                <text fontSize="4.1" letterSpacing=".6" fill="#f2c65a" fillOpacity=".55" fontFamily="Georgia, serif">
+                  <textPath href="#fund-moldura">{MICRO}</textPath>
+                </text>
+                {/* Cantos art déco */}
+                <g fill="none" stroke="url(#fund-ouro)" strokeWidth="1" strokeLinecap="round">
+                  <path d={CANTO} />
+                  <path d={CANTO} transform={`translate(${W} 0) scale(-1 1)`} />
+                  <path d={CANTO} transform={`translate(0 ${H}) scale(1 -1)`} />
+                  <path d={CANTO} transform={`translate(${W} ${H}) scale(-1 -1)`} />
+                </g>
+                {/* Filetes do cabeçalho */}
+                <g stroke="url(#fund-ouro)" strokeWidth=".7" strokeOpacity=".8">
+                  <path d={`M70 88 H${W / 2 - 10}`} />
+                  <path d={`M${W / 2 + 10} 88 H${W - 70}`} />
+                </g>
+                <path d={`M${W / 2} 84 L${W / 2 + 4} 88 L${W / 2} 92 L${W / 2 - 4} 88 Z`} fill="url(#fund-ouro)" />
+              </svg>
 
-          <div className="trophy-float-3d relative text-evolution drop-shadow-[0_0_18px_rgba(245,158,11,0.55)]">
-            <Crown size={26} strokeWidth={1.75} className="absolute -top-4 left-1/2 -translate-x-1/2" />
-            <Trophy size={72} strokeWidth={1.25} />
-          </div>
-        </div>
+              {/* Faixa holográfica de segurança (vertical, à direita) */}
+              <motion.div
+                aria-hidden
+                className={`absolute bottom-[34px] top-[34px] w-[10px] overflow-hidden rounded-[2px] ${!interagiu && !reduzir ? "fund-holo-auto" : ""}`}
+                style={{
+                  right: 24,
+                  backgroundImage: "linear-gradient(180deg, #ff6ad5, #c774e8, #8795e8, #94d0ff, #7cffcb, #fffc7c, #ffb07c, #ff6ad5)",
+                  backgroundSize: "100% 300%",
+                  backgroundPositionY: interagiu ? brilhoY : undefined,
+                  opacity: 0.32,
+                  mixBlendMode: "screen",
+                }}
+              >
+                <span className="absolute inset-0 whitespace-nowrap text-center text-[5px] font-bold leading-[10px] tracking-[0.3em] text-black/60" style={{ writingMode: "vertical-rl" }}>
+                  {"FUNDADOR ✦ POKERSYNC ✦ ".repeat(12)}
+                </span>
+              </motion.div>
 
-        <h3 className="text-lg font-bold text-ink">Você é um dos pioneiros</h3>
-        <p className="mt-2 text-sm leading-relaxed text-muted">{description}</p>
+              {/* Brilho holográfico geral (acompanha o mouse) */}
+              <motion.div
+                aria-hidden
+                className={`pointer-events-none absolute inset-0 mix-blend-color-dodge ${!interagiu && !reduzir ? "fund-holo-auto" : ""}`}
+                style={{
+                  backgroundImage:
+                    "linear-gradient(115deg, transparent 32%, rgba(255,215,120,.22) 42%, rgba(255,160,180,.16) 48%, rgba(160,210,255,.16) 54%, transparent 66%)",
+                  backgroundSize: "250% 250%",
+                  backgroundPositionX: interagiu ? brilhoX : undefined,
+                  backgroundPositionY: interagiu ? brilhoY : undefined,
+                  opacity: 0.7,
+                }}
+              />
 
-        <div className="mt-5 flex items-center gap-2 border-t border-hairline pt-4">
-          <CalendarDays size={14} className="shrink-0 text-muted/70" />
-          <div className="min-w-0">
-            <p className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Concedido em</p>
-            <p className="text-sm font-semibold text-ink">{dateFmt.format(new Date(unlockedAt))}</p>
+              {/* Conteúdo */}
+              <div className="relative flex h-full flex-col items-center px-10 pb-7 pt-9 text-center" style={{ transform: "translateZ(30px)" }}>
+                <p className="text-[9.5px] font-bold uppercase tracking-[0.42em] text-[#f2c65a]/75">PokerSync</p>
+                <p
+                  className="mt-1 whitespace-nowrap bg-clip-text text-[19px] font-bold uppercase tracking-[0.1em] text-transparent"
+                  style={{ fontFamily: "Georgia, 'Times New Roman', serif", backgroundImage: "linear-gradient(180deg, #fff4c8, #f2c65a 45%, #b98220 60%, #f5d27a)" }}
+                >
+                  Membro Fundador
+                </p>
+
+                <div className="mt-6">
+                  <SeloFundador tamanho={138} fitas />
+                </div>
+
+                <p className="mt-1 max-w-full truncate text-[20px] italic text-white" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+                  {nome || "Jogador"}
+                </p>
+                <p className="mt-1 line-clamp-3 text-[10.5px] leading-snug text-white/60">{description}</p>
+
+                <div className="mt-auto grid w-full grid-cols-2 border-t border-[#f2c65a]/25 pt-2.5 text-left">
+                  <div>
+                    <p className="text-[8.5px] font-bold uppercase tracking-[0.2em] text-[#f2c65a]/60">{numero ? "Nº de fundador" : "Geração"}</p>
+                    <p className="text-[14px] font-bold tabular-nums text-white" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+                      {numero ? `Nº ${String(numero).padStart(4, "0")}` : "Fundação"}
+                    </p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-[8.5px] font-bold uppercase tracking-[0.2em] text-[#f2c65a]/60">Membro desde</p>
+                    <p className="text-[14px] font-bold text-white" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+                      {desde}
+                    </p>
+                  </div>
+                </div>
+              </div>
+            </div>
+          </motion.div>
+
+          <div className="relative flex gap-2">
+            <button
+              type="button"
+              onClick={compartilhar}
+              className="flex items-center gap-1.5 rounded-xl bg-ink px-4 py-2 text-[13px] font-semibold text-void transition-opacity hover:opacity-90"
+            >
+              {copiado ? <Check size={15} /> : <Share2 size={15} />}
+              {copiado ? "Texto copiado" : "Compartilhar"}
+            </button>
+            <button
+              type="button"
+              onClick={onClose}
+              className="flex items-center gap-1.5 rounded-xl border border-white/15 px-4 py-2 text-[13px] font-semibold text-ink transition-colors hover:bg-white/[0.06]"
+            >
+              <X size={15} /> Fechar
+            </button>
           </div>
         </div>
       </div>
-    </div>
+      <style>{`
+        @keyframes fundHolo { 0% { background-position: 0% 0%; } 50% { background-position: 100% 100%; } 100% { background-position: 0% 0%; } }
+        .fund-holo-auto { animation: fundHolo 6s ease-in-out infinite; }
+        @keyframes embVarre { 0% { transform: translateX(-90px) skewX(-18deg); } 60%, 100% { transform: translateX(200px) skewX(-18deg); } }
+        .emb-varre { animation: embVarre var(--vel, 5s) ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) { .fund-holo-auto, .emb-varre { animation: none; } }
+      `}</style>
+    </ModalPortal>
   );
 }

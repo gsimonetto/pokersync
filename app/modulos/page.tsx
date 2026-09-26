@@ -13,6 +13,7 @@ import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service
 import { fetchMyAchievements, type Achievement } from "@/lib/services/achievements-service";
 import { Modal } from "@/components/ui/modal";
 import { FounderCard } from "@/components/achievements/founder-card";
+import { SeloFundador } from "@/components/achievements/selo-fundador";
 import { MinhasMetasModalBody } from "@/components/goals/minhas-metas-modal";
 import { RecadosCoachModalBody } from "@/components/goals/recados-coach-modal";
 import { fetchGoals } from "@/lib/services/bankroll-service";
@@ -311,6 +312,20 @@ export default function ModulosPage() {
               <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas PokerSync</p>
               <div className="flex min-h-9 flex-wrap gap-2">
                 {achievements.map((a) => {
+                  // Fundador tem selo próprio (lacre de cera), no lugar do ícone genérico.
+                  if (a.code === "founder")
+                    return (
+                      <button
+                        key={a.code}
+                        type="button"
+                        title={a.description}
+                        onClick={() => setOpenAchievement(a)}
+                        className="grid size-9 place-items-center rounded-lg transition-transform hover:scale-110"
+                        aria-label="Ver carta de Membro Fundador"
+                      >
+                        <SeloFundador tamanho={36} animar={false} />
+                      </button>
+                    );
                   const Icon = ACHIEVEMENT_ICON[a.code] ?? Trophy;
                   return (
                     <button
@@ -395,6 +410,7 @@ export default function ModulosPage() {
           onClose={() => setOpenAchievement(null)}
           description={openAchievement.description}
           unlockedAt={openAchievement.unlockedAt}
+          nome={displayName}
         />
       )}
     </AppShell>
