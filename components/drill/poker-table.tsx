@@ -267,6 +267,10 @@ const FICHA_POTE_PX = 16;
 const MAX_FICHAS_APOSTA = 4;
 const MAX_FICHAS_POTE = 5;
 const MAX_FICHAS_VOO = 6;
+// Ficha em voo nunca menor que isso: no celular a mesa encolhe tudo (~0,6x)
+// e a ficha voando ficava com ~8px -- girando de lado, sumia (bug
+// reportado: "tomei 4bet e não teve animação das fichas").
+const FICHA_VOO_MIN_PX = 18;
 
 // % do pote ao lado do bb -- e' assim que quem joga em nivel avancado
 // pensa sizing (padrao GTOWizard/PIOSolver), bb sozinho exige fazer a
@@ -1432,7 +1436,13 @@ export function PokerTable({
         })}
 
         {voos.map((v) => (
-          <VooDeFichas key={v.id} voo={v} tamanho={(v.tipo === "premio" ? FICHA_POTE_PX : FICHA_APOSTA_PX) * seatScale} vel={vel} onFim={fimDoVoo} />
+          <VooDeFichas
+            key={v.id}
+            voo={v}
+            tamanho={Math.max(FICHA_VOO_MIN_PX, (v.tipo === "premio" ? FICHA_POTE_PX : FICHA_APOSTA_PX) * seatScale)}
+            vel={vel}
+            onFim={fimDoVoo}
+          />
         ))}
       </div>
     </div>

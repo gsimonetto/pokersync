@@ -189,6 +189,13 @@ function computeChipsAddedInStreet(
 // history bar pra BB — chipsAdded continua RAW de proposito (contabilidade
 // interna do pote usa fichas cruas ate o ultimo instante, ver comentario
 // mais abaixo em projectHandAtStep).
+// Blind (SB/BB) ou ante? O parser diz o tipo do post; mãos lidas antes
+// disso (sem o campo) caem na comparação do valor com os blinds da mão.
+function isBlindPost(a: ParsedAction, hand: ParsedHand): boolean {
+  if (a.postType) return a.postType !== "ante";
+  return a.amount === hand.smallBlind || a.amount === hand.bigBlind;
+}
+
 function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: number): StepEvent[] {
   const events: StepEvent[] = [];
   const posByName = new Map(layout.filter((s) => s.playerName).map((s) => [s.playerName as string, s.posLabel]));
@@ -225,8 +232,7 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
         // Nao ha campo explicito de "tipo de post" disponivel aqui pra
         // diferenciar de outro jeito — identifica blind comparando o
         // valor do post com hand.smallBlind/hand.bigBlind.
-        const isBlindPost = a.amount === hand.smallBlind || a.amount === hand.bigBlind;
-        if (isBlindPost) {
+        if (isBlindPost(a, hand)) {
           committed.set(a.player, (committed.get(a.player) ?? 0) + (a.amount ?? 0));
         }
         continue;
@@ -408,7 +414,10 @@ export function projectHandAtStep(
     const preflop = hand.streets.find((st) => st.name === "preflop");
     if (preflop) {
       for (const a of preflop.actions) {
-        if (a.action === "posts") {
+        // Só blind fica na frente do jogador; o ante vai direto pro pote
+        // (bug reportado: SB aparecia com 0,6 BB e BB com 1,1 BB numa mão
+        // com ante de 0,1 BB -- e o ante somava em toda aposta da rua).
+        if (a.action === "posts" && isBlindPost(a, hand)) {
           const pos = posByName.get(a.player);
           if (pos) streetCommitted.set(pos, (streetCommitted.get(pos) ?? 0) + (a.amount ?? 0));
         }

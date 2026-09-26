@@ -31,6 +31,8 @@ export interface ParsedAction {
   amount?: number;
   raiseTo?: number;
   isAllIn?: boolean;
+  /** Só em "posts": qual aposta forçada foi (ante vai direto pro pote, blind fica na frente do jogador). */
+  postType?: "small blind" | "big blind" | "ante";
 }
 
 export interface ParsedStreet {
@@ -404,6 +406,7 @@ function extractStreetActions(
         player: postM[1],
         action: "posts",
         amount: Number(postM[3].replace(",", "")),
+        postType: postM[2].toLowerCase() as ParsedAction["postType"],
       });
       continue;
     }
@@ -416,6 +419,7 @@ function extractStreetActions(
         player: postNoColonM[1],
         action: "posts",
         amount: Number(postNoColonM[3].replace(",", "")),
+        postType: postNoColonM[2].toLowerCase() as ParsedAction["postType"],
       });
       continue;
     }
