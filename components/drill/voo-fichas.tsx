@@ -9,6 +9,8 @@ import { FichaAmericana, type Denominacao } from "./ficha-americana";
    jogada, num arco curto, e as fichas saem uma atrás da outra.
 
    - aposta:   do assento até a pilha da aposta na frente dele;
+   - devolucao: a parte da aposta que ninguém pagou volta da pilha pro
+                stack do dono;
    - recolher: das apostas da rua até o pote (o pote acende em dourado);
    - premio:   as fichas se espalham pra fora do pote e vão até o vencedor.
 
@@ -22,7 +24,7 @@ export interface Ponto {
 
 export interface Voo {
   id: string;
-  tipo: "aposta" | "recolher" | "premio";
+  tipo: "aposta" | "devolucao" | "recolher" | "premio";
   fichas: Denominacao[];
   de: Ponto;
   para: Ponto;
@@ -35,6 +37,7 @@ export interface Voo {
 // uma ficha e a próxima.
 const TEMPO = {
   aposta: { dur: 620, entre: 80 },
+  devolucao: { dur: 560, entre: 60 },
   recolher: { dur: 560, entre: 35 },
   premio: { dur: 620, entre: 55 },
 };

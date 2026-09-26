@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { createPortal } from "react-dom";
 import Link from "next/link";
-import { AlertTriangle, Bookmark, ChevronLeft, ChevronRight, ChevronsLeft, ChevronsRight, Play, Pause, Target, Loader2, Trophy, Layers, ArrowLeft, Gauge, Grid3x3 } from "lucide-react";
+import { AlertTriangle, Bookmark, Target, Loader2, Trophy, Layers, ArrowLeft, Gauge, Grid3x3 } from "lucide-react";
 import { PokerTable, type TableHand } from "@/components/drill/poker-table";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { OpponentStatsModal } from "./opponent-stats-modal";
@@ -18,9 +18,10 @@ import type { ParsedHand } from "@/lib/poker/hand-parser";
 import { resumoDaMao } from "@/lib/poker/hand-summary";
 import { linkConstrutorDaMao } from "@/lib/ranges/link-da-mao";
 import { equidade, nomeDaJogada } from "@/lib/poker/jogada";
-import { F, T, num } from "@/lib/poker/drill-theme";
+import { F, T } from "@/lib/poker/drill-theme";
 import { salvarPreferenciaMesa, usePreferenciasMesa, type UnidadeValor } from "@/lib/hooks/use-preferencias-mesa";
-import { LinhaDoTempo } from "./linha-do-tempo";
+import { CartaTexto, LinhaDoTempo, NOME_RUA, nomesDosRaises, rotuloAcao } from "./linha-do-tempo";
+import { CHIP_MESA, ControlesReplay, INFO_MESA, OURO_MESA, SegmentoMesa, classeIconeMesa } from "@/components/drill/mesa-ui";
 import { CartaoAvaliacao, FaixaAvaliacaoCelular } from "./avaliacao-rapida";
 
 // Mesa PERSISTENTE do Revisor de Mãos — decisao de arquitetura (2026-08):
@@ -59,92 +60,97 @@ const SUPPORTED_DRILL_POSITIONS = new Set(["BB", "BTN", "SB"]);
 // mais acao por rua). 1500ms da tempo de ler a acao antes de avancar.
 const AUTOPLAY_MS = 1500;
 
-// Estilo comum dos 5 botoes do chip unico de navegacao no celular (ver
-// dock de mesa-cheia abaixo) -- cada um so' precisa dizer se esta
-// desabilitado, o resto (tamanho/formato/transparencia) e' identico.
-function navDockBtnStyle(disabled: boolean): React.CSSProperties {
-  return {
-    display: "flex", alignItems: "center", justifyContent: "center",
-    background: "transparent", border: 0, color: disabled ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.85)",
-    borderRadius: 999, width: 34, height: 34, cursor: disabled ? "not-allowed" : "pointer", flexShrink: 0,
-  };
-}
-
-// Chip estático (não clicável) — mesmo visual do ChipButton, usado pra
-// exibir info (torneio/blinds) em vez de disparar ação.
+// Chip estático (não clicável) — torneio/blinds, no mesmo desenho dos
+// botões da mesa (ver mesa-ui.tsx).
 function InfoChip({ icon, label, encolhe = false }: { icon: React.ReactNode; label: string; encolhe?: boolean }) {
   return (
-    <div
-      className="ps-rv-table-header-chip"
-      title={encolhe ? label : undefined}
-      style={{
-        display: "flex",
-        alignItems: "center",
-        flexShrink: encolhe ? 1 : 0,
-        gap: 6,
-        fontFamily: F,
-        fontSize: 12,
-        fontWeight: 500,
-        padding: "7px 12px",
-        borderRadius: 999,
-        border: "1px solid rgba(255,255,255,0.10)",
-        background: "rgba(255,255,255,0.03)",
-        color: "rgba(255,255,255,0.75)",
-        whiteSpace: "nowrap",
-        minWidth: 0,
-      }}
-    >
+    <div className={`ps-rv-table-header-chip ${INFO_MESA} ${encolhe ? "shrink" : "shrink-0"}`} title={encolhe ? label : undefined}>
       {icon}
-      <span style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>{label}</span>
+      <span className="truncate">{label}</span>
     </div>
   );
 }
 
-// BB ou fichas (M8), como a opção das salas -- ao lado dos blinds, no
-// mesmo formato de pílula da navegação. A escolha fica guardada (também
-// dá pra trocar em Configurações > Mesa, que vale no celular).
-function SeletorUnidade({ unidade }: { unidade: UnidadeValor }) {
-  const opcao = (valor: UnidadeValor, rotulo: string) => {
-    const ativo = unidade === valor;
-    return (
-      <button
-        type="button"
-        aria-pressed={ativo}
-        onClick={() => salvarPreferenciaMesa("unidade", valor)}
-        style={{
-          border: 0,
-          cursor: ativo ? "default" : "pointer",
-          borderRadius: 999,
-          padding: "5px 10px",
-          fontFamily: F,
-          fontSize: 11,
-          fontWeight: 600,
-          background: ativo ? "rgba(255,255,255,0.14)" : "transparent",
-          color: ativo ? "#FFFFFF" : "rgba(255,255,255,0.5)",
-          transition: "all 150ms ease",
-        }}
-      >
-        {rotulo}
-      </button>
+// Celular: não há linha do tempo embaixo da mesa, então uma linha curta
+// diz o que acabou de acontecer (pedido: "tomei 4bet" e na mesa não
+// dava pra saber que era uma 4-bet). Ex.: "Pré-flop · HJ 4-bet 15 BB".
+function UltimaAcao({ estado, heroPos, emFichas }: { estado: ReplayState; heroPos: string | null; emFichas: boolean }) {
+  const ev = estado.currentEvent;
+  const ruaAtual = estado.tableHand.history.find((r) => r.current) ?? estado.tableHand.history[0];
+  const rua = NOME_RUA[ruaAtual?.street ?? "PREFLOP"] ?? "Pré-flop";
+  const unidade = emFichas ? "" : " BB";
+  const quem = (pos: string) => (pos === heroPos ? "Você" : pos);
+  const valor = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}${unidade}`;
+  let conteudo: React.ReactNode;
+  if (!ev) {
+    conteudo = "Blinds na mesa";
+  } else if (ev.kind === "action") {
+    const acoes = ruaAtual?.actions ?? [];
+    const nome = nomesDosRaises(ruaAtual?.street ?? "", acoes)[acoes.length - 1];
+    const rotulo = rotuloAcao(ev.label, nome);
+    conteudo = (
+      <>
+        <b className="font-semibold text-ink">{quem(ev.posLabel)}</b> {rotulo}
+        {/\d$/.test(rotulo) ? unidade : ""}
+      </>
     );
-  };
+  } else if (ev.kind === "deal") {
+    conteudo = (
+      <span className="inline-flex gap-1">
+        {ev.newCards.map((c) => (
+          <CartaTexto key={c} card={c} />
+        ))}
+      </span>
+    );
+  } else if (ev.kind === "showdown") {
+    conteudo = (
+      <>
+        <b className="font-semibold text-ink">{quem(ev.posLabel)}</b> mostra{" "}
+        <span className="inline-flex gap-1">
+          {ev.cards.map((c) => (
+            <CartaTexto key={c} card={c} />
+          ))}
+        </span>
+      </>
+    );
+  } else {
+    conteudo = (
+      <>
+        <b className="font-semibold text-ink">{quem(ev.posLabel)}</b> leva{" "}
+        <span className="font-semibold text-[#d4af37]">{valor(emFichas ? ev.amount : ev.amount / estado.bbUnit)}</span>
+      </>
+    );
+  }
   return (
-    <div
-      role="group"
-      aria-label="Mostrar valores em"
-      title="Mostrar os valores da mesa em BB ou em fichas"
-      style={{ display: "flex", alignItems: "center", gap: 2, padding: 3, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)", flexShrink: 0 }}
-    >
-      {opcao("bb", "BB")}
-      {opcao("fichas", "Fichas")}
+    <div className="flex h-9 shrink-0 items-center justify-center" aria-live="polite">
+      <div className={`${INFO_MESA} max-w-full text-[12.5px]`}>
+        <span className="text-muted">{ev?.kind === "showdown" ? "Showdown" : rua} ·</span>
+        <span className="truncate text-ink/85">{conteudo}</span>
+      </div>
     </div>
   );
 }
 
-// Botao "modelo chips" — pill discreta com friso fino, neutra por
-// padrao e so ganhando destaque real no hover (pedido explicito). Usado
-// tanto pro "Analisar mão" quanto pro "Compartilhar", pra manter os dois
-// no mesmo padrao visual no canto superior direito.
+// BB ou fichas (M8), como a opção das salas -- ao lado dos blinds. A
+// escolha fica guardada (também dá pra trocar em Configurações > Mesa,
+// que vale no celular).
+function SeletorUnidade({ unidade }: { unidade: UnidadeValor }) {
+  return (
+    <SegmentoMesa
+      valor={unidade}
+      onChange={(v) => salvarPreferenciaMesa("unidade", v)}
+      rotulo="Mostrar valores em"
+      title="Mostrar os valores da mesa em BB ou em fichas"
+      opcoes={[
+        { valor: "bb", rotulo: "BB" },
+        { valor: "fichas", rotulo: "Fichas" },
+      ]}
+    />
+  );
+}
+
+// Botão da mesa (Salvar, Analisar, Construtor, EV/ICM): com texto ou só
+// o ícone (no celular os rótulos não cabem na linha do topo).
 function ChipButton({
   icon,
   label,
@@ -153,6 +159,7 @@ function ChipButton({
   disabled,
   title,
   iconOnly,
+  grande = false,
 }: {
   icon: React.ReactNode;
   label: string;
@@ -160,47 +167,11 @@ function ChipButton({
   href?: string;
   disabled?: boolean;
   title?: string;
-  // No celular, Salvar/Compartilhar/Analisar disputam a mesma linha dos
-  // controles de navegacao (anterior/play/proximo) -- com o rotulo em
-  // texto, os 3 juntos nao cabem e o ultimo corta pra fora da tela
-  // (pedido explicito: "apenas icones"). So' o icone, num botao quadrado
-  // do mesmo tamanho dos controles de navegacao ao lado.
   iconOnly?: boolean;
+  /** Botão maior (celular, toque). */
+  grande?: boolean;
 }) {
-  const [hover, setHover] = useState(false);
-  const style: React.CSSProperties = iconOnly
-    ? {
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        width: 30,
-        height: 30,
-        borderRadius: 999,
-        border: `1px solid ${disabled ? "rgba(255,255,255,0.08)" : hover ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"}`,
-        background: disabled ? "rgba(255,255,255,0.02)" : hover ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
-        color: disabled ? "rgba(255,255,255,0.25)" : hover ? "#FFFFFF" : "rgba(255,255,255,0.75)",
-        cursor: disabled ? "not-allowed" : "pointer",
-        textDecoration: "none",
-        transition: "all 150ms ease",
-        flexShrink: 0,
-      }
-    : {
-        display: "flex",
-        alignItems: "center",
-        gap: 6,
-        fontFamily: F,
-        fontSize: 12,
-        fontWeight: 500,
-        padding: "7px 13px",
-        borderRadius: 999,
-        border: `1px solid ${disabled ? "rgba(255,255,255,0.08)" : hover ? "rgba(255,255,255,0.32)" : "rgba(255,255,255,0.14)"}`,
-        background: disabled ? "rgba(255,255,255,0.02)" : hover ? "rgba(255,255,255,0.10)" : "rgba(255,255,255,0.04)",
-        color: disabled ? "rgba(255,255,255,0.25)" : hover ? "#FFFFFF" : "rgba(255,255,255,0.75)",
-        whiteSpace: "nowrap",
-        cursor: disabled ? "not-allowed" : "pointer",
-        textDecoration: "none",
-        transition: "all 150ms ease",
-      };
+  const className = `ps-rv-table-action-btn ${iconOnly ? classeIconeMesa(grande ? "lg" : "md") : CHIP_MESA}`;
   const content = iconOnly ? (
     icon
   ) : (
@@ -211,15 +182,7 @@ function ChipButton({
   );
   if (href && !disabled) {
     return (
-      <Link
-        href={href}
-        title={title}
-        aria-label={iconOnly ? title ?? label : undefined}
-        className="ps-rv-table-action-btn"
-        style={style}
-        onMouseEnter={() => setHover(true)}
-        onMouseLeave={() => setHover(false)}
-      >
+      <Link href={href} title={title} aria-label={iconOnly ? title ?? label : undefined} className={className}>
         {content}
       </Link>
     );
@@ -231,10 +194,7 @@ function ChipButton({
       disabled={disabled}
       title={title}
       aria-label={iconOnly ? title ?? label : undefined}
-      className="ps-rv-table-action-btn"
-      style={style}
-      onMouseEnter={() => setHover(true)}
-      onMouseLeave={() => setHover(false)}
+      className={className}
     >
       {content}
     </button>
@@ -550,6 +510,16 @@ export function RevisorHandTable({
     return { fromPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-${ev.posLabel}` };
   }, [replayState, stepIndex]);
 
+  // Sobra de aposta que ninguém pagou voltando pro dono, no step que
+  // fechou a ação (ex.: o fold diante da 4-bet).
+  const devolucaoAnimation = useMemo(() => {
+    if (!replayState) return null;
+    const ev = replayState.currentEvent;
+    if (!ev || ev.kind !== "action" || !ev.devolucao || !replayState.isAdvancing) return null;
+    const amountBB = Math.round((ev.devolucao.amount / replayState.bbUnit) * 10) / 10;
+    return { toPosLabel: ev.devolucao.posLabel, amount: amountBB, key: `${stepIndex}-dev-${ev.devolucao.posLabel}` };
+  }, [replayState, stepIndex]);
+
   // Ficha do pote indo até o vencedor (pedido explicito: "quando alguém
   // ganhar o pote, ter animação dos blinds indo até o vencedor e somando
   // ao stack") -- so' dispara no step do evento "award" (ultimo step da
@@ -726,7 +696,10 @@ export function RevisorHandTable({
         pos: slot.posLabel,
         voce: slot.isHero,
         texto,
-        vencedor: board.length === 5 && ultimoPasso && parsedHand.winner === p.player,
+        vencedor:
+          board.length === 5 &&
+          ultimoPasso &&
+          ((parsedHand.winnings?.length ?? 0) > 0 ? parsedHand.winnings!.some((w) => w.player === p.player) : parsedHand.winner === p.player),
       });
     });
     return { ...th, seats, placar: placar.length >= 2 ? placar : null };
@@ -999,88 +972,19 @@ export function RevisorHandTable({
                   junto do resto das informacoes (pedido explicito).
                   Seletor de velocidade continua removido — autoplay roda
                   em ritmo fixo. */}
-              <div style={{ display: "flex", alignItems: "center", gap: 3, padding: 3, borderRadius: 999, border: "1px solid rgba(255,255,255,0.10)", background: "rgba(255,255,255,0.03)" }}>
-                {/* Mão anterior/seguinte (pedido explicito: "quero o botao
-                    de player do desktop igual do celular, e' mais
-                    completo") -- mesmos onPrevHand/onNextHand ja usados no
-                    dock do celular, so' que dentro do pill de navegacao do
-                    header desktop em vez de um dock separado. */}
-                <button
-                  onClick={onPrevHand}
-                  disabled={!onPrevHand}
-                  aria-label="Mão anterior"
-                  title="Mão anterior"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
-                    color: !onPrevHand ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
-                    borderRadius: 999, width: 26, height: 26, cursor: !onPrevHand ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <ChevronsLeft size={13} />
-                </button>
-
-                <button
-                  onClick={prevStep}
-                  disabled={replayState.stepIndex === 0}
-                  aria-label="Passo anterior"
-                  title="Anterior (←)"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
-                    color: replayState.stepIndex === 0 ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
-                    borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex === 0 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <ChevronLeft size={13} />
-                </button>
-
-                <button
-                  onClick={() => setAutoplay((v) => !v)}
-                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
-                  aria-label={autoplay ? "Pausar" : "Reproduzir"}
-                  title={autoplay ? "Pausar (espaço)" : "Reproduzir (espaço)"}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", border: 0,
-                    background: autoplay ? "rgba(52,211,153,0.18)" : "transparent",
-                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.75)",
-                    borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  {autoplay ? <Pause size={11} /> : <Play size={11} />}
-                </button>
-
-                <button
-                  onClick={nextStep}
-                  disabled={replayState.stepIndex >= replayState.stepCount - 1}
-                  aria-label="Próximo passo"
-                  title="Próximo (→)"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", border: 0,
-                    background: replayState.stepIndex >= replayState.stepCount - 1 ? "transparent" : "rgba(255,255,255,0.85)",
-                    color: replayState.stepIndex >= replayState.stepCount - 1 ? "rgba(255,255,255,0.22)" : "#111111",
-                    borderRadius: 999, width: 26, height: 26, cursor: replayState.stepIndex >= replayState.stepCount - 1 ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <ChevronRight size={13} />
-                </button>
-
-                <button
-                  onClick={onNextHand}
-                  disabled={!onNextHand}
-                  aria-label="Próxima mão"
-                  title="Próxima mão"
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", background: "transparent", border: 0,
-                    color: !onNextHand ? "rgba(255,255,255,0.22)" : "rgba(255,255,255,0.75)",
-                    borderRadius: 999, width: 26, height: 26, cursor: !onNextHand ? "not-allowed" : "pointer",
-                  }}
-                >
-                  <ChevronsRight size={13} />
-                </button>
-
-                <span style={{ marginLeft: 3, marginRight: 5, fontSize: 10.5, color: "rgba(255,255,255,0.4)", ...num }}>
-                  {replayState.stepIndex + 1}/{replayState.stepCount}
-                </span>
-              </div>
+              <ControlesReplay
+                tamanho="compacto"
+                onMaoAnterior={onPrevHand}
+                onPassoAnterior={prevStep}
+                onPlay={() => setAutoplay((v) => !v)}
+                onProximoPasso={nextStep}
+                onProximaMao={onNextHand}
+                tocando={autoplay}
+                noInicio={replayState.stepIndex === 0}
+                noFim={replayState.stepIndex >= replayState.stepCount - 1}
+                passo={replayState.stepIndex + 1}
+                totalPassos={replayState.stepCount}
+              />
 
               {/* iconOnly (pedido explicito: "quero apenas os icones de
                   salvar e analisar mao") -- title continua com o texto
@@ -1109,12 +1013,14 @@ export function RevisorHandTable({
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. position:relative pra sustentar os overlays
             do modo mobile (blinds fosco + dock de navegacao) abaixo. */}
+        {isMobile && <UltimaAcao estado={replayState} heroPos={heroPos} emFichas={emFichas} />}
         <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
           <PokerTable
             hand={mesaComInfo ?? replayState.tableHand}
             seats={isMobile && mobileSeatLayout ? mobileSeatLayout : replayState.seatLayout}
             chipAnimation={chipAnimation}
             potAwardAnimation={potAwardAnimation}
+            devolucaoAnimation={devolucaoAnimation}
             streetCommitments={commitsNaMesa}
             unidade={unidade}
             opponentStats={opponentStats}
@@ -1141,90 +1047,28 @@ export function RevisorHandTable({
 
           {isMobile && (
             <div style={{ position: "absolute", right: 8, bottom: 8, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8, zIndex: 40 }}>
-              {/* "Treinar esse spot" -- pedido explicito: "só no final da
-                  ação, em cima dos botões do player" -- so' aparece no
-                  ultimo passo da mao (nao faz sentido treinar um spot
-                  cuja acao ainda nao terminou de se revelar), empilhado
-                  ACIMA do chip de navegacao (mesma coluna, nunca
-                  sobrepondo). */}
+              {/* "Treinar esse spot" -- só no último passo da mão, em cima
+                  da navegação (mesma coluna, nunca sobrepondo). */}
               {isLastStep && trainHref && (
-                <Link
-                  href={trainHref}
-                  style={{
-                    display: "flex", alignItems: "center", justifyContent: "center", gap: 5,
-                    background: "rgba(255,255,255,0.92)", color: "#111111",
-                    borderRadius: 999, padding: "8px 10px",
-                    fontFamily: F, fontSize: 11, fontWeight: 700, textDecoration: "none", whiteSpace: "nowrap",
-                  }}
-                >
-                  <Target size={13} /> Treinar
+                <Link href={trainHref} className={OURO_MESA}>
+                  <Target size={14} /> Treinar
                 </Link>
               )}
 
-              {/* Chip unico de navegacao (pedido explicito: "o player
-                  pode ser um chip unico com botao de voltar a mao
-                  anterior, voltar a acao, play automatico, avancar
-                  acao, ir pra proxima mao") -- 5 controles dentro do
-                  MESMO pill, em vez de circulos soltos. HORIZONTAL (era
-                  vertical) e ancorado no canto inferior direito (era uma
-                  coluna alta ancorada em top:90%, que cobria boa parte
-                  da lateral direita da mesa e acabava por cima do
-                  vizinho de mesa cheia que senta ali) -- pedido
-                  explicito: "deixar deitado pra não sobrepor o vilão da
-                  direita". Nessa altura (rodape' da mesa, mesma linha do
-                  hero deslocado pra esquerda) nao ha nenhum assento por
-                  perto. */}
-              <div style={{ display: "flex", flexDirection: "row", alignItems: "center", gap: 2, padding: 4, borderRadius: 999, background: "rgba(0,0,0,0.5)", border: "1px solid rgba(255,255,255,0.14)" }}>
-                <button
-                  onClick={onPrevHand}
-                  disabled={!onPrevHand}
-                  aria-label="Mão anterior"
-                  title="Mão anterior"
-                  style={navDockBtnStyle(!onPrevHand)}
-                >
-                  <ChevronsLeft size={15} />
-                </button>
-                <button
-                  onClick={prevStep}
-                  disabled={replayState.stepIndex === 0}
-                  aria-label="Passo anterior"
-                  title="Anterior (←)"
-                  style={navDockBtnStyle(replayState.stepIndex === 0)}
-                >
-                  <ChevronLeft size={15} />
-                </button>
-                <button
-                  onClick={() => setAutoplay((v) => !v)}
-                  disabled={isLastStep}
-                  aria-label={autoplay ? "Pausar" : "Reproduzir"}
-                  title={autoplay ? "Pausar (espaço)" : "Reproduzir (espaço)"}
-                  style={{
-                    ...navDockBtnStyle(isLastStep),
-                    background: autoplay ? "rgba(52,211,153,0.22)" : "transparent",
-                    color: isLastStep ? "rgba(255,255,255,0.22)" : autoplay ? "#6EE7B7" : "rgba(255,255,255,0.85)",
-                  }}
-                >
-                  {autoplay ? <Pause size={14} /> : <Play size={14} />}
-                </button>
-                <button
-                  onClick={nextStep}
-                  disabled={isLastStep}
-                  aria-label="Próximo passo"
-                  title="Próximo (→)"
-                  style={navDockBtnStyle(isLastStep)}
-                >
-                  <ChevronRight size={15} />
-                </button>
-                <button
-                  onClick={onNextHand}
-                  disabled={!onNextHand}
-                  aria-label="Próxima mão"
-                  title="Próxima mão"
-                  style={navDockBtnStyle(!onNextHand)}
-                >
-                  <ChevronsRight size={15} />
-                </button>
-              </div>
+              {/* Navegação num vidro só: mão anterior, passo anterior,
+                  play, próximo passo (dourado) e próxima mão. Deitada e
+                  no canto de baixo, longe dos assentos da direita. */}
+              <ControlesReplay
+                tamanho="grande"
+                onMaoAnterior={onPrevHand}
+                onPassoAnterior={prevStep}
+                onPlay={() => setAutoplay((v) => !v)}
+                onProximoPasso={nextStep}
+                onProximaMao={onNextHand}
+                tocando={autoplay}
+                noInicio={replayState.stepIndex === 0}
+                noFim={isLastStep}
+              />
             </div>
           )}
         </div>
@@ -1246,12 +1090,13 @@ export function RevisorHandTable({
           <>
             {canSave && (
               <ChipButton
-                icon={<Bookmark size={15} fill={saved ? "currentColor" : "none"} />}
+                icon={<Bookmark size={16} fill={saved ? "currentColor" : "none"} />}
                 label={saved ? "Salvo" : "Salvar"}
                 title={saved ? "Remover dos salvos" : "Salvar spot pra rever depois"}
                 onClick={toggleSaved}
                 disabled={savingSpot}
                 iconOnly
+                grande
               />
             )}
             {/* EV/ICM no celular (pedido explicito: "nao localizei no
@@ -1284,15 +1129,16 @@ export function RevisorHandTable({
               ))}
             {canAnalyze && (
               <ChipButton
-                icon={<Target size={15} />}
+                icon={<Target size={16} />}
                 label="Analisar mão"
                 onClick={onOpenHand}
                 title="Analisar essa mão em detalhe"
                 iconOnly
+                grande
               />
             )}
             {linkConstrutor && (
-              <ChipButton icon={<Grid3x3 size={15} />} label="Ver no Construtor" href={linkConstrutor} title="Ver o range desse spot no Construtor de Ranges" iconOnly />
+              <ChipButton icon={<Grid3x3 size={16} />} label="Ver no Construtor" href={linkConstrutor} title="Ver o range desse spot no Construtor de Ranges" iconOnly grande />
             )}
           </>,
           actionsSlot

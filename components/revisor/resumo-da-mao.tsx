@@ -6,7 +6,7 @@ import { Card } from "@/components/drill/card";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
 import { projectHandAtStep } from "@/lib/poker/hand-replay-projector";
 import { resumoDaMao, formatarBb } from "@/lib/poker/hand-summary";
-import { CartaTexto, FATIA_BOARD, NOME_RUA, rotuloAcao } from "./linha-do-tempo";
+import { CartaTexto, FATIA_BOARD, NOME_RUA, nomesDosRaises, rotuloAcao } from "./linha-do-tempo";
 
 // "Resumo da mão" do Analisar mão: o que antes era só o hand history cru
 // (texto em inglês da sala, difícil de ler) vira um resumo em português --
@@ -144,13 +144,13 @@ export function ResumoDaMao({ hand, historicoBruto, hero = "Você" }: { hand: Pa
                 <p className="m-0 mt-1 text-[12px] leading-relaxed text-ink/85">
                   {r.actions.length === 0
                     ? "Sem ação (já estava all-in)."
-                    : r.actions.map((a, i) => {
+                    : r.actions.map((a, i, todas) => {
                         const ehHero = a.pos === dados.heroPos;
                         return (
                           <span key={i}>
                             {i > 0 && <span className="text-muted"> · </span>}
                             <span className={ehHero ? "font-semibold text-[#d4af37]" : a.label === "fold" ? "text-muted" : ""}>
-                              {ehHero ? hero : a.pos} {rotuloAcao(a.label)}
+                              {ehHero ? hero : a.pos} {rotuloAcao(a.label, nomesDosRaises(r.street, todas)[i])}
                             </span>
                           </span>
                         );

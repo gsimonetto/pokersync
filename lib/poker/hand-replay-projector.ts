@@ -31,6 +31,10 @@ export type StepEvent =
       // Valor em bb pra mostrar dentro do chip — ausente pra fold/check
       // (sem tamanho pra exibir).
       badgeSizeBB?: number;
+      // Aposta não paga que volta pro dono NESTE step (a ação que fechou a
+      // rua, ex.: o fold diante da 4-bet) — RAW. Sai da frente dele, do
+      // pote, e volta pro stack.
+      devolucao?: { player: string; posLabel: string; amount: number };
     }
   | { kind: "deal"; street: Exclude<StreetName, "preflop">; newCards: string[] }
   | {
@@ -189,6 +193,13 @@ function computeChipsAddedInStreet(
 // history bar pra BB — chipsAdded continua RAW de proposito (contabilidade
 // interna do pote usa fichas cruas ate o ultimo instante, ver comentario
 // mais abaixo em projectHandAtStep).
+// Blind (SB/BB) ou ante? O parser diz o tipo do post; mãos lidas antes
+// disso (sem o campo) caem na comparação do valor com os blinds da mão.
+function isBlindPost(a: ParsedAction, hand: ParsedHand): boolean {
+  if (a.postType) return a.postType !== "ante";
+  return a.amount === hand.smallBlind || a.amount === hand.bigBlind;
+}
+
 function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: number): StepEvent[] {
   const events: StepEvent[] = [];
   const posByName = new Map(layout.filter((s) => s.playerName).map((s) => [s.playerName as string, s.posLabel]));
@@ -225,37 +236,37 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
         // Nao ha campo explicito de "tipo de post" disponivel aqui pra
         // diferenciar de outro jeito — identifica blind comparando o
         // valor do post com hand.smallBlind/hand.bigBlind.
-        const isBlindPost = a.amount === hand.smallBlind || a.amount === hand.bigBlind;
-        if (isBlindPost) {
+        if (isBlindPost(a, hand)) {
           committed.set(a.player, (committed.get(a.player) ?? 0) + (a.amount ?? 0));
         }
         continue;
       }
 
       if (a.action === "uncalled_return") {
-        // CORRECAO (2026-08, bug real): aposta nao-igualada volta pro
-        // jogador ("Aposta nao-igualada (X) voltou pra Y" no resumo),
-        // mas o pote reconstruido nunca descontava esse valor de volta
-        // — contava a aposta inteira como se tivesse ficado no pote.
-        // Continua NAO virando um step navegavel (mantido como pedido
-        // originalmente: "aplicado automaticamente, invisivel pro
-        // replayer") — em vez disso, desconta o valor devolvido do
-        // ULTIMO evento de acao desse mesmo jogador NESSA MESMA rua (o
-        // bet/raise que gerou a sobra), corrigindo o total sem alterar
-        // a navegacao existente. Se a aposta foi TOTALMENTE nao-
-        // igualada (ninguem pagou nada dela), o evento correspondente
-        // fica com chipsAdded=0 — a ficha nao anima nem aparece parada
-        // em frente ao assento nesse step (o pote nunca recebeu esse
-        // dinheiro de verdade), mas o texto na history bar continua
-        // mostrando o valor apostado originalmente (actionLabel usa o
-        // valor bruto do parser, nao afetado por essa correcao).
+        // Aposta nao-igualada volta pro jogador ("Uncalled bet (X)
+        // returned to Y"). Continua NAO virando um step navegavel
+        // ("aplicado automaticamente, invisivel pro replayer"), mas agora
+        // acontece NA HORA CERTA: no step da acao que fechou a rua (o
+        // fold diante da aposta), nao mais descontado da propria aposta.
+        // Bug reportado: "tomei 4bet e nao teve animacao das fichas" --
+        // o desconto antigo zerava a 4-bet inteira (so' a sobra nao paga
+        // era apostada a mais), entao ela nao voava nem aumentava a
+        // pilha na frente do jogador; a mesa parecia nao ter 4-bet.
         const returned = a.amount ?? 0;
-        for (let i = events.length - 1; i >= 0; i--) {
-          const ev = events[i];
-          if (ev.kind === "deal") break; // nao cruza pra uma rua anterior
-          if (ev.kind === "action" && ev.player === a.player && ev.chipsAdded > 0) {
-            ev.chipsAdded = Math.max(0, ev.chipsAdded - returned);
-            break;
+        const ultima = events[events.length - 1];
+        if (returned > 0 && ultima?.kind === "action") {
+          const pos = posByName.get(a.player) ?? a.player;
+          ultima.devolucao = { player: a.player, posLabel: pos, amount: (ultima.devolucao?.amount ?? 0) + returned };
+        } else if (returned > 0) {
+          // Sem acao antes da devolucao nessa rua (nao deveria acontecer):
+          // jeito antigo, desconta da ultima aposta do proprio jogador.
+          for (let i = events.length - 1; i >= 0; i--) {
+            const ev = events[i];
+            if (ev.kind === "deal") break;
+            if (ev.kind === "action" && ev.player === a.player && ev.chipsAdded > 0) {
+              ev.chipsAdded = Math.max(0, ev.chipsAdded - returned);
+              break;
+            }
           }
         }
         continue;
@@ -294,7 +305,14 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
     });
   }
 
-  if (hand.winner && hand.pot != null && hand.pot > 0) {
+  // Um prêmio por vencedor (pote dividido / side pot), com o que cada um
+  // levou de verdade. Mãos sem essas linhas: o pote todo pro vencedor.
+  const winnings = hand.winnings ?? [];
+  if (winnings.length > 0) {
+    for (const w of winnings) {
+      events.push({ kind: "award", player: w.player, posLabel: posByName.get(w.player) ?? w.player, amount: w.amount });
+    }
+  } else if (hand.winner && hand.pot != null && hand.pot > 0) {
     const posLabel = posByName.get(hand.winner) ?? hand.winner;
     events.push({
       kind: "award",
@@ -408,7 +426,10 @@ export function projectHandAtStep(
     const preflop = hand.streets.find((st) => st.name === "preflop");
     if (preflop) {
       for (const a of preflop.actions) {
-        if (a.action === "posts") {
+        // Só blind fica na frente do jogador; o ante vai direto pro pote
+        // (bug reportado: SB aparecia com 0,6 BB e BB com 1,1 BB numa mão
+        // com ante de 0,1 BB -- e o ante somava em toda aposta da rua).
+        if (a.action === "posts" && isBlindPost(a, hand)) {
           const pos = posByName.get(a.player);
           if (pos) streetCommitted.set(pos, (streetCommitted.get(pos) ?? 0) + (a.amount ?? 0));
         }
@@ -425,6 +446,12 @@ export function projectHandAtStep(
         if (e.chipsAdded > 0) {
           streetCommitted.set(e.posLabel, (streetCommitted.get(e.posLabel) ?? 0) + e.chipsAdded);
           chipsOutByPlayer.set(e.player, (chipsOutByPlayer.get(e.player) ?? 0) + e.chipsAdded);
+        }
+        if (e.devolucao) {
+          const d = e.devolucao;
+          pot -= d.amount;
+          streetCommitted.set(d.posLabel, Math.max(0, (streetCommitted.get(d.posLabel) ?? 0) - d.amount));
+          chipsOutByPlayer.set(d.player, (chipsOutByPlayer.get(d.player) ?? 0) - d.amount);
         }
         break;
       }

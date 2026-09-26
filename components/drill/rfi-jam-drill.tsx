@@ -9,7 +9,6 @@ import { PokerTable, type TableHand, type SeatState } from "@/components/drill/p
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
 import { fetchTrainingAccuracy, fetchSessionState, type RfiJamFilterState } from "@/lib/services/drill-service";
-import { Chip } from "@/components/chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
@@ -25,6 +24,7 @@ import {
   rfiJamSpotToRangeHands,
 } from "@/lib/services/rfi-jam-service";
 import { RangeDoSpot } from "@/components/drill/range-do-spot";
+import { INFO_MESA, classeIconeMesa } from "@/components/drill/mesa-ui";
 import { BotaoAcao, SeloAcao, TECLAS, fmtBB, ordenarOpcoes, type OpcaoAcao } from "@/components/drill/barra-de-acao";
 import { salvarPreferenciaMesa, usePreferenciasMesa, type TempoDecisao, type VelocidadeAnimacao } from "@/lib/hooks/use-preferencias-mesa";
 
@@ -35,6 +35,21 @@ const F = '"Space Grotesk", sans-serif';
 // mesmas 3 faixas usadas no resto do produto pra sinalizar bom/medio/
 // ruim (--color-positive/evolution/negative em app/globals.css). Sem
 // mao nenhuma jogada ainda fica neutro, nem verde nem vermelho.
+// Acerto no histórico, no desenho das informações da mesa (mesa-ui.tsx):
+// bolinha na cor da faixa (verde/âmbar/vermelho) + texto. Antes era o
+// Chip com brilho, que em "SEM HISTÓRICO" virava um selo cinza aceso.
+function SeloAcerto({ total, acertos, pct, curto = false }: { total: number; acertos: number; pct: number; curto?: boolean }) {
+  return (
+    <span
+      className={`${INFO_MESA} ${curto ? "max-w-[38vw]" : ""}`}
+      title={total > 0 ? `${acertos} de ${total} mãos ótimas desde o início` : "Suas respostas aparecem aqui"}
+    >
+      <span className="size-2 shrink-0 rounded-full" style={{ background: accuracyChipColor(total, pct) }} />
+      <span className="truncate">{total > 0 ? (curto ? `${pct}% ótimas` : `Histórico · ${pct}% ótimas`) : curto ? "Sem histórico" : "Sem histórico ainda"}</span>
+    </span>
+  );
+}
+
 function accuracyChipColor(total: number, pct: number): string {
   if (total === 0) return "#8A8A8A";
   if (pct >= 70) return "#22c55e";
@@ -1360,24 +1375,11 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                 disabled={filtersLocked}
                 aria-label={filtersLocked ? "Filtros disponíveis a partir do plano Individual" : "Abrir filtros"}
                 title={filtersLocked ? "Filtros disponíveis a partir do plano Individual" : "Abrir filtros"}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  width: 34,
-                  height: 34,
-                  borderRadius: 9,
-                  background: "#1A1A1A",
-                  border: "1px solid rgba(255,255,255,0.10)",
-                  color: "rgba(255,255,255,0.7)",
-                  flexShrink: 0,
-                  opacity: filtersLocked ? 0.45 : 1,
-                  cursor: filtersLocked ? "not-allowed" : "pointer",
-                }}
+                className={classeIconeMesa("lg")}
               >
                 {filtersLocked ? <Lock size={14} strokeWidth={1.75} /> : <SlidersHorizontal size={15} strokeWidth={1.5} />}
               </button>
-              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)" }}>
+              <span style={{ fontSize: 12, fontWeight: 600, color: "rgba(255,255,255,0.6)", whiteSpace: "nowrap", minWidth: 0 }}>
                 {heroPos} vs {villainPos} <span style={{ color: "rgba(255,255,255,0.35)", fontWeight: 500 }}>· {fmtBB(stackBb)}</span>
                 {round && <span style={{ marginLeft: 6, padding: "1px 6px", borderRadius: 5, background: "rgba(255,255,255,0.08)", color: "#FFFFFF" }}>{round.label}</span>}
               </span>
@@ -1390,15 +1392,13 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                 {/* Mesmo texto do chip do computador ("67% ótimas", com o
                     total no toque/hover) -- "142/214 · 66%" não dizia o
                     que era contado. */}
-                <span title={`${stats.hits} de ${stats.total} mãos ótimas desde o início`}>
-                  <Chip color={accuracyChipColor(stats.total, sessionPct)} size="sm">
-                    {stats.total > 0 ? `${sessionPct}% ótimas` : "Sem histórico"}
-                  </Chip>
-                </span>
+                <SeloAcerto total={stats.total} acertos={stats.hits} pct={sessionPct} curto />
               </div>
             </div>
 
-            <div style={{ position: "relative", flex: 1, minHeight: 0 }}>
+            {/* Respiro de 8px nas laterais, como no Revisor: a borda da
+                mesa encostava na beirada da tela. */}
+            <div style={{ position: "relative", flex: 1, minHeight: 0, margin: "0 8px 8px" }}>
               <PokerTable
                 hand={tableHand}
                 seats={fullscreenSeatLayout}
@@ -1468,23 +1468,11 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
           sumir. */}
       <div className="ps-tr-header" style={{ display: "flex", alignItems: "center", gap: 12, flexShrink: 0, minHeight: 34 }}>
         <button
-          className="ps-tr-filters-toggle"
           onClick={() => !filtersLocked && setFiltersOpen((v) => !v)}
           disabled={filtersLocked}
           title={filtersLocked ? "Filtros disponíveis a partir do plano Individual" : filtersOpen ? "Esconder filtros" : "Mostrar filtros"}
-          style={{
-            alignItems: "center",
-            justifyContent: "center",
-            width: 34,
-            height: 34,
-            borderRadius: 9,
-            background: filtersOpen ? "rgba(255,255,255,0.10)" : "#1A1A1A",
-            border: "1px solid rgba(255,255,255,0.10)",
-            color: "rgba(255,255,255,0.7)",
-            flexShrink: 0,
-            opacity: filtersLocked ? 0.45 : 1,
-            cursor: filtersLocked ? "not-allowed" : "pointer",
-          }}
+          className={`ps-tr-filters-toggle ${classeIconeMesa("md")} ${filtersOpen ? "border-[#d4af37]/40 text-[#d4af37]" : ""}`}
+          style={{ alignItems: "center", justifyContent: "center" }}
         >
           {filtersLocked ? <Lock size={14} strokeWidth={1.75} /> : <SlidersHorizontal size={15} strokeWidth={1.5} />}
         </button>
@@ -1500,11 +1488,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
               {blockProgress.hands > 0 ? ` · ${Math.round((blockProgress.hits / blockProgress.hands) * 100)}% ótimas` : ""}
             </span>
           )}
-          <span title={`${stats.hits} de ${stats.total} mãos ótimas desde o início`}>
-            <Chip color={accuracyChipColor(stats.total, sessionPct)}>
-              Histórico{stats.total > 0 ? ` · ${sessionPct}% ótimas` : ""}
-            </Chip>
-          </span>
+          <SeloAcerto total={stats.total} acertos={stats.hits} pct={sessionPct} />
         </div>
 
         {tabs}
@@ -1820,9 +1804,11 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                           position: "relative",
                           flex: 1,
                           minHeight: 0,
-                          background: "#050505",
-                          borderRadius: 14,
-                          border: "1px solid rgba(255,255,255,0.08)",
+                          // Vidro mais escuro dentro do card de vidro (era um
+                          // bloco preto sólido, cara da versão antiga).
+                          background: "rgba(0,0,0,0.28)",
+                          borderRadius: 18,
+                          border: "1px solid rgba(255,255,255,0.06)",
                           padding: "16px 16px 48px",
                           overflow: "visible",
                         }

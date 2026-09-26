@@ -21,11 +21,25 @@ export const NOME_RUA: Record<string, string> = { PREFLOP: "Pré-flop", FLOP: "F
 // Quantas cartas do board cada rua revela (flop 3, turn 1, river 1).
 export const FATIA_BOARD: Record<string, [number, number]> = { FLOP: [0, 3], TURN: [3, 4], RIVER: [4, 5] };
 
+// Nome do raise no pré-flop, do jeito que quem joga fala: o 1º é a
+// abertura, depois 3-bet, 4-bet... (pedido: "tomei 4bet" -- a faixa
+// dizia "HJ raise 15", sem deixar claro que era a 4-bet).
+export function nomeDoRaisePreflop(ordem: number): string {
+  return ordem <= 1 ? "abre" : `${ordem + 1}-bet`;
+}
+
+/** Nome de cada raise da rua (mesma ordem das ações); fora do pré-flop, nada muda. */
+export function nomesDosRaises(street: string, acoes: { label: string }[]): (string | undefined)[] {
+  let raises = 0;
+  return acoes.map((a) => (street.toUpperCase() === "PREFLOP" && a.label.startsWith("raise to") ? nomeDoRaisePreflop(++raises) : undefined));
+}
+
 // "raise to 8.25bb" -> "raise 8,3" (o "bb" fica implícito na faixa toda).
-export function rotuloAcao(label: string): string {
+// `nomeRaise` troca o "raise" pelo nome no pré-flop (ex.: "4-bet 15").
+export function rotuloAcao(label: string, nomeRaise?: string): string {
   const m = label.match(/^(raise to|bet|call|posts|all-in) ([\d.]+)bb$/);
   if (!m) return label;
-  const verbo = m[1] === "raise to" ? "raise" : m[1];
+  const verbo = m[1] === "raise to" ? nomeRaise ?? "raise" : m[1];
   const valor = Number(m[2]).toLocaleString("pt-BR", { maximumFractionDigits: 1 });
   return `${verbo} ${valor}`;
 }
@@ -95,18 +109,19 @@ export function LinhaDoTempo({
           // qualquer outra coisa, e isso escondia as ações que importam.
           const itens: { texto: string; hero: boolean; fraco: boolean }[] = [];
           let folds = 0;
+          const nomes = nomesDosRaises(r.street, r.actions);
           const soltarFolds = () => {
             if (folds > 0) itens.push({ texto: folds === 1 ? "1 fold" : `${folds} folds`, hero: false, fraco: true });
             folds = 0;
           };
-          for (const a of r.actions) {
+          for (const [i, a] of r.actions.entries()) {
             const hero = a.pos === heroPos;
             if (a.label === "fold" && !hero) {
               folds++;
               continue;
             }
             soltarFolds();
-            itens.push({ texto: `${hero ? "Você" : a.pos} ${rotuloAcao(a.label)}`, hero, fraco: false });
+            itens.push({ texto: `${hero ? "Você" : a.pos} ${rotuloAcao(a.label, nomes[i])}`, hero, fraco: false });
           }
           soltarFolds();
           return (
