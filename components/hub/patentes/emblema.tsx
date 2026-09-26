@@ -339,9 +339,18 @@ interface Ctx {
   mini: boolean;
 }
 
-/** Tamanho e contorno do número: nas miniaturas ele ocupa quase o emblema todo. */
-const numero = (c: Ctx, nivel: number) =>
-  c.mini ? { fontSize: nivel >= 10 ? 52 : 62, strokeWidth: 9 } : { fontSize: nivel >= 10 ? 30 : 34, strokeWidth: 4 };
+// Largura livre (no quadro de 120) na altura do número, por patente -- o
+// número da miniatura nunca passa disso, pra não vazar pra fora da peça.
+const LARGURA_NUMERO = [56, 58, 52, 50, 44, 48, 56, 52, 58, 48];
+
+/** Tamanho e contorno do número. Na miniatura ele cresce até caber na largura livre da peça. */
+function numero(c: Ctx, nivel: number, faixa: Faixa) {
+  if (!c.mini) return { fontSize: nivel >= 10 ? 30 : 34, strokeWidth: 4 };
+  const traco = 6;
+  const porDigito = 0.62; // largura média de um algarismo em negrito, em "em"
+  const cabe = (LARGURA_NUMERO[faixa] - traco) / (porDigito * String(nivel).length);
+  return { fontSize: Math.min(44, Math.floor(cabe)), strokeWidth: traco };
+}
 
 const vel = (v: string) => ({ ["--vel" as string]: v }) as CSSProperties;
 
@@ -989,11 +998,11 @@ function Lendario({ c, nivel, mostrarNumero }: { c: Ctx; nivel: number; mostrarN
           y={NUMERO_Y[9]}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize={numero(c, nivel).fontSize}
+          fontSize={numero(c, nivel, 9).fontSize}
           fontWeight="900"
           fill={`url(#${c.id("numero")})`}
           stroke="#000"
-          strokeWidth={numero(c, nivel).strokeWidth}
+          strokeWidth={numero(c, nivel, 9).strokeWidth}
           paintOrder="stroke"
           style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-1px" }}
         >
@@ -1086,11 +1095,11 @@ export function EmblemaPatente({
                     y={NUMERO_Y[faixa]}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fontSize={numero(c, nivel).fontSize}
+                    fontSize={numero(c, nivel, faixa).fontSize}
                     fontWeight="900"
                     fill="#fff"
                     stroke={m.escuro}
-                    strokeWidth={numero(c, nivel).strokeWidth}
+                    strokeWidth={numero(c, nivel, faixa).strokeWidth}
                     paintOrder="stroke"
                     style={{
                       fontVariantNumeric: "tabular-nums",
