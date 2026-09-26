@@ -406,8 +406,13 @@ function CommittedChip({ seat, amount, scale, heroScale = 1, subir = 0 }: { seat
   // (heroScale>1, modo mesa-cheia), as cartas dele crescem mas esse
   // offset continuava do tamanho normal, entao a ficha de aposta ficava
   // perto demais e as cartas (agora maiores) cresciam por cima dela.
+  // Com as cartas lado a lado (mais largas que o antigo leque) e o herói
+  // ampliado (modo celular, heroScale > 1), a ficha de quem senta na
+  // metade de baixo caía em cima das cartas do herói -- ela avança mais
+  // um pouco rumo ao centro nesse caso.
+  const longeDoHeroi = !seat.isHero && heroScale > 1 && seat.y > 55 ? 34 : 0;
   const offsetPx =
-    ((seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX) + (seat.isHero ? 0 : ABOVE_SEAT_EXTRA_OFFSET_PX)) *
+    ((seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX) + (seat.isHero ? 0 : ABOVE_SEAT_EXTRA_OFFSET_PX) + longeDoHeroi) *
     scale *
     (seat.isHero ? heroScale : 1);
   return (
@@ -426,41 +431,19 @@ function CommittedChip({ seat, amount, scale, heroScale = 1, subir = 0 }: { seat
   );
 }
 
-// Cartas sobrepostas (uma quase em cima da outra), como GGPoker e a
-// maioria dos apps mobile fazem — em vez do padrao antigo lado a lado
-// com espaco entre elas. A segunda carta cobre boa parte da primeira
-// (overlapPx negativo) e cada carta ganha uma leve rotacao em leque, pra
-// nao parecer um bloco unico colado.
-//
-// FIX (2026-09): rotacao pedida explicitamente igual ao GGPoker — a
-// PRIMEIRA carta deitada pra ESQUERDA, a SEGUNDA deitada pra DIREITA
-// (leque abrindo pros dois lados a partir do centro). A formula abaixo
-// ja fazia isso matematicamente (indice mais baixo = rotacao negativa =
-// gira sentido anti-horario = topo da carta pende pra esquerda), mas o
-// angulo total (6deg pra 2 cartas = 3deg pra cada lado) era sutil demais
-// pra ficar perceptivel — subiu pra 10deg (5deg por carta em duplas).
-// Subiu de novo pra 16deg (pedido explicito: "deitar um pouquinho mais
-// as cartas, pois o 10 neste exemplo ficou muito escondido") -- com mais
-// giro o canto superior-esquerdo da carta de tras (onde fica o rank)
-// desloca mais pra fora da carta da frente, ficando mais visivel.
-const CARD_OVERLAP_PX: Record<Size, number> = { board: 30, hero: 44, mini: 20, villain: 25 } as const;
+// Cartas LADO A LADO, retas, com um respiro entre elas (pedido explicito:
+// "quero as cartas uma ao lado da outra, vai ficar melhor a
+// visualizacao"). Antes ficavam em leque, a segunda cobrindo boa parte da
+// primeira -- o indice da carta de tras ficava parcialmente escondido.
+const CARD_GAP_PX = 4;
 type Size = "board" | "hero" | "mini" | "villain";
 
-function CardFan({ cards, size, fanDeg = 16 }: { cards: (string | null)[]; size: Size; fanDeg?: number }) {
-  const overlap = CARD_OVERLAP_PX[size];
+function CardFan({ cards, size }: { cards: (string | null)[]; size: Size }) {
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", gap: CARD_GAP_PX }}>
       {cards.map((c, i) => (
-        // Dois wrappers separados de proposito: a animacao de entrada
-        // (fadeInUp) tambem mexe em `transform` (translateY), e uma
-        // unica div com os dois (rotate estatico + animacao) faz o
-        // keyframe da animacao GANHAR e apagar a rotacao assim que ela
-        // roda — a carta ficava sempre reta, mesmo com o angulo certo no
-        // codigo. Separando, cada div cuida de UM transform só.
-        <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - (cards.length - 1) / 2) * fanDeg}deg)` }}>
-          <div style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
-            <Card card={c} size={size} />
-          </div>
+        <div key={i} style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
+          <Card card={c} size={size} />
         </div>
       ))}
     </div>
@@ -511,20 +494,14 @@ function CardSilhouette() {
   );
 }
 
-// Mesmo leque/sobreposicao do CardFan, so' que com a silhueta acima em
-// vez de cartas reais -- reusa CARD_OVERLAP_PX.villain pra ficar
-// visualmente identico ao par de cartas reveladas do vilao (mesmo
-// tamanho, mesmo espacamento), trocando so' o conteudo interno de cada
-// carta.
-function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
-  const overlap = CARD_OVERLAP_PX.villain;
+// Mesmo arranjo do CardFan (lado a lado), com a silhueta no lugar das
+// cartas reais -- visualmente identico ao par revelado do vilao.
+function GhostCardFan() {
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", gap: CARD_GAP_PX }}>
       {[0, 1].map((i) => (
-        <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - 0.5) * fanDeg}deg)` }}>
-          <div style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
-            <CardSilhouette />
-          </div>
+        <div key={i} style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
+          <CardSilhouette />
         </div>
       ))}
     </div>
