@@ -436,12 +436,21 @@ export function projectHandAtStep(
         break;
       case "showdown":
         revealed.set(e.player, e.cards);
+        // A última rua não tem "deal" depois dela -- sem isso as apostas do
+        // river ficavam paradas na frente dos jogadores até o fim da mão e
+        // nunca iam pro pote (bug reportado: "no river, não teve animação
+        // das fichas"). No showdown elas vão pro pote, como na mesa de
+        // verdade (a mesa anima o recolhimento quando elas somem).
+        streetCommitted = new Map();
         break;
       case "award":
         // Pote vai pro vencedor -- o stack dele soma esse valor a partir
         // desse step (ver seats[...].stack mais abaixo), no mesmo passo
-        // em que a animação de fichas indo até ele acontece na UI.
+        // em que a animação de fichas indo até ele acontece na UI. Sem
+        // showdown (todos largaram), as apostas da rua vão pro pote aqui,
+        // logo antes de ele ir pro vencedor.
         chipsWonByPlayer.set(e.player, (chipsWonByPlayer.get(e.player) ?? 0) + e.amount);
+        streetCommitted = new Map();
         break;
     }
     if (i === clampedIndex - 1) currentEvent = e;
