@@ -19,7 +19,7 @@ export function progressoDoNivel(nivel: number, xpAtual: number) {
 //   * cor do anel = patente (a cor muda a cada 10 níveis: 11 prata,
 //     21 ouro ... 99 lendário), a mesma do RankChip e do Hub;
 //   * quanto do anel está preenchido = quanto falta pro próximo nível;
-//   * selo embaixo = o escudo da patente em miniatura + o número do nível
+//   * selo embaixo = o escudo da patente em miniatura com o nível dentro
 //     (pedido explícito: trocar a bolinha com o número pelo escudo).
 //
 // Quem já tem nível e XP em mãos (ranking) passa `nivel`/`xpAtual`;
@@ -44,7 +44,7 @@ export function AvatarNivel({
   tamanho?: number;
   nivel?: number | null;
   xpAtual?: number | null;
-  /** Selo (escudo da patente + nível) embaixo da foto. Padrão: só a partir de 30px. */
+  /** Selo (escudo da patente com o nível dentro) embaixo da foto. Padrão: só a partir de 30px. */
   mostrarNivel?: boolean;
   animar?: boolean;
   /** Foto quadrada (cartão de perfil) com o anel acompanhando os cantos. */
@@ -63,13 +63,8 @@ export function AvatarNivel({
   const cor = nivel == null ? null : levelColor(nivel);
   const pct = nivel == null ? 0 : progressoDoNivel(nivel, xpAtual);
   const numero = (mostrarNivel ?? tamanho >= 30) && nivel != null;
-  // Selo cresce com a foto: escudo e número sempre na mesma proporção.
-  const selo =
-    tamanho >= 96
-      ? { escudo: 26, caixa: "-bottom-2.5 pr-2 text-[13px]" }
-      : tamanho >= 48
-        ? { escudo: 20, caixa: "-bottom-2 pr-1.5 text-[10.5px]" }
-        : { escudo: 17, caixa: "-bottom-2 pr-1 text-[9.5px]" };
+  // Selo cresce com a foto: o escudo da patente com o nível dentro.
+  const selo = tamanho >= 96 ? { escudo: 40, caixa: "-bottom-4" } : tamanho >= 48 ? { escudo: 30, caixa: "-bottom-3" } : { escudo: 24, caixa: "-bottom-2.5" };
   const titulo =
     nivel == null
       ? undefined
@@ -141,11 +136,8 @@ export function AvatarNivel({
       </svg>
       <Avatar id={avatarId} url={avatarUrl} size={foto} shape={quadrado ? "square" : "circle"} />
       {numero && nivel != null && (
-        <span
-          className={`absolute left-1/2 flex -translate-x-1/2 items-center rounded-full border-2 border-[#111111] bg-[#050505] ring-1 ring-white/10 font-black leading-none tabular-nums text-white shadow-[0_2px_6px_rgba(0,0,0,0.6)] ${selo.caixa}`}
-        >
-          <EmblemaPatente nivel={nivel} tamanho={selo.escudo} animar={false} mostrarNumero={false} halo={false} className="-my-[3px]" />
-          {nivel}
+        <span className={`absolute left-1/2 flex -translate-x-1/2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${selo.caixa}`}>
+          <EmblemaPatente nivel={nivel} tamanho={selo.escudo} animar={false} halo={false} />
         </span>
       )}
     </span>

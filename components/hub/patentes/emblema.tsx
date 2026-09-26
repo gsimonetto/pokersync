@@ -335,7 +335,13 @@ interface Ctx {
   id: (s: string) => string;
   a: boolean;
   det: boolean;
+  /** Miniatura (selo da foto): número bem maior e contorno grosso pra continuar legível. */
+  mini: boolean;
 }
+
+/** Tamanho e contorno do número: nas miniaturas ele ocupa quase o emblema todo. */
+const numero = (c: Ctx, nivel: number) =>
+  c.mini ? { fontSize: nivel >= 10 ? 52 : 62, strokeWidth: 9 } : { fontSize: nivel >= 10 ? 30 : 34, strokeWidth: 4 };
 
 const vel = (v: string) => ({ ["--vel" as string]: v }) as CSSProperties;
 
@@ -983,11 +989,11 @@ function Lendario({ c, nivel, mostrarNumero }: { c: Ctx; nivel: number; mostrarN
           y={NUMERO_Y[9]}
           textAnchor="middle"
           dominantBaseline="middle"
-          fontSize={nivel >= 10 ? 30 : 34}
+          fontSize={numero(c, nivel).fontSize}
           fontWeight="900"
           fill={`url(#${c.id("numero")})`}
           stroke="#000"
-          strokeWidth="3.6"
+          strokeWidth={numero(c, nivel).strokeWidth}
           paintOrder="stroke"
           style={{ fontVariantNumeric: "tabular-nums", letterSpacing: "-1px" }}
         >
@@ -1030,7 +1036,7 @@ export function EmblemaPatente({
   const m = MATERIAIS[faixa];
   const cor = levelColor(nivel);
   const det = tamanho >= 60;
-  const c: Ctx = { id: (s) => `${uid}-${s}`, a: animar, det };
+  const c: Ctx = { id: (s) => `${uid}-${s}`, a: animar, det, mini: tamanho < 48 };
   const marcas = marcasDaDivisao(nivel);
   const Peca = faixa < 9 ? PECAS[faixa] : null;
 
@@ -1080,11 +1086,11 @@ export function EmblemaPatente({
                     y={NUMERO_Y[faixa]}
                     textAnchor="middle"
                     dominantBaseline="middle"
-                    fontSize={nivel >= 10 ? 30 : 34}
+                    fontSize={numero(c, nivel).fontSize}
                     fontWeight="900"
                     fill="#fff"
                     stroke={m.escuro}
-                    strokeWidth="4"
+                    strokeWidth={numero(c, nivel).strokeWidth}
                     paintOrder="stroke"
                     style={{
                       fontVariantNumeric: "tabular-nums",
