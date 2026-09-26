@@ -14,6 +14,10 @@ export type Baralho = "4cores" | "2cores";
 export type UnidadeValor = "bb" | "fichas";
 export type VelocidadeAnimacao = "normal" | "rapida" | "sem";
 export type TempoDecisao = 0 | 10 | 15 | 20;
+/** Estilo das cartas (ver components/drill/carta-estilos.tsx). */
+export type EstiloCartaPref = "solido" | "classico" | "jumbo";
+/** Estilo da mesa (ver TEMAS_MESA em components/drill/poker-table.tsx). */
+export type EstiloMesa = "arena" | "luxo";
 
 export interface PreferenciasMesa {
   /** Cor do feltro (M9). "padrao" = azul no Treino, vinho no Revisor. */
@@ -26,15 +30,21 @@ export interface PreferenciasMesa {
   animacao: VelocidadeAnimacao;
   /** Segundos pra decidir no Treino; 0 = sem tempo (M11). */
   tempo: TempoDecisao;
+  /** Estilo das cartas: Cor Sólida Premium (padrão), Clássico de Cassino ou Índice Jumbo. */
+  carta: EstiloCartaPref;
+  /** Estilo da mesa: Arena (padrão) ou Luxo Moderno. */
+  mesa: EstiloMesa;
 }
 
-const PADRAO: PreferenciasMesa = { feltro: "padrao", baralho: "4cores", unidade: "bb", animacao: "normal", tempo: 0 };
+const PADRAO: PreferenciasMesa = { feltro: "padrao", baralho: "4cores", unidade: "bb", animacao: "normal", tempo: 0, carta: "solido", mesa: "arena" };
 const OPCOES: { [K in keyof PreferenciasMesa]: readonly PreferenciasMesa[K][] } = {
   feltro: ["padrao", "verde", "azul", "vinho", "grafite"],
   baralho: ["4cores", "2cores"],
   unidade: ["bb", "fichas"],
   animacao: ["normal", "rapida", "sem"],
   tempo: [0, 10, 15, 20],
+  carta: ["solido", "classico", "jumbo"],
+  mesa: ["arena", "luxo"],
 };
 
 const CHAVE = "pokersync:mesa:preferencias";
@@ -61,6 +71,8 @@ function normaliza(salvo: Record<string, unknown>): PreferenciasMesa {
     unidade: valida("unidade", salvo.unidade),
     animacao: valida("animacao", salvo.animacao),
     tempo: valida("tempo", salvo.tempo),
+    carta: valida("carta", salvo.carta),
+    mesa: valida("mesa", salvo.mesa),
   };
 }
 

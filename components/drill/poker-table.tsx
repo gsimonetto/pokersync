@@ -1,12 +1,14 @@
 "use client";
 
-import { createContext, useContext, useEffect, useRef, useState } from "react";
+import { createContext, useCallback, useContext, useEffect, useLayoutEffect, useRef, useState } from "react";
 import { Info, Target, Trophy } from "lucide-react";
-import { Card, sortCardsDesc } from "./card";
+import { Card, alturaDaCarta, sortCardsDesc } from "./card";
+import { PilhaFichas, quebrarEmFichas } from "./ficha-americana";
+import { VooDeFichas, duracaoDoVoo, type Ponto, type Voo } from "./voo-fichas";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
 import type { OpponentStats } from "@/lib/services/opponent-stats-service";
-import { usePreferenciasMesa, type CorFeltro, type UnidadeValor, type VelocidadeAnimacao } from "@/lib/hooks/use-preferencias-mesa";
+import { usePreferenciasMesa, type CorFeltro, type EstiloMesa, type UnidadeValor, type VelocidadeAnimacao } from "@/lib/hooks/use-preferencias-mesa";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -26,6 +28,25 @@ import { usePreferenciasMesa, type CorFeltro, type UnidadeValor, type Velocidade
 // continuar encolhendo.
 const BASE_TABLE_WIDTH_PX = 900;
 const DEFAULT_MIN_SEAT_SCALE = 0.4;
+// Telas grandes (pedido explícito: "todas responsivas em todo tipo de
+// tela"): antes o tamanho travava em 1 e, num monitor grande, a mesa
+// crescia e os assentos/cartas ficavam miúdos no meio dela. Agora
+// acompanham a mesa até 2x (monitor 2K/4K).
+const MAX_SEAT_SCALE = 2;
+// Mesa em pé (3/5, celular e tablet): a escala por largura (largura/900)
+// deixava tudo miúdo no tablet em pé, com a mesa enorme. Aqui ela vai do
+// piso (celular, mesa até ~430px) até 1 numa mesa de tablet (~580px).
+const RETRATO_MAX_ASPECTO = 0.61;
+const RETRATO_LARGURA_PISO = 260;
+const RETRATO_LARGURA_CHEIA = 580;
+
+function escalaDaMesa(largura: number, aspecto: number, minScale: number): number {
+  if (aspecto <= RETRATO_MAX_ASPECTO) {
+    const bruta = (largura - RETRATO_LARGURA_PISO) / (RETRATO_LARGURA_CHEIA - RETRATO_LARGURA_PISO);
+    return Math.min(1, Math.max(minScale, bruta));
+  }
+  return Math.min(MAX_SEAT_SCALE, Math.max(minScale, largura / BASE_TABLE_WIDTH_PX));
+}
 
 // `minScale` (pedido pelo modo mesa-cheia do Treino no celular): o piso
 // padrao (0.4) foi calibrado pra mesa cheia de assentos com carta E nome
@@ -35,20 +56,22 @@ const DEFAULT_MIN_SEAT_SCALE = 0.4;
 // mais do que precisava. Um piso mais alto (ex: 0.75) protege so' os
 // assentos vazios da lateral (que ficam apertados numa mesa estreita em
 // pe) sem esmagar quem de fato importa olhar.
-function useSeatScale(ref: React.RefObject<HTMLElement | null>, minScale: number = DEFAULT_MIN_SEAT_SCALE) {
-  const [scale, setScale] = useState(1);
+// Também devolve o tamanho da mesa em pixel -- as fichas voando (ver
+// voo-fichas.tsx) andam em pixel entre pontos medidos na mesa.
+function useSeatScale(ref: React.RefObject<HTMLElement | null>, aspecto: number, minScale: number = DEFAULT_MIN_SEAT_SCALE) {
+  const [medida, setMedida] = useState({ scale: 1, largura: 0, altura: 0 });
   useEffect(() => {
     const el = ref.current;
     if (!el) return;
     const observer = new ResizeObserver((entries) => {
-      const width = entries[0]?.contentRect.width;
-      if (!width) return;
-      setScale(Math.min(1, Math.max(minScale, width / BASE_TABLE_WIDTH_PX)));
+      const caixa = entries[0]?.contentRect;
+      if (!caixa?.width) return;
+      setMedida({ scale: escalaDaMesa(caixa.width, aspecto, minScale), largura: caixa.width, altura: caixa.height });
     });
     observer.observe(el);
     return () => observer.disconnect();
-  }, [ref, minScale]);
-  return scale;
+  }, [ref, aspecto, minScale]);
+  return medida;
 }
 
 // "8 / 5" -> 1.6 (largura / altura) -- usado pra calcular o retangulo
@@ -167,56 +190,83 @@ const FELTROS_ESCOLHIDOS: Record<Exclude<CorFeltro, "padrao">, { background: str
   },
 };
 
-function ChipStackIcon({ size = 13 }: { size?: number }) {
-  const disc = (bottom: number, z: number) => (
-    <div
-      key={z}
-      style={{
-        position: "absolute",
-        bottom,
-        left: 0,
-        width: size,
-        height: size,
-        borderRadius: "50%",
-        background: "#C9A227",
-        boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.5)",
-        zIndex: z,
-      }}
-    />
-  );
-  return (
-    <div style={{ position: "relative", width: size, height: size + 5, flexShrink: 0 }}>
-      {disc(0, 1)}
-      {disc(3, 2)}
-    </div>
-  );
+// Estilo da mesa (Configurações, pedido explícito): Arena (padrão) ou Luxo
+// Moderno. Só muda o ACABAMENTO -- borda, textura do feltro, placas,
+// fichas, pote e botão do dealer. Geometria, posições, escala no celular,
+// animações e cores de posição são as mesmas nos dois.
+//   Arena: mesa final de TV -- borda de couro preto com LED na cor do
+//          feltro, holofote no centro, placas de vidro escuro.
+//   Luxo:  borda de nogueira com veio, filete de latão, feltro camurça,
+//          placas de couro, fichas bordô.
+const RUIDO = `url("data:image/svg+xml;utf8,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>",
+)}")`;
+
+interface TemaMesa {
+  /** Borda em volta do feltro; recebe o brilho do feltro (vira o LED na Arena). */
+  aro: (brilho: string) => React.CSSProperties;
+  /** Ruído por cima da borda (veio da madeira). */
+  aroComVeio?: boolean;
+  /** Anéis logo em volta do feltro (filete). */
+  feltroBorda: string[];
+  /** Feltro quando a cor escolhida é "Padrão" (sem isso: a cor da tela). */
+  feltroPadrao?: { background: string; glow: string };
+  luz: string;
+  linhaAposta: string;
+  placa: { fundo: string; borda: string; nome: string; valor: string };
+  pill: { fundo: string; borda: string; texto: string };
+  pote: { fundo: string; borda: string; texto: string; brilho: string };
+  dealer: React.CSSProperties;
 }
 
-function PotChipStack() {
-  const disc = (bottom: number, z: number) => (
-    <div
-      key={z}
-      style={{
-        position: "absolute",
-        bottom,
-        left: 0,
-        width: 14,
-        height: 14,
-        borderRadius: "50%",
-        background: "#1F9D6B",
-        boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5)",
-        zIndex: z,
-      }}
-    />
-  );
-  return (
-    <div style={{ position: "relative", width: 14, height: 20, flexShrink: 0 }}>
-      {disc(0, 1)}
-      {disc(3, 2)}
-      {disc(6, 3)}
-    </div>
-  );
-}
+// rgba(...,.35) -> rgba(...,.9): o brilho do feltro vira a luz do LED.
+const aceso = (cor: string) => cor.replace(/[\d.]+\)$/, "0.9)");
+
+export const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
+  arena: {
+    aro: (brilho) => ({
+      background: "linear-gradient(180deg, #2c2f36 0%, #111317 40%, #050506 100%)",
+      boxShadow: `0 0 0 1px #000, inset 0 2px 0 rgba(255,255,255,.14), inset 0 -2px 4px rgba(0,0,0,.8), 0 0 28px -6px ${aceso(brilho)}, 0 30px 70px rgba(0,0,0,.8)`,
+    }),
+    feltroBorda: ["0 0 0 2px #000", "0 0 0 3.5px rgba(255,255,255,.08)"],
+    luz: "radial-gradient(40% 45% at 50% 40%, rgba(255,255,255,.12), transparent 70%)",
+    linhaAposta: "rgba(255,255,255,.12)",
+    placa: { fundo: "linear-gradient(180deg, rgba(30,34,42,.94), rgba(10,12,15,.94))", borda: "rgba(255,255,255,.12)", nome: "rgba(255,255,255,.8)", valor: "#F5D48C" },
+    pill: { fundo: "rgba(0,0,0,.75)", borda: "rgba(255,255,255,.18)", texto: "#FFFFFF" },
+    pote: { fundo: "linear-gradient(180deg,#000000,#0A0A0A)", borda: "rgba(255,255,255,.20)", texto: "#FFFFFF", brilho: "0 0 20px rgba(52,211,153,.20)" },
+    dealer: { background: "radial-gradient(circle at 35% 30%, #ffffff, #d9d9d9)", color: "#111111", boxShadow: "0 2px 6px rgba(0,0,0,.6)" },
+  },
+  luxo: {
+    aro: () => ({
+      background:
+        "radial-gradient(120% 80% at 50% 0%, rgba(255,220,170,.25), transparent 50%), repeating-linear-gradient(95deg, #5a331b 0 3px, #6b3e22 3px 7px, #4a2914 7px 9px, #633a1f 9px 14px)",
+      boxShadow: "0 30px 70px rgba(0,0,0,.85), inset 0 2px 0 rgba(255,230,190,.35), inset 0 -3px 6px rgba(0,0,0,.6), 0 0 0 1px #1a0e06",
+    }),
+    aroComVeio: true,
+    feltroBorda: ["0 0 0 2px #C9A45C", "0 0 0 3px #5A4318"],
+    feltroPadrao: {
+      background: "radial-gradient(65% 75% at 50% 40%, #2C6A52 0%, #1D4D3B 35%, #123327 65%, #0A1F18 100%)",
+      glow: "rgba(44,106,82,.35)",
+    },
+    luz: "radial-gradient(45% 50% at 50% 38%, rgba(255,240,210,.12), transparent 70%)",
+    linhaAposta: "rgba(201,164,92,.35)",
+    placa: { fundo: "radial-gradient(120% 120% at 30% 0%, #3a2616, #1a0f08 70%)", borda: "#8A6A32", nome: "#F5E3B8", valor: "#FFFFFF" },
+    pill: { fundo: "rgba(20,12,6,.92)", borda: "#8A6A32", texto: "#F5E3B8" },
+    pote: { fundo: "linear-gradient(180deg, #2a1a0e, #140c06)", borda: "#C9A45C", texto: "#F5E3B8", brilho: "0 0 18px rgba(201,164,92,.25)" },
+    dealer: { background: "radial-gradient(circle at 35% 30%, #fff6de, #c9a45c)", color: "#2A1A0E", fontFamily: "Georgia, 'Times New Roman', serif", boxShadow: "0 2px 6px rgba(0,0,0,.6)" },
+  },
+};
+const TemaCtx = createContext<TemaMesa>(TEMAS_MESA.arena);
+
+// Fichas da mesa: Clássica Americana (ver ficha-americana.tsx), na cor
+// do valor. Tamanho em pixel na mesa "normal"; encolhem junto com a mesa
+// (scale dos assentos). Pedido explícito: fichas um pouco menores, pra
+// não pesar no celular.
+const FICHA_APOSTA_PX = 14;
+const FICHA_POTE_PX = 16;
+const MAX_FICHAS_APOSTA = 4;
+const MAX_FICHAS_POTE = 5;
+const MAX_FICHAS_VOO = 6;
 
 // % do pote ao lado do bb -- e' assim que quem joga em nivel avancado
 // pensa sizing (padrao GTOWizard/PIOSolver), bb sozinho exige fazer a
@@ -277,25 +327,31 @@ const COMMITTED_OFFSET_PX = 96;
 const HERO_COMMITTED_OFFSET_PX = 104;
 const ABOVE_SEAT_EXTRA_OFFSET_PX = 14;
 
-function CommittedPill({ amount }: { amount: number }) {
+// `atrasoMs`: quando a aposta acabou de ser feita, a pílula só aparece
+// quando as fichas voando do assento chegam nela (ver voo-fichas.tsx).
+function CommittedPill({ amount, atrasoMs = 0 }: { amount: number; atrasoMs?: number }) {
   const sufixo = useContext(SufixoValor);
+  const { pill } = useContext(TemaCtx);
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
         gap: 5,
-        background: "#0A0A0A",
-        border: "1px solid rgba(255,255,255,.18)",
+        background: pill.fundo,
+        border: `1px solid ${pill.borda}`,
         borderRadius: 999,
         padding: "3px 10px 3px 5px",
         boxShadow: "0 3px 8px rgba(0,0,0,.5)",
         animation: `fadeInUp ${dur(220)} ease-out both`,
+        animationDelay: `${atrasoMs}ms`,
         whiteSpace: "nowrap",
       }}
     >
-      <ChipStackIcon size={13} />
-      <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>
+      <div data-pilha-aposta="">
+        <PilhaFichas fichas={quebrarEmFichas(amount, MAX_FICHAS_APOSTA, !sufixo)} tamanho={FICHA_APOSTA_PX} />
+      </div>
+      <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: pill.texto, ...num }}>
         {formatStack(amount)}
         {sufixo && <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>{sufixo}</span>}
       </span>
@@ -303,10 +359,71 @@ function CommittedPill({ amount }: { amount: number }) {
   );
 }
 
+// A aposta na frente do assento não pode cair em cima de outro assento,
+// das cartas ou do pote. A posição de sempre (rumo ao centro) serve na
+// maioria das mesas; numa mesa estreita (celular) a aposta de quem senta
+// na lateral encostava no pote. Quando isso acontece, ela anda o mínimo
+// possível até um espaço livre, testando em volta; entre os lugares
+// livres mais perto, fica o que está mais perto do dono da aposta (pra
+// continuar claro de quem ela é). Tudo em pixel de tela, medido depois
+// de desenhar.
+type Caixa = { left: number; top: number; right: number; bottom: number };
+const FOLGA_APOSTA_PX = 3;
+const PASSO_BUSCA_PX = 4;
+const BUSCA_MAX_PX = 140;
+const DIRECOES_BUSCA = 16;
+
+function acharLugarLivre(base: Caixa, obstaculos: Caixa[], limite: Caixa, dono: Ponto): Ponto {
+  const colide = (c: Caixa) =>
+    obstaculos.some(
+      (o) => c.left < o.right + FOLGA_APOSTA_PX && c.right > o.left - FOLGA_APOSTA_PX && c.top < o.bottom + FOLGA_APOSTA_PX && c.bottom > o.top - FOLGA_APOSTA_PX,
+    );
+  const cabe = (c: Caixa) => c.left >= limite.left && c.right <= limite.right && c.top >= limite.top && c.bottom <= limite.bottom;
+  if (!colide(base)) return { x: 0, y: 0 };
+  const cx = (base.left + base.right) / 2;
+  const cy = (base.top + base.bottom) / 2;
+  for (let dist = PASSO_BUSCA_PX; dist <= BUSCA_MAX_PX; dist += PASSO_BUSCA_PX) {
+    let melhor: Ponto | null = null;
+    let menor = Infinity;
+    for (let k = 0; k < DIRECOES_BUSCA; k++) {
+      const a = (k * 2 * Math.PI) / DIRECOES_BUSCA;
+      const x = Math.round(Math.cos(a) * dist);
+      const y = Math.round(Math.sin(a) * dist);
+      const c = { left: base.left + x, right: base.right + x, top: base.top + y, bottom: base.bottom + y };
+      if (!cabe(c) || colide(c)) continue;
+      const ateDono = Math.hypot(cx + x - dono.x, cy + y - dono.y);
+      if (ateDono < menor) {
+        menor = ateDono;
+        melhor = { x, y };
+      }
+    }
+    if (melhor) return melhor;
+  }
+  return { x: 0, y: 0 };
+}
+
 // `subir` (px): o mesmo deslocamento que o assento ganha no alinhamento
 // pela placa (ver Seat.centrarNaPlaca) -- a ficha acompanha o bloco do
 // assento pra continuar na mesma distância das cartas dele.
-function CommittedChip({ seat, amount, scale, heroScale = 1, subir = 0 }: { seat: SeatLayoutSlot; amount: number; scale: number; heroScale?: number; subir?: number }) {
+function CommittedChip({
+  seat,
+  amount,
+  scale,
+  heroScale = 1,
+  subir = 0,
+  atrasoMs = 0,
+  ajuste,
+}: {
+  seat: SeatLayoutSlot;
+  amount: number;
+  scale: number;
+  heroScale?: number;
+  subir?: number;
+  atrasoMs?: number;
+  // Empurrão (px) pra fora de cima de um assento, das cartas ou do pote
+  // -- ver acharLugarLivre.
+  ajuste?: Ponto;
+}) {
   const dx = TABLE_CENTER.x - seat.x;
   const dy = TABLE_CENTER.y - seat.y;
   const len = Math.sqrt(dx * dx + dy * dy) || 1;
@@ -326,61 +443,45 @@ function CommittedChip({ seat, amount, scale, heroScale = 1, subir = 0 }: { seat
   // (heroScale>1, modo mesa-cheia), as cartas dele crescem mas esse
   // offset continuava do tamanho normal, entao a ficha de aposta ficava
   // perto demais e as cartas (agora maiores) cresciam por cima dela.
+  // Com as cartas lado a lado (mais largas que o antigo leque) e o herói
+  // ampliado (modo celular, heroScale > 1), a ficha de quem senta na
+  // metade de baixo caía em cima das cartas do herói -- ela avança mais
+  // um pouco rumo ao centro nesse caso.
+  const longeDoHeroi = !seat.isHero && heroScale > 1 && seat.y > 55 ? 34 : 0;
   const offsetPx =
-    ((seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX) + (seat.isHero ? 0 : ABOVE_SEAT_EXTRA_OFFSET_PX)) *
+    ((seat.isHero ? HERO_COMMITTED_OFFSET_PX : COMMITTED_OFFSET_PX) + (seat.isHero ? 0 : ABOVE_SEAT_EXTRA_OFFSET_PX) + longeDoHeroi) *
     scale *
     (seat.isHero ? heroScale : 1);
   return (
     <div
+      data-aposta={seat.posLabel}
       style={{
         position: "absolute",
         left: `${seat.x}%`,
         top: `${seat.y}%`,
-        transform: `translate(-50%,-50%) translate(${ux * offsetPx}px, ${uy * offsetPx - subir}px) scale(${scale})`,
+        transform: `translate(-50%,-50%) translate(${ux * offsetPx + (ajuste?.x ?? 0)}px, ${uy * offsetPx - subir + (ajuste?.y ?? 0)}px) scale(${scale})`,
         zIndex: 3,
         pointerEvents: "none",
       }}
     >
-      <CommittedPill amount={amount} />
+      <CommittedPill amount={amount} atrasoMs={atrasoMs} />
     </div>
   );
 }
 
-// Cartas sobrepostas (uma quase em cima da outra), como GGPoker e a
-// maioria dos apps mobile fazem — em vez do padrao antigo lado a lado
-// com espaco entre elas. A segunda carta cobre boa parte da primeira
-// (overlapPx negativo) e cada carta ganha uma leve rotacao em leque, pra
-// nao parecer um bloco unico colado.
-//
-// FIX (2026-09): rotacao pedida explicitamente igual ao GGPoker — a
-// PRIMEIRA carta deitada pra ESQUERDA, a SEGUNDA deitada pra DIREITA
-// (leque abrindo pros dois lados a partir do centro). A formula abaixo
-// ja fazia isso matematicamente (indice mais baixo = rotacao negativa =
-// gira sentido anti-horario = topo da carta pende pra esquerda), mas o
-// angulo total (6deg pra 2 cartas = 3deg pra cada lado) era sutil demais
-// pra ficar perceptivel — subiu pra 10deg (5deg por carta em duplas).
-// Subiu de novo pra 16deg (pedido explicito: "deitar um pouquinho mais
-// as cartas, pois o 10 neste exemplo ficou muito escondido") -- com mais
-// giro o canto superior-esquerdo da carta de tras (onde fica o rank)
-// desloca mais pra fora da carta da frente, ficando mais visivel.
-const CARD_OVERLAP_PX: Record<Size, number> = { board: 30, hero: 44, mini: 20, villain: 25 } as const;
+// Cartas LADO A LADO, retas, com um respiro entre elas (pedido explicito:
+// "quero as cartas uma ao lado da outra, vai ficar melhor a
+// visualizacao"). Antes ficavam em leque, a segunda cobrindo boa parte da
+// primeira -- o indice da carta de tras ficava parcialmente escondido.
+const CARD_GAP_PX = 4;
 type Size = "board" | "hero" | "mini" | "villain";
 
-function CardFan({ cards, size, fanDeg = 16 }: { cards: (string | null)[]; size: Size; fanDeg?: number }) {
-  const overlap = CARD_OVERLAP_PX[size];
+function CardFan({ cards, size }: { cards: (string | null)[]; size: Size }) {
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", gap: CARD_GAP_PX }}>
       {cards.map((c, i) => (
-        // Dois wrappers separados de proposito: a animacao de entrada
-        // (fadeInUp) tambem mexe em `transform` (translateY), e uma
-        // unica div com os dois (rotate estatico + animacao) faz o
-        // keyframe da animacao GANHAR e apagar a rotacao assim que ela
-        // roda — a carta ficava sempre reta, mesmo com o angulo certo no
-        // codigo. Separando, cada div cuida de UM transform só.
-        <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - (cards.length - 1) / 2) * fanDeg}deg)` }}>
-          <div style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
-            <Card card={c} size={size} />
-          </div>
+        <div key={i} style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
+          <Card card={c} size={size} />
         </div>
       ))}
     </div>
@@ -431,20 +532,14 @@ function CardSilhouette() {
   );
 }
 
-// Mesmo leque/sobreposicao do CardFan, so' que com a silhueta acima em
-// vez de cartas reais -- reusa CARD_OVERLAP_PX.villain pra ficar
-// visualmente identico ao par de cartas reveladas do vilao (mesmo
-// tamanho, mesmo espacamento), trocando so' o conteudo interno de cada
-// carta.
-function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
-  const overlap = CARD_OVERLAP_PX.villain;
+// Mesmo arranjo do CardFan (lado a lado), com a silhueta no lugar das
+// cartas reais -- visualmente identico ao par revelado do vilao.
+function GhostCardFan() {
   return (
-    <div style={{ display: "flex" }}>
+    <div style={{ display: "flex", gap: CARD_GAP_PX }}>
       {[0, 1].map((i) => (
-        <div key={i} style={{ marginLeft: i === 0 ? 0 : -overlap, zIndex: i, transform: `rotate(${(i - 0.5) * fanDeg}deg)` }}>
-          <div style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
-            <CardSilhouette />
-          </div>
+        <div key={i} style={{ animation: `fadeInUp ${dur(260)} ease-out both`, animationDelay: dur(i * 60) }}>
+          <CardSilhouette />
         </div>
       ))}
     </div>
@@ -458,7 +553,7 @@ function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
 // espaço no layout).
 function alturaCartasAcima(seat: SeatLayoutSlot, state: SeatState): number {
   const { status = "empty", cards } = state;
-  if (seat.isHero) return cards && cards.length > 0 ? 90 + 6 : 0;
+  if (seat.isHero) return cards && cards.length > 0 ? alturaDaCarta("hero") + 6 : 0;
   const reveladas = !!cards && cards.length > 0 && cards.every(Boolean);
   const silhueta = !reveladas && status !== "empty" && status !== "folded";
   return reveladas || silhueta ? 66 : 0;
@@ -503,6 +598,7 @@ function Seat({
   // sobe pra placa (e não o bloco inteiro) ficar no ponto do anel.
   const subirPelaCarta = centrarNaPlaca ? (alturaCartasAcima(seat, state) * effectiveScale) / 2 : 0;
   const sufixo = useContext(SufixoValor);
+  const tema = useContext(TemaCtx);
 
   // Cartas sempre EM CIMA do nome do seat, pra todas as posicoes da mesa
   // (pedido explicito: "as cartas de todas as posicoes precisam ficar em
@@ -625,15 +721,13 @@ function Seat({
               width: 20,
               height: 20,
               borderRadius: "50%",
-              background: "#B91C1C",
-              boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.55)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontFamily: F,
               fontSize: 10,
-              fontWeight: 700,
-              color: "#FFFFFF",
+              fontWeight: 800,
+              ...tema.dealer,
             }}
           >
             D
@@ -676,15 +770,16 @@ function Seat({
               nick do jogador, bem na quina, sem sobrepor"). */}
           {bountyChip}
           <div
+            data-placa=""
             style={{
               display: "flex",
               flexDirection: "column",
               alignItems: "center",
               gap: 1,
               fontFamily: F,
-              color: acting ? "#FFFFFF" : "rgba(255,255,255,.72)",
-              background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
-              border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
+              color: acting ? "#FFFFFF" : tema.placa.nome,
+              background: acting ? `linear-gradient(${col.base}40, ${col.base}40), ${tema.placa.fundo}` : tema.placa.fundo,
+              border: acting ? `1px solid ${col.glow}` : `1px solid ${tema.placa.borda}`,
               borderRadius: 10,
               padding: "4px 10px",
               maxWidth: 118,
@@ -712,7 +807,10 @@ function Seat({
                 />
               </>
             )}
-            <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack}{sufixo ? ` ${sufixo}` : ""}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", color: acting ? "#FFFFFF" : tema.placa.valor, ...num }}>
+              {stack != null ? formatStack(stack) : stack}
+              {sufixo ? ` ${sufixo}` : ""}
+            </span>
           </div>
         </div>
       )}
@@ -723,6 +821,7 @@ function Seat({
 
   return (
     <div
+      data-assento={seat.posLabel}
       style={{
         position: "absolute",
         left: `${seat.x}%`,
@@ -786,114 +885,6 @@ function Seat({
             );
           })()
         )}
-      </div>
-    </div>
-  );
-}
-
-function ChipAnimation({
-  fromSeat,
-  amount,
-  animKey,
-  scale,
-}: {
-  fromSeat: SeatLayoutSlot;
-  amount: number;
-  animKey: string | number;
-  scale: number;
-}) {
-  const dx = TABLE_CENTER.x - fromSeat.x;
-  const dy = TABLE_CENTER.y - fromSeat.y;
-  const sufixo = useContext(SufixoValor);
-  return (
-    // Dois niveis, mesmo motivo do CardFan: a animacao chipTravel ja mexe
-    // em `transform` (translate+scale) nos seus proprios keyframes — numa
-    // unica div, esse `scale(seatScale)` estatico seria apagado assim que
-    // a animacao comeca a rodar. O externo (sem tamanho proprio, so' o
-    // ponto de ancoragem) fica com a posicao + escala da mesa; o interno
-    // fica com a animacao de viagem da ficha, sem mudar nada nela.
-    <div
-      key={animKey}
-      style={{
-        position: "absolute",
-        left: `${fromSeat.x}%`,
-        top: `${fromSeat.y}%`,
-        transform: `scale(${scale})`,
-        zIndex: 4,
-        pointerEvents: "none",
-        ["--chip-dx" as string]: `${dx}%`,
-        ["--chip-dy" as string]: `${dy}%`,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          animation: `chipTravel ${dur(600)} cubic-bezier(0.22, 1, 0.36, 1) forwards`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <ChipStackIcon size={13} />
-          <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 500, color: TEXT.critical, ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-            +{formatStack(amount)}{sufixo ? ` ${sufixo}` : ""}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
-
-// Ficha do pote indo até o vencedor -- pedido explicito: "quando alguém
-// ganhar o pote, ter animação dos blinds indo até o vencedor e somando
-// ao stack". Mesmo keyframe de viagem (chipTravel) da ChipAnimation
-// acima, só que na direção OPOSTA: parte do centro da mesa (onde o pote
-// fica) até o assento do vencedor, em vez de um assento até o centro. O
-// stack já soma o valor recebido nesse mesmo step (ver
-// hand-replay-projector.ts, chipsWonByPlayer) -- essa animação só torna
-// visível o dinheiro se movendo até lá.
-function PotAwardAnimation({
-  toSeat,
-  amount,
-  animKey,
-  scale,
-}: {
-  toSeat: SeatLayoutSlot;
-  amount: number;
-  animKey: string | number;
-  scale: number;
-}) {
-  const dx = toSeat.x - TABLE_CENTER.x;
-  const dy = toSeat.y - TABLE_CENTER.y;
-  const sufixo = useContext(SufixoValor);
-  return (
-    <div
-      key={animKey}
-      style={{
-        position: "absolute",
-        left: `${TABLE_CENTER.x}%`,
-        top: `${TABLE_CENTER.y}%`,
-        transform: `scale(${scale})`,
-        zIndex: 6,
-        pointerEvents: "none",
-        ["--chip-dx" as string]: `${dx}%`,
-        ["--chip-dy" as string]: `${dy}%`,
-      }}
-    >
-      <div
-        style={{
-          position: "absolute",
-          left: 0,
-          top: 0,
-          animation: `chipTravel ${dur(700)} cubic-bezier(0.22, 1, 0.36, 1) forwards`,
-        }}
-      >
-        <div style={{ display: "flex", alignItems: "center", gap: 5 }}>
-          <PotChipStack />
-          <span style={{ fontFamily: F, fontSize: 13, fontWeight: 700, color: "#FCD34D", ...num, textShadow: "0 1px 3px rgba(0,0,0,.9)" }}>
-            +{formatStack(amount)}{sufixo ? ` ${sufixo}` : ""}
-          </span>
-        </div>
       </div>
     </div>
   );
@@ -1035,7 +1026,7 @@ export function PokerTable({
   hand: TableHand | null;
   seats: SeatLayoutSlot[];
   chipAnimation?: { fromPosLabel: string; amount: number; key: string | number } | null;
-  // Ficha do pote viajando ATÉ o vencedor (ver PotAwardAnimation acima) --
+  // Pote indo ATÉ o vencedor (fichas espalhando e voando, ver voo-fichas.tsx) --
   // ausente em qualquer consumidor que nao passe (ex: Treino), sem
   // mudanca de comportamento pra quem nao usa.
   potAwardAnimation?: { toPosLabel: string; amount: number; key: string | number } | null;
@@ -1054,18 +1045,187 @@ export function PokerTable({
 }) {
   const active = !!hand;
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
-  const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
-  const awardToSeat = potAwardAnimation ? seats.find((s) => s.posLabel === potAwardAnimation.toPosLabel) : null;
-  const { feltro } = usePreferenciasMesa();
-  const felt = feltro === "padrao" ? FELT_PALETTES[variant] : FELTROS_ESCOLHIDOS[feltro];
+  const { feltro, mesa } = usePreferenciasMesa();
+  const tema = TEMAS_MESA[mesa];
+  const felt = feltro === "padrao" ? (tema.feltroPadrao ?? FELT_PALETTES[variant]) : FELTROS_ESCOLHIDOS[feltro];
   const sufixo = unidade === "fichas" ? "" : "BB";
   const semAnimacao = animacao === "sem";
   const tableBoxRef = useRef<HTMLDivElement>(null);
-  const seatScale = useSeatScale(tableBoxRef, minSeatScale) * escalaAssentos;
   const aspectRatioValue = parseAspectRatio(aspectRatio);
+  const medidaMesa = useSeatScale(tableBoxRef, aspectRatioValue, minSeatScale);
+  const seatScale = medidaMesa.scale * escalaAssentos;
+  const emFichas = !sufixo;
+  const vel = animacao === "rapida" ? 0.4 : 1;
+
+  // ---- Fichas voando: "Moeda girando" (ver voo-fichas.tsx) ----
+  // Sem voo com animação desligada nas Configurações ou com "reduzir
+  // movimento" ligado no aparelho.
+  const [reduzMovimento, setReduzMovimento] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia("(prefers-reduced-motion: reduce)");
+    setReduzMovimento(mq.matches);
+    const mudou = () => setReduzMovimento(mq.matches);
+    mq.addEventListener("change", mudou);
+    return () => mq.removeEventListener("change", mudou);
+  }, []);
+  const voar = !semAnimacao && !reduzMovimento;
+  const [voos, setVoos] = useState<Voo[]>([]);
+  const potPillRef = useRef<HTMLDivElement>(null);
+  const potPilhaRef = useRef<HTMLDivElement>(null);
+  const timers = useRef<number[]>([]);
+  useEffect(() => () => timers.current.forEach((t) => window.clearTimeout(t)), []);
+  const fimDoVoo = useCallback((id: string) => setVoos((v) => v.filter((x) => x.id !== id)), []);
+  const novoVoo = (voo: Voo) => setVoos((v) => (v.some((x) => x.id === voo.id) ? v : [...v, voo]));
+  // Onde um elemento está na mesa, em pixel relativo à caixa da mesa.
+  const caixaNaMesa = (el: Element | null | undefined): Caixa | null => {
+    const caixa = tableBoxRef.current;
+    if (!el || !caixa) return null;
+    const a = caixa.getBoundingClientRect();
+    const b = el.getBoundingClientRect();
+    return { left: b.left - a.left, right: b.right - a.left, top: b.top - a.top, bottom: b.bottom - a.top };
+  };
+  const centroNaMesa = (el: Element | null | undefined): Ponto | null => {
+    const c = caixaNaMesa(el);
+    return c && { x: (c.left + c.right) / 2, y: (c.top + c.bottom) / 2 };
+  };
+  const placaDoAssento = (pos: string) => tableBoxRef.current?.querySelector(`[data-assento="${pos}"] [data-placa]`);
+  // Fichas saem da / chegam na placa com o stack do jogador; sem placa
+  // (assento vazio), o ponto do assento na mesa.
+  const pontoDoAssento = (s: SeatLayoutSlot): Ponto =>
+    centroNaMesa(placaDoAssento(s.posLabel)) ?? {
+      x: (s.x / 100) * medidaMesa.largura,
+      y: (s.y / 100) * medidaMesa.altura,
+    };
+  const rotuloValor = (v: number) => `+${formatStack(v)}${sufixo ? ` ${sufixo}` : ""}`;
+
+  // Apostas fora de cima dos assentos e do pote (ver acharLugarLivre).
+  // Mede depois de desenhar e, se alguma precisa andar, desenha de novo
+  // antes de aparecer na tela. Também guarda onde cada pilha de aposta
+  // ficou -- é de lá que as fichas saem/chegam nos voos.
+  const [ajusteApostas, setAjusteApostas] = useState<Record<string, Ponto>>({});
+  const pilhasDasApostas = useRef<Record<string, Ponto>>({});
+  useLayoutEffect(() => {
+    const caixa = tableBoxRef.current;
+    if (!caixa) return;
+    const t = caixa.getBoundingClientRect();
+    const obstaculos: Caixa[] = [...caixa.querySelectorAll("[data-obstaculo], [data-assento]")]
+      .map((el) => el.getBoundingClientRect())
+      .filter((r) => r.width > 0 && r.height > 0);
+    const novo: Record<string, Ponto> = {};
+    const pilhas: Record<string, Ponto> = {};
+    caixa.querySelectorAll<HTMLElement>("[data-aposta]").forEach((el) => {
+      const pos = el.dataset.aposta ?? "";
+      const atual = ajusteApostas[pos] ?? { x: 0, y: 0 };
+      const r = el.getBoundingClientRect();
+      const base = { left: r.left - atual.x, right: r.right - atual.x, top: r.top - atual.y, bottom: r.bottom - atual.y };
+      const assento = seats.find((s) => s.posLabel === pos);
+      const dono = assento ? { x: t.left + (assento.x / 100) * t.width, y: t.top + (assento.y / 100) * t.height } : { x: t.left + t.width / 2, y: t.top + t.height / 2 };
+      const ajuste = acharLugarLivre(base, obstaculos, t, dono);
+      novo[pos] = ajuste;
+      // As outras apostas também não podem cair em cima desta.
+      obstaculos.push({ left: base.left + ajuste.x, right: base.right + ajuste.x, top: base.top + ajuste.y, bottom: base.bottom + ajuste.y });
+      const pilha = el.querySelector("[data-pilha-aposta]")?.getBoundingClientRect();
+      if (pilha) {
+        pilhas[pos] = { x: pilha.left + pilha.width / 2 - atual.x + ajuste.x - t.left, y: pilha.top + pilha.height / 2 - atual.y + ajuste.y - t.top };
+      }
+    });
+    pilhasDasApostas.current = pilhas;
+    const mudou =
+      Object.keys(novo).length !== Object.keys(ajusteApostas).length ||
+      Object.entries(novo).some(([pos, a]) => {
+        const b = ajusteApostas[pos];
+        return !b || Math.abs(a.x - b.x) > 1 || Math.abs(a.y - b.y) > 1;
+      });
+    if (mudou) setAjusteApostas(novo);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [medidaMesa, seats, hand, streetCommitments, seatScale, heroScale, centrarNaPlaca]);
+
+  // 1) Recolher: a rua acabou -- as apostas da frente dos assentos somem
+  //    (e o pote não diminuiu, ou seja, não é o passo pra trás do Revisor).
+  //    As fichas voam de onde cada aposta estava até o pote, que acende.
+  //    Guarda onde cada aposta está a cada mudança, pra saber de onde elas
+  //    saem quando sumirem.
+  const apostasAntes = useRef<{ soma: number; pote: number; apostas: Record<string, { ponto: Ponto; valor: number }> } | null>(null);
+  const recolhendoAte = useRef(0);
+  useEffect(() => {
+    const pote = hand?.pot ?? 0;
+    const apostas: Record<string, { ponto: Ponto; valor: number }> = {};
+    Object.entries(pilhasDasApostas.current).forEach(([pos, ponto]) => {
+      const valor = streetCommitments?.[pos] ?? 0;
+      if (valor > 0) apostas[pos] = { ponto, valor };
+    });
+    const soma = Object.values(streetCommitments ?? {}).reduce((t, v) => t + v, 0);
+    const antes = apostasAntes.current;
+    apostasAntes.current = { soma, pote, apostas };
+    if (!voar || !hand || !antes || antes.soma <= 0 || soma > 0 || pote < antes.pote - 0.01) return;
+    const para = centroNaMesa(potPilhaRef.current);
+    const origens = Object.entries(antes.apostas);
+    if (!para || origens.length === 0) return;
+    const agora = Date.now();
+    let fim = 0;
+    origens.forEach(([pos, { ponto, valor }]) => {
+      const fichas = quebrarEmFichas(valor, MAX_FICHAS_VOO, emFichas);
+      fim = Math.max(fim, duracaoDoVoo("recolher", fichas.length, vel));
+      novoVoo({ id: `recolher-${pos}-${agora}`, tipo: "recolher", fichas, de: ponto, para });
+    });
+    recolhendoAte.current = agora + fim;
+    // O pote acende em dourado quando as fichas chegam.
+    timers.current.push(
+      window.setTimeout(() => {
+        potPillRef.current?.animate(
+          [{ boxShadow: "0 0 0 rgba(242,198,90,0)" }, { boxShadow: "0 0 22px rgba(242,198,90,.9)" }, { boxShadow: "0 0 0 rgba(242,198,90,0)" }],
+          { duration: 700 * vel, easing: "ease-out", composite: "add" },
+        );
+        potPilhaRef.current?.animate([{ transform: "scale(1)" }, { transform: "scale(1.18)" }, { transform: "scale(1)" }], { duration: 320 * vel, easing: "ease-out" });
+      }, fim),
+    );
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [streetCommitments, hand?.pot, medidaMesa.largura, medidaMesa.altura]);
+
+  // 2) Aposta: as fichas saem do assento e param na pilha da aposta dele
+  //    (a pílula com o valor aparece quando elas chegam, ver atrasoDaAposta).
+  useEffect(() => {
+    if (!voar || !chipAnimation || chipAnimation.amount <= 0) return;
+    const assento = seats.find((s) => s.posLabel === chipAnimation.fromPosLabel);
+    if (!assento) return;
+    const de = pontoDoAssento(assento);
+    const para = pilhasDasApostas.current[chipAnimation.fromPosLabel] ?? { x: (TABLE_CENTER.x / 100) * medidaMesa.largura, y: (TABLE_CENTER.y / 100) * medidaMesa.altura };
+    novoVoo({ id: `aposta-${chipAnimation.key}`, tipo: "aposta", fichas: quebrarEmFichas(chipAnimation.amount, MAX_FICHAS_VOO, emFichas), de, para });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chipAnimation?.key]);
+  const atrasoDaAposta = (pos: string) =>
+    voar && chipAnimation && chipAnimation.fromPosLabel === pos && chipAnimation.amount > 0
+      ? duracaoDoVoo("aposta", quebrarEmFichas(chipAnimation.amount, MAX_FICHAS_VOO, emFichas).length, vel)
+      : 0;
+
+  // 3) Prêmio: as fichas se espalham pra fora do pote e vão até o
+  //    vencedor, e o valor ganho sobe em cima dele. Se as apostas da última
+  //    rua ainda estão indo pro pote, espera elas chegarem.
+  useEffect(() => {
+    if (!voar || !potAwardAnimation || potAwardAnimation.amount <= 0) return;
+    const assento = seats.find((s) => s.posLabel === potAwardAnimation.toPosLabel);
+    const de = centroNaMesa(potPilhaRef.current);
+    if (!assento || !de) return;
+    const espera = Math.max(0, recolhendoAte.current - Date.now()) / vel;
+    const para = pontoDoAssento(assento);
+    // "+valor" ao lado do stack, do lado de dentro da mesa.
+    const placa = caixaNaMesa(placaDoAssento(assento.posLabel)) ?? { left: para.x, right: para.x, top: para.y, bottom: para.y };
+    const lado = para.x <= medidaMesa.largura / 2 ? "direita" : "esquerda";
+    novoVoo({
+      id: `premio-${potAwardAnimation.key}`,
+      tipo: "premio",
+      fichas: quebrarEmFichas(potAwardAnimation.amount, MAX_FICHAS_VOO, emFichas),
+      de,
+      para,
+      atrasoMs: espera,
+      rotulo: { texto: rotuloValor(potAwardAnimation.amount), em: { x: lado === "direita" ? placa.right + 6 : placa.left - 6, y: para.y }, lado },
+    });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [potAwardAnimation?.key]);
 
   return (
     <SufixoValor.Provider value={sufixo}>
+    <TemaCtx.Provider value={tema}>
     <div
       data-ps-animacao={animacao}
       style={{
@@ -1087,12 +1247,6 @@ export function PokerTable({
         @keyframes cardDeal { from { opacity: 0; transform: translateY(-8px) rotate(-4deg); } to { opacity: 1; transform: translateY(0) rotate(0); } }
         @keyframes fadeInUp { from { opacity: 0; transform: translateY(6px); } to { opacity: 1; transform: translateY(0); } }
         [data-ps-animacao="sem"] *, [data-ps-animacao="sem"] *::before, [data-ps-animacao="sem"] *::after { animation: none !important; transition: none !important; }
-        @keyframes chipTravel {
-          0% { opacity: 0; transform: translate(-50%, -50%) scale(0.6); }
-          15% { opacity: 1; transform: translate(-50%, -50%) scale(1); }
-          85% { opacity: 1; transform: translate(calc(-50% + var(--chip-dx)), calc(-50% + var(--chip-dy))) scale(1); }
-          100% { opacity: 0; transform: translate(calc(-50% + var(--chip-dx)), calc(-50% + var(--chip-dy))) scale(0.85); }
-        }
       `}</style>
 
       {/* SPR agora é renderizado no bloco central, acima do board. */}
@@ -1141,56 +1295,12 @@ export function PokerTable({
         }}
         ref={tableBoxRef}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: "2% 1.5%",
-            borderRadius: cornerRadius,
-            pointerEvents: "none",
-            background: "conic-gradient(from 200deg, #4A4E55, #8A8F98, #3A3D42, #6E727A, #4A4E55)",
-            opacity: 0.9,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: "3.4% 2.6%",
-            borderRadius: cornerRadius,
-            pointerEvents: "none",
-            background: [
-              "repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 4px)",
-              "repeating-linear-gradient(-45deg, rgba(0,0,0,0.4) 0px, rgba(0,0,0,0.4) 1px, transparent 1px, transparent 4px)",
-              "radial-gradient(circle at 50% 50%, #2A2C30 0%, #1C1D20 55%, #0E0F10 100%)",
-            ].join(", "),
-            boxShadow: "inset 0 0 24px rgba(0,0,0,.7)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: "3.4% 2.6%",
-            borderRadius: cornerRadius,
-            pointerEvents: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: 0.05,
-            overflow: "hidden",
-          }}
-        >
-          <span
-            style={{
-              fontFamily: F,
-              fontWeight: 800,
-              fontSize: 46,
-              letterSpacing: 4,
-              color: "#FFFFFF",
-              transform: "rotate(-8deg)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            POKERSYNC
-          </span>
+        {/* Borda da mesa (couro na Arena, nogueira no Luxo) -- ocupa a
+            faixa entre a caixa e o feltro. */}
+        <div style={{ position: "absolute", inset: 0, borderRadius: cornerRadius, pointerEvents: "none", ...tema.aro(felt.glow) }}>
+          {tema.aroComVeio && (
+            <div style={{ position: "absolute", inset: 0, borderRadius: cornerRadius, backgroundImage: RUIDO, backgroundSize: "90px 260px", opacity: 0.35, mixBlendMode: "overlay" }} />
+          )}
         </div>
 
         <div
@@ -1199,27 +1309,21 @@ export function PokerTable({
             inset: "2.8% 2%",
             borderRadius: cornerRadius,
             background: felt.background,
-            border: "2px solid #000000",
+            overflow: "hidden",
             boxShadow: [
-              "0 0 0 6px #000000",
-              "0 0 0 7px rgba(255,255,255,.08)",
+              ...tema.feltroBorda,
               `0 0 40px ${felt.glow}`,
-              "0 24px 60px rgba(0,0,0,.75)",
               "inset 0 2px 30px rgba(255,255,255,.06)",
               "inset 0 -30px 80px rgba(0,0,0,.65)",
             ].join(", "),
           }}
         >
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: cornerRadius,
-              pointerEvents: "none",
-              background: "radial-gradient(55% 35% at 50% 25%, rgba(255,255,255,.09), transparent 70%)",
-            }}
-          />
-          <div style={{ position: "absolute", inset: "3%", borderRadius: cornerRadius, pointerEvents: "none", border: "1px solid rgba(255,255,255,.06)" }} />
+          {/* Textura do feltro, luz no centro e linha de aposta. Sem marca
+              escrita no feltro: no anel de 8 lugares ela caía atrás do
+              assento do topo. */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: RUIDO, opacity: 0.14, mixBlendMode: "overlay" }} />
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: tema.luz }} />
+          <div style={{ position: "absolute", inset: "12% 9%", borderRadius: cornerRadius, pointerEvents: "none", border: `1px solid ${tema.linhaAposta}` }} />
         </div>
 
         {/* FIX (2026-09): desceu de 44% pra 48% — com cartas SEMPRE em cima
@@ -1238,9 +1342,10 @@ export function PokerTable({
             // ficam absolute, ancorados no proprio topo desse wrapper --
             // flutuam ACIMA do board sem empurrar o centro dele pra baixo.
             <div style={{ position: "relative", display: "flex", justifyContent: "center" }}>
-              <div style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
+              <div data-obstaculo="" style={{ position: "absolute", bottom: "100%", left: "50%", transform: "translateX(-50%)", marginBottom: 10, display: "flex", flexDirection: "column", alignItems: "center", gap: 8 }}>
                 {hand.potOddsPct != null ? <PotOddsBadge pct={hand.potOddsPct} /> : hand.spr != null && <SprBadge spr={hand.spr} />}
                 <div
+                  ref={potPillRef}
                   style={{
                     display: "flex",
                     alignItems: "center",
@@ -1248,18 +1353,20 @@ export function PokerTable({
                     padding: "6px 14px",
                     borderRadius: 999,
                     fontFamily: F,
-                    background: "linear-gradient(180deg,#000000,#0A0A0A)",
-                    border: "1px solid rgba(255,255,255,.20)",
-                    boxShadow: "0 8px 22px rgba(0,0,0,.7), 0 0 20px rgba(52,211,153,.20)",
+                    background: tema.pote.fundo,
+                    border: `1px solid ${tema.pote.borda}`,
+                    boxShadow: `0 8px 22px rgba(0,0,0,.7), ${tema.pote.brilho}`,
                     whiteSpace: "nowrap",
                   }}
                 >
-                  <PotChipStack />
-                  <span style={{ color: TEXT.critical, fontWeight: 500, fontSize: 15, ...num }}>{formatStack(hand.pot)}</span>
+                  <div ref={potPilhaRef}>
+                    <PilhaFichas fichas={quebrarEmFichas(hand.pot, MAX_FICHAS_POTE, emFichas)} tamanho={FICHA_POTE_PX} />
+                  </div>
+                  <span style={{ color: tema.pote.texto, fontWeight: 600, fontSize: 15, ...num }}>{formatStack(hand.pot)}</span>
                   {sufixo && <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>{sufixo}</span>}
                 </div>
               </div>
-              <div style={{ display: "flex", gap: 7 }}>
+              <div data-obstaculo="" style={{ display: "flex", gap: 7 }}>
                 {hand.board.map((c, i) => (
                   <div key={i} style={{ animation: `cardDeal ${dur(300)} ease-out both`, animationDelay: dur(i * 70) }}>
                     <Card card={c} />
@@ -1269,7 +1376,7 @@ export function PokerTable({
               {/* Placar logo abaixo do board, também absolute: não empurra o
                   board pra cima (ele continua centralizado na mesa). */}
               {hand.placar && hand.placar.length > 0 && (
-                <div style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", marginTop: 12, display: "flex", gap: 8 }}>
+                <div data-obstaculo="" style={{ position: "absolute", top: "100%", left: "50%", transform: "translateX(-50%)", marginTop: 12, display: "flex", gap: 8 }}>
                   {hand.placar.map((p) => (
                     <PlacarItem key={p.pos} {...p} />
                   ))}
@@ -1310,18 +1417,26 @@ export function PokerTable({
           const amt = streetCommitments?.[s.posLabel];
           if (!amt || amt < MIN_COMMITTED_TO_SHOW) return null;
           const subir = centrarNaPlaca ? (alturaCartasAcima(s, seatData(s.posLabel)) * seatScale * (s.isHero ? heroScale : 1)) / 2 : 0;
-          return <CommittedChip key={`bet-${s.posLabel}`} seat={s} amount={amt} scale={seatScale} heroScale={heroScale} subir={subir} />;
+          return (
+            <CommittedChip
+              key={`bet-${s.posLabel}`}
+              seat={s}
+              amount={amt}
+              scale={seatScale}
+              heroScale={heroScale}
+              subir={subir}
+              atrasoMs={atrasoDaAposta(s.posLabel)}
+              ajuste={ajusteApostas[s.posLabel]}
+            />
+          );
         })}
 
-        {!semAnimacao && chipAnimation && chipFromSeat && chipAnimation.amount > 0 && (
-          <ChipAnimation fromSeat={chipFromSeat} amount={chipAnimation.amount} animKey={chipAnimation.key} scale={seatScale} />
-        )}
-
-        {!semAnimacao && potAwardAnimation && awardToSeat && potAwardAnimation.amount > 0 && (
-          <PotAwardAnimation toSeat={awardToSeat} amount={potAwardAnimation.amount} animKey={potAwardAnimation.key} scale={seatScale} />
-        )}
+        {voos.map((v) => (
+          <VooDeFichas key={v.id} voo={v} tamanho={(v.tipo === "premio" ? FICHA_POTE_PX : FICHA_APOSTA_PX) * seatScale} vel={vel} onFim={fimDoVoo} />
+        ))}
       </div>
     </div>
+    </TemaCtx.Provider>
     </SufixoValor.Provider>
   );
 }
