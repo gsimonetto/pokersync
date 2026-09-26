@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } fro
 import { AlertTriangle, Loader2, Search, X, List, ArrowLeft, Maximize2, Minimize2, Zap, Eye } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
+import { classeIconeMesa } from "@/components/drill/mesa-ui";
 import { HalfCard, sortCardsDesc } from "@/components/drill/card";
 import { RevisorResponsiveStyles } from "./revisor-responsive-styles";
 import { ModalPortal } from "@/components/modal-portal";
@@ -760,7 +761,8 @@ export function RevisorSessao({
                     ? "1px solid rgba(255,255,255,0.04)"
                     : "none",
                 background: active ? "rgba(255,255,255,0.06)" : "transparent",
-                borderLeft: active ? "2px solid #FFFFFF" : "2px solid transparent",
+                // Dourado = destaque do produto (era branco).
+                borderLeft: active ? "2px solid #d4af37" : "2px solid transparent",
               }}
             >
               {/* alignItems "flex-end" (era "center") — pedido
@@ -917,11 +919,7 @@ export function RevisorSessao({
               onClick={onBack}
               aria-label="Voltar"
               title="Voltar"
-              style={{
-                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                width: 34, height: 34, borderRadius: 9, background: "#1A1A1A",
-                border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0,
-              }}
+              className={classeIconeMesa("lg")}
             >
               <ArrowLeft size={16} />
             </button>
@@ -932,11 +930,7 @@ export function RevisorSessao({
               onClick={() => setListOpen(true)}
               aria-label={`Mãos (${filteredHands.length}${filteredHands.length !== hands.length ? `/${hands.length}` : ""})`}
               title="Mãos da sessão"
-              style={{
-                all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                width: 34, height: 34, borderRadius: 9, background: "#1A1A1A",
-                border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0,
-              }}
+              className={classeIconeMesa("lg")}
             >
               <List size={16} />
             </button>
@@ -949,11 +943,7 @@ export function RevisorSessao({
                 onClick={toggleFullscreen}
                 aria-label={isFullscreen ? "Sair da tela cheia" : "Tela cheia"}
                 title={isFullscreen ? "Sair da tela cheia" : "Tela cheia (esconde a barra do navegador)"}
-                style={{
-                  all: "unset", cursor: "pointer", display: "flex", alignItems: "center", justifyContent: "center",
-                  width: 34, height: 34, borderRadius: 9, background: "#1A1A1A",
-                  border: "1px solid rgba(255,255,255,0.10)", color: "rgba(255,255,255,0.7)", flexShrink: 0,
-                }}
+                className={classeIconeMesa("lg")}
               >
                 {isFullscreen ? <Minimize2 size={16} /> : <Maximize2 size={16} />}
               </button>
@@ -981,9 +971,9 @@ export function RevisorSessao({
           }}
         />
         <aside
+          className="painel-vidro border-r border-white/10"
           style={{
             position: "fixed", inset: 0, zIndex: 160, width: "82%", maxWidth: 320,
-            background: "linear-gradient(180deg, #0F0F0F, #0A0A0A)",
             display: "flex", flexDirection: "column",
             transform: listOpen ? "translateX(0)" : "translateX(-100%)",
             transition: "transform 220ms ease",
@@ -1010,7 +1000,9 @@ export function RevisorSessao({
         ref={gridRef}
         style={{
           display: "grid",
-          gridTemplateColumns: "220px 1fr",
+          // 236px (era 220): "Mão 2" virava "Mã..." quando o resultado
+          // era largo ("+14,8 BB").
+          gridTemplateColumns: "236px 1fr",
           gap: 12,
           height: gridHeight ? `${gridHeight}px` : GRID_FALLBACK_HEIGHT,
           minHeight: GRID_MIN_HEIGHT,

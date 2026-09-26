@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { Check, HelpCircle, X } from "lucide-react";
 import { F } from "@/lib/poker/drill-theme";
 import { NOME_RUA } from "./linha-do-tempo";
+import { GRUPO_MESA } from "@/components/drill/mesa-ui";
 
 // Nota rápida por rua ao lado da mesa do Revisor -- pedido explícito:
 // avaliar pré-flop/flop/turn/river sem abrir o "Analisar mão", só com os
@@ -95,7 +96,7 @@ function BotoesNota({
               width: tamanho,
               height: tamanho,
               padding: 0,
-              borderRadius: 7,
+              borderRadius: 10,
               cursor: bloqueado ? "not-allowed" : "pointer",
               border: `1px solid ${ativo ? cor : "rgba(255,255,255,0.16)"}`,
               background: ativo ? cor : "rgba(255,255,255,0.03)",
@@ -229,17 +230,22 @@ export function FaixaAvaliacaoCelular({
     // zIndex: a caixa (invisível) do assento do hero, que passa um tiquinho
     // da borda de baixo da mesa no celular baixo, não pode roubar o toque.
     <div style={{ height: 44, flexShrink: 0, position: "relative", zIndex: 41, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: F }}>
-      <div
-        style={{
-          display: "flex", alignItems: "center", gap: 10, padding: "3px 3px 3px 14px", borderRadius: 999,
-          background: "rgba(255,255,255,0.04)", border: "1px solid rgba(255,255,255,0.10)", whiteSpace: "nowrap",
-        }}
-      >
+      {/* Mesmo vidro dos controles da mesa (ver mesa-ui.tsx). */}
+      <div className={`${GRUPO_MESA} gap-2.5 whitespace-nowrap py-1 pl-3.5 pr-1`}>
         <span
           aria-live="polite"
-          style={{ minWidth: 52, fontSize: 11.5, fontWeight: 600, color: salvo ? "#34D399" : liberada ? "rgba(255,255,255,0.75)" : "rgba(255,255,255,0.3)" }}
+          style={{ minWidth: 52, fontSize: 11.5, fontWeight: 600, color: salvo ? "#34D399" : liberada ? "rgba(255,255,255,0.8)" : "rgba(255,255,255,0.3)" }}
         >
-          {salvo ? "Salvo ✓" : somenteLeitura ? `Nota do jogador · ${rotulo}` : rotulo}
+          {salvo ? (
+            "Salvo ✓"
+          ) : somenteLeitura ? (
+            `Nota do jogador · ${rotulo}`
+          ) : (
+            <>
+              <span style={{ color: "rgba(255,255,255,0.45)", fontWeight: 500 }}>Sua nota · </span>
+              {rotulo}
+            </>
+          )}
         </span>
         {somenteLeitura ? (
           <span style={{ display: "inline-flex", alignItems: "center", minHeight: 34, paddingRight: 11 }}>
