@@ -736,7 +736,10 @@ export function RevisorHandTable({
         pos: slot.posLabel,
         voce: slot.isHero,
         texto,
-        vencedor: board.length === 5 && ultimoPasso && parsedHand.winner === p.player,
+        vencedor:
+          board.length === 5 &&
+          ultimoPasso &&
+          ((parsedHand.winnings?.length ?? 0) > 0 ? parsedHand.winnings!.some((w) => w.player === p.player) : parsedHand.winner === p.player),
       });
     });
     return { ...th, seats, placar: placar.length >= 2 ? placar : null };

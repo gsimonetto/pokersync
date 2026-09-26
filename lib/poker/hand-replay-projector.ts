@@ -305,7 +305,14 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
     });
   }
 
-  if (hand.winner && hand.pot != null && hand.pot > 0) {
+  // Um prêmio por vencedor (pote dividido / side pot), com o que cada um
+  // levou de verdade. Mãos sem essas linhas: o pote todo pro vencedor.
+  const winnings = hand.winnings ?? [];
+  if (winnings.length > 0) {
+    for (const w of winnings) {
+      events.push({ kind: "award", player: w.player, posLabel: posByName.get(w.player) ?? w.player, amount: w.amount });
+    }
+  } else if (hand.winner && hand.pot != null && hand.pot > 0) {
     const posLabel = posByName.get(hand.winner) ?? hand.winner;
     events.push({
       kind: "award",

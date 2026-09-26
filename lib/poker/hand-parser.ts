@@ -76,6 +76,9 @@ export interface ParsedHand {
   board: string[];
   pot: number | null;
   winner: string | null;
+  /** Quem levou quanto (uma linha "collected" por pote: pote dividido e
+   *  side pot têm mais de um vencedor). Vazio se a mão não diz. */
+  winnings?: { player: string; amount: number }[];
   streets: ParsedStreet[];
   rawText: string;
   seats: ParsedSeat[];
@@ -472,6 +475,28 @@ function extractWinner(text: string, playerPattern: string = "\\S+"): string | n
   // temos o valor coletado pelo vencedor, nao o pote total antes do rake).
   const bracketM = text.match(new RegExp(`(${P}) collected \\[\\s*\\$?([\\d.,]+)\\s*\\]`, "i"));
   return bracketM ? bracketM[1] : null;
+}
+
+// Todas as linhas "X collected N" antes do resumo: pote dividido e side
+// pot têm um vencedor por pote (ou dois no mesmo pote). Antes só o
+// primeiro "collected" contava e o pote inteiro ia pra ele -- num pote
+// dividido um jogador terminava com o pote todo e o outro com nada.
+function extractWinnings(text: string, playerPattern: string = "\\S+"): { player: string; amount: number }[] {
+  const P = playerPattern;
+  const fimAcoes = text.search(/\*\*\* (?:SUMMARY|SUM[AÁ]RIO) \*\*\*/i);
+  const corpo = fimAcoes >= 0 ? text.slice(0, fimAcoes) : text;
+  const total = new Map<string, number>();
+  const somar = (player: string, bruto: string) => {
+    const amount = Number(bruto.replace(/,/g, ""));
+    if (Number.isFinite(amount) && amount > 0) total.set(player, (total.get(player) ?? 0) + amount);
+  };
+  for (const linha of corpo.split(/\r?\n/)) {
+    const m =
+      linha.match(new RegExp(`^(${P}) (?:collected|recebeu) \\$?([\\d.,]+)`, "i")) ??
+      linha.match(new RegExp(`^(${P}) collected \\[\\s*\\$?([\\d.,]+)\\s*\\]`, "i"));
+    if (m) somar(m[1], m[2]);
+  }
+  return [...total.entries()].map(([player, amount]) => ({ player, amount }));
 }
 
 // PokerStars escreve essa linha SO na ultima mao de um torneio, quando
@@ -1065,6 +1090,7 @@ export function parseHand(rawText: string): ParsedHand {
     board,
     pot: extractPot(rawText),
     winner: extractWinner(rawText, P),
+    winnings: extractWinnings(rawText, P),
     wonTournament: extractWonTournament(rawText),
     heroFinishPlace: extractHeroFinishPlace(rawText, heroName),
     heroBountiesWon: heroBounties.count,
