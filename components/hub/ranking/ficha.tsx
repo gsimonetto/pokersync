@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { motion } from "framer-motion";
 import { Flame, Trophy, X } from "lucide-react";
 import { ModalPortal } from "@/components/modal-portal";
@@ -9,6 +9,11 @@ import type { JogadorRanking } from "@/lib/services/ranking-service";
 import { levelColor, levelMaterial, levelSubTier } from "@/lib/services/xp-service";
 import { MEDALHA, fmtXP, movimento } from "@/lib/hub/ranking-regras";
 import { FotoRanking, SetaMovimento } from "@/components/hub/ranking/linha";
+import { SeloFundador } from "@/components/achievements/selo-fundador";
+import { FounderCard } from "@/components/achievements/founder-card";
+import { fetchConquistasDoJogador, type Achievement } from "@/lib/services/achievements-service";
+
+const mesAno = new Intl.DateTimeFormat("pt-BR", { month: "short", year: "numeric" });
 
 const OURO = "#E0B24C";
 
@@ -16,12 +21,34 @@ const OURO = "#E0B24C";
 // (alcance do polegar); no computador abre no centro. O bloco "Você x
 // ele" é o que transforma o ranking de vitrine em rivalidade: duas
 // barras lado a lado e a diferença exata.
+//
+// Conquistas PokerSync (ex.: Membro Fundador) ficam em evidência logo
+// abaixo do nome -- o selo também vai pregado (reto) na foto -- e abrem a
+// carta da conquista (pedido explícito).
 export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: JogadorRanking | null; onFechar: () => void }) {
+  const [conquistas, setConquistas] = useState<Achievement[]>([]);
+  const [cartaAberta, setCartaAberta] = useState<Achievement | null>(null);
+
   useEffect(() => {
+    // Com a carta da conquista aberta, o Esc fecha só ela.
+    if (cartaAberta) return;
     const k = (e: KeyboardEvent) => e.key === "Escape" && onFechar();
     window.addEventListener("keydown", k);
     return () => window.removeEventListener("keydown", k);
-  }, [onFechar]);
+  }, [onFechar, cartaAberta]);
+
+  useEffect(() => {
+    let vivo = true;
+    fetchConquistasDoJogador(j.userId)
+      .then((c) => vivo && setConquistas(c))
+      .catch(() => vivo && setConquistas([]));
+    return () => {
+      vivo = false;
+    };
+  }, [j.userId]);
+
+  const fundador = conquistas.find((c) => c.code === "founder");
+  const outras = conquistas.filter((c) => c.code !== "founder");
 
   const cor = levelColor(j.nivel);
   const medalha = j.posicao != null ? MEDALHA[j.posicao] : undefined;
@@ -57,7 +84,20 @@ export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: Jogad
           </button>
 
           <div className="relative flex flex-col items-center px-5 pt-5 text-center">
-            <FotoRanking j={j} tamanho={92} animar brilho />
+            <span className="relative">
+              <FotoRanking j={j} tamanho={92} animar brilho />
+              {fundador && (
+                <button
+                  type="button"
+                  onClick={() => setCartaAberta(fundador)}
+                  className="absolute -right-4 -top-2 transition-transform hover:scale-110"
+                  aria-label="Ver carta de Membro Fundador"
+                  title="Membro Fundador"
+                >
+                  <SeloFundador tamanho={40} animar={false} />
+                </button>
+              )}
+            </span>
             <p className="mt-3 max-w-full truncate text-lg font-bold text-ink">{j.nome}</p>
             <p className="mt-0.5 flex items-center gap-1.5 text-[12px]">
               <span className="font-semibold" style={{ color: cor }}>
@@ -69,6 +109,35 @@ export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: Jogad
               <p className="mt-2 flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold" style={{ color: "#F5D48C", background: "#F5D48C1a" }}>
                 <Trophy size={11} fill="#F5D48C" /> Campeão da Temporada {j.titulos.map((n) => `#${n}`).join(", ")}
               </p>
+            )}
+
+            {/* Conquistas PokerSync em destaque */}
+            {fundador && (
+              <button
+                type="button"
+                onClick={() => setCartaAberta(fundador)}
+                className="group mt-3 flex w-full items-center gap-3 rounded-2xl border p-2 pr-3 text-left transition-colors hover:border-[#f2c65a]/60"
+                style={{ borderColor: "#f2c65a33", background: "linear-gradient(100deg, #3a0710cc, #12060899 60%, #f2c65a14)" }}
+              >
+                <SeloFundador tamanho={44} animar={false} />
+                <span className="min-w-0 flex-1">
+                  <span className="block text-[9.5px] font-bold uppercase tracking-[0.22em] text-[#f2c65a]/70">Conquista PokerSync</span>
+                  <span className="block truncate text-[15px] font-bold text-[#f5d27a]" style={{ fontFamily: "Georgia, 'Times New Roman', serif" }}>
+                    Membro Fundador
+                  </span>
+                  <span className="block text-[11px] text-white/55">desde {mesAno.format(new Date(fundador.unlockedAt))}</span>
+                </span>
+                <span className="shrink-0 text-[11px] font-semibold text-[#f2c65a]/70 transition-colors group-hover:text-[#f5d27a]">Ver carta ›</span>
+              </button>
+            )}
+            {outras.length > 0 && (
+              <div className="mt-2 flex flex-wrap justify-center gap-1.5">
+                {outras.map((c) => (
+                  <span key={c.code} title={c.description} className="flex items-center gap-1 rounded-full border border-evolution/30 bg-evolution/10 px-2 py-0.5 text-[11px] font-semibold text-evolution">
+                    <Trophy size={11} /> {c.label}
+                  </span>
+                ))}
+              </div>
             )}
           </div>
 
@@ -140,6 +209,9 @@ export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: Jogad
           )}
         </motion.div>
       </div>
+      {cartaAberta && (
+        <FounderCard open onClose={() => setCartaAberta(null)} description={cartaAberta.description} unlockedAt={cartaAberta.unlockedAt} nome={j.nome} />
+      )}
     </ModalPortal>
   );
 }

@@ -25,17 +25,24 @@ async function applyCheckout(userId: string, patch: Record<string, unknown>) {
   if (error) console.error("Falha ao gravar dado vindo do Stripe:", error);
 }
 
-// Selo "Founder" -- todo jogador que fecha um plano pago ganha, uma unica
-// vez (unique key em user_achievements: user_id+achievement_code). Como e'
-// upsert com ignoreDuplicates, chamar de novo em upgrade/downgrade de
-// plano e' seguro e nao mexe no unlocked_at original -- a data que aparece
-// no card e' a do primeiro pagamento, nao a do plano atual.
-async function grantFounderAchievement(userId: string) {
-  const supabase = createServiceClient();
-  const { error } = await supabase
-    .from("user_achievements")
-    .upsert({ user_id: userId, achievement_code: "founder" }, { onConflict: "user_id,achievement_code", ignoreDuplicates: true });
-  if (error) console.error("Falha ao conceder a conquista Founder:", error);
+// Selo "Membro Fundador" -- so' os 100 primeiros que fizerem o pagamento
+// ANUAL no primeiro mes (pedido explicito). Aqui confere se a assinatura
+// e' cobrada por ano; limite de 100 e prazo de 1 mes ficam no banco, em
+// conceder_fundador() (atomico, nao passa de 100 nem com pagamentos
+// simultaneos). Quem ja' e' fundador nao e' afetado por upgrade/downgrade:
+// a data no card continua a do primeiro pagamento.
+async function grantFounderAchievement(userId: string, subscriptionId: string | null) {
+  if (!subscriptionId) return;
+  try {
+    const assinatura = await getStripe().subscriptions.retrieve(subscriptionId);
+    const anual = assinatura.items.data.some((item) => item.price.recurring?.interval === "year");
+    if (!anual) return;
+    const supabase = createServiceClient();
+    const { error } = await supabase.rpc("conceder_fundador", { p_user: userId });
+    if (error) console.error("Falha ao conceder Membro Fundador:", error);
+  } catch (e) {
+    console.error("Falha ao conferir assinatura anual pro Membro Fundador:", e);
+  }
 }
 
 // Resolve o que um evento de assinatura (session ou subscription) esta
@@ -89,7 +96,7 @@ export async function POST(request: NextRequest) {
         stripe_customer_id: customerId,
         stripe_plan_subscription_id: subscriptionId,
       });
-      if (planId !== "free") await grantFounderAchievement(userId);
+      if (planId !== "free") await grantFounderAchievement(userId, subscriptionId);
     } else if (userId && addonId === "radar") {
       await applyCheckout(userId, {
         radar_addon: true,
