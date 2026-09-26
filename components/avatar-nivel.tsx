@@ -2,6 +2,7 @@
 
 import { motion } from "framer-motion";
 import { Avatar } from "@/components/avatar";
+import { EmblemaPatente } from "@/components/hub/patentes/emblema";
 import { MAX_LEVEL, levelColor, levelMaterial, levelSubTier, xpForNextLevel } from "@/lib/services/xp-service";
 import { useNivelDoJogador } from "@/lib/services/nivel-service";
 
@@ -18,7 +19,8 @@ export function progressoDoNivel(nivel: number, xpAtual: number) {
 //   * cor do anel = patente (a cor muda a cada 10 níveis: 11 prata,
 //     21 ouro ... 99 lendário), a mesma do RankChip e do Hub;
 //   * quanto do anel está preenchido = quanto falta pro próximo nível;
-//   * número embaixo = o nível.
+//   * selo embaixo = o escudo da patente em miniatura com o nível dentro
+//     (pedido explícito: trocar a bolinha com o número pelo escudo).
 //
 // Quem já tem nível e XP em mãos (ranking) passa `nivel`/`xpAtual`;
 // quem só tem o id passa `userId` e o nível é buscado (em lote, com
@@ -42,7 +44,7 @@ export function AvatarNivel({
   tamanho?: number;
   nivel?: number | null;
   xpAtual?: number | null;
-  /** Número do nível embaixo da foto. Padrão: só a partir de 30px. */
+  /** Selo (escudo da patente com o nível dentro) embaixo da foto. Padrão: só a partir de 30px. */
   mostrarNivel?: boolean;
   animar?: boolean;
   /** Foto quadrada (cartão de perfil) com o anel acompanhando os cantos. */
@@ -61,7 +63,8 @@ export function AvatarNivel({
   const cor = nivel == null ? null : levelColor(nivel);
   const pct = nivel == null ? 0 : progressoDoNivel(nivel, xpAtual);
   const numero = (mostrarNivel ?? tamanho >= 30) && nivel != null;
-  const pequeno = tamanho < 48;
+  // Selo cresce com a foto: o escudo da patente com o nível dentro.
+  const selo = tamanho >= 96 ? { escudo: 40, caixa: "-bottom-4" } : tamanho >= 48 ? { escudo: 30, caixa: "-bottom-3" } : { escudo: 24, caixa: "-bottom-2.5" };
   const titulo =
     nivel == null
       ? undefined
@@ -132,14 +135,9 @@ export function AvatarNivel({
         )}
       </svg>
       <Avatar id={avatarId} url={avatarUrl} size={foto} shape={quadrado ? "square" : "circle"} />
-      {numero && cor && (
-        <span
-          className={`absolute left-1/2 -translate-x-1/2 rounded-full border-2 border-[#111111] font-black tabular-nums text-black ${
-            pequeno ? "-bottom-1.5 px-1 text-[8.5px] leading-3" : tamanho >= 96 ? "-bottom-1.5 px-2 text-[12px] leading-5" : "-bottom-1 px-1.5 text-[10px] leading-4"
-          }`}
-          style={{ background: cor }}
-        >
-          {nivel}
+      {numero && nivel != null && (
+        <span className={`absolute left-1/2 flex -translate-x-1/2 drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)] ${selo.caixa}`}>
+          <EmblemaPatente nivel={nivel} tamanho={selo.escudo} animar={false} halo={false} />
         </span>
       )}
     </span>
