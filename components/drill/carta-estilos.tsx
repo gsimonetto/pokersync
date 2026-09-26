@@ -133,24 +133,18 @@ export function CartaEstilo({
         </>
       );
     } else {
-      // Jumbo: índice gigante (padrão de cartas de torneio) -- o valor
-      // ocupa metade da carta, o naipe a outra.
+      // Jumbo: índice gigante (padrão de cartas de torneio) no canto de
+      // cima -- que é a parte que continua visível quando as cartas do
+      // herói ficam em leque, uma cobrindo a outra. Naipe logo embaixo e
+      // um naipe grande no canto oposto.
       corpo = (
         <>
           {papel}
-          <text
-            x={dois ? 50 : 50}
-            y={66}
-            textAnchor="middle"
-            fontFamily={FONTE}
-            fontWeight="800"
-            fontSize={dois ? 58 : 70}
-            letterSpacing={dois ? -5 : 0}
-            fill={tinta}
-          >
+          <text x="7" y={dois ? 48 : 50} fontFamily={FONTE} fontWeight="800" fontSize={dois ? 42 : 52} letterSpacing={dois ? -4 : 0} fill={tinta}>
             {rank}
           </text>
-          <Naipe n={n} x={50} y={104} tam={pequena ? 58 : 54} fill={tinta} extra={<path d={NAIPE_PATH[n]} fill={`url(#${id("tinta")})`} />} />
+          <Naipe n={n} x={dois ? 21 : 21} y={dois ? 70 : 72} tam={pequena ? 30 : 26} fill={tinta} />
+          <Naipe n={n} x={68} y={110} tam={pequena ? 46 : 42} fill={tinta} extra={<path d={NAIPE_PATH[n]} fill={`url(#${id("tinta")})`} />} />
           {!pequena && <rect x="5" y="5" width="90" height="133" rx="5" fill="none" stroke={tinta} strokeOpacity=".12" strokeWidth=".8" />}
         </>
       );

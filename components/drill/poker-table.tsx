@@ -2,11 +2,11 @@
 
 import { createContext, useContext, useEffect, useRef, useState } from "react";
 import { Info, Target, Trophy } from "lucide-react";
-import { Card, sortCardsDesc } from "./card";
+import { Card, alturaDaCarta, sortCardsDesc } from "./card";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
 import type { OpponentStats } from "@/lib/services/opponent-stats-service";
-import { usePreferenciasMesa, type CorFeltro, type UnidadeValor, type VelocidadeAnimacao } from "@/lib/hooks/use-preferencias-mesa";
+import { usePreferenciasMesa, type CorFeltro, type EstiloMesa, type UnidadeValor, type VelocidadeAnimacao } from "@/lib/hooks/use-preferencias-mesa";
 
 // FIX (2026-09): "me mostre como ficou no celular e em outras telas"
 // revelou que cartas, placas de nome e badges de aposta (todos com
@@ -167,7 +167,85 @@ const FELTROS_ESCOLHIDOS: Record<Exclude<CorFeltro, "padrao">, { background: str
   },
 };
 
+// Estilo da mesa (Configurações, pedido explícito): Arena (padrão) ou Luxo
+// Moderno. Só muda o ACABAMENTO -- borda, textura do feltro, placas,
+// fichas, pote e botão do dealer. Geometria, posições, escala no celular,
+// animações e cores de posição são as mesmas nos dois.
+//   Arena: mesa final de TV -- borda de couro preto com LED na cor do
+//          feltro, holofote no centro, placas de vidro escuro.
+//   Luxo:  borda de nogueira com veio, filete de latão, feltro camurça,
+//          placas de couro, fichas bordô.
+const RUIDO = `url("data:image/svg+xml;utf8,${encodeURIComponent(
+  "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>",
+)}")`;
+
+interface TemaMesa {
+  /** Borda em volta do feltro; recebe o brilho do feltro (vira o LED na Arena). */
+  aro: (brilho: string) => React.CSSProperties;
+  /** Ruído por cima da borda (veio da madeira). */
+  aroComVeio?: boolean;
+  /** Anéis logo em volta do feltro (filete). */
+  feltroBorda: string[];
+  /** Feltro quando a cor escolhida é "Padrão" (sem isso: a cor da tela). */
+  feltroPadrao?: { background: string; glow: string };
+  luz: string;
+  linhaAposta: string;
+  placa: { fundo: string; borda: string; nome: string; valor: string };
+  pill: { fundo: string; borda: string; texto: string };
+  ficha: { face: string; listra: string };
+  fichaPote: { face: string; listra: string };
+  pote: { fundo: string; borda: string; texto: string; brilho: string };
+  dealer: React.CSSProperties;
+}
+
+// rgba(...,.35) -> rgba(...,.9): o brilho do feltro vira a luz do LED.
+const aceso = (cor: string) => cor.replace(/[\d.]+\)$/, "0.9)");
+
+export const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
+  arena: {
+    aro: (brilho) => ({
+      background: "linear-gradient(180deg, #2c2f36 0%, #111317 40%, #050506 100%)",
+      boxShadow: `0 0 0 1px #000, inset 0 2px 0 rgba(255,255,255,.14), inset 0 -2px 4px rgba(0,0,0,.8), 0 0 28px -6px ${aceso(brilho)}, 0 30px 70px rgba(0,0,0,.8)`,
+    }),
+    feltroBorda: ["0 0 0 2px #000", "0 0 0 3.5px rgba(255,255,255,.08)"],
+    luz: "radial-gradient(40% 45% at 50% 40%, rgba(255,255,255,.12), transparent 70%)",
+    linhaAposta: "rgba(255,255,255,.12)",
+    placa: { fundo: "linear-gradient(180deg, rgba(30,34,42,.94), rgba(10,12,15,.94))", borda: "rgba(255,255,255,.12)", nome: "rgba(255,255,255,.8)", valor: "#F5D48C" },
+    pill: { fundo: "rgba(0,0,0,.75)", borda: "rgba(255,255,255,.18)", texto: "#FFFFFF" },
+    ficha: { face: "#E0B24C", listra: "#FFFFFF" },
+    fichaPote: { face: "#1F9D6B", listra: "#FFFFFF" },
+    pote: { fundo: "linear-gradient(180deg,#000000,#0A0A0A)", borda: "rgba(255,255,255,.20)", texto: "#FFFFFF", brilho: "0 0 20px rgba(52,211,153,.20)" },
+    dealer: { background: "radial-gradient(circle at 35% 30%, #ffffff, #d9d9d9)", color: "#111111", boxShadow: "0 2px 6px rgba(0,0,0,.6)" },
+  },
+  luxo: {
+    aro: () => ({
+      background:
+        "radial-gradient(120% 80% at 50% 0%, rgba(255,220,170,.25), transparent 50%), repeating-linear-gradient(95deg, #5a331b 0 3px, #6b3e22 3px 7px, #4a2914 7px 9px, #633a1f 9px 14px)",
+      boxShadow: "0 30px 70px rgba(0,0,0,.85), inset 0 2px 0 rgba(255,230,190,.35), inset 0 -3px 6px rgba(0,0,0,.6), 0 0 0 1px #1a0e06",
+    }),
+    aroComVeio: true,
+    feltroBorda: ["0 0 0 2px #C9A45C", "0 0 0 3px #5A4318"],
+    feltroPadrao: {
+      background: "radial-gradient(65% 75% at 50% 40%, #2C6A52 0%, #1D4D3B 35%, #123327 65%, #0A1F18 100%)",
+      glow: "rgba(44,106,82,.35)",
+    },
+    luz: "radial-gradient(45% 50% at 50% 38%, rgba(255,240,210,.12), transparent 70%)",
+    linhaAposta: "rgba(201,164,92,.35)",
+    placa: { fundo: "radial-gradient(120% 120% at 30% 0%, #3a2616, #1a0f08 70%)", borda: "#8A6A32", nome: "#F5E3B8", valor: "#FFFFFF" },
+    pill: { fundo: "rgba(20,12,6,.92)", borda: "#8A6A32", texto: "#F5E3B8" },
+    ficha: { face: "#7A1F2B", listra: "#F5E3B8" },
+    fichaPote: { face: "#1D4D3B", listra: "#F5E3B8" },
+    pote: { fundo: "linear-gradient(180deg, #2a1a0e, #140c06)", borda: "#C9A45C", texto: "#F5E3B8", brilho: "0 0 18px rgba(201,164,92,.25)" },
+    dealer: { background: "radial-gradient(circle at 35% 30%, #fff6de, #c9a45c)", color: "#2A1A0E", fontFamily: "Georgia, 'Times New Roman', serif", boxShadow: "0 2px 6px rgba(0,0,0,.6)" },
+  },
+};
+const TemaCtx = createContext<TemaMesa>(TEMAS_MESA.arena);
+
+// Face de ficha de cassino: cor com listras na borda.
+const faceFicha = (f: { face: string; listra: string }) => `repeating-conic-gradient(${f.face} 0 30deg, ${f.listra} 30deg 45deg)`;
+
 function ChipStackIcon({ size = 13 }: { size?: number }) {
+  const { ficha } = useContext(TemaCtx);
   const disc = (bottom: number, z: number) => (
     <div
       key={z}
@@ -178,8 +256,8 @@ function ChipStackIcon({ size = 13 }: { size?: number }) {
         width: size,
         height: size,
         borderRadius: "50%",
-        background: "#C9A227",
-        boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 1px 2px rgba(0,0,0,.5)",
+        background: faceFicha(ficha),
+        boxShadow: `inset 0 0 0 ${Math.max(2, size * 0.22)}px ${ficha.face}, inset 0 0 0 ${Math.max(3, size * 0.3)}px rgba(0,0,0,.25), 0 1px 2px rgba(0,0,0,.5)`,
         zIndex: z,
       }}
     />
@@ -193,6 +271,7 @@ function ChipStackIcon({ size = 13 }: { size?: number }) {
 }
 
 function PotChipStack() {
+  const { fichaPote } = useContext(TemaCtx);
   const disc = (bottom: number, z: number) => (
     <div
       key={z}
@@ -203,8 +282,8 @@ function PotChipStack() {
         width: 14,
         height: 14,
         borderRadius: "50%",
-        background: "#1F9D6B",
-        boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 1px 3px rgba(0,0,0,.5)",
+        background: faceFicha(fichaPote),
+        boxShadow: `inset 0 0 0 3px ${fichaPote.face}, inset 0 0 0 4px rgba(0,0,0,.25), 0 1px 3px rgba(0,0,0,.5)`,
         zIndex: z,
       }}
     />
@@ -279,14 +358,15 @@ const ABOVE_SEAT_EXTRA_OFFSET_PX = 14;
 
 function CommittedPill({ amount }: { amount: number }) {
   const sufixo = useContext(SufixoValor);
+  const { pill } = useContext(TemaCtx);
   return (
     <div
       style={{
         display: "flex",
         alignItems: "center",
         gap: 5,
-        background: "#0A0A0A",
-        border: "1px solid rgba(255,255,255,.18)",
+        background: pill.fundo,
+        border: `1px solid ${pill.borda}`,
         borderRadius: 999,
         padding: "3px 10px 3px 5px",
         boxShadow: "0 3px 8px rgba(0,0,0,.5)",
@@ -295,7 +375,7 @@ function CommittedPill({ amount }: { amount: number }) {
       }}
     >
       <ChipStackIcon size={13} />
-      <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: TEXT.critical, ...num }}>
+      <span style={{ fontFamily: F, fontSize: 14, fontWeight: 700, color: pill.texto, ...num }}>
         {formatStack(amount)}
         {sufixo && <span style={{ fontSize: 11, fontWeight: 600, color: TEXT.secondary, marginLeft: 3 }}>{sufixo}</span>}
       </span>
@@ -458,7 +538,7 @@ function GhostCardFan({ fanDeg = 10 }: { fanDeg?: number }) {
 // espaço no layout).
 function alturaCartasAcima(seat: SeatLayoutSlot, state: SeatState): number {
   const { status = "empty", cards } = state;
-  if (seat.isHero) return cards && cards.length > 0 ? 90 + 6 : 0;
+  if (seat.isHero) return cards && cards.length > 0 ? alturaDaCarta("hero") + 6 : 0;
   const reveladas = !!cards && cards.length > 0 && cards.every(Boolean);
   const silhueta = !reveladas && status !== "empty" && status !== "folded";
   return reveladas || silhueta ? 66 : 0;
@@ -503,6 +583,7 @@ function Seat({
   // sobe pra placa (e não o bloco inteiro) ficar no ponto do anel.
   const subirPelaCarta = centrarNaPlaca ? (alturaCartasAcima(seat, state) * effectiveScale) / 2 : 0;
   const sufixo = useContext(SufixoValor);
+  const tema = useContext(TemaCtx);
 
   // Cartas sempre EM CIMA do nome do seat, pra todas as posicoes da mesa
   // (pedido explicito: "as cartas de todas as posicoes precisam ficar em
@@ -625,15 +706,13 @@ function Seat({
               width: 20,
               height: 20,
               borderRadius: "50%",
-              background: "#B91C1C",
-              boxShadow: "inset 0 0 0 2px rgba(255,255,255,.85), inset 0 0 0 3px rgba(0,0,0,.35), 0 2px 6px rgba(0,0,0,.55)",
               display: "flex",
               alignItems: "center",
               justifyContent: "center",
               fontFamily: F,
               fontSize: 10,
-              fontWeight: 700,
-              color: "#FFFFFF",
+              fontWeight: 800,
+              ...tema.dealer,
             }}
           >
             D
@@ -682,9 +761,9 @@ function Seat({
               alignItems: "center",
               gap: 1,
               fontFamily: F,
-              color: acting ? "#FFFFFF" : "rgba(255,255,255,.72)",
-              background: acting ? `${col.base}33` : "rgba(0,0,0,.55)",
-              border: acting ? `1px solid ${col.glow}` : "1px solid rgba(255,255,255,.08)",
+              color: acting ? "#FFFFFF" : tema.placa.nome,
+              background: acting ? `linear-gradient(${col.base}40, ${col.base}40), ${tema.placa.fundo}` : tema.placa.fundo,
+              border: acting ? `1px solid ${col.glow}` : `1px solid ${tema.placa.borda}`,
               borderRadius: 10,
               padding: "4px 10px",
               maxWidth: 118,
@@ -712,7 +791,10 @@ function Seat({
                 />
               </>
             )}
-            <span style={{ fontSize: 12.5, fontWeight: 500, whiteSpace: "nowrap", ...num }}>{stack != null ? formatStack(stack) : stack}{sufixo ? ` ${sufixo}` : ""}</span>
+            <span style={{ fontSize: 12.5, fontWeight: 600, whiteSpace: "nowrap", color: acting ? "#FFFFFF" : tema.placa.valor, ...num }}>
+              {stack != null ? formatStack(stack) : stack}
+              {sufixo ? ` ${sufixo}` : ""}
+            </span>
           </div>
         </div>
       )}
@@ -1056,8 +1138,9 @@ export function PokerTable({
   const seatData = (p: string): SeatState => (hand?.seats && hand.seats[p]) || { status: "empty" };
   const chipFromSeat = chipAnimation ? seats.find((s) => s.posLabel === chipAnimation.fromPosLabel) : null;
   const awardToSeat = potAwardAnimation ? seats.find((s) => s.posLabel === potAwardAnimation.toPosLabel) : null;
-  const { feltro } = usePreferenciasMesa();
-  const felt = feltro === "padrao" ? FELT_PALETTES[variant] : FELTROS_ESCOLHIDOS[feltro];
+  const { feltro, mesa } = usePreferenciasMesa();
+  const tema = TEMAS_MESA[mesa];
+  const felt = feltro === "padrao" ? (tema.feltroPadrao ?? FELT_PALETTES[variant]) : FELTROS_ESCOLHIDOS[feltro];
   const sufixo = unidade === "fichas" ? "" : "BB";
   const semAnimacao = animacao === "sem";
   const tableBoxRef = useRef<HTMLDivElement>(null);
@@ -1066,6 +1149,7 @@ export function PokerTable({
 
   return (
     <SufixoValor.Provider value={sufixo}>
+    <TemaCtx.Provider value={tema}>
     <div
       data-ps-animacao={animacao}
       style={{
@@ -1141,56 +1225,12 @@ export function PokerTable({
         }}
         ref={tableBoxRef}
       >
-        <div
-          style={{
-            position: "absolute",
-            inset: "2% 1.5%",
-            borderRadius: cornerRadius,
-            pointerEvents: "none",
-            background: "conic-gradient(from 200deg, #4A4E55, #8A8F98, #3A3D42, #6E727A, #4A4E55)",
-            opacity: 0.9,
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: "3.4% 2.6%",
-            borderRadius: cornerRadius,
-            pointerEvents: "none",
-            background: [
-              "repeating-linear-gradient(45deg, rgba(255,255,255,0.035) 0px, rgba(255,255,255,0.035) 1px, transparent 1px, transparent 4px)",
-              "repeating-linear-gradient(-45deg, rgba(0,0,0,0.4) 0px, rgba(0,0,0,0.4) 1px, transparent 1px, transparent 4px)",
-              "radial-gradient(circle at 50% 50%, #2A2C30 0%, #1C1D20 55%, #0E0F10 100%)",
-            ].join(", "),
-            boxShadow: "inset 0 0 24px rgba(0,0,0,.7)",
-          }}
-        />
-        <div
-          style={{
-            position: "absolute",
-            inset: "3.4% 2.6%",
-            borderRadius: cornerRadius,
-            pointerEvents: "none",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            opacity: 0.05,
-            overflow: "hidden",
-          }}
-        >
-          <span
-            style={{
-              fontFamily: F,
-              fontWeight: 800,
-              fontSize: 46,
-              letterSpacing: 4,
-              color: "#FFFFFF",
-              transform: "rotate(-8deg)",
-              whiteSpace: "nowrap",
-            }}
-          >
-            POKERSYNC
-          </span>
+        {/* Borda da mesa (couro na Arena, nogueira no Luxo) -- ocupa a
+            faixa entre a caixa e o feltro. */}
+        <div style={{ position: "absolute", inset: 0, borderRadius: cornerRadius, pointerEvents: "none", ...tema.aro(felt.glow) }}>
+          {tema.aroComVeio && (
+            <div style={{ position: "absolute", inset: 0, borderRadius: cornerRadius, backgroundImage: RUIDO, backgroundSize: "90px 260px", opacity: 0.35, mixBlendMode: "overlay" }} />
+          )}
         </div>
 
         <div
@@ -1199,27 +1239,21 @@ export function PokerTable({
             inset: "2.8% 2%",
             borderRadius: cornerRadius,
             background: felt.background,
-            border: "2px solid #000000",
+            overflow: "hidden",
             boxShadow: [
-              "0 0 0 6px #000000",
-              "0 0 0 7px rgba(255,255,255,.08)",
+              ...tema.feltroBorda,
               `0 0 40px ${felt.glow}`,
-              "0 24px 60px rgba(0,0,0,.75)",
               "inset 0 2px 30px rgba(255,255,255,.06)",
               "inset 0 -30px 80px rgba(0,0,0,.65)",
             ].join(", "),
           }}
         >
-          <div
-            style={{
-              position: "absolute",
-              inset: 0,
-              borderRadius: cornerRadius,
-              pointerEvents: "none",
-              background: "radial-gradient(55% 35% at 50% 25%, rgba(255,255,255,.09), transparent 70%)",
-            }}
-          />
-          <div style={{ position: "absolute", inset: "3%", borderRadius: cornerRadius, pointerEvents: "none", border: "1px solid rgba(255,255,255,.06)" }} />
+          {/* Textura do feltro, luz no centro e linha de aposta. Sem marca
+              escrita no feltro: no anel de 8 lugares ela caía atrás do
+              assento do topo. */}
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: RUIDO, opacity: 0.14, mixBlendMode: "overlay" }} />
+          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: tema.luz }} />
+          <div style={{ position: "absolute", inset: "12% 9%", borderRadius: cornerRadius, pointerEvents: "none", border: `1px solid ${tema.linhaAposta}` }} />
         </div>
 
         {/* FIX (2026-09): desceu de 44% pra 48% — com cartas SEMPRE em cima
@@ -1248,14 +1282,14 @@ export function PokerTable({
                     padding: "6px 14px",
                     borderRadius: 999,
                     fontFamily: F,
-                    background: "linear-gradient(180deg,#000000,#0A0A0A)",
-                    border: "1px solid rgba(255,255,255,.20)",
-                    boxShadow: "0 8px 22px rgba(0,0,0,.7), 0 0 20px rgba(52,211,153,.20)",
+                    background: tema.pote.fundo,
+                    border: `1px solid ${tema.pote.borda}`,
+                    boxShadow: `0 8px 22px rgba(0,0,0,.7), ${tema.pote.brilho}`,
                     whiteSpace: "nowrap",
                   }}
                 >
                   <PotChipStack />
-                  <span style={{ color: TEXT.critical, fontWeight: 500, fontSize: 15, ...num }}>{formatStack(hand.pot)}</span>
+                  <span style={{ color: tema.pote.texto, fontWeight: 600, fontSize: 15, ...num }}>{formatStack(hand.pot)}</span>
                   {sufixo && <span style={{ color: TEXT.secondary, fontSize: 11, fontWeight: 500 }}>{sufixo}</span>}
                 </div>
               </div>
@@ -1322,6 +1356,7 @@ export function PokerTable({
         )}
       </div>
     </div>
+    </TemaCtx.Provider>
     </SufixoValor.Provider>
   );
 }

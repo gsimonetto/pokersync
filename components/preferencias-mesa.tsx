@@ -7,12 +7,15 @@ import {
   usePreferenciasMesa,
   type Baralho,
   type CorFeltro,
+  type EstiloCartaPref,
+  type EstiloMesa,
   type TempoDecisao,
   type UnidadeValor,
   type VelocidadeAnimacao,
 } from "@/lib/hooks/use-preferencias-mesa";
 
-// Aba "Mesa" das Configurações: cor do feltro e baralho (M9), BB ou
+// Aba "Mesa" das Configurações: estilo da mesa e das cartas, cor do
+// feltro e baralho (M9), BB ou
 // fichas no Revisor (M8), velocidade das animações (M10) e tempo pra
 // decidir no Treino (M11). Cada escolha vale na hora e fica guardada na
 // conta (ver use-preferencias-mesa).
@@ -24,6 +27,31 @@ const FELTROS: { valor: CorFeltro; rotulo: string; fundo: string }[] = [
   { valor: "azul", rotulo: "Azul", fundo: "radial-gradient(circle at 50% 40%, #123A6E, #0A1D38)" },
   { valor: "vinho", rotulo: "Vinho", fundo: "radial-gradient(circle at 50% 40%, #7A1830, #3D0C18)" },
   { valor: "grafite", rotulo: "Grafite", fundo: "radial-gradient(circle at 50% 40%, #3A3F47, #1D2025)" },
+];
+
+const MESAS: { valor: EstiloMesa; rotulo: string; descricao: string; aro: string; feltro: string; filete: string }[] = [
+  {
+    valor: "arena",
+    rotulo: "Arena (padrão)",
+    descricao: "Mesa final de TV: couro preto e LED",
+    aro: "linear-gradient(180deg, #2c2f36, #050506)",
+    feltro: "radial-gradient(60% 70% at 50% 42%, #1f6fb8, #0c3058 70%, #061a33)",
+    filete: "0 0 0 2px #000, 0 0 16px -2px rgba(59,130,246,.9)",
+  },
+  {
+    valor: "luxo",
+    rotulo: "Luxo Moderno",
+    descricao: "Nogueira, latão e feltro camurça",
+    aro: "repeating-linear-gradient(95deg, #5a331b 0 3px, #6b3e22 3px 7px, #4a2914 7px 9px, #633a1f 9px 14px)",
+    feltro: "radial-gradient(60% 70% at 50% 42%, #2c6a52, #123327 75%, #0a1f18)",
+    filete: "0 0 0 2px #c9a45c",
+  },
+];
+
+const CARTAS: { valor: EstiloCartaPref; rotulo: string }[] = [
+  { valor: "solido", rotulo: "Cor Sólida (padrão)" },
+  { valor: "classico", rotulo: "Clássico de Cassino" },
+  { valor: "jumbo", rotulo: "Índice Jumbo" },
 ];
 
 const BARALHOS: { valor: Baralho; rotulo: string }[] = [
@@ -69,7 +97,60 @@ export function PreferenciasMesaPainel() {
   const pref = usePreferenciasMesa();
   return (
     <div className="flex flex-col gap-5">
-      <Secao titulo="Cor da mesa" ajuda="Vale no Treino e no Revisor. Padrão: azul no Treino e vinho no Revisor.">
+      <Secao titulo="Estilo da mesa" ajuda="Muda a borda, as placas dos jogadores, as fichas e o pote. Vale no Treino e no Revisor.">
+        <div className="grid grid-cols-2 gap-2">
+          {MESAS.map((m) => {
+            const ativo = pref.mesa === m.valor;
+            return (
+              <button
+                key={m.valor}
+                type="button"
+                aria-pressed={ativo}
+                onClick={() => salvarPreferenciaMesa("mesa", m.valor)}
+                className={`flex flex-col items-center gap-2 rounded-xl border p-2.5 transition-colors ${
+                  ativo ? "border-[#d4af37]/50 bg-[#d4af37]/[0.08]" : "border-white/10 bg-white/[0.03] hover:border-white/20"
+                }`}
+              >
+                <span className="relative block h-14 w-full max-w-[150px] rounded-full p-[7px]" style={{ background: m.aro }}>
+                  <span className="block h-full w-full rounded-full" style={{ background: m.feltro, boxShadow: m.filete }} />
+                </span>
+                <span className={`text-[11.5px] font-semibold ${ativo ? "text-ink" : "text-muted"}`}>{m.rotulo}</span>
+                <span className="text-[10.5px] text-muted">{m.descricao}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Secao>
+
+      <Secao titulo="Estilo das cartas" ajuda="Todos em 4 cores (ou 2, abaixo), sem figuras: o valor e o naipe vêm primeiro.">
+        <div className="grid grid-cols-3 gap-2">
+          {CARTAS.map((c) => {
+            const ativo = pref.carta === c.valor;
+            return (
+              <button
+                key={c.valor}
+                type="button"
+                aria-pressed={ativo}
+                onClick={() => salvarPreferenciaMesa("carta", c.valor)}
+                className={`flex flex-col items-center gap-2 rounded-xl border p-2.5 transition-colors ${
+                  ativo ? "border-[#d4af37]/50 bg-[#d4af37]/[0.08]" : "border-white/10 bg-white/[0.03] hover:border-white/20"
+                }`}
+              >
+                {/* Tamanho de mesa: nas miniaturas os estilos ficam parecidos
+                    (todos aumentam o índice), no board a diferença aparece. */}
+                <span className="flex gap-1">
+                  {["As", "Kh"].map((k) => (
+                    <Card key={k} card={k} size="board" estilo={c.valor} />
+                  ))}
+                </span>
+                <span className={`text-center text-[11px] font-semibold ${ativo ? "text-ink" : "text-muted"}`}>{c.rotulo}</span>
+              </button>
+            );
+          })}
+        </div>
+      </Secao>
+
+      <Secao titulo="Cor da mesa" ajuda="Vale no Treino e no Revisor. Padrão: azul no Treino e vinho no Revisor (verde na mesa Luxo).">
         <div className="flex flex-wrap gap-3">
           {FELTROS.map((f) => {
             const ativo = pref.feltro === f.valor;
