@@ -84,7 +84,7 @@ function parseAspectRatio(value: string): number {
 export interface SeatState {
   status: "empty" | "live" | "acting" | "folded";
   stack?: number;
-  action?: { type: string; size?: number } | null;
+  action?: { type: string; size?: number; nome?: string } | null;
   cards?: (string | null)[];
   // Bounty ("cabeça") desse jogador em torneios PKO/Mystery Bounty --
   // ausente fora desse formato (ver ParsedSeat.bountyValue).
@@ -281,7 +281,9 @@ function formatPotPct(size: number, pot: number): string | null {
   return `${Math.round((size / pot) * 100)}%`;
 }
 
-function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: number }) {
+// `semPct`: sem o "· X% pot" (celular, onde o selo precisa caber embaixo
+// da placa do jogador).
+function ActionBadge({ action, pot, semPct = false }: { action?: SeatState["action"]; pot: number; semPct?: boolean }) {
   const sufixo = useContext(SufixoValor);
   if (!action) return null;
   const a = ACT[action.type.toLowerCase()] || ACT.check;
@@ -289,7 +291,7 @@ function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: numbe
   // diz tudo que importa; a fracao do pote so faz sentido pra sizing de
   // aposta/raise normal, nao pra um all-in (que e' o stack inteiro, nao
   // uma decisao de sizing).
-  const potPct = action.size && action.type !== "allin" ? formatPotPct(action.size, pot) : null;
+  const potPct = action.size && action.type !== "allin" && !semPct ? formatPotPct(action.size, pot) : null;
   return (
     <div
       style={{
@@ -306,7 +308,7 @@ function ActionBadge({ action, pot }: { action?: SeatState["action"]; pot: numbe
         animation: `fadeInUp ${dur(200)} ease-out`,
       }}
     >
-      {a.label}
+      {action.nome ?? a.label}
       {action.size ? ` ${formatStack(action.size)}${sufixo ? ` ${sufixo}` : ""}` : ""}
       {potPct && <span style={{ opacity: 0.7 }}> · {potPct} pot</span>}
     </div>
@@ -624,7 +626,11 @@ function Seat({
   // continua aparecendo do jeito de sempre via CommittedChip (o valor em
   // bb flutuando em frente ao assento), so' esse chip fixo embaixo do
   // nome que sai pra call/bet/raise.
-  const showBadge = action && (action.type === "fold" || action.type === "check" || action.type === "allin");
+  // Toda ação aparece embaixo do jogador, só no passo em que ela acontece
+  // (o projector só manda o selo do passo atual) -- pedido explícito:
+  // "mantenha apenas embaixo do jogador" (call/fold/all-in), no lugar da
+  // linha "Pré-flop · ..." em cima da mesa, que cobria o assento do topo.
+  const showBadge = !!action;
   const badgeArea = (
     <div style={{ minHeight: 17, display: "flex", alignItems: "center", gap: 5 }}>
       {/* key muda toda vez que a acao muda (novo fold/check/allin) --
@@ -632,7 +638,7 @@ function Seat({
           em vez de so' trocar o texto sem animar (pedido explicito:
           "check/fold/allin como chips" -- o chip precisa "chegar" com a
           mesma animacao de qualquer outro chip da mesa). */}
-      {!acting && showBadge && <ActionBadge key={`${action.type}-${action.size ?? ""}`} action={action} pot={pot} />}
+      {!acting && showBadge && <ActionBadge key={`${action.type}-${action.size ?? ""}`} action={action} pot={pot} semPct={heroScale > 1} />}
     </div>
   );
 

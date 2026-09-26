@@ -31,6 +31,9 @@ export type StepEvent =
       // Valor em bb pra mostrar dentro do chip — ausente pra fold/check
       // (sem tamanho pra exibir).
       badgeSizeBB?: number;
+      // Nome do raise no pré-flop pro selo do assento: "3-bet", "4-bet"...
+      // (o 1º raise continua "Raise"). Ausente nas outras ações/ruas.
+      badgeNome?: string;
       // Aposta não paga que volta pro dono NESTE step (a ação que fechou a
       // rua, ex.: o fold diante da 4-bet) — RAW. Sai da frente dele, do
       // pote, e volta pro stack.
@@ -220,6 +223,7 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
     // Committed por jogador NESTA rua — reset a cada rua nova, porque
     // "raises X to Y" e' relativo ao total-da-rua daquele jogador.
     const committed = new Map<string, number>();
+    let raisesNaRua = 0;
 
     for (const a of street.actions) {
       if (a.action === "posts") {
@@ -278,6 +282,8 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
         committed.set(a.player, (committed.get(a.player) ?? 0) + chipsAdded);
       }
       const { badgeType, badgeSizeBB } = resolveBadge(a, bbUnit);
+      if (a.action === "raises") raisesNaRua++;
+      const badgeNome = a.action === "raises" && streetName === "preflop" && raisesNaRua >= 2 ? `${raisesNaRua + 1}-bet` : undefined;
 
       events.push({
         kind: "action",
@@ -288,6 +294,7 @@ function buildEventList(hand: ParsedHand, layout: SeatLayoutSlot[], bbUnit: numb
         isFold: a.action === "folds",
         badgeType,
         badgeSizeBB,
+        badgeNome,
       });
     }
   }
@@ -532,13 +539,13 @@ export function projectHandAtStep(
     // mesmo dentro da mesma rua.
     const badge =
       currentEvent && currentEvent.kind === "action" && currentEvent.player === slot.playerName
-        ? { type: currentEvent.badgeType, size: currentEvent.badgeSizeBB }
+        ? { type: currentEvent.badgeType, size: currentEvent.badgeSizeBB, nome: currentEvent.badgeNome }
         : null;
     seats[slot.posLabel] = {
       status: isFolded ? "folded" : isActing ? "acting" : "live",
       stack: toBB(seatData.startingChips - chipsOut + chipsWon),
       cards: slot.isHero ? hand.heroCards ?? undefined : revealedForVillain,
-      action: badge ? { type: badge.type, size: badge.size } : null,
+      action: badge ? { type: badge.type, size: badge.size, nome: badge.nome } : null,
       bountyValue: seatData.bountyValue,
     };
   }

@@ -20,7 +20,7 @@ import { linkConstrutorDaMao } from "@/lib/ranges/link-da-mao";
 import { equidade, nomeDaJogada } from "@/lib/poker/jogada";
 import { F, T } from "@/lib/poker/drill-theme";
 import { salvarPreferenciaMesa, usePreferenciasMesa, type UnidadeValor } from "@/lib/hooks/use-preferencias-mesa";
-import { CartaTexto, LinhaDoTempo, NOME_RUA, nomesDosRaises, rotuloAcao } from "./linha-do-tempo";
+import { LinhaDoTempo } from "./linha-do-tempo";
 import { CHIP_MESA, ControlesReplay, INFO_MESA, OURO_MESA, SegmentoMesa, classeIconeMesa } from "@/components/drill/mesa-ui";
 import { CartaoAvaliacao, FaixaAvaliacaoCelular } from "./avaliacao-rapida";
 
@@ -67,66 +67,6 @@ function InfoChip({ icon, label, encolhe = false }: { icon: React.ReactNode; lab
     <div className={`ps-rv-table-header-chip ${INFO_MESA} ${encolhe ? "shrink" : "shrink-0"}`} title={encolhe ? label : undefined}>
       {icon}
       <span className="truncate">{label}</span>
-    </div>
-  );
-}
-
-// Celular: não há linha do tempo embaixo da mesa, então uma linha curta
-// diz o que acabou de acontecer (pedido: "tomei 4bet" e na mesa não
-// dava pra saber que era uma 4-bet). Ex.: "Pré-flop · HJ 4-bet 15 BB".
-function UltimaAcao({ estado, heroPos, emFichas }: { estado: ReplayState; heroPos: string | null; emFichas: boolean }) {
-  const ev = estado.currentEvent;
-  const ruaAtual = estado.tableHand.history.find((r) => r.current) ?? estado.tableHand.history[0];
-  const rua = NOME_RUA[ruaAtual?.street ?? "PREFLOP"] ?? "Pré-flop";
-  const unidade = emFichas ? "" : " BB";
-  const quem = (pos: string) => (pos === heroPos ? "Você" : pos);
-  const valor = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}${unidade}`;
-  let conteudo: React.ReactNode;
-  if (!ev) {
-    conteudo = "Blinds na mesa";
-  } else if (ev.kind === "action") {
-    const acoes = ruaAtual?.actions ?? [];
-    const nome = nomesDosRaises(ruaAtual?.street ?? "", acoes)[acoes.length - 1];
-    const rotulo = rotuloAcao(ev.label, nome);
-    conteudo = (
-      <>
-        <b className="font-semibold text-ink">{quem(ev.posLabel)}</b> {rotulo}
-        {/\d$/.test(rotulo) ? unidade : ""}
-      </>
-    );
-  } else if (ev.kind === "deal") {
-    conteudo = (
-      <span className="inline-flex gap-1">
-        {ev.newCards.map((c) => (
-          <CartaTexto key={c} card={c} />
-        ))}
-      </span>
-    );
-  } else if (ev.kind === "showdown") {
-    conteudo = (
-      <>
-        <b className="font-semibold text-ink">{quem(ev.posLabel)}</b> mostra{" "}
-        <span className="inline-flex gap-1">
-          {ev.cards.map((c) => (
-            <CartaTexto key={c} card={c} />
-          ))}
-        </span>
-      </>
-    );
-  } else {
-    conteudo = (
-      <>
-        <b className="font-semibold text-ink">{quem(ev.posLabel)}</b> leva{" "}
-        <span className="font-semibold text-[#d4af37]">{valor(emFichas ? ev.amount : ev.amount / estado.bbUnit)}</span>
-      </>
-    );
-  }
-  return (
-    <div className="flex h-9 shrink-0 items-center justify-center" aria-live="polite">
-      <div className={`${INFO_MESA} max-w-full text-[12.5px]`}>
-        <span className="text-muted">{ev?.kind === "showdown" ? "Showdown" : rua} ·</span>
-        <span className="truncate text-ink/85">{conteudo}</span>
-      </div>
     </div>
   );
 }
@@ -1013,7 +953,6 @@ export function RevisorHandTable({
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. position:relative pra sustentar os overlays
             do modo mobile (blinds fosco + dock de navegacao) abaixo. */}
-        {isMobile && <UltimaAcao estado={replayState} heroPos={heroPos} emFichas={emFichas} />}
         <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
           <PokerTable
             hand={mesaComInfo ?? replayState.tableHand}
