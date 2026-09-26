@@ -23,8 +23,8 @@ const OURO = "#E0B24C";
 // barras lado a lado e a diferença exata.
 //
 // Conquistas PokerSync (ex.: Membro Fundador) ficam em evidência logo
-// abaixo do nome -- o selo também vai pregado na foto -- e abrem a carta
-// da conquista (pedido explícito).
+// abaixo do nome -- o selo também vai pregado (reto) na foto -- e abrem a
+// carta da conquista (pedido explícito).
 export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: JogadorRanking | null; onFechar: () => void }) {
   const [conquistas, setConquistas] = useState<Achievement[]>([]);
   const [cartaAberta, setCartaAberta] = useState<Achievement | null>(null);
@@ -90,7 +90,7 @@ export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: Jogad
                 <button
                   type="button"
                   onClick={() => setCartaAberta(fundador)}
-                  className="absolute -right-4 -top-2 rotate-12 transition-transform hover:rotate-0 hover:scale-110"
+                  className="absolute -right-4 -top-2 transition-transform hover:scale-110"
                   aria-label="Ver carta de Membro Fundador"
                   title="Membro Fundador"
                 >
