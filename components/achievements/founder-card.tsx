@@ -5,6 +5,7 @@ import { motion, useMotionValue, useReducedMotion, useSpring, useTransform } fro
 import { Check, Share2, X } from "lucide-react";
 import { ModalPortal } from "@/components/modal-portal";
 import { SeloFundador } from "@/components/achievements/selo-fundador";
+import { CANTO_DECO, ondas, rosacea } from "@/components/ui/gravuras";
 
 const dateFmt = new Intl.DateTimeFormat("pt-BR", { day: "2-digit", month: "short", year: "numeric" });
 const EASE = [0.22, 1, 0.36, 1] as const;
@@ -27,37 +28,9 @@ const EASE = [0.22, 1, 0.36, 1] as const;
 const W = 320;
 const H = 448;
 
-// Rosácea de guilhochê: curvas de espirógrafo sobrepostas, levemente
-// defasadas -- é o desenho que impede cópia em cédulas e certificados.
-const GUILHOCHE = (() => {
-  const linhas: string[] = [];
-  const cx = W / 2;
-  const cy = 196;
-  for (let s = 0; s < 9; s++) {
-    const a = 70 + s * 3.2;
-    const b = 16 - s * 0.6;
-    const n = 18;
-    const pts: string[] = [];
-    for (let i = 0; i <= 720; i++) {
-      const t = (i / 720) * Math.PI * 2;
-      const x = cx + a * Math.cos(t) + b * Math.cos(n * t + s * 0.35);
-      const y = cy + a * Math.sin(t) - b * Math.sin(n * t + s * 0.35);
-      pts.push(`${x.toFixed(1)} ${y.toFixed(1)}`);
-    }
-    linhas.push(`M${pts.join(" L")} Z`);
-  }
-  return linhas;
-})();
-
-// Faixas onduladas no pé da carta (mesma família do guilhochê).
-const ONDAS = Array.from({ length: 7 }, (_, k) => {
-  const pts: string[] = [];
-  for (let x = 16; x <= W - 16; x += 4) pts.push(`${x} ${(H - 58 + k * 3 + 2.4 * Math.sin(x / 9 + k * 0.9)).toFixed(1)}`);
-  return `M${pts.join(" L")}`;
-});
-
-// Canto art déco (canto de cima-esquerda; os outros são espelhos).
-const CANTO = "M14 46 V20 Q14 14 20 14 H46 M20 38 V24 Q20 20 24 20 H38 M26 26 L32 32";
+const GUILHOCHE = rosacea(W / 2, 196);
+const ONDAS = ondas(16, W - 16, H - 58);
+const CANTO = CANTO_DECO;
 
 const MICRO = "POKERSYNC · MEMBRO FUNDADOR · ".repeat(14);
 

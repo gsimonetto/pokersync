@@ -15,7 +15,8 @@ import { useId } from "react";
 //   * lábio levantado: a cera empurrada pra fora pelo sinete;
 //   * fundo afundado: onde o sinete bateu (sombra em cima, luz embaixo);
 //   * relevo em folha de ouro: "MEMBRO FUNDADOR" em arco, MMXXVI,
-//     coroa de louros e o monograma F -- o ouro pega só nas partes altas.
+//     coroa de louros (ramos cruzados e amarrados embaixo) e o monograma F
+//     -- o ouro pega só nas partes altas.
 //
 // Na carta ganha as fitas de seda penduradas (`fitas`). Abaixo de 60px
 // somem textos em arco, louros e brilhos (viram ruído); fica a cera e o F.
@@ -36,20 +37,31 @@ const BORDA = (() => {
   return `M${pts.join(" L")} Z`;
 })();
 
-// Folhas dos louros, ao longo de um arco em volta do F (lado esquerdo;
-// o direito é espelho).
+// Coroa de louros em volta do F: dois ramos que nascem cruzados embaixo
+// (amarrados por um laço), com folhas em pares que diminuem até a ponta.
+// Gera o ramo da esquerda; o da direita é espelho.
 const LOUROS = (() => {
-  const folhas: { x: number; y: number; r: number }[] = [];
-  for (let k = 0; k < 7; k++) {
-    const a = ((118 + k * 14) * Math.PI) / 180;
-    const x = 60 + 21 * Math.cos(a);
-    const y = 60 + 21 * Math.sin(a);
-    const tang = (a * 180) / Math.PI + 90;
-    const lado = k % 2 ? 1 : -1;
-    folhas.push({ x: r1(x + Math.cos(a) * 2.2 * lado), y: r1(y + Math.sin(a) * 2.2 * lado), r: r1(tang + 28 * lado) });
+  const R = 22;
+  const a0 = (86 * Math.PI) / 180; // começa um pouco depois do meio, pra cruzar com o outro ramo
+  const a1 = (232 * Math.PI) / 180;
+  const ponto = (a: number, r = R) => [60 + r * Math.cos(a), 60 + r * Math.sin(a)];
+  const [x0, y0] = ponto(a0);
+  const [x1, y1] = ponto(a1);
+  const folhas: { x: number; y: number; ang: number; L: number }[] = [];
+  const pares = 7;
+  for (let k = 0; k < pares; k++) {
+    const u = (k + 0.9) / (pares + 0.6);
+    const a = a0 + (a1 - a0) * u;
+    const [x, y] = ponto(a);
+    const frente = (a * 180) / Math.PI + 90; // direção do ramo (rumo à ponta)
+    const L = 7 - 2.6 * u;
+    folhas.push({ x: r1(x), y: r1(y), ang: r1(frente - 38), L: r1(L) }); // folha pra fora
+    folhas.push({ x: r1(x), y: r1(y), ang: r1(frente + 34), L: r1(L * 0.9) }); // folha pra dentro
   }
-  return folhas;
+  folhas.push({ x: r1(x1), y: r1(y1), ang: r1((a1 * 180) / Math.PI + 90), L: 4.4 }); // folha da ponta
+  return { ramo: `M${r1(x0)} ${r1(y0)} A${R} ${R} 0 0 1 ${r1(x1)} ${r1(y1)}`, folhas };
 })();
+const folha = (L: number) => `M0 0 Q${r1(L * 0.45)} ${r1(-L * 0.42)} ${L} 0 Q${r1(L * 0.45)} ${r1(L * 0.42)} 0 0 Z`;
 
 // Fitas de seda (só na carta): duas caudas com corte em V.
 const FITA_E = "M52 92 L30 140 L36 136 L40 146 L60 100 Z";
@@ -74,9 +86,9 @@ export function SeloFundador({
 
   const louros = (
     <g>
-      <path d="M49.5 78 A21 21 0 0 1 40 50" fill="none" stroke={`url(#${id("ouro")})`} strokeWidth="1" strokeLinecap="round" />
-      {LOUROS.map((f, i) => (
-        <ellipse key={i} cx={f.x} cy={f.y} rx="3.6" ry="1.5" transform={`rotate(${f.r} ${f.x} ${f.y})`} fill={`url(#${id("ouro")})`} />
+      <path d={LOUROS.ramo} fill="none" stroke={`url(#${id("ouro")})`} strokeWidth=".9" strokeLinecap="round" />
+      {LOUROS.folhas.map((f, i) => (
+        <path key={i} d={folha(f.L)} transform={`translate(${f.x} ${f.y}) rotate(${f.ang})`} fill={`url(#${id("ouro")})`} stroke="#6b3f06" strokeWidth=".2" />
       ))}
     </g>
   );
@@ -191,6 +203,8 @@ export function SeloFundador({
                 </text>
                 {louros}
                 <g transform="translate(120 0) scale(-1 1)">{louros}</g>
+                <path d="M60 82 q-3.4 -2.6 -4.2 0.2 q0.8 2.6 4.2 -0.2 q3.4 -2.6 4.2 0.2 q-0.8 2.6 -4.2 -0.2 Z" fill={`url(#${id("ouro")})`} stroke="#6b3f06" strokeWidth=".25" />
+                <circle cx="60" cy="82" r="1.1" fill={`url(#${id("ouro")})`} stroke="#6b3f06" strokeWidth=".25" />
               </>
             )}
             <text
