@@ -550,6 +550,16 @@ export function RevisorHandTable({
     return { fromPosLabel: ev.posLabel, amount: amountBB, key: `${stepIndex}-${ev.posLabel}` };
   }, [replayState, stepIndex]);
 
+  // Sobra de aposta que ninguém pagou voltando pro dono, no step que
+  // fechou a ação (ex.: o fold diante da 4-bet).
+  const devolucaoAnimation = useMemo(() => {
+    if (!replayState) return null;
+    const ev = replayState.currentEvent;
+    if (!ev || ev.kind !== "action" || !ev.devolucao || !replayState.isAdvancing) return null;
+    const amountBB = Math.round((ev.devolucao.amount / replayState.bbUnit) * 10) / 10;
+    return { toPosLabel: ev.devolucao.posLabel, amount: amountBB, key: `${stepIndex}-dev-${ev.devolucao.posLabel}` };
+  }, [replayState, stepIndex]);
+
   // Ficha do pote indo até o vencedor (pedido explicito: "quando alguém
   // ganhar o pote, ter animação dos blinds indo até o vencedor e somando
   // ao stack") -- so' dispara no step do evento "award" (ultimo step da
@@ -1115,6 +1125,7 @@ export function RevisorHandTable({
             seats={isMobile && mobileSeatLayout ? mobileSeatLayout : replayState.seatLayout}
             chipAnimation={chipAnimation}
             potAwardAnimation={potAwardAnimation}
+            devolucaoAnimation={devolucaoAnimation}
             streetCommitments={commitsNaMesa}
             unidade={unidade}
             opponentStats={opponentStats}

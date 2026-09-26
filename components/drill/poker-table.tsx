@@ -984,6 +984,7 @@ export function PokerTable({
   seats,
   chipAnimation,
   potAwardAnimation,
+  devolucaoAnimation,
   streetCommitments,
   variant = "replay",
   // Retangulo deitado (8/5) por padrao -- mesa normal na tela toda em
@@ -1034,6 +1035,8 @@ export function PokerTable({
   // ausente em qualquer consumidor que nao passe (ex: Treino), sem
   // mudanca de comportamento pra quem nao usa.
   potAwardAnimation?: { toPosLabel: string; amount: number; key: string | number } | null;
+  // Aposta não paga voltando pro dono (ver voo-fichas.tsx, "devolucao").
+  devolucaoAnimation?: { toPosLabel: string; amount: number; key: string | number } | null;
   streetCommitments?: Record<string, number>;
   variant?: TableVariant;
   aspectRatio?: string;
@@ -1108,6 +1111,9 @@ export function PokerTable({
   // ficou -- é de lá que as fichas saem/chegam nos voos.
   const [ajusteApostas, setAjusteApostas] = useState<Record<string, Ponto>>({});
   const pilhasDasApostas = useRef<Record<string, Ponto>>({});
+  // Onde as pilhas estavam antes da última mudança -- a devolução sai
+  // de lá quando a pilha some inteira.
+  const pilhasAnteriores = useRef<Record<string, Ponto>>({});
   useLayoutEffect(() => {
     const caixa = tableBoxRef.current;
     if (!caixa) return;
@@ -1133,6 +1139,7 @@ export function PokerTable({
         pilhas[pos] = { x: pilha.left + pilha.width / 2 - atual.x + ajuste.x - t.left, y: pilha.top + pilha.height / 2 - atual.y + ajuste.y - t.top };
       }
     });
+    pilhasAnteriores.current = { ...pilhasAnteriores.current, ...pilhasDasApostas.current };
     pilhasDasApostas.current = pilhas;
     const mudou =
       Object.keys(novo).length !== Object.keys(ajusteApostas).length ||
@@ -1201,6 +1208,18 @@ export function PokerTable({
     voar && chipAnimation && chipAnimation.fromPosLabel === pos && chipAnimation.amount > 0
       ? duracaoDoVoo("aposta", quebrarEmFichas(chipAnimation.amount, MAX_FICHAS_VOO, emFichas).length, vel)
       : 0;
+
+  // 2b) Devolução: a sobra da aposta que ninguém pagou volta da pilha
+  //     pro stack do dono (ex.: o fold diante da 4-bet).
+  useEffect(() => {
+    if (!voar || !devolucaoAnimation || devolucaoAnimation.amount <= 0) return;
+    const assento = seats.find((s) => s.posLabel === devolucaoAnimation.toPosLabel);
+    const pos = devolucaoAnimation.toPosLabel;
+    const de = pilhasDasApostas.current[pos] ?? pilhasAnteriores.current[pos];
+    if (!assento || !de) return;
+    novoVoo({ id: `devolucao-${devolucaoAnimation.key}`, tipo: "devolucao", fichas: quebrarEmFichas(devolucaoAnimation.amount, MAX_FICHAS_VOO, emFichas), de, para: pontoDoAssento(assento) });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [devolucaoAnimation?.key]);
 
   // 3) Prêmio: as fichas se espalham pra fora do pote e vão até o
   //    vencedor, e o valor ganho sobe em cima dele. Se as apostas da última
