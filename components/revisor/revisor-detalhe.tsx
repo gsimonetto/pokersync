@@ -39,7 +39,7 @@ import { findEligibleAllInConfrontation } from "@/lib/poker/hand-ev-eligibility"
 import { computeHandEv, fetchHandEvResult, type HandEvResult } from "@/lib/services/hand-ev-service";
 import { CoachThread } from "./coach-thread";
 import { ResumoDaMao } from "./resumo-da-mao";
-import { CartaTexto, NOME_RUA, rotuloAcao } from "./linha-do-tempo";
+import { CartaTexto, NOME_RUA, nomesDosRaises, rotuloAcao } from "./linha-do-tempo";
 import { projectHandAtStep } from "@/lib/poker/hand-replay-projector";
 import { ShareHandModal } from "./share-hand-modal";
 
@@ -428,13 +428,15 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
       const heroPos = st.seatLayout.find((sl) => sl.isHero)?.posLabel;
       for (const r of st.tableHand.history) {
         const acoes = r.actions.filter((a) => !a.label.startsWith("posts"));
+        const nomes = nomesDosRaises(r.street, acoes);
         const ultimaMinha = acoes.map((a) => a.pos).lastIndexOf(heroPos ?? "");
         if (ultimaMinha < 0) continue;
         const inicio = Math.max(0, acoes.findIndex((a) => a.label !== "fold"));
         mapa[r.street.toLowerCase()] = acoes
+          .map((a, i) => ({ ...a, nome: nomes[i] }))
           .slice(inicio, ultimaMinha + 1)
           .filter((a) => a.label !== "fold" || a.pos === heroPos)
-          .map((a) => ({ texto: `${a.pos === heroPos ? heroNome : a.pos} ${rotuloAcao(a.label)}`, voce: a.pos === heroPos }));
+          .map((a) => ({ texto: `${a.pos === heroPos ? heroNome : a.pos} ${rotuloAcao(a.label, a.nome)}`, voce: a.pos === heroPos }));
       }
     } catch {
       // replay não montou -- o passo 1 mostra só o nome da rua
