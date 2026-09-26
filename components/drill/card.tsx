@@ -31,7 +31,11 @@ export function sortCardsDesc<T extends string | null>(cards: T[]): T[] {
 
 // Largura de cada tamanho (a altura sai da proporção de carta de pôquer,
 // 100 x 143): board 56x80, herói 64x92, vilão 46x66, mini 34x49.
-const LARGURA = { board: 56, hero: 64, mini: 34, villain: 46 } as const;
+// heroCelular 50x72: herói no celular, onde o assento dele já é ampliado
+// (heroScale) -- com "hero" as duas cartas lado a lado ficavam enormes
+// perto do board e cobriam o vizinho (pedido explícito: "no celular as
+// cartas ficaram muito grande").
+const LARGURA = { board: 56, hero: 64, heroCelular: 50, mini: 34, villain: 46 } as const;
 type Size = keyof typeof LARGURA;
 export const alturaDaCarta = (size: Size) => Math.round((LARGURA[size] * 143) / 100);
 

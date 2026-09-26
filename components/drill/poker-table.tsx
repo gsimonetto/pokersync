@@ -474,7 +474,7 @@ function CommittedChip({
 // visualizacao"). Antes ficavam em leque, a segunda cobrindo boa parte da
 // primeira -- o indice da carta de tras ficava parcialmente escondido.
 const CARD_GAP_PX = 4;
-type Size = "board" | "hero" | "mini" | "villain";
+type Size = "board" | "hero" | "heroCelular" | "mini" | "villain";
 
 function CardFan({ cards, size }: { cards: (string | null)[]; size: Size }) {
   return (
@@ -847,7 +847,7 @@ function Seat({
                 {/* size "hero" (72x100, era "board" 56x80) -- pedido
                     explicito: "as cartas do hero deverão ser maiores que
                     as do vilão" (villain usa 46x66, ja bem menor). */}
-                <CardFan cards={sortCardsDesc(cards)} size="hero" />
+                <CardFan cards={sortCardsDesc(cards)} size={heroScale > 1 ? "heroCelular" : "hero"} />
               </div>
             )}
             <div style={{ position: "relative", zIndex: 2 }}>{seatInfo}</div>
