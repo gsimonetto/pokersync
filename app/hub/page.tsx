@@ -8,27 +8,14 @@ import { PainelVisual } from "@/components/dashboard/kit";
 import { PerfEstilos } from "@/components/performance/perf-estilos";
 import { AbasAnimadas } from "@/components/performance/abas-animadas";
 import { PainelCard } from "@/components/painel/painel-card";
-import { AvatarNivel } from "@/components/avatar-nivel";
 import { CartaoNivel, HubEstilos, PatentesModal } from "@/components/hub/nivel";
 import { Missoes } from "@/components/hub/missoes";
 import { Ranking } from "@/components/hub/ranking/ranking";
-import { EmblemaEstilos, EmblemaPatente } from "@/components/hub/patentes/emblema";
+import { EmblemaEstilos } from "@/components/hub/patentes/emblema";
 import { CartaPatente } from "@/components/hub/patentes/carta";
 import { SubiuDeNivel, nivelVistoAntes } from "@/components/hub/patentes/subiu";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
-import {
-  MAX_LEVEL,
-  fetchActiveMissions,
-  fetchActiveSeason,
-  fetchMissionCatalog,
-  fetchProgress,
-  levelColor,
-  levelMaterial,
-  levelSubTier,
-  xpForNextLevel,
-  type Progress,
-  type Season,
-} from "@/lib/services/xp-service";
+import { fetchActiveMissions, fetchActiveSeason, fetchMissionCatalog, fetchProgress, type Progress, type Season } from "@/lib/services/xp-service";
 
 type Vista = "missoes" | "ranking";
 
@@ -128,12 +115,11 @@ export default function HubPage() {
             <HubEstilos />
             <EmblemaEstilos />
 
-            <header className="mb-4 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div>
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Hub de Evolução</h1>
-                <p className="mt-1 text-[12.5px] text-muted">Seu nível, suas missões e a disputa da temporada.</p>
-              </div>
-              {progress && <ResumoNivel progress={progress} perfil={perfil} onAbrirCarta={() => setCarta(true)} />}
+            {/* O resumo do nível (foto + patente + quanto falta) foi pra tela
+                inicial, ao lado da Banca -- aqui ele duplicava o "Seu nível". */}
+            <header className="mb-4">
+              <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Hub de Evolução</h1>
+              <p className="mt-1 text-[12.5px] text-muted">Seu nível, suas missões e a disputa da temporada.</p>
             </header>
 
             <div className="sticky top-0 z-30 -mx-4 mb-4 border-b border-white/[0.06] bg-black/70 px-4 pt-2 backdrop-blur-xl md:-mx-6 md:px-6">
@@ -175,45 +161,5 @@ export default function HubPage() {
       )}
       {subiu && <SubiuDeNivel de={subiu.de} para={subiu.para} onFechar={() => setSubiu(null)} />}
     </AppShell>
-  );
-}
-
-// Canto direito do cabeçalho: sua foto (anel de nível), o emblema da
-// patente e quanto falta -- o "quem sou eu aqui" visível nas duas abas.
-// Tocar abre a carta holográfica.
-function ResumoNivel({ progress, perfil, onAbrirCarta }: { progress: Progress; perfil: Profile | null; onAbrirCarta: () => void }) {
-  const max = progress.level >= MAX_LEVEL;
-  const cor = levelColor(progress.level);
-  return (
-    <button
-      type="button"
-      onClick={onAbrirCarta}
-      className="painel-vidro group flex items-center gap-3 self-start rounded-2xl border border-white/10 py-2 pl-2 pr-4 text-left transition-colors hover:border-white/20 sm:self-auto"
-      title="Ver carta da patente"
-      style={{ boxShadow: `inset 0 1px 0 ${cor}33` }}
-    >
-      <span className="relative">
-        <AvatarNivel
-          avatarId={perfil?.avatar_id ?? 1}
-          avatarUrl={perfil?.avatar_url}
-          nivel={progress.level}
-          xpAtual={progress.xp_current}
-          tamanho={46}
-          mostrarNivel={false}
-          animar
-        />
-        <span className="absolute -bottom-2 -right-2 transition-transform duration-300 group-hover:scale-110">
-          <EmblemaPatente nivel={progress.level} tamanho={30} mostrarNumero={false} />
-        </span>
-      </span>
-      <span className="min-w-0 pl-1">
-        <span className="block text-[13px] font-semibold" style={{ color: cor }}>
-          {levelMaterial(progress.level)} {levelSubTier(progress.level)} · Nível {progress.level}
-        </span>
-        <span className="block text-[11.5px] tabular-nums text-muted">
-          {max ? "Nível máximo" : `faltam ${(xpForNextLevel(progress.level) - progress.xp_current).toLocaleString("pt-BR")} XP pro ${progress.level + 1}`}
-        </span>
-      </span>
-    </button>
   );
 }
