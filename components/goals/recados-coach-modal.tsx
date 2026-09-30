@@ -97,16 +97,16 @@ export function RecadosCoachModalBody() {
               <Target size={13} className="text-training" />
               Metas do coach
             </h3>
-            <div className="flex gap-1 rounded-lg bg-elevated p-1 text-[11px] font-semibold">
+            <div className="flex gap-1 rounded-lg bg-white/[0.04] p-1 text-[11px] font-semibold">
               <button
                 onClick={() => setAba("ativas")}
-                className={`rounded-md px-2 py-1 transition-colors ${aba === "ativas" ? "bg-surface text-ink" : "text-muted"}`}
+                className={`rounded-md px-2 py-1 transition-colors ${aba === "ativas" ? "bg-white/[0.1] text-ink" : "text-muted"}`}
               >
                 Ativas ({metasAtivas.length})
               </button>
               <button
                 onClick={() => setAba("finalizadas")}
-                className={`rounded-md px-2 py-1 transition-colors ${aba === "finalizadas" ? "bg-surface text-ink" : "text-muted"}`}
+                className={`rounded-md px-2 py-1 transition-colors ${aba === "finalizadas" ? "bg-white/[0.1] text-ink" : "text-muted"}`}
               >
                 Finalizadas ({metasFinalizadas.length})
               </button>
@@ -116,7 +116,7 @@ export function RecadosCoachModalBody() {
             {(aba === "ativas" ? metasAtivas : metasFinalizadas).map((m) => {
               const pct = Math.min(100, Math.round((m.progress / m.target) * 100));
               return (
-                <li key={m.id} className="rounded-lg border border-hairline bg-elevated p-3">
+                <li key={m.id} className="rounded-lg border border-hairline bg-white/[0.04] p-3">
                   <div className="flex items-center justify-between gap-3">
                     <span className="text-[12.5px] font-medium">
                       {METRICA_LABEL[m.metric]}
@@ -150,7 +150,7 @@ export function RecadosCoachModalBody() {
             <ClipboardList size={13} className="text-training" />
             Alvos do funil
           </h3>
-          <div className="space-y-2.5 rounded-lg border border-hairline bg-elevated p-3">
+          <div className="space-y-2.5 rounded-lg border border-hairline bg-white/[0.04] p-3">
             {card.drillsTarget > 0 && (
               <div>
                 <div className="mb-1 flex justify-between text-[12.5px]">
@@ -192,7 +192,7 @@ export function RecadosCoachModalBody() {
             <StickyNote size={13} className="text-training" />
             Observação do coach
           </h3>
-          <p className="rounded-lg border border-hairline bg-elevated p-3 text-[12.5px] italic text-muted">&quot;{card.notes}&quot;</p>
+          <p className="rounded-lg border border-hairline bg-white/[0.04] p-3 text-[12.5px] italic text-muted">&quot;{card.notes}&quot;</p>
         </section>
       )}
 
@@ -202,7 +202,7 @@ export function RecadosCoachModalBody() {
             <ClipboardList size={13} className="text-training" />
             Checklist do funil
           </h3>
-          <ul className="rounded-lg border border-hairline bg-elevated">
+          <ul className="rounded-lg border border-hairline bg-white/[0.04]">
             {checklist.map((it, i) => (
               <li
                 key={it.id}
@@ -251,7 +251,7 @@ export function RecadosCoachModalBody() {
           </h3>
           <ul className="space-y-2">
             {comentarios.map((c) => (
-              <li key={c.id} className="rounded-lg border border-hairline bg-elevated p-3">
+              <li key={c.id} className="rounded-lg border border-hairline bg-white/[0.04] p-3">
                 {/* conversa=1: comentário abre direto na conversa ("Analisar mão"). */}
                 <Link href={`/revisor?shared=${c.reviewId}&conversa=1`} className="text-[12.5px] font-semibold text-ink hover:text-training hover:underline">
                   {c.reviewTitle}

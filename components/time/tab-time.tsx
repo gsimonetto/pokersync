@@ -119,7 +119,7 @@ export function PerfilDoTime({
             onChange={(e) => setNome(e.target.value)}
             maxLength={40}
             aria-label="Nome do time"
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none focus:border-ink/40"
+            className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-sm text-ink outline-none focus:border-ink/40"
           />
           <textarea
             value={desc}
@@ -127,7 +127,7 @@ export function PerfilDoTime({
             rows={3}
             maxLength={400}
             placeholder="Descreva o time: foco, formatos, rotina de estudo…"
-            className="w-full resize-none rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50 focus:border-ink/40"
+            className="w-full resize-none rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50 focus:border-ink/40"
           />
           <div className="flex flex-wrap gap-2">
             {Object.values(ACCENT).map((c) => (
@@ -359,12 +359,12 @@ export function EtiquetasTime({
               maxLength={24}
               placeholder="Nova etiqueta"
               aria-label="Nome da nova etiqueta"
-              className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50 focus:border-ink/40 sm:max-w-[240px]"
+              className="min-w-0 flex-1 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50 focus:border-ink/40 sm:max-w-[240px]"
             />
             <button
               onClick={criar}
               disabled={salvando || !nova.trim()}
-              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40"
+              className="flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40"
             >
               <Plus size={14} />
               Criar
@@ -489,7 +489,7 @@ export function ExcluirTime({ info, onExcluido }: { info: TeamInfo; onExcluido: 
                 autoComplete="off"
                 autoCapitalize="off"
                 spellCheck={false}
-                className="mt-1.5 w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-negative/60"
+                className="mt-1.5 w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none focus:border-negative/60"
               />
               {erro && <p className="mt-2 text-[12.5px] text-negative">{erro}</p>}
 

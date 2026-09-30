@@ -2,12 +2,8 @@
 
 import { useCallback, useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
-import { MotionConfig } from "framer-motion";
 import { Bell, CheckCheck, Inbox, ListChecks, Settings, Users } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
-import { PainelVisual } from "@/components/dashboard/kit";
-import { PerfEstilos } from "@/components/performance/perf-estilos";
-import { AbasAnimadas } from "@/components/performance/abas-animadas";
+import { CARD_VIDRO, TelaVidro } from "@/components/ui/tela-vidro";
 import { ItemNotificacao } from "@/components/notifications-menu";
 import { BOTAO_VIDRO } from "@/components/banca/util";
 import {
@@ -89,63 +85,51 @@ export default function NotificacoesPage() {
   const totalNaoLidas = naoLidas.sistema + naoLidas.tarefas + naoLidas.team;
 
   return (
-    <AppShell>
-      <PainelVisual value="vidro">
-        <MotionConfig reducedMotion="user">
-          <main className="perf w-full px-3 pb-12 pt-4 text-ink sm:px-4 sm:pt-6 md:px-6">
-            <PerfEstilos />
-            <header className="mb-3 flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-              <div className="min-w-0">
-                <h1 className="text-[21px] font-semibold tracking-tight sm:text-3xl">Notificações</h1>
-                <p className="mt-1 text-[12.5px] text-muted">{totalNaoLidas > 0 ? `${totalNaoLidas} por ler` : "Tudo lido"}</p>
-              </div>
-              {totalNaoLidas > 0 && (
-                <button onClick={lerTudo} className={`${BOTAO_VIDRO} self-start sm:self-auto`}>
-                  <CheckCheck size={15} /> Ler tudo
-                </button>
-              )}
-            </header>
-
-            <div className="sticky top-0 z-30 -mx-3 mb-3.5 border-b border-white/[0.06] bg-black/70 px-3 pt-1 backdrop-blur-xl sm:-mx-4 sm:px-4 md:-mx-6 md:px-6">
-              <AbasAnimadas<Filtro>
-                value={filtro}
-                onChange={setFiltro}
-                rotulo="Categorias de notificação"
-                options={[
-                  { value: "todas", label: "Todas", icon: Inbox, badge: totalNaoLidas || undefined },
-                  { value: "sistema", label: "Sistema", icon: Settings, badge: naoLidas.sistema || undefined },
-                  { value: "tarefas", label: "Tarefas", icon: ListChecks, badge: naoLidas.tarefas || undefined },
-                  { value: "team", label: "Time", icon: Users, badge: naoLidas.team || undefined },
-                ]}
-              />
-            </div>
-
-            <section className="painel-vidro max-w-4xl rounded-3xl border border-white/10 p-2 sm:p-3">
-              {loading ? (
-                <div className="flex flex-col gap-2 p-1" aria-hidden>
-                  {[0, 1, 2, 3].map((i) => (
-                    <div key={i} className="painel-esqueleto h-[74px] rounded-2xl" />
-                  ))}
-                </div>
-              ) : items.length === 0 ? (
-                <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
-                  <span className="grid size-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.03] text-[#d4af37]">
-                    <Bell size={20} />
-                  </span>
-                  <p className="text-[13px] font-medium text-ink">Nada por aqui</p>
-                  <p className="text-[12px] text-muted">Nenhuma notificação nesta categoria.</p>
-                </div>
-              ) : (
-                <ul className="flex flex-col gap-1.5">
-                  {items.map((n) => (
-                    <ItemNotificacao key={n.id} n={n} quando={quando(n.created_at)} onAbrir={() => abrir(n)} onExcluir={(e) => excluir(n.id, e)} />
-                  ))}
-                </ul>
-              )}
-            </section>
-          </main>
-        </MotionConfig>
-      </PainelVisual>
-    </AppShell>
+    <TelaVidro<Filtro>
+      titulo="Notificações"
+      subtitulo={totalNaoLidas > 0 ? `${totalNaoLidas} por ler` : "Tudo lido"}
+      acoes={
+        totalNaoLidas > 0 && (
+          <button onClick={lerTudo} className={BOTAO_VIDRO}>
+            <CheckCheck size={15} /> Ler tudo
+          </button>
+        )
+      }
+      abas={{
+        value: filtro,
+        onChange: setFiltro,
+        rotulo: "Categorias de notificação",
+        options: [
+          { value: "todas", label: "Todas", icon: Inbox, badge: totalNaoLidas || undefined },
+          { value: "sistema", label: "Sistema", icon: Settings, badge: naoLidas.sistema || undefined },
+          { value: "tarefas", label: "Tarefas", icon: ListChecks, badge: naoLidas.tarefas || undefined },
+          { value: "team", label: "Time", icon: Users, badge: naoLidas.team || undefined },
+        ],
+      }}
+    >
+      <section className={`${CARD_VIDRO} max-w-4xl p-2 sm:p-3`}>
+        {loading ? (
+          <div className="flex flex-col gap-2 p-1" aria-hidden>
+            {[0, 1, 2, 3].map((i) => (
+              <div key={i} className="painel-esqueleto h-[74px] rounded-2xl" />
+            ))}
+          </div>
+        ) : items.length === 0 ? (
+          <div className="flex flex-col items-center gap-2 px-6 py-12 text-center">
+            <span className="grid size-11 place-items-center rounded-2xl border border-white/10 bg-white/[0.03] text-[#d4af37]">
+              <Bell size={20} />
+            </span>
+            <p className="text-[13px] font-medium text-ink">Nada por aqui</p>
+            <p className="text-[12px] text-muted">Nenhuma notificação nesta categoria.</p>
+          </div>
+        ) : (
+          <ul className="flex flex-col gap-1.5">
+            {items.map((n) => (
+              <ItemNotificacao key={n.id} n={n} quando={quando(n.created_at)} onAbrir={() => abrir(n)} onExcluir={(e) => excluir(n.id, e)} />
+            ))}
+          </ul>
+        )}
+      </section>
+    </TelaVidro>
   );
 }

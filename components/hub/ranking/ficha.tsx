@@ -77,7 +77,7 @@ export function FichaJogador({ j, eu, onFechar }: { j: JogadorRanking; eu: Jogad
           <button
             type="button"
             onClick={onFechar}
-            className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-elevated hover:text-ink"
+            className="absolute right-3 top-3 grid h-8 w-8 place-items-center rounded-lg text-muted transition-colors hover:bg-white/[0.05] hover:text-ink"
             aria-label="Fechar"
           >
             <X size={16} />

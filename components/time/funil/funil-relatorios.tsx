@@ -98,7 +98,7 @@ export function FunilRelatorios({
 
   if (total === 0) {
     return (
-      <section className="rounded-xl border border-hairline bg-surface p-6 text-center">
+      <section className="painel-vidro rounded-2xl border border-white/10 p-6 text-center">
         <BarChart3 size={22} className="mx-auto text-muted" />
         <p className="mt-2 text-sm text-muted">Nenhum jogador no funil ainda — os relatórios aparecem assim que o primeiro cartão for criado.</p>
       </section>
@@ -141,7 +141,7 @@ export function FunilRelatorios({
         ]}
       />
 
-      <section className="rounded-xl border border-hairline bg-surface p-5">
+      <section className="painel-vidro rounded-2xl border border-white/10 p-5">
         <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
           <div>
             <h3 className="text-sm font-semibold">Fluxo por fase</h3>
@@ -151,7 +151,7 @@ export function FunilRelatorios({
         </div>
 
         {fluxo === null && (
-          <p className="mb-3 flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[12px] text-muted">
+          <p className="mb-3 flex items-center gap-2 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[12px] text-muted">
             <Database size={13} className="shrink-0" />
             Entradas, subidas e tempo médio aparecem depois da atualização do banco do funil. A ocupação abaixo já é real.
           </p>
@@ -249,7 +249,7 @@ export function FunilRelatorios({
       </section>
 
       {porCoach.length > 0 && (
-        <section className="rounded-xl border border-hairline bg-surface p-5">
+        <section className="painel-vidro rounded-2xl border border-white/10 p-5">
           <h3 className="text-sm font-semibold">Carga por coach</h3>
           <p className="mt-0.5 text-[12px] text-muted">Onde a atenção do staff está faltando.</p>
           <div className="mt-3 overflow-x-auto">

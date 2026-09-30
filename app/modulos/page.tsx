@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { ArrowRight, Target, Trophy, MessageSquare, type LucideIcon } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { TelaVidro } from "@/components/ui/tela-vidro";
 import { AvatarNivel } from "@/components/avatar-nivel";
 import { createClient } from "@/lib/supabase/client";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
@@ -20,7 +20,8 @@ import { fetchGoals } from "@/lib/services/bankroll-service";
 import { fetchPlayerGoals, fetchPlayerAlerts } from "@/lib/services/team-service";
 import { todayISO } from "@/lib/bankroll/format";
 
-const BRL = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" });
+// Buy-in e prêmio vêm dos torneios importados, que são sempre em dólar.
+const USD = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "USD" });
 
 // Icone por conquista do catalogo (ver migracao achievements) --
 // fallback Trophy pra qualquer conquista futura sem icone proprio
@@ -163,11 +164,7 @@ export default function ModulosPage() {
       if (userRes.status === "fulfilled") {
         const userId = userRes.value.data.user?.id;
         if (userId) {
-          const { data: teamRow } = await supabase
-            .from("team_members")
-            .select("teams ( name, accent )")
-            .eq("user_id", userId)
-            .maybeSingle();
+          const { data: teamRow } = await supabase.from("team_members").select("teams ( name, accent )").eq("user_id", userId).maybeSingle();
           if (!alive) return;
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
           const teamData = teamRow?.teams as any;
@@ -184,8 +181,8 @@ export default function ModulosPage() {
   const age = useMemo(() => calcAge(profile?.data_nascimento ?? null), [profile]);
 
   return (
-    <AppShell>
-      <main className="flex flex-1 flex-col gap-4 px-4 py-6 md:px-6">
+    <TelaVidro titulo="Meu perfil" subtitulo="Seus números principais, conquistas, metas e recados do coach.">
+      <div className="flex flex-col gap-3.5">
         {/* Card de perfil: foto (coluna 1) + dados do jogador (coluna 2)
             + metricas mais relevantes (coluna 3), mesma ordem/estilo de
             linha -- estrutura pedida pelo usuario. Buy-in medio e Ganhos
@@ -195,8 +192,8 @@ export default function ModulosPage() {
             seu proprio jeito (ver handleRemove em app/banca/page.tsx e o
             comentario equivalente em StatisticsTab.tsx), entao excluir uma
             sessao na Banca nao muda esses dois numeros aqui. */}
-        <section className="group flex shrink-0 flex-col overflow-hidden rounded-xl border border-hairline bg-surface transition-all duration-300 hover:border-white/15 hover:shadow-[0_0_40px_-12px_rgba(255,255,255,0.18)] sm:flex-row">
-          <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center overflow-hidden bg-elevated p-4 sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
+        <section className="group flex shrink-0 flex-col overflow-hidden painel-vidro rounded-3xl border border-white/10 transition-all duration-300 hover:border-white/20 sm:flex-row">
+          <div className="mx-auto flex aspect-square w-full max-w-[220px] shrink-0 items-center justify-center overflow-hidden bg-white/[0.03] p-4 sm:mx-0 sm:aspect-auto sm:h-auto sm:w-[220px] sm:max-w-none">
             <AvatarNivel
               userId={profile?.id}
               avatarId={profile?.avatar_id ?? 1}
@@ -211,51 +208,49 @@ export default function ModulosPage() {
 
           <div className="flex-1 p-5">
             <div className="min-w-0">
-              <h2 className="truncate text-2xl font-bold tracking-tight text-ink">{displayName}</h2>
-              {profile?.nome && profile.nome !== displayName && (
-                <p className="mt-0.5 text-sm text-muted">{profile.nome}</p>
-              )}
+              <h2 className="truncate text-2xl font-semibold tracking-tight text-ink">{displayName}</h2>
+              {profile?.nome && profile.nome !== displayName && <p className="mt-0.5 text-sm text-muted">{profile.nome}</p>}
             </div>
 
-            <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-1 border-t border-hairline pt-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="mt-4 grid grid-cols-1 gap-x-6 gap-y-1 border-t border-white/[0.08] pt-4 sm:grid-cols-2 lg:grid-cols-3">
               <div className="flex flex-col gap-2.5">
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Idade</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Idade</span>
                   <span className="text-sm text-ink">{age !== null ? `${age} anos` : "—"}</span>
                 </div>
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Time atual</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Time atual</span>
                   <MetricValue href={team ? "/time" : undefined}>{team?.name ?? "Sem time"}</MetricValue>
                 </div>
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Ganhos totais</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Ganhos totais</span>
                   <MetricValue href="/performance" mono>
-                    {totalGanhos != null ? BRL.format(totalGanhos) : "—"}
+                    {totalGanhos != null ? USD.format(totalGanhos) : "—"}
                   </MetricValue>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Buy-in médio</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Buy-in médio</span>
                   <MetricValue href="/performance" mono>
-                    {avgBuyin != null ? BRL.format(avgBuyin) : "—"}
+                    {avgBuyin != null ? USD.format(avgBuyin) : "—"}
                   </MetricValue>
                 </div>
               </div>
 
               <div className="flex flex-col gap-2.5">
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">VPIP</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">VPIP</span>
                   <MetricValue href="/performance" mono>
                     {fmtPct(freq?.vpip ?? null) ?? "—"}
                   </MetricValue>
                 </div>
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">3-Bet</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">3-Bet</span>
                   <MetricValue href="/performance" mono>
                     {fmtPct(freq?.tresBet ?? null) ?? "—"}
                   </MetricValue>
                 </div>
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ROI acumulado</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">ROI acumulado</span>
                   <Link
                     href="/performance"
                     className={`text-sm font-semibold tabular-nums transition-colors hover:underline ${
@@ -266,7 +261,7 @@ export default function ModulosPage() {
                   </Link>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">ITM aproximado</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">ITM aproximado</span>
                   <MetricValue href="/performance" mono>
                     {fmtPct(perf?.itm_pct_aproximado) ?? "—"}
                   </MetricValue>
@@ -274,26 +269,26 @@ export default function ModulosPage() {
               </div>
 
               <div className="flex flex-col gap-2.5">
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Nível</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Nível</span>
                   <MetricValue href="/hub" mono>
                     {level != null ? level : "—"}
                   </MetricValue>
                 </div>
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Sessões</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Sessões</span>
                   <MetricValue href="/performance" mono>
                     {perf?.num_sessoes ?? "—"}
                   </MetricValue>
                 </div>
-                <div className="flex justify-between border-b border-hairline/50 pb-2">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Horas jogadas</span>
+                <div className="flex justify-between border-b border-white/[0.06] pb-2">
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Horas jogadas</span>
                   <MetricValue href="/performance" mono>
                     {perf?.horas_jogadas != null ? `${perf.horas_jogadas}h` : "—"}
                   </MetricValue>
                 </div>
                 <div className="flex justify-between">
-                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/60">Streak atual</span>
+                  <span className="text-[10px] font-bold uppercase tracking-wider text-muted/80">Streak atual</span>
                   <MetricValue href="/performance" mono>
                     {perf?.streak_atual != null ? `${perf.streak_atual}d` : "—"}
                   </MetricValue>
@@ -308,8 +303,8 @@ export default function ModulosPage() {
                 achievements vier preenchido (ver achievements-service.ts),
                 os selos desbloqueados aparecem aqui, cada um com o icone
                 do proprio catalogo (ACHIEVEMENT_ICON, fallback Trophy). */}
-            <div className="mt-3 border-t border-hairline pt-3">
-              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/60">Conquistas PokerSync</p>
+            <div className="mt-3 border-t border-white/[0.08] pt-3">
+              <p className="mb-2 text-[10px] font-bold uppercase tracking-wider text-muted/80">Conquistas PokerSync</p>
               <div className="flex min-h-9 flex-wrap gap-2">
                 {achievements.map((a) => {
                   // Fundador tem selo próprio (lacre de cera), no lugar do ícone genérico.
@@ -350,18 +345,18 @@ export default function ModulosPage() {
             pre-flop saiu daqui: ja existe em Player Evolution, duplicar so'
             inflava a tela sem necessidade. Sem time, so' o item de Metas
             aparece (ocupa a linha inteira, sem coluna vazia do lado). */}
-        <div className={`grid divide-hairline overflow-hidden rounded-xl border border-hairline bg-surface ${team ? "grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0" : "grid-cols-1"}`}>
+        <div
+          className={`grid divide-white/[0.06] overflow-hidden painel-vidro rounded-3xl border border-white/10 ${team ? "grid-cols-1 divide-y sm:grid-cols-2 sm:divide-x sm:divide-y-0" : "grid-cols-1"}`}
+        >
           <button
             onClick={() => setMetasModalOpen(true)}
-            className="group flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-elevated"
+            className="group flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04]"
           >
             <div className="relative shrink-0">
-              <div className="flex size-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-[#E0954C]">
+              <div className="flex size-9 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-[#E0954C]">
                 <Target size={16} />
               </div>
-              {metasDot && (
-                <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
-              )}
+              {metasDot && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />}
             </div>
             <div className="min-w-0 flex-1">
               <p className="text-[13px] font-semibold text-ink">Minhas Metas</p>
@@ -373,15 +368,13 @@ export default function ModulosPage() {
           {team && (
             <button
               onClick={() => setCoachModalOpen(true)}
-              className="group flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-elevated"
+              className="group flex items-center gap-3 px-4 py-3.5 text-left transition-colors hover:bg-white/[0.04]"
             >
               <div className="relative shrink-0">
-                <div className="flex size-9 items-center justify-center rounded-lg border border-hairline bg-elevated text-[#7C83E0]">
+                <div className="flex size-9 items-center justify-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-[#7C83E0]">
                   <MessageSquare size={16} />
                 </div>
-                {coachDot && (
-                  <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />
-                )}
+                {coachDot && <span className="absolute -right-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface bg-negative" />}
               </div>
               <div className="min-w-0 flex-1">
                 <p className="text-[13px] font-semibold text-ink">Recados do Coach</p>
@@ -391,7 +384,7 @@ export default function ModulosPage() {
             </button>
           )}
         </div>
-      </main>
+      </div>
 
       <Modal open={metasModalOpen} onClose={() => setMetasModalOpen(false)} title="Minhas Metas" wide>
         <MinhasMetasModalBody />
@@ -413,7 +406,7 @@ export default function ModulosPage() {
           nome={displayName}
         />
       )}
-    </AppShell>
+    </TelaVidro>
   );
 }
 
@@ -429,4 +422,3 @@ function MetricValue({ href, mono, children }: { href?: string; mono?: boolean; 
     </Link>
   );
 }
-

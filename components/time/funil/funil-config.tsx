@@ -24,7 +24,7 @@ import {
 import type { TeamDashboardRow } from "@/lib/services/team-service";
 import { faixaBuyin } from "@/lib/time/funil-regras";
 
-const INPUT = "w-full rounded-lg border border-hairline bg-surface px-2.5 py-2 text-sm text-ink outline-none focus:border-white/25";
+const INPUT = "w-full painel-vidro rounded-2xl border border-white/10 px-2.5 py-2 text-sm text-ink outline-none focus:border-white/25";
 
 function Modal({ titulo, icone, largura = "max-w-lg", onFechar, children }: {
   titulo: string;
@@ -40,7 +40,7 @@ function Modal({ titulo, icone, largura = "max-w-lg", onFechar, children }: {
           role="dialog"
           aria-modal="true"
           aria-label={titulo}
-          className={`max-h-[90vh] w-full ${largura} overflow-y-auto rounded-2xl border border-hairline bg-surface p-5`}
+          className={`max-h-[90vh] w-full ${largura} overflow-y-auto painel-vidro rounded-2xl border border-white/10 p-5`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between">
@@ -303,14 +303,14 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, slaPadrao, onFe
     <Modal titulo="Configurações do funil" icone={<Settings size={17} />} largura="max-w-2xl" onFechar={onFechar}>
       <p className="mt-1 text-[13px] text-muted">Fases na ordem do quadro. Cada fase pode ter faixa de buy-in, capacidade, requisitos de subida e um playbook.</p>
       {!crmDisponivel && (
-        <p className="mt-3 flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[12px] text-muted">
+        <p className="mt-3 flex items-center gap-2 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[12px] text-muted">
           <Database size={13} className="shrink-0" />
           Faixa de buy-in, capacidade, requisitos avançados e playbook aparecem depois da atualização do banco do funil.
         </p>
       )}
 
       {crmDisponivel && (
-        <section className="mt-4 rounded-xl border border-hairline bg-elevated p-3">
+        <section className="mt-4 rounded-xl border border-hairline bg-white/[0.04] p-3">
           <p className="text-[10.5px] font-bold uppercase tracking-[0.1em] text-muted/70">Padrão do funil</p>
           <div className="mt-2 flex flex-wrap items-center gap-2 text-[13px] text-ink/90">
             <label htmlFor="funil-sla-padrao">Cartão esfria depois de</label>
@@ -322,7 +322,7 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, slaPadrao, onFe
               value={sla ?? ""}
               onChange={(e) => setSla(e.target.value === "" ? null : Number(e.target.value))}
               onKeyDown={(e) => e.key === "Enter" && salvarSla()}
-              className="w-20 rounded-lg border border-hairline bg-surface px-2.5 py-1.5 text-sm tabular-nums text-ink outline-none focus:border-white/25"
+              className="w-20 painel-vidro rounded-2xl border border-white/10 px-2.5 py-1.5 text-sm tabular-nums text-ink outline-none focus:border-white/25"
             />
             <span>dias parado na fase</span>
             <button
@@ -344,7 +344,7 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, slaPadrao, onFe
 
       <ul className="mt-4 space-y-2">
         {fases.map((f, idx) => (
-          <li key={f.id} className="rounded-xl border border-hairline bg-elevated p-3">
+          <li key={f.id} className="rounded-xl border border-hairline bg-white/[0.04] p-3">
             {editandoId === f.id ? (
               <EditorFase
                 fase={f}
@@ -370,19 +370,19 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, slaPadrao, onFe
                 </span>
                 <span className="flex shrink-0 items-center gap-1">
                   <button onClick={() => mover(f, -1)} disabled={idx === 0} aria-label={`Subir ${f.name} na ordem`}
-                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-ink disabled:pointer-events-none disabled:opacity-20">
+                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-white/[0.06] hover:text-ink disabled:pointer-events-none disabled:opacity-20">
                     <ChevronUp size={14} />
                   </button>
                   <button onClick={() => mover(f, 1)} disabled={idx === fases.length - 1} aria-label={`Descer ${f.name} na ordem`}
-                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-ink disabled:pointer-events-none disabled:opacity-20">
+                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-white/[0.06] hover:text-ink disabled:pointer-events-none disabled:opacity-20">
                     <ChevronDown size={14} />
                   </button>
                   <button onClick={() => setEditandoId(f.id)} aria-label={`Editar ${f.name}`}
-                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-ink">
+                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-white/[0.06] hover:text-ink">
                     <Pencil size={13} />
                   </button>
                   <button onClick={() => excluir(f)} aria-label={`Excluir ${f.name}`}
-                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-surface hover:text-negative">
+                    className="grid h-7 w-7 place-items-center rounded-md text-muted hover:bg-white/[0.06] hover:text-negative">
                     <Trash2 size={13} />
                   </button>
                 </span>
@@ -399,7 +399,7 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, slaPadrao, onFe
           onKeyDown={(e) => e.key === "Enter" && criar()}
           placeholder="Nova fase…"
           maxLength={30}
-          className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none placeholder:text-muted/50"
+          className="min-w-0 flex-1 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-sm text-ink outline-none placeholder:text-muted/50"
         />
         <button onClick={criar} disabled={criando || !novaFase.trim()}
           className="flex shrink-0 items-center gap-1.5 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40">
@@ -485,7 +485,7 @@ export function ModalAdicionar({ jogadores, fases, onFechar, onChange, onErro }:
           </div>
           <Campo label="Fase inicial">
             <select value={fase} onChange={(e) => setFase(e.target.value)}
-              className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none">
+              className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none">
               {fases.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
             </select>
           </Campo>
@@ -532,7 +532,7 @@ export function ListaArquivados({ arquivados, carregando, fases, onRestaurar, on
 
   if (arquivados.length === 0) {
     return (
-      <section className="rounded-xl border border-hairline bg-surface p-6 text-center">
+      <section className="painel-vidro rounded-2xl border border-white/10 p-6 text-center">
         <ArchiveRestore size={22} className="mx-auto text-muted" />
         <p className="mt-2 text-sm text-muted">Ninguém arquivado ainda — quem sai do funil (formado ou removido) aparece aqui.</p>
       </section>
@@ -540,7 +540,7 @@ export function ListaArquivados({ arquivados, carregando, fases, onRestaurar, on
   }
 
   return (
-    <section className="painel-scroll min-h-0 flex-1 overflow-y-auto rounded-xl border border-hairline bg-surface p-5">
+    <section className="painel-scroll min-h-0 flex-1 overflow-y-auto painel-vidro rounded-2xl border border-white/10 p-5">
       <ul className="divide-y divide-hairline">
         {arquivados.map((a) => (
           <li key={a.cardId} className="flex flex-wrap items-center gap-3 py-3.5">
@@ -562,7 +562,7 @@ export function ListaArquivados({ arquivados, carregando, fases, onRestaurar, on
                 value={faseEscolhida[a.playerId] ?? fases[0]?.id ?? ""}
                 onChange={(e) => setFaseEscolhida((prev) => ({ ...prev, [a.playerId]: e.target.value }))}
                 aria-label={`Fase para restaurar ${a.nome}`}
-                className="rounded-lg border border-hairline bg-elevated px-2 py-1.5 text-[12px] text-ink outline-none"
+                className="rounded-lg border border-hairline bg-white/[0.04] px-2 py-1.5 text-[12px] text-ink outline-none"
               >
                 {fases.map((f) => <option key={f.id} value={f.id}>{f.name}</option>)}
               </select>

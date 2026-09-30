@@ -86,7 +86,7 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
   if (loading || threads.length === 0 || !ativo) return null;
 
   return (
-    <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+    <section className="mb-3.5 painel-vidro rounded-2xl border border-white/10 p-4">
       <div className="flex flex-wrap items-center justify-between gap-2">
         <h3 className="m-0 flex items-center gap-1.5 text-sm font-semibold text-ink">
           <MessageSquare size={14} className="icon-glow text-training" />
@@ -120,7 +120,7 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
         )}
 
         {threads.length > 1 && (
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+          <div className="flex gap-1 rounded-lg border border-hairline bg-white/[0.04] p-1">
             {threads.map((t) => (
               <button
                 key={t.shareId}
@@ -148,7 +148,7 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
             <li
               key={c.id}
               className={`rounded-lg border px-3 py-2 ${
-                c.isMine ? "border-hairline bg-elevated" : "border-training/30 bg-training/5"
+                c.isMine ? "border-hairline bg-white/[0.04]" : "border-training/30 bg-training/5"
               }`}
             >
               <div className="flex items-center justify-between gap-2">
@@ -176,7 +176,7 @@ export function CoachThread({ reviewId, reviewTitle }: { reviewId: string; revie
           onChange={(e) => setTexto(e.target.value)}
           rows={2}
           placeholder={ativo.iAmCoach ? "Escreva sua análise…" : "Responder ao coach…"}
-          className="min-w-0 flex-1 resize-none rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-training/50"
+          className="min-w-0 flex-1 resize-none rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[13px] text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-training/50"
         />
         <button
           onClick={enviar}

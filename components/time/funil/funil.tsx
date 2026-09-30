@@ -89,10 +89,10 @@ function casaFoco(i: ItemFunil, foco: Foco): boolean {
   }
 }
 
-const SELECT = "w-full rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink outline-none";
+const SELECT = "w-full rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-ink outline-none";
 const ROTULO = "mb-1 block text-[10px] font-bold uppercase tracking-wide text-muted/70";
 const BOTAO_ICONE =
-  "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:border-ink/40 hover:text-ink";
+  "grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-white/[0.04] text-muted transition-colors hover:border-ink/40 hover:text-ink";
 
 export function Funil({
   teamId,
@@ -336,7 +336,7 @@ export function Funil({
   }
 
   const itemAberto = abertoId ? itens.find((i) => i.card.playerId === abertoId) : undefined;
-  const moldura = vidro ? "painel-vidro rounded-3xl border border-white/10" : "rounded-2xl border border-hairline bg-surface";
+  const moldura = vidro ? "painel-vidro rounded-3xl border border-white/10" : "painel-vidro rounded-2xl border border-white/10";
 
   if (loading) return <div className="painel-esqueleto h-[480px] rounded-3xl" />;
 
@@ -381,7 +381,7 @@ export function Funil({
           <FilterPopover label="Filtros" icon={SlidersHorizontal} active={filtrosAtivos}>
             <div>
               <label className={ROTULO}>Buscar</label>
-              <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2 py-1.5">
+              <div className="flex items-center gap-1.5 rounded-lg border border-hairline bg-white/[0.04] px-2 py-1.5">
                 <Search size={12} className="shrink-0 text-muted" />
                 <input
                   value={busca}
@@ -428,7 +428,7 @@ export function Funil({
         )}
 
         {modo === "quadro" && (
-          <label className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5" title="Dividir o quadro em raias">
+          <label className="flex items-center gap-1.5 rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5" title="Dividir o quadro em raias">
             <Rows3 size={13} className="text-muted" />
             <select
               value={agrupar}

@@ -14,6 +14,9 @@ import {
 import { resetPerformanceStats } from "@/lib/services/analysis-service";
 import { haQuanto } from "@/components/banca/util";
 import { useConfirm } from "@/components/confirm-dialog";
+import { CARD_VIDRO } from "@/components/ui/tela-vidro";
+
+const BLOCO = "rounded-2xl border border-white/[0.08] bg-white/[0.03]";
 
 // Conteudo do addon Radar PokerSync, agora reaproveitado dentro de Player
 // Evolution (aba "Radar", pedido explicito: "radar pokersync deve ficar
@@ -66,7 +69,8 @@ const SCOPE_OPTIONS: { value: RadarImportScope; icon: typeof Sparkles; title: st
   },
 ];
 
-export function RadarPanel({ onReset }: { onReset?: () => void }) {
+// `cabecalho={false}` na página do Radar, onde o título já vem da moldura.
+export function RadarPanel({ onReset, cabecalho = true }: { onReset?: () => void; cabecalho?: boolean }) {
   // undefined = ainda carregando, null = ainda não respondeu.
   const [scope, setScope] = useState<RadarImportScope | null | undefined>(undefined);
   const [saving, setSaving] = useState<RadarImportScope | null>(null);
@@ -110,7 +114,7 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
     const ok = await confirm({
       title: "Resetar Performance",
       message:
-        "Isso zera todas as estatísticas do Performance (VPIP, PFR, C-Bet, ROI de mãos etc.) e volta a perguntar o escopo de importação. As mãos continuam salvas no Revisor de Mãos e os torneios na Gestão de Banca — só os números daqui somem, até você reimportar ou reabrir as mãos.",
+        "Isso zera tudo o que o Performance mostra (estatísticas de mão, torneios, prêmios, rebuys e lucro jogados até agora) e volta a perguntar o escopo de importação. As mãos continuam salvas no Revisor de Mãos e as sessões na Gestão de Banca.",
       confirmLabel: "Resetar",
     });
     if (!ok) return;
@@ -128,16 +132,18 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
   }
 
   return (
-    <div className="mx-auto flex max-w-2xl flex-col gap-6">
-      <div className="flex items-center gap-3">
-        <div className="grid size-12 shrink-0 place-items-center rounded-xl border border-[#E8B93C]/30 bg-[#E8B93C]/10 text-[#E8B93C]">
-          <RadarIcon size={22} />
+    <div className="flex max-w-3xl flex-col gap-3.5">
+      {cabecalho && (
+        <div className="flex items-center gap-3">
+          <div className="grid size-12 shrink-0 place-items-center rounded-2xl border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#d4af37]">
+            <RadarIcon size={22} />
+          </div>
+          <div>
+            <h2 className="text-xl font-semibold tracking-tight text-ink">{RADAR_COPY.title}</h2>
+            <p className="text-sm text-muted">{RADAR_COPY.blurb}</p>
+          </div>
         </div>
-        <div>
-          <h2 className="text-xl font-bold text-ink">{RADAR_COPY.title}</h2>
-          <p className="text-sm text-muted">{RADAR_COPY.blurb}</p>
-        </div>
-      </div>
+      )}
 
       {/* Pergunta obrigatória (pedido explicito: "isso precisa ser
           perguntado antes de comecar a importar qualquer mao ou
@@ -149,16 +155,14 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
           tinha o agente instalado antes dessa pergunta existir fica
           pausado ate' responder aqui. */}
       {scope === undefined ? (
-        <div className="flex items-center justify-center rounded-xl border border-hairline bg-surface p-8">
-          <Loader2 size={18} className="animate-spin text-muted" />
-        </div>
+        <div className="painel-esqueleto h-[180px] rounded-3xl" aria-hidden />
       ) : scope === null ? (
-        <div className="rounded-xl border border-training/40 bg-training/[0.06] p-5">
+        <div className={`${CARD_VIDRO} p-5`}>
           <p className="text-sm font-semibold text-ink">O que o Radar deve importar?</p>
           <p className="mt-1 text-xs leading-relaxed text-muted">
-            Antes de ativar, escolha uma opção (o Radar também pergunta isso no primeiro login) — vale pra Gestão de
-            Banca, Revisor de Mãos e Performance. Dá pra trocar depois: se você ampliar (por exemplo, de “só de agora”
-            pra “tudo”), o Radar manda sozinho o que faltou; se reduzir, o que já entrou continua.
+            Antes de ativar, escolha uma opção (o Radar também pergunta isso no primeiro login) — vale pra Gestão de Banca, Revisor de Mãos e
+            Performance. Dá pra trocar depois: se você ampliar (por exemplo, de “só de agora” pra “tudo”), o Radar manda sozinho o que faltou; se
+            reduzir, o que já entrou continua.
           </p>
           <div className="mt-4 grid gap-3 sm:grid-cols-3">
             {SCOPE_OPTIONS.map((opt) => (
@@ -167,10 +171,10 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
                 type="button"
                 onClick={() => choose(opt.value)}
                 disabled={saving !== null}
-                className="flex flex-col items-start gap-2 rounded-lg border border-hairline bg-surface p-4 text-left transition-colors hover:border-training/50 disabled:opacity-50"
+                className={`${BLOCO} flex flex-col items-start gap-2 p-4 text-left transition hover:border-[#d4af37]/40 hover:bg-white/[0.05] active:scale-[0.99] disabled:opacity-50`}
               >
                 <span className="flex items-center gap-2 text-sm font-semibold text-ink">
-                  {saving === opt.value ? <Loader2 size={14} className="animate-spin" /> : <opt.icon size={14} className="text-training" />}
+                  {saving === opt.value ? <Loader2 size={14} className="animate-spin" /> : <opt.icon size={14} className="text-[#d4af37]" />}
                   {opt.title}
                 </span>
                 <span className="text-xs leading-relaxed text-muted">{opt.desc}</span>
@@ -181,7 +185,7 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
         </div>
       ) : (
         <>
-          <div className="flex flex-wrap items-center justify-between gap-2 rounded-lg border border-hairline bg-elevated px-4 py-2.5">
+          <div className={`${CARD_VIDRO} flex flex-wrap items-center justify-between gap-2 px-4 py-3`}>
             <p className="text-xs text-muted">
               Importando: <span className="font-semibold text-ink">{SCOPE_OPTIONS.find((o) => o.value === scope)?.title}</span>
             </p>
@@ -203,8 +207,8 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
           </div>
           {error && <p className="text-xs text-negative">{error}</p>}
 
-          <div className="rounded-xl border border-hairline bg-surface p-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted/60">O que ele faz</p>
+          <div className={`${CARD_VIDRO} p-5`}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">O que ele faz</p>
             <ul className="mt-3 flex flex-col gap-2.5">
               {RADAR_COPY.benefits.map((benefit) => (
                 <li key={benefit} className="flex items-start gap-2 text-sm text-ink">
@@ -215,22 +219,18 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
             </ul>
           </div>
 
-          <div className="rounded-xl border border-hairline bg-elevated p-5">
-            <p className="text-xs font-bold uppercase tracking-wider text-muted/60">Como funciona</p>
+          <div className={`${CARD_VIDRO} p-5`}>
+            <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">Como funciona</p>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Depois de instalado, o Radar abre junto com o computador e fica perto do relógio, varrendo as pastas de
-              hand history — PokerStars e GGPoker (PartyPoker, 888poker e ACR ainda em fase de teste). Só as mãos
-              novas são enviadas, e cada mão importada alimenta automaticamente o Revisor e o Performance, sem precisar
-              colar hand history na mão.
+              Depois de instalado, o Radar abre junto com o computador e fica perto do relógio, varrendo as pastas de hand history — PokerStars e
+              GGPoker (PartyPoker, 888poker e ACR ainda em fase de teste). Só as mãos novas são enviadas, e cada mão importada alimenta
+              automaticamente o Revisor e o Performance, sem precisar colar hand history na mão.
             </p>
           </div>
 
           {aparelho !== undefined && (
             <p className="flex items-center gap-2 px-1 text-xs text-muted">
-              <span
-                className={`inline-block size-2 rounded-full ${radarLigadoAgora(aparelho) ? "bg-positive" : "bg-muted/50"}`}
-                aria-hidden
-              />
+              <span className={`inline-block size-2 rounded-full ${radarLigadoAgora(aparelho) ? "bg-positive" : "bg-muted/50"}`} aria-hidden />
               {aparelho === null
                 ? "Nenhum Radar conectado a esta conta ainda."
                 : radarLigadoAgora(aparelho)
@@ -239,12 +239,12 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
             </p>
           )}
 
-          <div className="flex flex-col items-start gap-3 rounded-xl border border-hairline bg-surface p-5 sm:flex-row sm:items-center sm:justify-between">
+          <div className={`${CARD_VIDRO} flex flex-col items-start gap-3 p-5 sm:flex-row sm:items-center sm:justify-between`}>
             <div>
               <p className="text-sm font-semibold text-ink">Windows 10/11, Mac com chip Apple (M1 ou mais novo) e Linux</p>
               <p className="mt-0.5 text-xs text-muted">
-                Depois de instalar, entre com a mesma conta do PokerSync. No Windows, se aparecer “O Windows protegeu o
-                computador”, clique em “Mais informações” → “Executar assim mesmo”.
+                Depois de instalar, entre com a mesma conta do PokerSync. No Windows, se aparecer “O Windows protegeu o computador”, clique em “Mais
+                informações” → “Executar assim mesmo”.
               </p>
               <p className="mt-1.5 text-xs text-muted">
                 Outros sistemas:{" "}
@@ -262,7 +262,7 @@ export function RadarPanel({ onReset }: { onReset?: () => void }) {
             </div>
             <a
               href={`${DOWNLOAD_BASE}/${DOWNLOADS[sistema].arquivo}`}
-              className="inline-flex shrink-0 items-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90"
+              className="inline-flex shrink-0 items-center gap-2 rounded-xl bg-[#d4af37] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.97]"
             >
               <Download size={15} />
               Baixar para {DOWNLOADS[sistema].rotulo}

@@ -474,7 +474,7 @@ export function RevisorNovaMao({
 
       {/* ================= MODAL: RESOLUCAO DE SESSAO ================= */}
       {sessionFlow.kind === "attach_or_new" && (
-        <div className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+        <div className="mb-3.5 painel-vidro rounded-2xl border border-white/10 p-4">
           <div className="mb-1 flex items-center gap-2">
             <Trophy size={16} className="text-review" />
             <label className="text-sm font-semibold text-ink">Torneio já existe</label>
@@ -511,7 +511,7 @@ export function RevisorNovaMao({
       )}
 
       {sessionFlow.kind === "new_tournament_form" && (
-        <div className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+        <div className="mb-3.5 painel-vidro rounded-2xl border border-white/10 p-4">
           <div className="mb-1 flex items-center gap-2">
             <Trophy size={16} className="text-review" />
             <label className="text-sm font-semibold text-ink">{sessionFlow.label}</label>
@@ -577,7 +577,7 @@ export function RevisorNovaMao({
       )}
 
       {sessionFlow.kind === "checking" && (
-        <div className="mb-3.5 flex items-center gap-2 rounded-xl border border-hairline bg-surface p-4 text-xs text-muted">
+        <div className="mb-3.5 flex items-center gap-2 painel-vidro rounded-2xl border border-white/10 p-4 text-xs text-muted">
           <Loader2 size={14} className="animate-spin" />
           Verificando se esse torneio já está na sua lista...
         </div>
@@ -585,7 +585,7 @@ export function RevisorNovaMao({
 
       {/* ================= BLOCO PRIMARIO: IMPORT ================= */}
       {sessionFlow.kind === "idle" && (
-        <section className="mb-3.5 rounded-xl border border-hairline bg-surface p-4">
+        <section className="mb-3.5 painel-vidro rounded-2xl border border-white/10 p-4">
           <div className="mb-1 flex items-center gap-2">
             <Upload size={16} className="text-review" />
             <label className="text-sm font-semibold text-ink">Importar hand history</label>
@@ -686,7 +686,7 @@ export function RevisorNovaMao({
 
       {/* ================= BLOCO SECUNDARIO: MANUAL / PRINT ================= */}
       {sessionFlow.kind === "idle" && (
-        <section className="mb-3.5 rounded-xl border border-hairline bg-surface">
+        <section className="mb-3.5 painel-vidro rounded-2xl border border-white/10">
           <button
             onClick={() => setManualOpen((v) => !v)}
             className="flex w-full items-center justify-between p-4 text-left"
@@ -817,7 +817,7 @@ export function RevisorNovaMao({
 
       {/* ================= VINCULO COM SESSAO DE BANCA (opcional, recolhido) ================= */}
       {sessionFlow.kind === "idle" && (
-        <section className="mb-3.5 rounded-xl border border-hairline bg-surface">
+        <section className="mb-3.5 painel-vidro rounded-2xl border border-white/10">
           <button
             onClick={() => setSessionOpen((v) => !v)}
             className="flex w-full items-center justify-between p-4 text-left"
@@ -862,7 +862,7 @@ export function RevisorNovaMao({
       )}
 
       {bankrollWarning && !error && (
-        <div className="mb-2.5 rounded-lg border border-hairline bg-elevated p-2.5 text-[13px] text-muted">
+        <div className="mb-2.5 rounded-lg border border-hairline bg-white/[0.04] p-2.5 text-[13px] text-muted">
           {bankrollWarning}
         </div>
       )}

@@ -102,7 +102,7 @@ export function FunilPlanilha({
     {/* Celular: cartões */}
     <div className="lg:hidden">
       <div className="mb-2.5 flex items-center gap-2">
-        <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
+        <label className="flex min-w-0 flex-1 items-center gap-1.5 rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5">
           <span className="shrink-0 text-[11px] text-muted">Ordenar por</span>
           <select
             value={ordem.coluna}
@@ -119,7 +119,7 @@ export function FunilPlanilha({
           type="button"
           onClick={() => setOrdem((o) => ({ ...o, dir: (o.dir * -1) as 1 | -1 }))}
           aria-label={ordem.dir === 1 ? "Ordem crescente (inverter)" : "Ordem decrescente (inverter)"}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted transition-colors hover:text-ink"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-lg border border-hairline bg-white/[0.04] text-muted transition-colors hover:text-ink"
         >
           {ordem.dir === 1 ? <ArrowUp size={14} /> : <ArrowDown size={14} />}
         </button>
@@ -332,7 +332,7 @@ function CartaoLinha({
         }
       }}
       aria-label={`${i.nome}: abrir cartão`}
-      className="rounded-xl border border-hairline bg-surface p-3 text-[12.5px] outline-none transition-colors active:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-training/60"
+      className="painel-vidro rounded-2xl border border-white/10 p-3 text-[12.5px] outline-none transition-colors active:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-training/60"
     >
       {/* Nome sozinho na linha (não disputa espaço com o seletor). */}
       <div className="flex items-center gap-2.5">
@@ -356,7 +356,7 @@ function CartaoLinha({
               if (f) onMover(f);
             }}
             aria-label={`Fase de ${i.nome}`}
-            className="min-w-0 max-w-[170px] rounded-md border border-hairline bg-elevated py-1 pl-1.5 pr-5 text-[12px] text-ink outline-none"
+            className="min-w-0 max-w-[170px] rounded-md border border-hairline bg-white/[0.04] py-1 pl-1.5 pr-5 text-[12px] text-ink outline-none"
           >
             {fases.map((f) => (
               <option key={f.id} value={f.id} className="bg-[#141414]">{f.name}</option>

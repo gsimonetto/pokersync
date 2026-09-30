@@ -153,7 +153,7 @@ export function ShareHandModal({
   return (
     <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 px-4 pb-8 pt-16 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-lg rounded-xl border border-hairline bg-surface p-5 shadow-2xl">
+      <div className="relative w-full max-w-lg painel-vidro rounded-2xl border border-white/10 p-5 shadow-2xl">
         <div className="flex items-center justify-between">
           <h2 className="text-sm font-bold text-ink">Compartilhar com o coach</h2>
           <button onClick={onClose} className="grid h-7 w-7 place-items-center rounded-md text-muted hover:text-ink" aria-label="Fechar">

@@ -299,7 +299,7 @@ export function PlayerBadge({
     return (
       <Tag
         {...(onClick ? { type: "button" as const, onClick, "aria-label": ariaLabel ?? `Ver ${dados.nome}` } : {})}
-        className={`flex w-full items-center gap-3 rounded-xl border border-hairline bg-elevated p-3 text-left ${
+        className={`flex w-full items-center gap-3 rounded-xl border border-hairline bg-white/[0.04] p-3 text-left ${
           onClick ? "transition-colors hover:border-white/15" : ""
         }`}
       >

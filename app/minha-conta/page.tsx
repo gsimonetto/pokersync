@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { CreditCard, Download, Eye, EyeOff, FileText, KeyRound, Loader2, Radar as RadarIcon, ShieldCheck, Trash2, Users } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { TelaVidro } from "@/components/ui/tela-vidro";
 import { useConfirm } from "@/components/confirm-dialog";
 import { createClient } from "@/lib/supabase/client";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
@@ -86,7 +86,7 @@ export default function MinhaContaPage() {
     try {
       const res = await fetch("/api/billing/invoices");
       const data = await res.json().catch(() => ({}));
-      setInvoices(res.ok ? data.invoices ?? [] : []);
+      setInvoices(res.ok ? (data.invoices ?? []) : []);
     } catch {
       setInvoices([]);
     } finally {
@@ -113,9 +113,7 @@ export default function MinhaContaPage() {
       });
       const data = await res.json().catch(() => ({}));
       setMsg(
-        res.ok
-          ? "Cancelamento agendado — você mantém acesso até o fim do período já pago."
-          : data.message || "Não foi possível cancelar agora."
+        res.ok ? "Cancelamento agendado — você mantém acesso até o fim do período já pago." : data.message || "Não foi possível cancelar agora.",
       );
     } catch {
       setMsg("Não foi possível cancelar agora. Tente novamente.");
@@ -126,11 +124,12 @@ export default function MinhaContaPage() {
 
   if (loading || plan === null) {
     return (
-      <AppShell>
-        <main className="flex w-full items-center justify-center px-4 py-20">
-          <Loader2 size={20} className="animate-spin text-muted" />
-        </main>
-      </AppShell>
+      <TelaVidro titulo="Minha conta" subtitulo="Seu plano, complementos e histórico de pagamento.">
+        <div className="flex max-w-2xl flex-col gap-3.5" aria-hidden>
+          <div className="painel-esqueleto h-[150px] rounded-3xl" />
+          <div className="painel-esqueleto h-[120px] rounded-3xl" />
+        </div>
+      </TelaVidro>
     );
   }
 
@@ -143,141 +142,127 @@ export default function MinhaContaPage() {
   const radarIsOwnPurchase = !hasTeamAccess && radarAddon && !planDef.addons.radar;
 
   return (
-    <AppShell>
-      <main className="w-full px-4 py-6 md:px-6 md:py-10">
-        <div className="mx-auto flex max-w-2xl flex-col gap-6">
-          <div>
-            <h1 className="text-2xl font-bold text-ink">Minha Conta</h1>
-            <p className="mt-1 text-sm text-muted">Seu plano, complementos e histórico de pagamento.</p>
-          </div>
+    <TelaVidro titulo="Minha conta" subtitulo="Seu plano, complementos e histórico de pagamento.">
+      <div className="flex max-w-2xl flex-col gap-3.5">
+        {msg && <p className="rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm text-ink">{msg}</p>}
 
-          {msg && <p className="rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink">{msg}</p>}
-
-          {/* Plano atual */}
-          <div className="rounded-xl border border-hairline bg-surface p-5">
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <p className="text-xs font-bold uppercase tracking-wider text-muted/60">Plano atual</p>
-                <p className="mt-1 text-xl font-bold text-ink">{hasTeamAccess ? "Acesso via Time" : planDef.name}</p>
-                {hasTeamAccess ? (
-                  <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
-                    <Users size={13} /> Acesso via o time <strong className="text-ink">{teamName}</strong>
-                  </p>
-                ) : (
-                  <p className="mt-1 text-sm text-muted">
-                    {planDef.priceCents ? `${BRL.format(planDef.priceCents / 100)}/mês` : "Grátis"}
-                  </p>
-                )}
-              </div>
-              <CreditCard size={20} className="shrink-0 text-muted/50" />
+        {/* Plano atual */}
+        <div className="painel-vidro rounded-3xl border border-white/10 p-5">
+          <div className="flex items-start justify-between gap-3">
+            <div>
+              <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">Plano atual</p>
+              <p className="mt-1 text-xl font-bold text-ink">{hasTeamAccess ? "Acesso via Time" : planDef.name}</p>
+              {hasTeamAccess ? (
+                <p className="mt-1 flex items-center gap-1.5 text-sm text-muted">
+                  <Users size={13} /> Acesso via o time <strong className="text-ink">{teamName}</strong>
+                </p>
+              ) : (
+                <p className="mt-1 text-sm text-muted">{planDef.priceCents ? `${BRL.format(planDef.priceCents / 100)}/mês` : "Grátis"}</p>
+              )}
             </div>
-
-            {!hasTeamAccess && (
-              <Link
-                href="/planos"
-                className="mt-4 inline-flex items-center justify-center rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-elevated"
-              >
-                Ver planos
-              </Link>
-            )}
-
-            {ownPlanIsPaid && (
-              <button
-                onClick={() => handleCancel("plan", `o plano ${planDef.name}`)}
-                disabled={cancelingTarget !== null}
-                className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-negative transition-opacity hover:opacity-80 disabled:opacity-50"
-              >
-                {cancelingTarget === "plan" && <Loader2 size={13} className="animate-spin" />}
-                Cancelar assinatura do plano
-              </button>
-            )}
+            <CreditCard size={20} className="shrink-0 text-muted/50" />
           </div>
 
-          {/* Senha de acesso -- quem entra so' pelo Google pode criar uma
+          {!hasTeamAccess && (
+            <Link
+              href="/planos"
+              className="mt-4 inline-flex items-center justify-center rounded-xl border border-white/10 bg-white/[0.04] font-medium text-ink/90 transition hover:border-white/20 hover:bg-white/[0.07] active:scale-[0.97] px-3 py-2 text-sm"
+            >
+              Ver planos
+            </Link>
+          )}
+
+          {ownPlanIsPaid && (
+            <button
+              onClick={() => handleCancel("plan", `o plano ${planDef.name}`)}
+              disabled={cancelingTarget !== null}
+              className="mt-2 inline-flex items-center gap-2 text-sm font-semibold text-negative transition-opacity hover:opacity-80 disabled:opacity-50"
+            >
+              {cancelingTarget === "plan" && <Loader2 size={13} className="animate-spin" />}
+              Cancelar assinatura do plano
+            </button>
+          )}
+        </div>
+
+        {/* Senha de acesso -- quem entra so' pelo Google pode criar uma
               senha aqui pra tambem poder entrar digitando e-mail/senha;
               quem ja tem senha pode trocar. */}
-          {temSenha !== null && <SenhaCard temSenha={temSenha} onDefinida={() => setTemSenha(true)} />}
+        {temSenha !== null && <SenhaCard temSenha={temSenha} onDefinida={() => setTemSenha(true)} />}
 
-          {/* Radar */}
-          <div className="flex items-center justify-between gap-3 rounded-xl border border-hairline bg-surface p-5">
-            <div className="flex items-center gap-3">
-              <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#E8B93C]/30 bg-[#E8B93C]/10 text-[#E8B93C]">
-                <RadarIcon size={18} />
-              </div>
-              <div>
-                <p className="text-sm font-semibold text-ink">Radar PokerSync</p>
-                <p className="text-xs text-muted">
-                  {hasTeamAccess
-                    ? "Incluso via o time"
-                    : planDef.addons.radar
-                      ? "Incluso no seu plano"
-                      : radarAddon
-                        ? `Complemento ativo — ${BRL.format(ADDON_PRICES.radar / 100)}/mês`
-                        : "Você não tem esse complemento"}
-                </p>
-              </div>
+        {/* Radar */}
+        <div className="flex items-center justify-between gap-3 painel-vidro rounded-3xl border border-white/10 p-5">
+          <div className="flex items-center gap-3">
+            <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#d4af37]">
+              <RadarIcon size={18} />
             </div>
-            {radarIsOwnPurchase && (
-              <button
-                onClick={() => handleCancel("radar", "o complemento Radar")}
-                disabled={cancelingTarget !== null}
-                className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-negative transition-opacity hover:opacity-80 disabled:opacity-50"
-              >
-                {cancelingTarget === "radar" && <Loader2 size={13} className="animate-spin" />}
-                Cancelar
-              </button>
-            )}
-          </div>
-
-          {/* Faturas */}
-          <div className="rounded-xl border border-hairline bg-surface p-5">
-            <div className="flex items-center justify-between gap-3">
-              <p className="text-sm font-semibold text-ink">Minhas faturas</p>
-              <button
-                onClick={loadInvoices}
-                disabled={loadingInvoices}
-                className="inline-flex items-center gap-2 rounded-lg border border-hairline px-3 py-1.5 text-xs font-semibold text-ink transition-colors hover:bg-elevated disabled:opacity-50"
-              >
-                {loadingInvoices ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
-                {invoices === null ? "Ver faturas" : "Atualizar"}
-              </button>
+            <div>
+              <p className="text-sm font-semibold text-ink">Radar PokerSync</p>
+              <p className="text-xs text-muted">
+                {hasTeamAccess
+                  ? "Incluso via o time"
+                  : planDef.addons.radar
+                    ? "Incluso no seu plano"
+                    : radarAddon
+                      ? `Complemento ativo — ${BRL.format(ADDON_PRICES.radar / 100)}/mês`
+                      : "Você não tem esse complemento"}
+              </p>
             </div>
-
-            {invoices !== null && (
-              <ul className="mt-4 flex flex-col gap-2">
-                {invoices.length === 0 && <li className="text-sm text-muted">Nenhuma fatura ainda.</li>}
-                {invoices.map((inv) => (
-                  <li
-                    key={inv.id}
-                    className="flex items-center justify-between gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm"
-                  >
-                    <div>
-                      <p className="text-ink">{DATE.format(new Date(inv.createdAt * 1000))}</p>
-                      <p className="text-xs text-muted">{INVOICE_STATUS_LABEL[inv.status ?? ""] ?? inv.status}</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                      <span className="font-semibold text-ink">{BRL.format(inv.amountPaidCents / 100)}</span>
-                      {inv.pdfUrl && (
-                        <a
-                          href={inv.pdfUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          className="text-xs font-semibold text-training hover:underline"
-                        >
-                          PDF
-                        </a>
-                      )}
-                    </div>
-                  </li>
-                ))}
-              </ul>
-            )}
           </div>
-          {/* Privacidade e dados (LGPD) */}
-          <PrivacidadeCard />
+          {radarIsOwnPurchase && (
+            <button
+              onClick={() => handleCancel("radar", "o complemento Radar")}
+              disabled={cancelingTarget !== null}
+              className="inline-flex shrink-0 items-center gap-2 text-sm font-semibold text-negative transition-opacity hover:opacity-80 disabled:opacity-50"
+            >
+              {cancelingTarget === "radar" && <Loader2 size={13} className="animate-spin" />}
+              Cancelar
+            </button>
+          )}
         </div>
-      </main>
-    </AppShell>
+
+        {/* Faturas */}
+        <div className="painel-vidro rounded-3xl border border-white/10 p-5">
+          <div className="flex items-center justify-between gap-3">
+            <p className="text-sm font-semibold text-ink">Minhas faturas</p>
+            <button
+              onClick={loadInvoices}
+              disabled={loadingInvoices}
+              className="inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] font-medium text-ink/90 transition hover:border-white/20 hover:bg-white/[0.07] active:scale-[0.97] px-3 py-1.5 text-xs disabled:opacity-50"
+            >
+              {loadingInvoices ? <Loader2 size={13} className="animate-spin" /> : <FileText size={13} />}
+              {invoices === null ? "Ver faturas" : "Atualizar"}
+            </button>
+          </div>
+
+          {invoices !== null && (
+            <ul className="mt-4 flex flex-col gap-2">
+              {invoices.length === 0 && <li className="text-sm text-muted">Nenhuma fatura ainda.</li>}
+              {invoices.map((inv) => (
+                <li
+                  key={inv.id}
+                  className="flex items-center justify-between gap-3 rounded-2xl border border-white/[0.08] bg-white/[0.03] px-3 py-2 text-sm"
+                >
+                  <div>
+                    <p className="text-ink">{DATE.format(new Date(inv.createdAt * 1000))}</p>
+                    <p className="text-xs text-muted">{INVOICE_STATUS_LABEL[inv.status ?? ""] ?? inv.status}</p>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <span className="font-semibold text-ink">{BRL.format(inv.amountPaidCents / 100)}</span>
+                    {inv.pdfUrl && (
+                      <a href={inv.pdfUrl} target="_blank" rel="noreferrer" className="text-xs font-semibold text-training hover:underline">
+                        PDF
+                      </a>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ul>
+          )}
+        </div>
+        {/* Privacidade e dados (LGPD) */}
+        <PrivacidadeCard />
+      </div>
+    </TelaVidro>
   );
 }
 
@@ -325,9 +310,9 @@ function PrivacidadeCard() {
   }
 
   return (
-    <div className="rounded-xl border border-hairline bg-surface p-5">
+    <div className="painel-vidro rounded-3xl border border-white/10 p-5">
       <div className="flex items-center gap-3">
-        <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
+        <div className="grid size-10 shrink-0 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-muted">
           <ShieldCheck size={18} />
         </div>
         <div>
@@ -345,20 +330,19 @@ function PrivacidadeCard() {
       <button
         onClick={baixarDados}
         disabled={exportando}
-        className="mt-4 inline-flex items-center gap-2 rounded-lg border border-hairline px-3 py-2 text-sm font-semibold text-ink transition-colors hover:bg-elevated disabled:opacity-50"
+        className="mt-4 inline-flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.04] font-medium text-ink/90 transition hover:border-white/20 hover:bg-white/[0.07] active:scale-[0.97] px-3 py-2 text-sm disabled:opacity-50"
       >
         {exportando ? <Loader2 size={14} className="animate-spin" /> : <Download size={14} />}
         Baixar meus dados
       </button>
 
-      <div className="mt-5 border-t border-hairline pt-4">
+      <div className="mt-5 border-t border-white/[0.08] pt-4">
         <p className="flex items-center gap-1.5 text-sm font-semibold text-negative">
           <Trash2 size={14} /> Excluir minha conta
         </p>
         <p className="mt-1 text-xs text-muted">
-          Apaga sua conta e seus dados pessoais do PokerSync (banca, mãos revisadas, treino, XP, times) de forma
-          permanente. Não dá pra desfazer. Conteúdo que você criou como coach/admin de um time não é apagado
-          automaticamente — fale com o suporte se precisar disso também.
+          Apaga sua conta e seus dados pessoais do PokerSync (banca, mãos revisadas, treino, XP, times) de forma permanente. Não dá pra desfazer.
+          Conteúdo que você criou como coach/admin de um time não é apagado automaticamente — fale com o suporte se precisar disso também.
         </p>
         <p className="mt-3 text-xs text-muted">
           Digite <strong className="text-ink">EXCLUIR</strong> abaixo para confirmar:
@@ -369,12 +353,12 @@ function PrivacidadeCard() {
             value={confirmText}
             onChange={(e) => setConfirmText(e.target.value)}
             placeholder="EXCLUIR"
-            className="w-full max-w-[180px] rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink placeholder-muted/50 outline-none focus:border-negative/50"
+            className="w-full max-w-[180px] rounded-xl border border-white/10 bg-white/[0.04] px-3 py-2 text-sm text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-negative/60"
           />
           <button
             onClick={excluirConta}
             disabled={confirmText !== "EXCLUIR" || excluindo}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-negative px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-negative/90 disabled:opacity-40"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-negative px-4 py-2 text-sm font-semibold text-white transition-colors hover:bg-negative/90 disabled:opacity-40"
           >
             {excluindo && <Loader2 size={14} className="animate-spin" />}
             Excluir permanentemente
@@ -416,9 +400,9 @@ function SenhaCard({ temSenha, onDefinida }: { temSenha: boolean; onDefinida: ()
   }
 
   return (
-    <div className="rounded-xl border border-hairline bg-surface p-5">
+    <div className="painel-vidro rounded-3xl border border-white/10 p-5">
       <div className="flex items-center gap-3">
-        <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
+        <div className="grid size-10 shrink-0 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-muted">
           <KeyRound size={18} />
         </div>
         <div>
@@ -436,11 +420,11 @@ function SenhaCard({ temSenha, onDefinida }: { temSenha: boolean; onDefinida: ()
           <input
             type={mostrar ? "text" : "password"}
             required
-            minLength={6}
+            minLength={8}
             value={senha}
             onChange={(e) => setSenha(e.target.value)}
             placeholder={temSenha ? "Nova senha" : "Criar senha"}
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 pr-9 text-sm text-ink placeholder-muted/50 outline-none focus:border-white/30"
+            className="w-full rounded-xl border border-white/10 bg-white/[0.04] text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-[#d4af37]/60 px-3 py-2 pr-9 text-sm"
           />
           <button
             type="button"
@@ -454,16 +438,16 @@ function SenhaCard({ temSenha, onDefinida }: { temSenha: boolean; onDefinida: ()
         <input
           type={mostrar ? "text" : "password"}
           required
-          minLength={6}
+          minLength={8}
           value={confirmar}
           onChange={(e) => setConfirmar(e.target.value)}
           placeholder="Confirmar senha"
-          className="flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink placeholder-muted/50 outline-none focus:border-white/30"
+          className="flex-1 rounded-xl border border-white/10 bg-white/[0.04] text-ink outline-none transition-colors placeholder:text-muted/60 focus:border-[#d4af37]/60 px-3 py-2 text-sm"
         />
         <button
           type="submit"
           disabled={salvando}
-          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90 disabled:opacity-50"
+          className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#d4af37] font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.97] px-4 py-2 text-sm disabled:opacity-50"
         >
           {salvando && <Loader2 size={14} className="animate-spin" />}
           {temSenha ? "Trocar senha" : "Criar senha"}

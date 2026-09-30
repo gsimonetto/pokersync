@@ -166,7 +166,7 @@ function MoreFiltersModal({ onClose, children }: { onClose: () => void; children
   return (
     <ModalPortal>
       <div className="fixed inset-0 z-50 flex items-start justify-center overflow-y-auto bg-void/70 p-4 pt-10" onClick={onClose}>
-        <div className="w-full max-w-md rounded-xl border border-hairline bg-surface p-5" onClick={(e) => e.stopPropagation()}>
+        <div className="w-full max-w-md painel-vidro rounded-2xl border border-white/10 p-5" onClick={(e) => e.stopPropagation()}>
           <div className="mb-3 flex items-center justify-between gap-2">
             <h3 className="text-[15px] font-semibold">Mais filtros</h3>
             <button onClick={onClose} className="text-muted hover:text-ink" aria-label="Fechar">

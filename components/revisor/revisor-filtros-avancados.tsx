@@ -121,7 +121,7 @@ export function RevisorFiltrosAvancados({
 
   return (
     <div>
-      <div className="mb-4 rounded-xl border border-hairline bg-surface p-3.5">
+      <div className="mb-4 painel-vidro rounded-2xl border border-white/10 p-3.5">
         <div className="mb-3 flex items-center gap-2">
           <SlidersHorizontal size={15} className="icon-glow text-review" />
           <h3 className="m-0 text-sm font-semibold text-ink">Buscar por posição, stack e resultado</h3>
@@ -180,7 +180,7 @@ export function RevisorFiltrosAvancados({
               key={r.id}
               onClick={() => onOpen(items.map((i) => i.id), r.id)}
               style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
-              className="fade-in-up flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-lg"
+              className="fade-in-up flex cursor-pointer gap-3 painel-vidro rounded-2xl border border-white/10 p-3 transition-all duration-150 hover:-translate-y-0.5 hover:border-ink/40 hover:shadow-lg"
             >
               <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">
                 {thumbs[r.id] ? (

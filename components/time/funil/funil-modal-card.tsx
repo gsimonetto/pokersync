@@ -54,7 +54,7 @@ import type { ItemFunil } from "@/components/time/funil/tipos";
 // interações, sempre visível (registrar uma conversa sem perder o resto
 // de vista).
 
-const INPUT = "w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-white/25";
+const INPUT = "w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none focus:border-white/25";
 
 // <input type="datetime-local"> fala horário local sem fuso.
 function isoParaLocal(iso: string | null): string {
@@ -273,7 +273,7 @@ export function FunilModalCard({
           role="dialog"
           aria-modal="true"
           aria-label={`Cartão de ${item.nome}`}
-          className="max-h-[92vh] w-full max-w-5xl overflow-y-auto rounded-2xl border border-hairline bg-surface p-5"
+          className="max-h-[92vh] w-full max-w-5xl overflow-y-auto painel-vidro rounded-2xl border border-white/10 p-5"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Cabeçalho: crachá + onde está + há quanto tempo */}
@@ -311,7 +311,7 @@ export function FunilModalCard({
             <div className="space-y-5">
               {/* 1) Próximo passo */}
               {crmDisponivel ? (
-                <section className={`rounded-xl border p-3.5 ${passo.trim() ? "border-hairline bg-elevated/40" : "border-negative/40 bg-negative/[0.06]"}`}>
+                <section className={`rounded-xl border p-3.5 ${passo.trim() ? "border-hairline bg-white/[0.03]" : "border-negative/40 bg-negative/[0.06]"}`}>
                   <label htmlFor="funil-passo" className="mb-2 flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
                     <CornerDownRight size={12} /> Próximo passo
                   </label>
@@ -329,7 +329,7 @@ export function FunilModalCard({
                       value={passoEm}
                       onChange={(e) => setPassoEm(e.target.value)}
                       aria-label="Quando"
-                      className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12.5px] text-ink outline-none [color-scheme:dark]"
+                      className="rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5 text-[12.5px] text-ink outline-none [color-scheme:dark]"
                     />
                     {ATALHOS_DATA.map((a) => (
                       <button
@@ -347,7 +347,7 @@ export function FunilModalCard({
                   )}
                 </section>
               ) : (
-                <p className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[12px] text-muted">
+                <p className="flex items-center gap-2 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[12px] text-muted">
                   <Database size={13} className="shrink-0" />
                   Próximo passo, prioridade e requisitos de subida aparecem depois da atualização do banco do funil.
                 </p>
@@ -370,7 +370,7 @@ export function FunilModalCard({
                 ) : (
                   <ul className="space-y-1.5">
                     {item.requisitos.map((r) => (
-                      <li key={r.chave} className="flex items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2">
+                      <li key={r.chave} className="flex items-center gap-3 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2">
                         {r.ok ? <Check size={14} className="shrink-0 text-positive" /> : <Circle size={14} className="shrink-0 text-muted/60" />}
                         <span className="min-w-0 flex-1 truncate text-[12.5px] text-ink/90 sm:w-32 sm:flex-none">{r.rotulo}</span>
                         <span className="hidden h-1.5 flex-1 overflow-hidden rounded-full bg-white/[0.07] sm:block" aria-hidden>
@@ -463,7 +463,7 @@ export function FunilModalCard({
                 {!carregandoExtras && checklist.length > 0 && (
                   <ul className="mb-2 space-y-1">
                     {checklist.map((ck) => (
-                      <li key={ck.id} className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5">
+                      <li key={ck.id} className="flex items-center gap-2 rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5">
                         <button type="button" onClick={() => alternarItem(ck)} className="shrink-0 text-muted hover:text-ink" aria-label={ck.done ? "Desmarcar" : "Marcar"}>
                           {ck.done ? <CheckCircle2 size={16} className="text-positive" /> : <Circle size={16} />}
                         </button>
@@ -481,7 +481,7 @@ export function FunilModalCard({
                     onChange={(e) => setNovoItem(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && (e.preventDefault(), adicionarItem())}
                     placeholder="Adicionar item…"
-                    className="min-w-0 flex-1 rounded-lg border border-hairline bg-elevated px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
+                    className="min-w-0 flex-1 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-[13px] text-ink outline-none placeholder:text-muted/50"
                   />
                   <button type="button" onClick={adicionarItem} disabled={!novoItem.trim()} aria-label="Adicionar item"
                     className="shrink-0 rounded-lg border border-hairline px-3 py-2 text-[13px] text-ink transition-colors hover:border-ink/40 disabled:opacity-40">
@@ -556,7 +556,7 @@ export function FunilModalCard({
                     Sair do funil
                   </button>
                 ) : (
-                  <div className="rounded-lg border border-hairline bg-elevated p-3">
+                  <div className="rounded-lg border border-hairline bg-white/[0.04] p-3">
                     <p className="text-[13px] text-ink/85">O que fazer com {item.nome}?</p>
                     <div className="mt-2 flex flex-col gap-2">
                       <button onClick={() => arquivar("concluido")} disabled={arquivando} type="button"

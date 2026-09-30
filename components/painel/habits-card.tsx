@@ -115,7 +115,7 @@ export function HabitsCard({
   }
 
   const campo =
-    "w-full rounded-xl border border-hairline bg-elevated px-2.5 py-2 text-sm focus:border-[#d4af37]/70 focus:outline-none";
+    "w-full rounded-xl border border-hairline bg-white/[0.04] px-2.5 py-2 text-sm focus:border-[#d4af37]/70 focus:outline-none";
 
   return (
     <PainelCard

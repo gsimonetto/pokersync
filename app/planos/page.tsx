@@ -3,7 +3,7 @@
 import { Suspense, useEffect, useState } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { Check, Loader2, Lock, Radar as RadarIcon, Users, Sparkles } from "lucide-react";
-import { AppShell } from "@/components/app-shell";
+import { CARD_VIDRO, TelaVidro } from "@/components/ui/tela-vidro";
 import { fetchMyPlanState } from "@/lib/services/plan-service";
 import { fetchHasActiveTeamAccess } from "@/lib/services/team-service";
 import { ADDON_PRICES, PLAN_IDS, PLANS, SELF_SERVE_PLAN_IDS, isAddonUnlockedFor, type PlanId, type ModuleKey } from "@/lib/plans/plans-data";
@@ -102,17 +102,10 @@ function PlanosContent() {
   const radarIncludedInPlan = (myPlan !== null && PLANS[myPlan].addons.radar) || hasTeamAccess;
 
   return (
-    <main className="w-full px-4 py-6 md:px-6 md:py-10">
-      <div className="mb-8">
-        <h1 className="text-2xl font-bold text-ink">Planos PokerSync</h1>
-        <p className="mt-1 text-sm text-muted">Escolha o plano que acompanha seu ritmo de evolução.</p>
-      </div>
+    <>
+      {checkoutMsg && <p className={`${CARD_VIDRO} mb-3.5 rounded-2xl px-4 py-2.5 text-sm text-ink`}>{checkoutMsg}</p>}
 
-      {checkoutMsg && (
-        <p className="mb-6 rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink">{checkoutMsg}</p>
-      )}
-
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-3.5 sm:grid-cols-2 xl:grid-cols-4">
         {PLAN_IDS.map((id, idx) => {
           const plan = PLANS[id];
           const isMine = myPlan === id;
@@ -132,8 +125,8 @@ function PlanosContent() {
                 background: isMine ? `${accent}0d` : undefined,
                 boxShadow: isMine || destaque ? `0 0 0 1px ${accent}20, 0 12px 28px -16px ${accent}55` : undefined,
               }}
-              className={`fade-in-up group relative flex flex-col gap-4 overflow-hidden rounded-xl border p-5 transition-all duration-200 hover:-translate-y-1 ${
-                isMine || destaque ? "" : "border-hairline bg-surface hover:border-white/20"
+              className={`painel-vidro fade-in-up group relative flex flex-col gap-4 overflow-hidden rounded-3xl border p-5 transition-all duration-200 hover:-translate-y-1 ${
+                isMine || destaque ? "" : "border-white/10 hover:border-white/20"
               }`}
             >
               {/* Barra de acento no topo -- reforca a identidade de cor do
@@ -150,7 +143,9 @@ function PlanosContent() {
               )}
 
               <div>
-                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: accent }}>{plan.name}</p>
+                <p className="text-xs font-bold uppercase tracking-wider" style={{ color: accent }}>
+                  {plan.name}
+                </p>
                 <p className="mt-1 text-2xl font-bold text-ink">
                   {plan.priceCents === 0 ? "Grátis" : BRL.format((plan.priceCents ?? 0) / 100)}
                   {plan.priceCents ? <span className="text-sm font-normal text-muted"> /mês</span> : null}
@@ -198,7 +193,7 @@ function PlanosContent() {
 
               {isMine ? (
                 <span
-                  className="rounded-lg border px-3 py-1.5 text-center text-xs font-semibold"
+                  className="rounded-xl border px-3 py-1.5 text-center text-xs font-semibold"
                   style={{ color: accent, borderColor: `${accent}40`, background: `${accent}1A` }}
                 >
                   Seu plano atual
@@ -207,13 +202,13 @@ function PlanosContent() {
                 <button
                   onClick={() => handleCheckout(target, { planId: id })}
                   disabled={loadingTarget !== null}
-                  className="inline-flex items-center justify-center gap-2 rounded-lg bg-white px-3 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90 disabled:opacity-60"
+                  className="inline-flex items-center justify-center gap-2 rounded-xl bg-[#d4af37] px-3 py-2 text-sm font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.97] disabled:opacity-60"
                 >
                   {loadingTarget === target && <Loader2 size={14} className="animate-spin" />}
                   Assinar
                 </button>
               ) : plan.priceCents ? (
-                <span className="rounded-lg border border-hairline px-3 py-2 text-center text-sm font-semibold text-muted">
+                <span className="rounded-xl border border-white/10 bg-white/[0.03] px-3 py-2 text-center text-sm font-semibold text-muted">
                   Contratação por contato direto
                 </span>
               ) : null}
@@ -225,11 +220,15 @@ function PlanosContent() {
       {/* Radar nao e' plano -- e' complemento avulso, comprado a parte por
           quem esta num plano que nao inclui (ver isAddonUnlocked). */}
       <div
-        className="fade-in-up mt-4 flex flex-col gap-3 rounded-xl border p-5 sm:flex-row sm:items-center sm:justify-between"
-        style={{ animationDelay: "260ms", borderColor: `${ACCENT.gold}30`, background: `radial-gradient(circle at 0% 0%, ${ACCENT.gold}0d, transparent 60%)` }}
+        className="painel-vidro fade-in-up mt-3.5 flex flex-col gap-3 rounded-3xl border p-5 sm:flex-row sm:items-center sm:justify-between"
+        style={{
+          animationDelay: "260ms",
+          borderColor: `${ACCENT.gold}30`,
+          background: `radial-gradient(circle at 0% 0%, ${ACCENT.gold}0d, transparent 60%)`,
+        }}
       >
         <div className="flex items-center gap-3">
-          <div className="grid size-10 shrink-0 place-items-center rounded-lg border border-[#E8B93C]/30 bg-[#E8B93C]/10 text-[#E8B93C]">
+          <div className="grid size-10 shrink-0 place-items-center rounded-xl border border-[#d4af37]/30 bg-[#d4af37]/10 text-[#d4af37]">
             <RadarIcon size={18} className="icon-glow" />
           </div>
           <div>
@@ -241,18 +240,18 @@ function PlanosContent() {
         </div>
 
         {radarIncludedInPlan ? (
-          <span className="shrink-0 rounded-lg border border-training/40 bg-training/10 px-3 py-1.5 text-center text-xs font-semibold text-training">
+          <span className="shrink-0 rounded-xl border border-positive/40 bg-positive/10 px-3 py-1.5 text-center text-xs font-semibold text-positive">
             Incluso no seu plano
           </span>
         ) : radarUnlocked ? (
-          <span className="shrink-0 rounded-lg border border-training/40 bg-training/10 px-3 py-1.5 text-center text-xs font-semibold text-training">
+          <span className="shrink-0 rounded-xl border border-positive/40 bg-positive/10 px-3 py-1.5 text-center text-xs font-semibold text-positive">
             Você já tem
           </span>
         ) : (
           <button
             onClick={() => handleCheckout("addon:radar", { addonId: "radar" })}
             disabled={loadingTarget !== null || myPlan === null}
-            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-lg bg-white px-4 py-2 text-sm font-semibold text-void transition-colors hover:bg-white/90 disabled:opacity-60"
+            className="inline-flex shrink-0 items-center justify-center gap-2 rounded-xl bg-[#d4af37] px-4 py-2 text-sm font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.97] disabled:opacity-60"
           >
             {loadingTarget === "addon:radar" && <Loader2 size={14} className="animate-spin" />}
             Comprar — {BRL.format(ADDON_PRICES.radar / 100)}/mês
@@ -260,20 +259,19 @@ function PlanosContent() {
         )}
       </div>
 
-      <p className="mt-8 text-xs text-muted">
-        Pagamento via Stripe — em ativação (conta em validação de documentos). Os planos Team são fechados por
-        contato direto por enquanto.
+      <p className="mt-6 text-xs text-muted">
+        Pagamento via Stripe — em ativação (conta em validação de documentos). Os planos Team são fechados por contato direto por enquanto.
       </p>
-    </main>
+    </>
   );
 }
 
 export default function PlanosPage() {
   return (
-    <AppShell>
+    <TelaVidro titulo="Planos PokerSync" subtitulo="Escolha o plano que acompanha seu ritmo de evolução.">
       <Suspense fallback={null}>
         <PlanosContent />
       </Suspense>
-    </AppShell>
+    </TelaVidro>
   );
 }

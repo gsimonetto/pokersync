@@ -150,7 +150,7 @@ export function FunilQuadro({
                   aria-label={`Expandir ${fase.name}`}
                   // self-start: cabeçalho recolhido baixinho, sem esticar os
                   // cabeçalhos vizinhos (o nome vertical fica no corpo).
-                  className={`${largura(fase.id)} flex shrink-0 flex-col items-center gap-1.5 self-start rounded-xl border border-hairline bg-elevated/60 py-2.5 text-muted transition-colors hover:text-ink`}
+                  className={`${largura(fase.id)} flex shrink-0 flex-col items-center gap-1.5 self-start rounded-xl border border-hairline bg-white/[0.04] py-2.5 text-muted transition-colors hover:text-ink`}
                 >
                   <span className="h-2.5 w-2.5 rounded-full" style={{ backgroundColor: fase.color }} />
                   <span className="text-[11px] font-bold tabular-nums">{ocupacao}</span>
@@ -161,7 +161,7 @@ export function FunilQuadro({
             return (
               <div
                 key={fase.id}
-                className={`${largura(fase.id)} shrink-0 rounded-xl border border-hairline bg-elevated/60 px-3 py-2.5`}
+                className={`${largura(fase.id)} shrink-0 rounded-xl border border-hairline bg-white/[0.04] px-3 py-2.5`}
                 title={fase.descricao ?? undefined}
               >
                 <div className="flex items-center gap-2">
@@ -176,7 +176,7 @@ export function FunilQuadro({
                     onClick={() => alternarRecolhida(fase.id)}
                     title="Recolher coluna"
                     aria-label={`Recolher ${fase.name}`}
-                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted/60 transition-colors hover:bg-surface hover:text-ink"
+                    className="grid h-6 w-6 shrink-0 place-items-center rounded-md text-muted/60 transition-colors hover:bg-white/[0.06] hover:text-ink"
                   >
                     <ChevronsRightLeft size={12} />
                   </button>
@@ -244,7 +244,7 @@ export function FunilQuadro({
                     onDragLeave={() => setAlvoDrop((cur) => (cur === alvo ? null : cur))}
                     onDrop={(e) => soltar(e, fase)}
                     className={`${largura(fase.id)} flex shrink-0 flex-col rounded-xl border p-1.5 transition-colors ${
-                      recebendo ? "border-ink/40 bg-ink/5 ring-2 ring-ink/15" : "border-hairline/60 bg-elevated/25"
+                      recebendo ? "border-ink/40 bg-ink/5 ring-2 ring-ink/15" : "border-hairline/60 bg-white/[0.02]"
                     } ${umaRaia ? "min-h-0" : "min-h-[72px]"}`}
                   >
                     {recolhida ? (

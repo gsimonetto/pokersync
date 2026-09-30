@@ -184,7 +184,7 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
                 : "Quem ganhar mais XP até o fim leva o prêmio"}
             </p>
           </div>
-          <div role="tablist" aria-label="Recorte do ranking" className="flex gap-1 rounded-xl border border-hairline bg-elevated p-1">
+          <div role="tablist" aria-label="Recorte do ranking" className="flex gap-1 rounded-xl border border-hairline bg-white/[0.04] p-1">
             {ESCOPOS.map((e) => {
               const Icone = e.icone;
               const ativo = e.valor === escopo;
@@ -249,7 +249,7 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
               <button
                 type="button"
                 onClick={() => setTentativa((t) => t + 1)}
-                className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-1.5 text-[12.5px] font-semibold text-ink hover:bg-elevated"
+                className="mt-1 inline-flex items-center gap-1.5 rounded-lg border border-hairline px-3 py-1.5 text-[12.5px] font-semibold text-ink hover:bg-white/[0.05]"
               >
                 <RefreshCw size={13} /> Tentar de novo
               </button>

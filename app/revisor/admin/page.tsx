@@ -1,5 +1,6 @@
 import { AdminDrillsPanel } from "@/components/revisor/admin-drills-panel";
 import { createClient } from "@/lib/supabase/server";
+import { TelaVidro } from "@/components/ui/tela-vidro";
 
 // E-mail espelha exatamente a policy RLS de hand_review_drill_suggestions
 // (hrds_owner_read_all etc: auth.jwt()->>'email' = 'gsimonetto1@gmail.com').
@@ -17,9 +18,9 @@ export default async function AdminDrillsPage() {
 
   if (user?.email !== ADMIN_EMAIL) {
     return (
-      <main className="mx-auto max-w-xl px-4 py-16 text-center">
+      <TelaVidro semCasca titulo="Acesso restrito">
         <p className="text-sm text-muted">Você não tem permissão para acessar esta página.</p>
-      </main>
+      </TelaVidro>
     );
   }
 

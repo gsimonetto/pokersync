@@ -84,7 +84,7 @@ export function CartaoNivel({
   const marco = proximoMarco(level);
 
   return (
-    <section className={`@container relative ${semMoldura ? "" : "overflow-hidden rounded-2xl border border-hairline bg-surface p-4 sm:p-5"}`}>
+    <section className={`@container relative ${semMoldura ? "" : "overflow-hidden painel-vidro rounded-2xl border border-white/10 p-4 sm:p-5"}`}>
       {!semMoldura && (
         <div
           aria-hidden
@@ -334,7 +334,7 @@ export function PatentesModal({ nivelAtual, onFechar }: { nivelAtual: number; on
             <h2 className="flex items-center gap-2 text-sm font-bold text-ink">
               <Layers size={16} style={{ color: ACCENT }} /> Patentes
             </h2>
-            <button onClick={onFechar} className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-elevated hover:text-ink" aria-label="Fechar">
+            <button onClick={onFechar} className="grid h-8 w-8 place-items-center rounded-lg text-muted hover:bg-white/[0.05] hover:text-ink" aria-label="Fechar">
               <X size={16} />
             </button>
           </div>
