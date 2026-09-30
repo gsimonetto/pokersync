@@ -2,7 +2,7 @@
 
 import { useEffect, useMemo, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { Target, Flame, BarChart3, MapPin, Radar as RadarIcon, Lock, LayoutGrid } from "lucide-react";
+import { Target, Flame, MapPin, Radar as RadarIcon, Lock, LayoutGrid } from "lucide-react";
 import Link from "next/link";
 import { AppShell } from "@/components/app-shell";
 import { AnalysisFilters } from "@/components/analysis/AnalysisFilters";
@@ -60,13 +60,12 @@ import {
   type BuyinBucket,
 } from "@/types/analysis";
 
-type TabKey = "geral" | "preflop" | "postflop" | "estatisticas" | "posicao" | "radar";
+type TabKey = "geral" | "preflop" | "postflop" | "posicao" | "radar";
 
 const TABS: { value: TabKey; label: string; icon: typeof Target }[] = [
   { value: "geral", label: "Visão geral", icon: LayoutGrid },
   { value: "preflop", label: "Preflop", icon: Target },
   { value: "postflop", label: "Postflop", icon: Flame },
-  { value: "estatisticas", label: "Estatísticas", icon: BarChart3 },
   { value: "posicao", label: "Por posição", icon: MapPin },
   { value: "radar", label: "Radar", icon: RadarIcon },
 ];
@@ -77,7 +76,7 @@ export default function PerformancePage() {
   const [tournamentSessions, setTournamentSessions] = useState<HandSession[]>([]);
   const [payouts, setPayouts] = useState<TournamentPayout[]>([]);
   // Sessões da Gestão de Banca: curva de lucro e ROI por buy-in (mesma
-  // fonte do Lucro total/ROI da aba Estatísticas).
+  // fonte do Lucro total/ROI da Visão geral).
   const [sessoesBanca, setSessoesBanca] = useState<Session[]>([]);
   const [loading, setLoading] = useState(true);
   const [erro, setErro] = useState("");
@@ -92,7 +91,7 @@ export default function PerformancePage() {
     setTabState(nova);
   }
   const [filters, setFilters] = useState<Filters>(EMPTY_ANALYSIS_FILTERS);
-  // Filtro de buy-in — só afeta a aba Estatísticas (Total Games/ROI/ITM/
+  // Filtro de buy-in — só afeta os números de torneio (Total Games/ROI/ITM/
   // Lucro total, que vêm de hand_sessions + tournament_payouts; cEV/ICM
   // não têm buy-in associado, ver comentário em fetchTournamentMetrics),
   // por isso vive separado do `filters` de cima (que filtra mãos
@@ -101,7 +100,7 @@ export default function PerformancePage() {
   // Buy-in/premiação importados sempre vêm em USD (ver
   // use-currency-preference.ts) — o jogador escolhe se quer ver em dólar
   // cru ou convertido pra real, um só lugar controlando os dois painéis
-  // que mostram dinheiro na aba Estatísticas.
+  // que mostram dinheiro na Visão geral.
   const { currency, setCurrency, formatUsd } = useCurrencyPreference();
   // Radar PokerSync e' addon, nao vem liberado por padrao em nenhum plano
   // -- a aba existe pra todo mundo (pedido: "radar pokersync deve ficar
@@ -286,17 +285,41 @@ export default function PerformancePage() {
                       transition={{ duration: 0.28, ease: EASE }}
                       className="grid gap-3.5"
                     >
-                      {semMaos && tab !== "radar" && tab !== "estatisticas" && tab !== "geral" ? (
+                      {semMaos && tab !== "radar" && tab !== "geral" ? (
                         <p className="painel-vidro rounded-3xl border border-dashed border-white/10 p-8 text-center text-sm text-muted">
                           Sem mãos com hand history estruturada ainda. Aguarde a sincronização do agente desktop (Radar
                           PokerSync) — as métricas aparecem aqui automaticamente assim que houver dado.
                         </p>
                       ) : (
                         <>
+                          {/* Visão geral = antiga "Visão geral" + "Estatísticas"
+                              (mostravam quase o mesmo): resumo em cima, lucro e
+                              tendência semanal lado a lado (gráfico semanal em
+                              tamanho compacto), depois torneios. */}
                           {tab === "geral" && (
                             <>
                               <ResumoPerformance rows={filteredRows} preflop={preflop} tournament={tournament} sessoes={sessoesBanca} ordem={0} />
-                              <LinhaSemanal rows={filteredRows} ordem={1} />
+                              <div className="grid items-start gap-3.5 xl:grid-cols-2">
+                                <CurvaLucro sessoes={sessoesBanca} ordem={1} />
+                                <LinhaSemanal rows={filteredRows} ordem={2} />
+                              </div>
+                              <div className="grid items-start gap-3.5 lg:grid-cols-2">
+                                <Eliminacao payouts={payouts} ordem={3} />
+                                <RoiBuyin sessoes={sessoesBanca} ordem={4} />
+                              </div>
+                              {tournament && (
+                                <StatisticsTab
+                                  metrics={tournament}
+                                  tournamentSessions={tournamentSessions}
+                                  payouts={payouts}
+                                  buyinFilter={tournamentBuyinFilter}
+                                  onBuyinFilterChange={handleBuyinFilterChange}
+                                  availableBuyinBuckets={availableBuyinBuckets}
+                                  currency={currency}
+                                  onCurrencyChange={setCurrency}
+                                  formatUsd={formatUsd}
+                                />
+                              )}
                             </>
                           )}
                           {tab === "preflop" && (
@@ -327,28 +350,6 @@ export default function PerformancePage() {
                             </>
                           )}
                           {tab === "posicao" && <BarrasPosicao rows={filteredRows} byPosition={byPosition} ordem={1} />}
-                          {tab === "estatisticas" && (
-                            <>
-                              <CurvaLucro sessoes={sessoesBanca} ordem={1} />
-                              <div className="grid items-start gap-3.5 lg:grid-cols-2">
-                                <Eliminacao payouts={payouts} ordem={2} />
-                                <RoiBuyin sessoes={sessoesBanca} ordem={3} />
-                              </div>
-                              {tournament && (
-                                <StatisticsTab
-                                  metrics={tournament}
-                                  tournamentSessions={tournamentSessions}
-                                  payouts={payouts}
-                                  buyinFilter={tournamentBuyinFilter}
-                                  onBuyinFilterChange={handleBuyinFilterChange}
-                                  availableBuyinBuckets={availableBuyinBuckets}
-                                  currency={currency}
-                                  onCurrencyChange={setCurrency}
-                                  formatUsd={formatUsd}
-                                />
-                              )}
-                            </>
-                          )}
                           {tab === "radar" &&
                             (radarUnlocked ? (
                               <RadarPanel onReset={loadAll} />
