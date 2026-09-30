@@ -35,7 +35,7 @@ import { EASE } from "@/components/painel/painel-card";
 import { ScoreHistoryChart } from "@/components/time/score-history-chart";
 import { MetasCard } from "@/components/time/metas-card";
 import { Kpi } from "@/components/time/kpi";
-import { PentagonoCircuito, type EixoCircuito } from "@/components/time/pentagono-circuito";
+import { PentagonoHolograma, type EixoPentagono } from "@/components/painel/pentagono-holograma";
 import { BRL, variacao } from "@/lib/format";
 import {
   DIA_SEMANA_LABEL,
@@ -174,7 +174,7 @@ export function PlayerDetailBody({
 
       <div className="grid gap-4 lg:grid-cols-[minmax(0,1.25fr)_minmax(0,1fr)]">
         <Cartao titulo="Perfil de jogo" icone={<Hexagon size={15} />} ordem={1} extra={evolutionStats && evolutionStats.hands > 0 ? <Amostra n={evolutionStats.hands} /> : undefined}>
-          <PentagonoCircuito eixos={eixosDoPerfil(evolutionStats)} amostra={evolutionStats?.hands ?? 0} />
+          <PentagonoHolograma eixos={eixosDoPerfil(evolutionStats)} amostra={evolutionStats?.hands ?? 0} />
           <p className="mt-2 text-center text-[11px] text-muted/70">
             Cada ponta tem a própria escala. Passe o mouse no número para ver o que ele mede.
           </p>
@@ -304,7 +304,7 @@ function Amostra({ n }: { n: number }) {
 
 // As 5 pontas do pentágono: 3 de pré-flop e 2 de pós-flop, as mais usadas
 // pra descrever o estilo de um jogador. Tetos = escala de cada ponta.
-function eixosDoPerfil(s: PlayerEvolutionStats | null): EixoCircuito[] {
+function eixosDoPerfil(s: PlayerEvolutionStats | null): EixoPentagono[] {
   return [
     {
       chave: "vpip",

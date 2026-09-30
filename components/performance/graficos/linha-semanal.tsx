@@ -6,7 +6,7 @@ import { LineChart } from "lucide-react";
 import { PainelCard } from "@/components/painel/painel-card";
 import type { AnalysisHandRow } from "@/types/analysis";
 import { COR_PFR, COR_UNICA, COR_VPIP, DicaGrafico, Legenda } from "./base";
-import { useLargura, useTamanho } from "./usar-largura";
+import { useLargura } from "./usar-largura";
 
 // Tendência semana a semana -- responde "estou corrigindo o leak ou
 // piorando?". Dá pra trocar a métrica (VPIP e PFR juntos, 3-Bet, roubo
@@ -23,7 +23,9 @@ import { useLargura, useTamanho } from "./usar-largura";
 const MIN_SEMANA = 20;
 const MIN_SITUACAO = 5;
 // Compacto de propósito: é a leitura de direção, não o gráfico principal.
-const ALTURA_MIN = 190;
+// Altura fixa e compacta: antes o gráfico esticava até ocupar toda a
+// altura livre da tela e ficava enorme.
+const ALTURA_AREA = 200;
 const ALTURA_VOLUME = 26;
 const M = { t: 12, r: 44, b: 26, l: 34 };
 
@@ -123,14 +125,12 @@ function series(semanas: Semana[], m: Metrica): Serie[] {
 
 export function LinhaSemanal({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ordem?: number }) {
   const caixa = useRef<HTMLDivElement>(null);
-  const area = useRef<HTMLDivElement>(null);
   const largura = useLargura(caixa);
   const [foco, setFoco] = useState<number | null>(null);
   const [metrica, setMetrica] = useState<Metrica>("vpfr");
   const semanas = useMemo(() => porSemana(rows), [rows]);
   const lista = useMemo(() => series(semanas, metrica), [semanas, metrica]);
-  const alturaArea = useTamanho(area, semanas.length >= 2).altura;
-  const ALTURA = Math.max(ALTURA_MIN, alturaArea) - ALTURA_VOLUME;
+  const ALTURA = ALTURA_AREA - ALTURA_VOLUME;
   const duas = metrica === "vpfr";
 
   const todos = lista.flatMap((l) => l.valores).filter((v): v is number => v != null);
@@ -180,7 +180,7 @@ export function LinhaSemanal({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ord
     <PainelCard title="Sua tendência por semana" icon={<LineChart size={15} />} ordem={ordem} rolagem={false}>
       {/* Contêiner medido sempre existe (mesmo sem dado), pra largura já
           estar certa quando um filtro fizer o gráfico aparecer. */}
-      <div ref={caixa} className="relative flex w-full flex-1 flex-col" onMouseLeave={() => setFoco(null)}>
+      <div ref={caixa} className="relative flex w-full flex-col" onMouseLeave={() => setFoco(null)}>
         {semanas.length < 2 ? (
           <p className="text-sm text-muted">
             Precisa de pelo menos 2 semanas com {MIN_SEMANA}+ mãos pra desenhar a tendência. Continue importando.
@@ -232,7 +232,7 @@ export function LinhaSemanal({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ord
             </div>
             {/* O SVG fica por cima (absoluto) da área medida, pra altura dele
                 não empurrar a medida de volta. */}
-            <div ref={area} className="relative w-full flex-1" style={{ minHeight: ALTURA_MIN }}>
+            <div className="relative w-full" style={{ height: ALTURA_AREA }}>
               {largura > 0 && (
                 <svg
                   width={largura}
@@ -317,7 +317,7 @@ export function LinhaSemanal({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ord
                       />
                     );
                   })}
-                  <text x={M.l - 14} y={ALTURA + ALTURA_VOLUME - 4} textAnchor="end" fontSize={9} fill="rgba(255,255,255,0.35)">
+                  <text x={0} y={ALTURA + ALTURA_VOLUME - 4} textAnchor="start" fontSize={9} fill="rgba(255,255,255,0.35)">
                     mãos
                   </text>
                   {/* mira + marcadores da semana em foco */}

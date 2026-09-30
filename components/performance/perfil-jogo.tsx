@@ -1,11 +1,9 @@
 "use client";
 
-import { useEffect, useMemo, useState } from "react";
-import { animate, useReducedMotion } from "framer-motion";
-import { EASE } from "@/components/painel/painel-card";
-import { InfoHover } from "@/components/painel/info-hover";
+import { useMemo } from "react";
+import { PentagonoHolograma, type EixoPentagono } from "@/components/painel/pentagono-holograma";
 import type { AnalysisHandRow, PreflopMetrics } from "@/types/analysis";
-import { COR_UNICA, SeloAmostra } from "./graficos/base";
+import { SeloAmostra } from "./graficos/base";
 
 // Pentágono do PERFIL DE JOGO: como você joga (estilo), não se está
 // indo bem -- isso é o Score, que fica na tela de início. Três pontas de
@@ -17,32 +15,13 @@ import { COR_UNICA, SeloAmostra } from "./graficos/base";
 // verdade fica escrito em cada ponta -- a forma é só a leitura rápida.
 //
 // Sem faixa "ideal" desenhada de propósito: não temos referência
-// auditável pra essas frequências.
+// auditável pra essas frequências. Desenho: o mesmo pentágono em
+// holograma do Score e da ficha do jogador.
 
-type Eixo = {
-  chave: string;
-  curto: string;
-  titulo: string;
-  oQueE: string;
-  comoCalcula: string;
-  teto: number;
-  valor: number | null;
-  vezes: string;
-};
-
-const CX = 100;
-const CY = 104;
-const R = 70;
-const r2 = (n: number) => Math.round(n * 100) / 100; // mesmo arredondamento no servidor e no navegador
-function ponto(i: number, fracao: number) {
-  const a = ((-90 + i * 72) * Math.PI) / 180;
-  return { x: r2(CX + R * fracao * Math.cos(a)), y: r2(CY + R * fracao * Math.sin(a)) };
-}
-const poligono = (fracoes: number[]) => fracoes.map((f, i) => `${ponto(i, f).x},${ponto(i, f).y}`).join(" ");
 const pctDe = (a: number, b: number) => (b > 0 ? (a / b) * 100 : null);
 const fmt = (v: number | null) => (v == null ? "—" : `${Math.round(v)}%`);
 
-function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
+function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): EixoPentagono[] {
   // Base = chances reais (histórico da mão), não todas as mãos do agressor.
   const agressor = rows.filter((r) => r.posflop?.cbet.flop != null);
   const cbet = agressor.filter((r) => r.posflop!.cbet.flop === true);
@@ -51,8 +30,11 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
   const chances3bet = rows.filter((r) => r.threeBetOpportunity === true);
   const vpipN = rows.filter((r) => r.vpip).length;
   const pfrN = rows.filter((r) => r.pfr).length;
+  const PRE = "Performance · pré-flop";
+  const POS = "Performance · pós-flop";
   return [
     {
+      origem: PRE,
       chave: "vpip",
       curto: "Entra no pote",
       titulo: "Entra no pote (VPIP)",
@@ -63,6 +45,7 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
       vezes: `${vpipN} de ${rows.length} mãos`,
     },
     {
+      origem: PRE,
       chave: "agressao",
       curto: "Agressão pré",
       titulo: "Agressão pré-flop",
@@ -73,6 +56,7 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
       vezes: `${pfrN} de ${vpipN} mãos jogadas`,
     },
     {
+      origem: PRE,
       chave: "3bet",
       curto: "3-Bet",
       titulo: "3-Bet",
@@ -83,6 +67,7 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
       vezes: `${chances3bet.filter((r) => r.threeBet).length} de ${chances3bet.length} chances`,
     },
     {
+      origem: POS,
       chave: "cbet",
       curto: "C-bet flop",
       titulo: "C-bet no flop",
@@ -93,6 +78,7 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
       vezes: `${cbet.length} de ${agressor.length} flops`,
     },
     {
+      origem: POS,
       chave: "barrel",
       curto: "2º tiro",
       titulo: "2º tiro no turn",
@@ -107,19 +93,6 @@ function montarEixos(rows: AnalysisHandRow[], preflop: PreflopMetrics): Eixo[] {
 
 export function PerfilJogo({ rows, preflop }: { rows: AnalysisHandRow[]; preflop: PreflopMetrics }) {
   const eixos = useMemo(() => montarEixos(rows, preflop), [rows, preflop]);
-  const reduzir = useReducedMotion();
-  const [crescimento, setCrescimento] = useState(reduzir ? 1 : 0);
-  useEffect(() => {
-    if (reduzir) {
-      setCrescimento(1);
-      return;
-    }
-    const c = animate(0, 1, { duration: 0.9, ease: EASE, delay: 0.45, onUpdate: setCrescimento });
-    return () => c.stop();
-  }, [reduzir]);
-
-  const temDado = eixos.some((e) => e.valor != null);
-  const fracoes = eixos.map((e) => Math.min(1, (e.valor ?? 0) / e.teto));
 
   return (
     <div className="flex h-full min-h-0 w-full flex-col">
@@ -134,66 +107,13 @@ export function PerfilJogo({ rows, preflop }: { rows: AnalysisHandRow[]; preflop
       </div>
 
       <div className="flex min-h-0 flex-1 items-center justify-center">
-        <div className="relative aspect-square w-full max-w-[230px]">
-          <svg viewBox="0 0 200 200" className="absolute inset-0 h-full w-full" aria-hidden>
-            {[0.25, 0.5, 0.75, 1].map((f) => (
-              <polygon
-                key={f}
-                points={poligono([f, f, f, f, f])}
-                fill="none"
-                stroke={f === 1 ? "rgba(255,255,255,0.14)" : "rgba(255,255,255,0.06)"}
-                strokeWidth={1}
-              />
-            ))}
-            {eixos.map((e, i) => {
-              const p = ponto(i, 1);
-              return <line key={e.chave} x1={CX} y1={CY} x2={p.x} y2={p.y} stroke="rgba(255,255,255,0.06)" strokeWidth={1} />;
-            })}
-            {temDado && (
-              <g opacity={Math.min(1, crescimento * 2)}>
-                <polygon
-                  points={poligono(fracoes.map((f) => f * crescimento))}
-                  fill="rgba(212,175,55,0.16)"
-                  stroke={COR_UNICA}
-                  strokeWidth={2}
-                  strokeLinejoin="round"
-                />
-                {eixos.map((e, i) => {
-                  if (e.valor == null) return null;
-                  const pt = ponto(i, fracoes[i] * crescimento);
-                  return <circle key={e.chave} cx={pt.x} cy={pt.y} r={4} fill={COR_UNICA} stroke="#161616" strokeWidth={2} />;
-                })}
-              </g>
-            )}
-          </svg>
-
-          {eixos.map((e, i) => {
-            const a = ((-90 + i * 72) * Math.PI) / 180;
-            const x = r2(((CX + (R + 19) * Math.cos(a)) / 200) * 100);
-            const y = r2(((CY + (R + 13) * Math.sin(a)) / 200) * 100);
-            return (
-              <InfoHover
-                key={e.chave}
-                explicacao={{
-                  titulo: e.titulo,
-                  oQueE: e.oQueE,
-                  itens: [
-                    { rotulo: "Você", valor: fmt(e.valor) },
-                    { rotulo: "Quantas vezes", valor: e.vezes },
-                    { rotulo: "Ponta do gráfico", valor: `0 a ${e.teto}%` },
-                  ],
-                  origem: i < 3 ? "Performance · pré-flop" : "Performance · pós-flop",
-                  comoCalcula: e.comoCalcula,
-                }}
-                className="absolute -translate-x-1/2 -translate-y-1/2 rounded-md px-1 text-center leading-none"
-                style={{ left: `${x}%`, top: `${y}%` }}
-              >
-                <span className="block whitespace-nowrap text-[10.5px] text-muted/80">{e.curto}</span>
-                <span className="tnum block text-[12px] font-bold text-ink/90">{fmt(e.valor)}</span>
-              </InfoHover>
-            );
-          })}
-        </div>
+        <PentagonoHolograma
+          eixos={eixos}
+          amostra={rows.length}
+          formatar={fmt}
+          rotuloValor="Você"
+          vazio="Sem mãos no período — o perfil aparece assim que você importar o histórico."
+        />
       </div>
 
       <p className="mt-1 px-1 text-center text-[10.5px] text-muted/60">

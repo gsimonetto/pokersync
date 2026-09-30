@@ -4,7 +4,7 @@ import Link from "next/link";
 import { ArrowRight, TriangleAlert } from "lucide-react";
 import { COMPONENTES_SCORE as COMPONENTES, nivelDoScore, type PlayerPerformance } from "@/lib/services/performance-service";
 import { Numero } from "./painel-card";
-import { PentagonoCircuito, type EixoCircuito } from "@/components/time/pentagono-circuito";
+import { PentagonoHolograma, type EixoPentagono } from "./pentagono-holograma";
 import { InfoHover, type Explicacao } from "./info-hover";
 import { num } from "./formato";
 
@@ -17,8 +17,8 @@ import { num } from "./formato";
 // (COMPONENTES_SCORE em lib/services/performance-service.ts), e as
 // faixas de cor também: abaixo de 40 fraco, 40-69 em evolução, 70+ bom.
 //
-// Desenho: o mesmo pentágono 3D ("placa de circuito") da ficha do
-// jogador (components/time/pentagono-circuito.tsx) -- um padrão só de
+// Desenho: o mesmo pentágono em holograma da ficha do jogador e do perfil
+// de jogo da Performance (pentagono-holograma.tsx) -- um padrão só de
 // pentágono no produto.
 
 function corDoScore(v: number): string {
@@ -59,9 +59,9 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
     .filter((p) => p.valor != null && p.valor < 70)
     .reduce<(typeof pilares)[number] | null>((menor, p) => (menor == null || p.valor! < menor.valor! ? p : menor), null);
 
-  // Mesmo pentágono 3D ("placa de circuito") da ficha do jogador, com os
-  // 5 pilares do Score de 0 a 100. O ponto fraco sai em vermelho.
-  const eixos: EixoCircuito[] = pilares.map((p) => ({
+  // Mesmo pentágono em holograma da ficha do jogador, com os 5 pilares do
+  // Score de 0 a 100. O ponto fraco sai em vermelho.
+  const eixos: EixoPentagono[] = pilares.map((p) => ({
     chave: p.key,
     curto: CURTO[p.key] ?? p.label,
     titulo: `${p.label} · peso ${p.peso}`,
@@ -102,8 +102,8 @@ export function PentagonoScore({ perf, explicacao }: { perf: PlayerPerformance |
           (unidades de container), mantendo a proporção. No celular segue
           a largura. */}
       <div className="flex min-h-0 flex-1 items-center justify-center xl:[container-type:size]">
-        <div className="w-full xl:w-[min(100cqw,calc(100cqh*2.05))]">
-          <PentagonoCircuito
+        <div className="w-full xl:w-[min(100cqw,calc(100cqh*1.67))]">
+          <PentagonoHolograma
             eixos={eixos}
             amostra={temDado ? 1 : 0}
             formatar={(v) => (v == null ? "—" : num(v))}
