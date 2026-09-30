@@ -3,12 +3,13 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, SlidersHorizontal, X, CheckCircle2, XCircle, Info, Check, RotateCcw } from "lucide-react";
-import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
+import { classificarJogada, ehAcerto, nomeDoVeredito, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
 import { registerTraining } from "@/lib/services/xp-service";
-import { fetchTrainingAccuracy, fetchSessionState, type RfiJamFilterState } from "@/lib/services/drill-service";
+import { fetchResumoEvTreino, fetchTrainingAccuracy, fetchSessionState, type ResumoEvTreino, type RfiJamFilterState } from "@/lib/services/drill-service";
+import { bbPor100, emBb, fmtBbEv, valorDoBb } from "@/lib/poker/ev-em-bb";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import { useIsMobile } from "@/lib/hooks/use-is-mobile";
@@ -42,10 +43,10 @@ function SeloAcerto({ total, acertos, pct, curto = false }: { total: number; ace
   return (
     <span
       className={`${INFO_MESA} ${curto ? "max-w-[38vw]" : ""}`}
-      title={total > 0 ? `${acertos} de ${total} mãos ótimas desde o início` : "Suas respostas aparecem aqui"}
+      title={total > 0 ? `${acertos} de ${total} mãos certas desde o início (jogadas que o GTO usa)` : "Suas respostas aparecem aqui"}
     >
       <span className="size-2 shrink-0 rounded-full" style={{ background: accuracyChipColor(total, pct) }} />
-      <span className="truncate">{total > 0 ? (curto ? `${pct}% ótimas` : `Histórico · ${pct}% ótimas`) : curto ? "Sem histórico" : "Sem histórico ainda"}</span>
+      <span className="truncate">{total > 0 ? (curto ? `${pct}% acertos` : `Histórico · ${pct}% acertos`) : curto ? "Sem histórico" : "Sem histórico ainda"}</span>
     </span>
   );
 }
@@ -194,14 +195,6 @@ function nomeDoDistrator(label: string | null): string {
   return "essa jogada";
 }
 
-const VERDICT_LABEL: Record<Verdict, string> = {
-  OTIMA: "Jogada Ótima",
-  ACEITAVEL: "Aceitável",
-  ERRO_LEVE: "Erro Leve",
-  ERRO_GRAVE: "Erro Grave",
-  UNKNOWN: "Sem dados do solver",
-};
-
 const STACK_OPTIONS = [10, 15, 20, 25, 30, 40, 50, 60];
 
 // Valor especial "Qualquer" pros 4 filtros que suportam sorteio (Situação,
@@ -221,6 +214,13 @@ const TYPE_OPTIONS = [
 ];
 
 const MARGINAL_GAP_THRESHOLD = 0.5;
+const MARGINAL_GAP_BB = 0.1;
+
+/** bb/100 com uma casa: "0" ou "−3,2". */
+const bb100Curto = (v: number | null) => (v == null || Math.abs(v) < 0.05 ? "0" : `−${Math.abs(v).toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 })}`);
+
+/** Perda da mão: "0 bb" ou "−0,46 bb". */
+const textoPerda = (perdaBb: number) => (perdaBb < 0.005 ? "0 bb" : `−${fmtBbEv(perdaBb)}`);
 
 // Números no padrão brasileiro (vírgula decimal): toFixed escrevia "2.5%".
 const pct1 = (n: number) => n.toLocaleString("pt-BR", { minimumFractionDigits: 1, maximumFractionDigits: 1 });
@@ -346,12 +346,15 @@ function VerdictFlash({ label, color, isGood, freqPct }: { label: string; color:
 // central de SPR/board/pote, sem disputar espaco com nenhum dos dois --
 // ver `top` do wrapper, calibrado pra essa faixa.
 function VerdictCenterFlash({
-  label, color, isGood, freqPct, onDetails, mensagem,
+  label, color, isGood, freqPct, perdaBb, onDetails, mensagem,
 }: {
   label: string;
   color: string;
   isGood: boolean;
   freqPct: number | null;
+  /** Perda da mão em bb -- aparece no lugar da frequência quando existe
+   *  (a frequência já está na frase de baixo). */
+  perdaBb?: number | null;
   onDetails: () => void;
   /** Frase curta do que o GTO faz (a mesma da faixa do desktop). */
   mensagem?: string | null;
@@ -372,8 +375,14 @@ function VerdictCenterFlash({
             ultrapassa a caixa do texto e por isso nunca "corta". */}
         <Icon size={26} color={color} strokeWidth={2.2} style={{ flexShrink: 0, filter: `drop-shadow(0 0 10px ${color}cc)` }} />
         <span style={{ fontFamily: F, color: "#FFFFFF", fontWeight: 800, fontSize: 16, whiteSpace: "nowrap", textShadow: `0 0 14px ${color}bb, 0 2px 14px rgba(0,0,0,.85), 0 1px 3px rgba(0,0,0,.9)` }}>{label}</span>
-        {freqPct != null && (
-          <span style={{ fontFamily: F, color: "rgba(255,255,255,.65)", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", textShadow: "0 2px 10px rgba(0,0,0,.85)" }}>{freqPct}%</span>
+        {perdaBb != null ? (
+          <span style={{ fontFamily: F, color: perdaBb < 0.005 ? "#6EE7B7" : "#FCA5A5", fontSize: 12.5, fontWeight: 700, fontVariantNumeric: "tabular-nums", textShadow: "0 2px 10px rgba(0,0,0,.85)" }}>
+            {textoPerda(perdaBb)}
+          </span>
+        ) : (
+          freqPct != null && (
+            <span style={{ fontFamily: F, color: "rgba(255,255,255,.65)", fontSize: 12, fontWeight: 600, fontVariantNumeric: "tabular-nums", textShadow: "0 2px 10px rgba(0,0,0,.85)" }}>{freqPct}%</span>
+          )
         )}
       </div>
       {mensagem && (
@@ -460,32 +469,42 @@ function FilterSection({ label, children }: { label: string; children: React.Rea
   );
 }
 
-// Uma barra por opção (Fold vs a ação) -- comparar dois comprimentos é
-// mais rápido de ler que comparar dois números, principalmente pra
-// quem ainda não tem intuição de "60% vs 40%" de cabeça.
-function FreqBar({ label, pct, highlighted }: { label: string; pct: number; highlighted: boolean }) {
+// Uma linha por jogada: quantas vezes o GTO escolhe (barra) e quanto
+// ela vale comparada a foldar (em bb) -- comparar dois comprimentos é
+// mais rápido de ler que comparar dois números, e o valor ao lado diz
+// POR QUE o GTO prefere uma à outra.
+function LinhaJogada({ label, pct, valor, highlighted }: { label: string; pct: number; valor: string; highlighted: boolean }) {
+  const cor = highlighted ? "#FFFFFF" : "rgba(255,255,255,0.5)";
+  const peso = highlighted ? 700 : 500;
   return (
     <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
-      <span style={{ width: 76, flexShrink: 0, fontSize: 12, color: highlighted ? "#FFFFFF" : "rgba(255,255,255,0.5)", fontWeight: highlighted ? 700 : 500 }}>
-        {label}
-      </span>
+      <span style={{ width: 70, flexShrink: 0, fontSize: 12, color: cor, fontWeight: peso }}>{label}</span>
       <div style={{ flex: 1, height: 8, borderRadius: 999, background: "rgba(255,255,255,0.06)", overflow: "hidden" }}>
         <div style={{ width: `${pct}%`, height: "100%", borderRadius: 999, background: highlighted ? "#FFFFFF" : "rgba(255,255,255,0.3)" }} />
       </div>
-      <span style={{ width: 38, flexShrink: 0, textAlign: "right", fontSize: 12, fontVariantNumeric: "tabular-nums", color: highlighted ? "#FFFFFF" : "rgba(255,255,255,0.5)", fontWeight: highlighted ? 700 : 500 }}>
-        {pct}%
-      </span>
+      <span style={{ width: 34, flexShrink: 0, textAlign: "right", fontSize: 12, fontVariantNumeric: "tabular-nums", color: cor, fontWeight: peso }}>{pct}%</span>
+      <span style={{ width: 70, flexShrink: 0, textAlign: "right", fontSize: 12, fontVariantNumeric: "tabular-nums", color: cor, fontWeight: peso }}>{valor}</span>
     </div>
   );
 }
 
-// Os números completos (equity ICM crua, % de diferença, explicação de
-// equilíbrio misto) ficam aqui, atrás de um clique -- em vez de
-// forçados na tela toda vez que o jogador responde uma mão. Quem quer
-// o detalhe técnico clica; quem só quer treinar o feedback rápido não
-// precisa decifrar "equity ICM" no meio da sessão.
+const TITULO_SECAO: React.CSSProperties = { fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" };
+const NOTA: React.CSSProperties = { marginTop: 8, fontSize: 11, lineHeight: 1.5, color: "rgba(255,255,255,0.4)" };
+
+/** "+2,3 bb" / "−0,46 bb" / "0 bb". */
+const comSinal = (v: number) => (Math.abs(v) < 0.005 ? "0 bb" : `${v > 0 ? "+" : "−"}${fmtBbEv(v)}`);
+
+// Os números completos ficam aqui, atrás de um clique -- a faixa do
+// resultado só traz a frase e a perda da mão. Tudo em bb (conta em
+// lib/poker/ev-em-bb.ts): o motor calcula em equity de premiação (ICM),
+// uma escala que muda de spot pra spot e não diz nada pro jogador.
+//
+// Três perguntas, nessa ordem:
+//   1. O que cada jogada vale?  (frequência do GTO + valor vs fold)
+//   2. Quanto EU perdi?         (0 bb se jogou como o GTO)
+//   3. Como estou indo?         (bb/100 de hoje e do total)
 function EvDetailsModal({
-  onClose, actionLabel, distractorLabel, chosen, foldPct, actionPct, gapRelativePct, evFold, evAction, isMarginal, isGoodVerdict,
+  onClose, actionLabel, distractorLabel, chosen, foldPct, actionPct, gapRelativePct, evAcaoBb, perdaBb, stackBb, resumo, isMarginal, isGoodVerdict,
 }: {
   onClose: () => void;
   actionLabel: string;
@@ -493,83 +512,133 @@ function EvDetailsModal({
   chosen: "fold" | "action" | "distractor";
   foldPct: number;
   actionPct: number;
+  /** Fallback quando o spot não tem régua de bb. */
   gapRelativePct: number | null;
-  evFold: number;
-  evAction: number;
+  /** Valor da ação comparado a foldar, em bb (null = sem régua). */
+  evAcaoBb: number | null;
+  /** O que o jogador perdeu nessa mão, em bb (null = sem régua). */
+  perdaBb: number | null;
+  stackBb: number;
+  resumo: ResumoEvTreino | null;
   isMarginal: boolean;
   isGoodVerdict: boolean;
 }) {
-  // FIX (pedido explicito: "a perca de bb nos detalhes e' o que falta,
-  // da forma que esta ta muito confuso ainda") -- antes esse numero
-  // mostrava sempre a MESMA % (a diferenca entre as duas opcoes da
-  // mao), nao importa se o jogador acertou ou errou -- depois de uma
-  // "Jogada Otima" o modal podia mostrar "40% de diferenca", lendo como
-  // se o jogador tivesse perdido 40% mesmo tendo acertado. Nao da pra
-  // mostrar a perda em bb de verdade ainda (o motor so' calcula EV em
-  // equity ICM, nao tem EV em fichas puras -- ver TYPE_OPTIONS acima).
-  // O que da pra corrigir sem inventar numero: deixar claro que o
-  // jogador so' PERDE essa fatia quando joga errado -- acertando, a
-  // perda e' 0%, nao a diferenca entre as opcoes.
-  const userLossPct = isGoodVerdict ? 0 : gapRelativePct;
   useEscapeToClose(onClose);
+  const temBb = evAcaoBb != null && perdaBb != null;
+  const melhor = evAcaoBb != null && evAcaoBb > 0 ? actionLabel : "Fold";
+  const escolhida = chosen === "fold" ? "Fold" : chosen === "action" ? actionLabel : nomeDoDistrator(distractorLabel);
+  const semPerda = perdaBb != null ? perdaBb < 0.005 : isGoodVerdict;
+  const hoje = resumo ? bbPor100(resumo.hoje.perdaBb, resumo.hoje.maos) : null;
+  const total = resumo ? bbPor100(resumo.total.perdaBb, resumo.total.maos) : null;
+
   return (
     <ModalPortal>
       <div
         onClick={onClose}
         role="dialog"
         aria-modal="true"
+        aria-label="Detalhes dessa mão"
         style={{ position: "fixed", inset: 0, zIndex: 200, display: "flex", alignItems: "center", justifyContent: "center", background: "rgba(0,0,0,0.7)", padding: 16 }}
       >
         <div
           onClick={(e) => e.stopPropagation()}
-          style={{ fontFamily: F, width: "100%", maxWidth: 380, borderRadius: 16, background: "#0F0F0F", border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 24px 60px rgba(0,0,0,0.6)", overflow: "hidden" }}
+          className="painel-vidro"
+          style={{ fontFamily: F, width: "100%", maxWidth: 420, maxHeight: "calc(100dvh - 32px)", overflowY: "auto", borderRadius: 16, border: "1px solid rgba(255,255,255,0.10)", boxShadow: "0 24px 60px rgba(0,0,0,0.6)" }}
         >
           <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", padding: "14px 16px", borderBottom: "1px solid rgba(255,255,255,0.08)" }}>
             <span style={{ fontSize: 13, fontWeight: 700, color: "#FFFFFF" }}>Detalhes dessa mão</span>
-            <button onClick={onClose} style={{ display: "flex", width: 26, height: 26, alignItems: "center", justifyContent: "center", borderRadius: 7, background: "rgba(255,255,255,0.06)", border: 0, color: "rgba(255,255,255,0.6)", cursor: "pointer" }}>
+            <button onClick={onClose} aria-label="Fechar" className={classeIconeMesa("md")}>
               <X size={14} />
             </button>
           </div>
 
           <div style={{ padding: "16px", display: "flex", flexDirection: "column", gap: 16 }}>
+            {/* 1. O que cada jogada vale */}
             <div>
-              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-                O que o GTO faz aqui
-              </span>
+              <div style={{ display: "flex", alignItems: "baseline", justifyContent: "space-between", gap: 8 }}>
+                <span style={TITULO_SECAO}>O que cada jogada vale</span>
+                <span style={{ ...TITULO_SECAO, letterSpacing: "0.04em" }}>GTO · valor</span>
+              </div>
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                <FreqBar label="Fold" pct={foldPct} highlighted={chosen === "fold"} />
-                <FreqBar label={actionLabel} pct={actionPct} highlighted={chosen === "action"} />
-                {distractorLabel && <FreqBar label={distractorLabel} pct={0} highlighted={chosen === "distractor"} />}
+                <LinhaJogada label="Fold" pct={foldPct} valor={temBb ? "0 bb" : "—"} highlighted={chosen === "fold"} />
+                <LinhaJogada label={actionLabel} pct={actionPct} valor={evAcaoBb != null ? comSinal(evAcaoBb) : "—"} highlighted={chosen === "action"} />
+                {distractorLabel && <LinhaJogada label={distractorLabel} pct={0} valor="fora do GTO" highlighted={chosen === "distractor"} />}
               </div>
-              {isMarginal && (
-                <p style={{ marginTop: 10, fontSize: 11.5, lineHeight: 1.5, color: "rgba(255,255,255,0.5)" }}>
-                  As duas opções valem praticamente o mesmo aqui — por isso o GTO mistura {actionPct}/{foldPct} em vez de escolher só uma. Não é indecisão, é assim que o equilíbrio funciona nesse spot.
-                </p>
-              )}
-            </div>
-
-            <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
-              <span style={{ fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>
-                Quanto você perdeu aqui
-              </span>
-              <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
-                <span style={{ fontSize: 26, fontWeight: 800, color: userLossPct === 0 ? "#34D399" : isMarginal ? "#f5a524" : "#FFFFFF" }}>
-                  {userLossPct != null ? `${pct1(userLossPct)}%` : "—"}
-                </span>
-                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.4)" }}>
-                  {userLossPct === 0 ? "você manteve o valor máximo dessa decisão" : `do valor máximo que essa decisão tinha`}
-                </span>
-              </div>
-              <p style={{ marginTop: 8, fontSize: 11, lineHeight: 1.5, color: "rgba(255,255,255,0.35)" }}>
-                {userLossPct === 0 ? (
-                  <>Essa mão tinha até {gapRelativePct != null ? `${pct1(gapRelativePct)}%` : "uma boa diferença"} de valor em jogo entre Fold e {actionLabel.toLowerCase()} — mas como você escolheu o lado certo, não perdeu nada disso.</>
-                ) : chosen === "distractor" && distractorLabel ? (
-                  <>O motor não calcula o valor de {nomeDoDistrator(distractorLabel)} aqui (ele nunca considera essa jogada) — o número acima é a diferença entre as duas opções reais (Fold e {actionLabel.toLowerCase()}), que é o que você abriu mão ao escolher uma jogada fora da conta do GTO.</>
+              <p style={NOTA}>
+                {isMarginal ? (
+                  <>
+                    As duas jogadas valem praticamente o mesmo aqui — por isso o GTO mistura {actionPct}/{foldPct}. Não é indecisão, é assim que o equilíbrio funciona
+                    nesse spot.
+                  </>
+                ) : temBb ? (
+                  <>
+                    Valor comparado a foldar (Fold = 0). {melhor} rende {fmtBbEv(Math.abs(evAcaoBb!))} a mais — por isso o GTO joga {melhor}{" "}
+                    {melhor === "Fold" ? foldPct : actionPct}% das vezes.
+                  </>
                 ) : (
-                  <>Fold valia {pct1(evFold)} e {actionLabel.toLowerCase()} valia {pct1(evAction)} (em equity de premiação desse torneio) — a % acima é essa diferença, na fatia que você abriu mão. É comparável entre mãos diferentes; os valores brutos entre parênteses não são (dependem do formato desse torneio específico).</>
+                  <>A barra mostra quantas vezes o GTO escolhe cada jogada nesse spot.</>
                 )}
               </p>
             </div>
+
+            {/* 2. Quanto você perdeu */}
+            <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+              <span style={TITULO_SECAO}>Quanto você perdeu nessa mão</span>
+              <div style={{ marginTop: 8, display: "flex", alignItems: "baseline", gap: 8 }}>
+                <span style={{ fontSize: 28, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: semPerda ? "#34D399" : isMarginal ? "#f5a524" : "#F87171" }}>
+                  {perdaBb != null ? comSinal(-perdaBb) : gapRelativePct != null ? `${pct1(isGoodVerdict ? 0 : gapRelativePct)}%` : "—"}
+                </span>
+                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)" }}>{semPerda ? "você jogou como o GTO" : `jogando ${escolhida} em vez de ${melhor}`}</span>
+              </div>
+              <p style={NOTA}>
+                {semPerda ? (
+                  <>Sua jogada faz parte da estratégia do GTO nesse spot — nada perdido.</>
+                ) : chosen === "distractor" ? (
+                  <>
+                    O motor não calcula {nomeDoDistrator(distractorLabel)} aqui (o GTO nunca considera essa jogada). O número é o mínimo que você abriu mão: a diferença entre
+                    as duas jogadas que o GTO usa.
+                  </>
+                ) : perdaBb != null ? (
+                  <>
+                    É quanto essa escolha custa toda vez que essa mão aparece. Em 100 mãos iguais a essa: <b style={{ color: "rgba(255,255,255,0.75)" }}>−{Math.round(perdaBb * 100).toLocaleString("pt-BR")} bb</b>.
+                  </>
+                ) : (
+                  <>Parte do valor que a melhor jogada tinha e que você deixou na mesa.</>
+                )}
+              </p>
+            </div>
+
+            {/* 3. Seu ritmo em bb/100 */}
+            {resumo && (resumo.total.maos > 0 || resumo.hoje.maos > 0) && (
+              <div style={{ paddingTop: 14, borderTop: "1px solid rgba(255,255,255,0.08)" }}>
+                <span style={TITULO_SECAO}>Seu ritmo · bb/100</span>
+                <div style={{ marginTop: 10, display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                  {[
+                    { rotulo: "Hoje", v: hoje, maos: resumo.hoje.maos },
+                    { rotulo: "Desde o início", v: total, maos: resumo.total.maos },
+                  ].map((c) => (
+                    <div key={c.rotulo} style={{ borderRadius: 12, border: "1px solid rgba(255,255,255,0.08)", background: "rgba(255,255,255,0.03)", padding: "10px 12px" }}>
+                      <div style={{ fontSize: 11, color: "rgba(255,255,255,0.45)" }}>{c.rotulo}</div>
+                      <div style={{ marginTop: 2, fontSize: 20, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: c.v == null ? "rgba(255,255,255,0.4)" : c.v < 0.05 ? "#34D399" : "#FFFFFF" }}>
+                        {c.v == null ? "—" : bb100Curto(c.v)}
+                        <span style={{ marginLeft: 4, fontSize: 11, fontWeight: 600, color: "rgba(255,255,255,0.4)" }}>bb/100</span>
+                      </div>
+                      <div style={{ fontSize: 10.5, color: "rgba(255,255,255,0.35)", fontVariantNumeric: "tabular-nums" }}>
+                        em {c.maos.toLocaleString("pt-BR")} {c.maos === 1 ? "mão" : "mãos"}
+                      </div>
+                    </div>
+                  ))}
+                </div>
+                <p style={NOTA}>Quanto você deixa na mesa, em média, a cada 100 mãos de treino, comparado ao GTO. Quanto mais perto de 0, melhor.</p>
+              </div>
+            )}
+
+            {temBb && (
+              <p style={{ margin: 0, fontSize: 10.5, lineHeight: 1.5, color: "rgba(255,255,255,0.3)" }}>
+                O motor calcula em ICM (valor na premiação do torneio). Aqui o resultado vira bb pelo valor das fichas com {fmtBB(stackBb)} de stack — uma
+                aproximação, a mesma régua pra todas as mãos.
+              </p>
+            )}
           </div>
         </div>
       </div>
@@ -681,6 +750,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // filtro -- ver comentario em fetchTrainingAccuracy).
   const [stats, setStats] = useState({ hits: 0, total: 0 });
   const [detailsOpen, setDetailsOpen] = useState(false);
+  // Perda em bb somada (hoje e total) -- base do bb/100. Mesmo esquema do
+  // placar: lê do banco uma vez e soma localmente a cada mão.
+  const [resumoEv, setResumoEv] = useState<ResumoEvTreino | null>(null);
 
   // Sessao diaria retomavel: filtros salvos pela ultima mao respondida
   // hoje (ver training_session_state, lido por fetchSessionState) e
@@ -700,6 +772,20 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       })
       .catch(() => {
         // sem sessao/erro de rede -- fica em 0/0 e segue contando dali
+      });
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  useEffect(() => {
+    let alive = true;
+    fetchResumoEvTreino()
+      .then((r) => {
+        if (alive) setResumoEv(r);
+      })
+      .catch(() => {
+        // sem resumo (rede/banco sem a coluna ainda) -- o bb/100 só não aparece
       });
     return () => {
       alive = false;
@@ -895,7 +981,15 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundSeed, spotCache]);
 
-  const isMarginal = round ? round.gap < MARGINAL_GAP_THRESHOLD : false;
+  // Régua de bb do spot (ver lib/poker/ev-em-bb.ts): o motor dá o valor
+  // de cada jogada em equity de premiação, que muda de escala a cada
+  // stack. Em bb dá pra comparar mãos e somar em bb/100.
+  const valorBb = useMemo(() => (spot ? valorDoBb(spot) : null), [spot]);
+  // Diferença entre as duas jogadas do GTO, em bb.
+  const gapBb = round ? emBb(round.gap, valorBb) : null;
+  // "As duas valem quase o mesmo": abaixo de 0,1 bb. Sem régua, o limite
+  // antigo na escala do motor (que com 15 bb dá ~0,09 bb).
+  const isMarginal = round ? (gapBb != null ? gapBb < MARGINAL_GAP_BB : round.gap < MARGINAL_GAP_THRESHOLD) : false;
 
   // Frequência da opção escolhida na estratégia do GTO -- fold e a ação
   // resolvida vêm do solver; o distrator (3o botão, sempre uma jogada
@@ -908,10 +1002,11 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     return chosen === "fold" ? 1 - round.freq : round.freq;
   }, [round, chosen]);
 
+  // Frequência + custo em bb, no modelo do GTO Wizard (ver gto-verdict.ts).
   const verdict: Verdict | null = useMemo(() => {
     if (chosenFreq == null) return null;
-    return classifyFrequency(chosenFreq);
-  }, [chosenFreq]);
+    return classificarJogada(chosenFreq, gapBb);
+  }, [chosenFreq, gapBb]);
 
   // O veredito real (acertei/errei) NUNCA é substituído por "MARGINAL" --
   // antes o rótulo virava "MARGINAL" sempre que o gap era pequeno,
@@ -919,9 +1014,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // podem cair num spot "marginal" e um ter acertado, outro não -- o
   // rótulo não podia dizer isso). "Marginal" agora é uma tag SEPARADA,
   // ao lado do veredito, não no lugar dele.
-  const displayLabel = verdict ? VERDICT_LABEL[verdict] : undefined;
-  const displayColor = verdict ? verdictColor(verdict) : undefined;
-  const isGoodVerdict = verdict === "OTIMA" || verdict === "ACEITAVEL";
+  const displayLabel = verdict ? nomeDoVeredito(verdict, gapBb) : undefined;
+  const displayColor = verdict ? verdictColor(verdict, gapBb) : undefined;
+  const isGoodVerdict = ehAcerto(verdict);
   const chosenFreqPct = chosenFreq != null ? Math.round(chosenFreq * 100) : null;
   // Gap relativo ao que está em jogo -- em vez do valor absoluto (que
   // depende da escala de ICM/premiação daquele torneio especifico, sem
@@ -944,6 +1039,12 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
         return denom > 0 ? (round.gap / denom) * 100 : 0;
       })()
     : null;
+
+  // Valor da ação comparado a foldar, e o que o jogador perdeu (0 quando
+  // escolheu uma jogada da estratégia do GTO -- mesma regra do ev_loss
+  // gravado em registerTraining).
+  const evAcaoBb = round && currentPhase ? emBb(round.ev - currentPhase.ev_fold, valorBb) : null;
+  const perdaBb = gapBb == null ? null : isGoodVerdict ? 0 : Math.max(0, gapBb);
 
   const actionLabel = currentPhase ? ACTION_LABEL[currentPhase.action] : "";
   // Range do GTO do spot atual (grade ao lado da mesa, ver RangeDoSpot).
@@ -978,10 +1079,19 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
   useEffect(() => {
     if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
-    const isHit = verdict === "OTIMA";
+    const isHit = ehAcerto(verdict);
     setStats((prev) => ({ hits: prev.hits + (isHit ? 1 : 0), total: prev.total + 1 }));
     setBlockProgress((prev) => ({ hands: (prev?.hands ?? 0) + 1, hits: (prev?.hits ?? 0) + (isHit ? 1 : 0) }));
-    const isGood = verdict === "OTIMA" || verdict === "ACEITAVEL";
+    if (perdaBb != null)
+      setResumoEv((prev) =>
+        prev
+          ? {
+              total: { maos: prev.total.maos + 1, perdaBb: prev.total.perdaBb + perdaBb },
+              hoje: { maos: prev.hoje.maos + 1, perdaBb: prev.hoje.perdaBb + perdaBb },
+            }
+          : prev,
+      );
+    const isGood = isHit;
     onRoundComplete?.();
     registerTraining({
       spotId: spot?.spotId ?? null,
@@ -1389,7 +1499,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     Hoje: {blockProgress.hands} {blockProgress.hands === 1 ? "mão" : "mãos"}
                   </span>
                 )}
-                {/* Mesmo texto do chip do computador ("67% ótimas", com o
+                {/* Mesmo texto do chip do computador ("67% acertos", com o
                     total no toque/hover) -- "142/214 · 66%" não dizia o
                     que era contado. */}
                 <SeloAcerto total={stats.total} acertos={stats.hits} pct={sessionPct} curto />
@@ -1418,6 +1528,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                   color={displayColor}
                   isGood={isGoodVerdict}
                   freqPct={chosenFreqPct}
+                  perdaBb={perdaBb}
                   onDetails={() => setDetailsOpen(true)}
                   mensagem={feedbackComTempo}
                 />
@@ -1485,7 +1596,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
           {blockProgress && (
             <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>
               Hoje: {blockProgress.hands} {blockProgress.hands === 1 ? "mão" : "mãos"}
-              {blockProgress.hands > 0 ? ` · ${Math.round((blockProgress.hits / blockProgress.hands) * 100)}% ótimas` : ""}
+              {blockProgress.hands > 0 ? ` · ${Math.round((blockProgress.hits / blockProgress.hands) * 100)}% acertos` : ""}
+              {resumoEv && resumoEv.hoje.maos > 0 && (
+                <span title="Quanto você deixa na mesa a cada 100 mãos, comparado ao GTO (hoje)"> · {bb100Curto(bbPor100(resumoEv.hoje.perdaBb, resumoEv.hoje.maos))} bb/100</span>
+              )}
             </span>
           )}
           <SeloAcerto total={stats.total} acertos={stats.hits} pct={sessionPct} />
@@ -1753,6 +1867,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                           <div style={{ fontSize: 11.5, color: "rgba(255,255,255,0.55)", marginTop: 1 }}>{feedbackComTempo}</div>
                         </div>
                       </div>
+                      {perdaBb != null && (
+                        <span
+                          title={perdaBb < 0.005 ? "Você jogou como o GTO" : "O que essa escolha custa, em big blinds"}
+                          style={{ marginLeft: "auto", flexShrink: 0, fontSize: 15, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: perdaBb < 0.005 ? "#34D399" : "#F87171", whiteSpace: "nowrap" }}
+                        >
+                          {textoPerda(perdaBb)}
+                        </span>
+                      )}
                       <button
                         onClick={() => setDetailsOpen(true)}
                         style={{ flexShrink: 0, display: "flex", alignItems: "center", gap: 5, fontFamily: F, fontSize: 11, fontWeight: 500, color: "rgba(255,255,255,0.5)", background: "transparent", border: "1px solid rgba(255,255,255,0.12)", borderRadius: 8, padding: "6px 10px", cursor: "pointer", whiteSpace: "nowrap" }}
@@ -1773,8 +1895,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     foldPct={Math.round((1 - round.freq) * 100)}
                     actionPct={Math.round(round.freq * 100)}
                     gapRelativePct={gapRelativePct}
-                    evFold={currentPhase.ev_fold}
-                    evAction={round.ev}
+                    evAcaoBb={evAcaoBb}
+                    perdaBb={perdaBb}
+                    stackBb={stackBb}
+                    resumo={resumoEv}
                     isMarginal={isMarginal}
                     isGoodVerdict={isGoodVerdict}
                   />

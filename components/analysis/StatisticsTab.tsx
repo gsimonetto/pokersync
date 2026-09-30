@@ -19,14 +19,12 @@ import {
   RefreshCw,
 } from "lucide-react";
 import { Painel, StatList } from "@/components/dashboard/kit";
-import { FilterChip } from "@/components/ui/filter-chip";
 import { buyinBucketOf } from "@/lib/services/analysis-service";
-import { BUYIN_BUCKET_LABEL, type BuyinBucket, type TournamentMetrics } from "@/types/analysis";
+import type { BuyinBucket, TournamentMetrics } from "@/types/analysis";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import type { TournamentPayout } from "@/lib/services/tournament-payout-service";
 import type { DisplayCurrency } from "@/lib/hooks/use-currency-preference";
 
-const BUYIN_BUCKET_ORDER: BuyinBucket[] = ["0-10", "10-50", "50-200", "200+"];
 
 function fmtPct(v: number | null): string | null {
   return v === null ? null : `${v >= 0 ? "+" : ""}${v.toFixed(1)}%`;
@@ -46,8 +44,6 @@ export function StatisticsTab({
   tournamentSessions,
   payouts,
   buyinFilter,
-  onBuyinFilterChange,
-  availableBuyinBuckets,
   currency,
   onCurrencyChange,
   formatUsd,
@@ -55,9 +51,8 @@ export function StatisticsTab({
   metrics: TournamentMetrics;
   tournamentSessions: HandSession[];
   payouts: TournamentPayout[];
+  /** Faixas de buy-in escolhidas no menu de filtros da página. */
   buyinFilter: BuyinBucket[];
-  onBuyinFilterChange: (next: BuyinBucket[]) => void;
-  availableBuyinBuckets: Set<BuyinBucket>;
   currency: DisplayCurrency;
   onCurrencyChange: (next: DisplayCurrency) => void;
   formatUsd: (amountUsd: number | null) => string | null;
@@ -90,10 +85,6 @@ export function StatisticsTab({
     () => filteredSessions.filter((s) => s.champion || s.reached_ft || s.final_place != null).length,
     [filteredSessions]
   );
-
-  function toggleBuyin(b: BuyinBucket) {
-    onBuyinFilterChange(buyinFilter.includes(b) ? buyinFilter.filter((x) => x !== b) : [...buyinFilter, b]);
-  }
 
   const payoutByTournament = useMemo(() => new Map(payouts.map((p) => [p.tournamentIdPs, p])), [payouts]);
 
@@ -277,24 +268,6 @@ export function StatisticsTab({
         </p>
       </Painel>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        <span className="mr-1 text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">Buy-in</span>
-        {BUYIN_BUCKET_ORDER.map((b) => (
-          <FilterChip
-            key={b}
-            label={BUYIN_BUCKET_LABEL[b]}
-            active={buyinFilter.includes(b)}
-            disabled={!availableBuyinBuckets.has(b)}
-            disabledReason="Sem torneio importado nessa faixa de buy-in ainda"
-            onClick={() => toggleBuyin(b)}
-          />
-        ))}
-        {buyinFilter.length > 0 && (
-          <button type="button" onClick={() => onBuyinFilterChange([])} className="ml-1 text-[11.5px] font-semibold text-muted hover:text-ink">
-            Limpar
-          </button>
-        )}
-      </div>
     </div>
   );
 }

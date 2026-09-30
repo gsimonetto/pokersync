@@ -39,6 +39,7 @@ const K = 0.56; // achatamento = inclinação do chão
 const ALT = 70; // altura em que o perfil flutua
 const PROJ = CY + 40; // centro do projetor
 const CIANO = "#22d3ee";
+const ANEIS = [0.25, 0.5, 0.75, 1];
 const VERMELHO = "#e0555a";
 
 type P = { x: number; y: number };
@@ -94,6 +95,11 @@ export function PentagonoHolograma({
   const fr = eixos.map((e) => Math.max(0.03, Math.min(1, Math.max(0, (e.valor ?? 0) / e.teto)) * cresc));
   const topo = fr.map((f, i) => no(n, i, f));
   const anel = (f: number) => pts(idx.map((i) => no(n, i, f)));
+  // Marcas da escala (0 · 25% · 50% · 75% · 100%) subindo pelo eixo de
+  // cima -- só quando todas as pontas usam a mesma escala (Score, 0 a
+  // 100). No perfil de jogo cada ponta tem o seu teto, e um "50%" ali
+  // não diria a mesma coisa em cada eixo; os anéis continuam.
+  const escalaUnica = n > 0 && eixos.every((e) => e.teto === eixos[0].teto);
   const corPonta = (i: number) => (destaque === i ? VERMELHO : ativo === i ? "#f0cf63" : "#cffafe");
 
   return (
@@ -140,14 +146,30 @@ export function PentagonoHolograma({
           />
 
           <g className={`holo-flutua-${uid}`}>
-            {/* Grade flutuante: 50% e 100%, mais os raios. */}
-            {[0.5, 1].map((f) => (
-              <polygon key={f} points={anel(f)} fill="none" stroke={CIANO} strokeOpacity={f === 1 ? 0.5 : 0.22} strokeDasharray={f === 1 ? undefined : "3 4"} />
+            {/* Grade flutuante: 25% · 50% · 75% · 100%, mais os raios. */}
+            {ANEIS.map((f) => (
+              <polygon
+                key={f}
+                points={anel(f)}
+                fill="none"
+                stroke={CIANO}
+                strokeOpacity={f === 1 ? 0.5 : f === 0.5 ? 0.3 : 0.16}
+                strokeDasharray={f === 1 ? undefined : "3 4"}
+              />
             ))}
             {idx.map((i) => {
               const v = no(n, i, 1);
               return <line key={i} x1={CX} y1={CY - ALT} x2={v.x} y2={v.y} stroke={ativo === i ? "#f0cf63" : CIANO} strokeOpacity={ativo === i ? 0.8 : 0.2} />;
             })}
+            {escalaUnica &&
+              [0, ...ANEIS].map((f) => {
+                const p = no(n, 0, f);
+                return (
+                  <text key={`marca-${f}`} x={p.x + 5} y={p.y + 3} fontSize="9" fontWeight="600" fill="#a5f3fc" fillOpacity="0.55" style={{ fontVariantNumeric: "tabular-nums" }}>
+                    {f === 0 ? "0" : `${f * 100}%`}
+                  </text>
+                );
+              })}
 
             {temDado && (
               <g>

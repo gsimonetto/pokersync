@@ -2,7 +2,9 @@
 
 import { AnimatePresence, motion } from "framer-motion";
 import { X } from "lucide-react";
+import type { FiltroBuyin } from "@/components/analysis/AnalysisFilters";
 import {
+  BUYIN_BUCKET_LABEL,
   HERO_POSITION_LABEL,
   PREFLOP_ACTION_LABEL,
   STACK_DEPTH_LABEL,
@@ -44,8 +46,15 @@ function ativos(f: Filters): Ativo[] {
   return lista;
 }
 
-export function FiltrosAtivos({ filters, onChange }: { filters: Filters; onChange: (f: Filters) => void }) {
-  const lista = ativos(filters);
+export function FiltrosAtivos({ filters, onChange, buyin }: { filters: Filters; onChange: (f: Filters) => void; buyin?: FiltroBuyin }) {
+  // Buy-in dos torneios: estado separado (só mexe nos números de torneio),
+  // mas aparece aqui como os outros filtros ativos.
+  const listaBuyin = (buyin?.selecionados ?? []).map((b) => ({
+    chave: `buyin:${b}`,
+    rotulo: `Buy-in ${BUYIN_BUCKET_LABEL[b]}`,
+    tirarBuyin: () => buyin!.onChange(buyin!.selecionados.filter((v) => v !== b)),
+  }));
+  const lista = [...ativos(filters), ...listaBuyin];
   if (lista.length === 0) return <span className="text-[12px] text-muted/70">Todas as mãos</span>;
   return (
     <div className="flex flex-wrap items-center gap-1.5">
@@ -64,7 +73,7 @@ export function FiltrosAtivos({ filters, onChange }: { filters: Filters; onChang
             {a.rotulo}
             <button
               type="button"
-              onClick={() => onChange(a.tirar(filters))}
+              onClick={() => ("tirarBuyin" in a ? a.tirarBuyin() : onChange(a.tirar(filters)))}
               aria-label={`Tirar filtro ${a.rotulo}`}
               className="grid h-4 w-4 place-items-center rounded-full text-[#f1d78a]/70 transition-colors hover:bg-white/10 hover:text-ink"
             >
@@ -76,7 +85,10 @@ export function FiltrosAtivos({ filters, onChange }: { filters: Filters; onChang
       {lista.length > 1 && (
         <button
           type="button"
-          onClick={() => onChange({ ...filters, formats: [], stackDepths: [], stages: [], positions: [], preflopActions: [] })}
+          onClick={() => {
+            onChange({ ...filters, formats: [], stackDepths: [], stages: [], positions: [], preflopActions: [] });
+            if (buyin?.selecionados.length) buyin.onChange([]);
+          }}
           className="ml-1 text-[11.5px] font-semibold text-muted transition-colors hover:text-ink"
         >
           Limpar

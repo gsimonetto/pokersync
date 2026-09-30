@@ -117,21 +117,47 @@ export async function fetchTodayTrainingCount(): Promise<number> {
 }
 
 // Acerto/erro ACUMULADO do jogador em todo o historico de training_sessions
-// -- nao e' uma contagem de sessao/pagina, e' o placar "X/Y otimas" mostrado
+// -- nao e' uma contagem de sessao/pagina, e' o placar "X% acertos" mostrado
 // no cabecalho do Treino (rfi-jam-drill.tsx). Antes esse numero vivia so'
 // em estado local do componente, entao reiniciava a cada login/reload
 // (bug reportado) -- agora e' sempre lido daqui e so' incrementado
 // localmente enquanto a mesma sessao de navegador dura, pra nao bater no
-// banco a cada mao.
+// banco a cada mao. Acerto = jogada que o GTO usa (melhor ou correta,
+// ver lib/poker/gto-verdict.ts), com os dois vocabularios do banco:
+// 'PERFECT'/'OK' (register_training, desde setembro) e 'OTIMA'/'ACEITAVEL'
+// (treinos antigos).
 export async function fetchTrainingAccuracy(): Promise<{ hits: number; total: number }> {
   const supabase = createClient();
   const [totalRes, hitsRes] = await Promise.all([
     supabase.from("training_sessions").select("id", { count: "exact", head: true }),
-    supabase.from("training_sessions").select("id", { count: "exact", head: true }).eq("verdict", "PERFECT"),
+    supabase.from("training_sessions").select("id", { count: "exact", head: true }).in("verdict", ["PERFECT", "OK", "OTIMA", "ACEITAVEL"]),
   ]);
   if (totalRes.error) throw totalRes.error;
   if (hitsRes.error) throw hitsRes.error;
   return { hits: hitsRes.count ?? 0, total: totalRes.count ?? 0 };
+}
+
+// Perda em bb (training_sessions.ev_loss_bb, preenchida no banco pela
+// mesma conta de lib/poker/ev-em-bb.ts) somada no total e hoje -- base do
+// bb/100 do Treino. Maos sem regua de bb (treinos antigos) ficam de fora.
+export interface ResumoEvTreino {
+  total: { maos: number; perdaBb: number };
+  hoje: { maos: number; perdaBb: number };
+}
+
+export async function fetchResumoEvTreino(): Promise<ResumoEvTreino> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("resumo_ev_treino").maybeSingle<{
+    maos: number;
+    perda_bb: number;
+    maos_hoje: number;
+    perda_bb_hoje: number;
+  }>();
+  if (error) throw error;
+  return {
+    total: { maos: data?.maos ?? 0, perdaBb: Number(data?.perda_bb ?? 0) },
+    hoje: { maos: data?.maos_hoje ?? 0, perdaBb: Number(data?.perda_bb_hoje ?? 0) },
+  };
 }
 
 // ---- Sessao diaria retomavel (filtros + progresso do bloco) -------------
