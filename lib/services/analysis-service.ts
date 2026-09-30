@@ -1,7 +1,10 @@
 import { createClient } from "@/lib/supabase/client";
 import type { HandSession } from "@/lib/services/hand-session-service";
+import type { Session } from "@/lib/bankroll/types";
+import { extractHeroBountiesWon } from "@/lib/poker/hand-parser";
 import { fetchHandEvResults } from "@/lib/services/hand-ev-service";
-import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
+import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
+import { garantirRebuysCalculados } from "@/lib/services/tournament-rebuy-service";
 import {
   type AnalysisFilters,
   type AnalysisHandRow,
@@ -33,9 +36,12 @@ import {
 // hand_reviews já restringe a linhas do próprio usuário.
 // ============================================================
 
-function normalizeFormat(raw: string | null | undefined): GameFormat | null {
+// maxSeats: mãos salvas antes da regra "3 jogadores = Spin & Go" ficaram
+// gravadas como SNG/MTT -- a mesa 3-max ainda denuncia que é Spin.
+function normalizeFormat(raw: string | null | undefined, maxSeats?: number | null): GameFormat | null {
   if (!raw) return null;
   const v = raw.trim().toLowerCase();
+  if (maxSeats === 3 && (v === "mtt" || v === "torneio" || v === "sng")) return "spin";
   if (v === "mtt" || v === "torneio") return "mtt";
   if (v === "cash") return "cash";
   if (v === "sng") return "sng";
@@ -172,7 +178,7 @@ function rowToAnalysisHand(r: any): AnalysisHandRow {
   return {
     handReviewId: r.hand_review_id,
     playedAt: hr?.created_at ?? r.computed_at,
-    format: normalizeFormat(parsed?.format ?? null),
+    format: normalizeFormat(parsed?.format ?? null, parsed?.maxSeats ?? null),
     stakes: parsed?.stakes ?? null,
     heroCards: cards,
     potType: (r.pot_type as PotType) ?? null,
@@ -480,29 +486,43 @@ export function buyinBucketOf(buyin: number): BuyinBucket {
 // TUDO, órfão incluído) são calculados à parte em StatisticsTab.
 interface ImportedTournament {
   buyin: number;
+  // buy-in × (1 + rebuys): o que o torneio custou de verdade.
+  cost: number;
+  rebuys: number;
   payout: number | null;
   date: string;
 }
 
-export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): Promise<TournamentMetrics> {
-  const [sessionsAll, payouts, evResults, totalBountiesWon] = await Promise.all([
+export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = [], corte: string | null = null): Promise<TournamentMetrics> {
+  const [todasSessoes, payoutsAll, evResultsAll, totalBountiesWon, handIdsSince] = await Promise.all([
     fetchTournamentSessions(),
     fetchTournamentPayouts(),
     fetchHandEvResults(),
-    fetchTotalBountiesWon(),
+    fetchTotalBountiesWon(corte),
+    corte ? fetchImportedHandIdsSince(corte) : Promise.resolve(null),
   ]);
+  const sessionsAll = sessoesDesde(todasSessoes, corte);
+  const payouts = filtrarPayoutsPorCorte(payoutsAll, todasSessoes, corte);
+  const evResults = handIdsSince ? evResultsAll.filter((r) => handIdsSince.has(r.handReviewId)) : evResultsAll;
   const payoutByTournament = new Map(payouts.map((p) => [p.tournamentIdPs, p]));
 
   const tournaments: ImportedTournament[] = sessionsAll
     .filter((s): s is typeof s & { buyin: number } => s.buyin != null)
     .filter((s) => buyinBuckets.length === 0 || buyinBuckets.includes(buyinBucketOf(s.buyin)))
-    .map((s) => ({
-      buyin: s.buyin,
-      payout: (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null) ?? null,
-      date: s.updated_at.slice(0, 10),
-    }));
+    .map((s) => {
+      const rebuys = Math.max(0, Number(s.reentries) || 0);
+      return {
+        buyin: s.buyin,
+        cost: s.buyin * (1 + rebuys),
+        rebuys,
+        payout: (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null) ?? null,
+        date: (s.last_played_at ?? s.updated_at).slice(0, 10),
+      };
+    });
 
-  const invested = tournaments.reduce((acc, t) => acc + t.buyin, 0);
+  const invested = tournaments.reduce((acc, t) => acc + t.cost, 0);
+  const totalRebuys = tournaments.reduce((acc, t) => acc + t.rebuys, 0);
+  const rebuyCost = tournaments.reduce((acc, t) => acc + t.buyin * t.rebuys, 0);
   const returned = tournaments.reduce((acc, t) => acc + (t.payout ?? 0), 0);
   const itmCount = tournaments.filter((t) => (t.payout ?? 0) > 0).length;
   // "Jogando desde" / "último torneio" — datas extremas da amostra
@@ -517,7 +537,7 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
   // tamanho do buy-in, o outro não.
   const avgBuyin = tournaments.length > 0 ? tournaments.reduce((acc, t) => acc + t.buyin, 0) / tournaments.length : null;
   const perGameRois = tournaments
-    .map((t) => (t.buyin > 0 ? (((t.payout ?? 0) - t.buyin) / t.buyin) * 100 : null))
+    .map((t) => (t.cost > 0 ? (((t.payout ?? 0) - t.cost) / t.cost) * 100 : null))
     .filter((r): r is number => r !== null);
   const avgRoiPct = perGameRois.length > 0 ? perGameRois.reduce((a, b) => a + b, 0) / perGameRois.length : null;
 
@@ -527,7 +547,7 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
   const netByDay = new Map<string, number>();
   for (const t of tournaments) {
     gamesByDay.set(t.date, (gamesByDay.get(t.date) ?? 0) + 1);
-    const net = (t.payout ?? 0) - t.buyin;
+    const net = (t.payout ?? 0) - t.cost;
     netByDay.set(t.date, (netByDay.get(t.date) ?? 0) + net);
   }
   const activeDays = gamesByDay.size;
@@ -597,7 +617,51 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
     ev_roi_pct: evResults.length > 0 && invested > 0 ? Math.round((netEvProfit / invested) * 1000) / 10 : null,
     total_bounties_won: totalBountiesWon.count,
     total_bounty_cash_won: Math.round(totalBountiesWon.cash * 100) / 100,
+    total_rebuys: totalRebuys,
+    tournaments_with_rebuy: tournaments.filter((t) => t.rebuys > 0).length,
+    rebuy_cost: Math.round(rebuyCost * 100) / 100,
   };
+}
+
+// Torneios jogados a partir do corte (data do "Apagar" do Performance ou
+// do "De hoje em diante"), pela última mão jogada em cada um.
+export function sessoesDesde<T extends HandSession>(sessoes: T[], since: string | null): T[] {
+  if (!since) return sessoes;
+  return sessoes.filter((s) => (s.last_played_at ?? s.updated_at) >= since);
+}
+
+// Sessões da Gestão de Banca que entram no Performance depois do corte.
+// Importada de torneio: vale se o torneio ainda vale (a data dela é a da
+// importação, não a do jogo). Lançada à mão: pela data/hora da sessão --
+// no próprio dia do corte, só as com horário depois dele.
+export function sessoesBancaDesde(sessoes: Session[], torneiosQueValem: HandSession[], since: string | null): Session[] {
+  if (!since) return sessoes;
+  const corte = new Date(since);
+  const dia = `${corte.getFullYear()}-${String(corte.getMonth() + 1).padStart(2, "0")}-${String(corte.getDate()).padStart(2, "0")}`;
+  const torneios = new Set(torneiosQueValem.map((s) => s.id));
+  return sessoes.filter((s) => {
+    if (s.importedHandSessionId) return torneios.has(s.importedHandSessionId);
+    if (s.date !== dia) return s.date > dia;
+    return !!s.time && new Date(`${s.date}T${s.time}`) >= corte;
+  });
+}
+
+// Prêmios que valem depois do corte: o de um torneio que ainda conta, ou
+// -- pro torneio que só tem resumo sincronizado, sem nenhuma mão -- o que
+// chegou depois do corte.
+export function filtrarPayoutsPorCorte(payouts: TournamentPayout[], todasSessoes: HandSession[], since: string | null): TournamentPayout[] {
+  if (!since) return payouts;
+  const valem = new Set(sessoesDesde(todasSessoes, since).map((s) => s.tournament_id_ps));
+  const temSessao = new Set(todasSessoes.map((s) => s.tournament_id_ps));
+  return payouts.filter((p) => valem.has(p.tournamentIdPs) || (!temSessao.has(p.tournamentIdPs) && (p.fetchedAt ?? p.updatedAt) >= since));
+}
+
+// Ids das mãos importadas jogadas a partir do corte.
+async function fetchImportedHandIdsSince(since: string): Promise<Set<string>> {
+  const supabase = createClient();
+  const { data, error } = await supabase.from("hand_reviews").select("id").gte("created_at", since);
+  if (error) throw error;
+  return new Set((data ?? []).map((r) => r.id as string));
 }
 
 // Soma heroBountiesWon de TODAS as mãos importadas (hand_reviews) do
@@ -607,19 +671,29 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = []): 
 // manualmente no Revisor também contam, mesmo espírito de "Torneios"/
 // "Ganhos" (conta tudo que foi importado). Mão sem heroBountiesWon
 // (ainda não reprocessada, ou parsed_data nulo) soma 0, nunca quebra.
-async function fetchTotalBountiesWon(): Promise<{ count: number; cash: number }> {
+//
+// Lido do TEXTO da mão, não do parsed_data gravado: mãos em português
+// importadas antes da correção de valorMonetario (hand-parser.ts) ficaram
+// com o valor 100x maior ("ganha $ 3,75" gravado como 375). Só busca as
+// mãos com eliminação, pra não trazer o histórico inteiro.
+async function fetchTotalBountiesWon(since: string | null = null): Promise<{ count: number; cash: number }> {
   const supabase = createClient();
-  const { data, error } = await supabase
+  let query = supabase
     .from("hand_reviews")
-    .select("count:parsed_data->>heroBountiesWon, cash:parsed_data->>heroBountyCashWon");
+    .select("hand_history, heroName:parsed_data->>heroName")
+    .or("hand_history.ilike.%for eliminating%,hand_history.ilike.%por eliminar%");
+  if (since) query = query.gte("created_at", since);
+  const { data, error } = await query;
   if (error) throw error;
-  return (data ?? []).reduce(
-    (acc, row) => {
-      const r = row as { count: string | null; cash: string | null };
-      return { count: acc.count + (Number(r.count) || 0), cash: acc.cash + (Number(r.cash) || 0) };
-    },
-    { count: 0, cash: 0 }
-  );
+  let count = 0;
+  let cash = 0;
+  for (const row of (data ?? []) as { hand_history: string | null; heroName: string | null }[]) {
+    if (!row.hand_history) continue;
+    const b = extractHeroBountiesWon(row.hand_history, row.heroName);
+    count += b.count;
+    cash += b.cashWon;
+  }
+  return { count, cash };
 }
 
 // Sessões de torneio (hand_sessions, mesmo agrupador do Revisor) — é onde
@@ -657,6 +731,13 @@ async function fetchTotalBountiesWon(): Promise<{ count: number; cash: number }>
 // zera só as estatísticas daqui, sem mexer na escolha do que o Radar
 // importa — limpar essa escolha pausa o Radar inteiro até o jogador
 // responder de novo, o que não faz sentido pra quem só quis zerar uma tela.
+//
+// performance_reset_at (2026-09): zerar só hand_tags deixava torneios,
+// prêmios, rebuys e lucro somando do mesmo jeito (bug reportado: "ao
+// excluir as informações, os torneios continuam contando"). Agora o reset
+// grava a data e o Performance inteiro ignora o que foi jogado antes dela
+// (ver fetchPerformanceResetAt e loadAll em app/performance/page.tsx) --
+// sem apagar nada do Revisor nem da Gestão de Banca.
 export async function resetPerformanceStats({ voltarAPerguntar = true }: { voltarAPerguntar?: boolean } = {}): Promise<void> {
   const supabase = createClient();
   const { data: userData, error: userErr } = await supabase.auth.getUser();
@@ -675,20 +756,43 @@ export async function resetPerformanceStats({ voltarAPerguntar = true }: { volta
       ...(voltarAPerguntar ? { radar_import_scope: null } : {}),
       radar_scope_performance: null,
       radar_scope_performance_since: null,
+      performance_reset_at: new Date().toISOString(),
     })
     .eq("id", userData.user.id);
   if (eProfile) throw eProfile;
+}
+
+export async function fetchPerformanceResetAt(): Promise<string | null> {
+  const supabase = createClient();
+  const { data: userData } = await supabase.auth.getUser();
+  if (!userData.user) return null;
+  const { data, error } = await supabase.from("profiles").select("performance_reset_at").eq("id", userData.user.id).maybeSingle();
+  if (error) throw error;
+  return (data?.performance_reset_at as string | null) ?? null;
 }
 
 export async function fetchTournamentSessions(): Promise<HandSession[]> {
   const supabase = createClient();
   const [{ data, error }, { data: importedReviews, error: eReviews }] = await Promise.all([
     supabase.from("hand_sessions").select("*").eq("kind", "tournament").not("tournament_id_ps", "is", null).order("updated_at", { ascending: false }),
-    supabase.from("hand_reviews").select("hand_session_id").not("hand_session_id", "is", null).in("source", IMPORTED_HAND_SOURCES as unknown as string[]),
+    supabase
+      .from("hand_reviews")
+      .select("hand_session_id, created_at")
+      .not("hand_session_id", "is", null)
+      .in("source", IMPORTED_HAND_SOURCES as unknown as string[]),
   ]);
   if (error) throw error;
   if (eReviews) throw eReviews;
-  const importedSessionIds = new Set((importedReviews ?? []).map((r) => r.hand_session_id as string));
-  return ((data ?? []) as HandSession[]).filter((s) => importedSessionIds.has(s.id));
+  // created_at da mão = quando ela foi jogada (gravado da própria hand history).
+  const ultimaMao = new Map<string, string>();
+  for (const r of importedReviews ?? []) {
+    const id = r.hand_session_id as string;
+    const quando = r.created_at as string;
+    if (!ultimaMao.has(id) || quando > ultimaMao.get(id)!) ultimaMao.set(id, quando);
+  }
+  const sessoes = ((data ?? []) as HandSession[])
+    .filter((s) => ultimaMao.has(s.id))
+    .map((s) => ({ ...s, last_played_at: ultimaMao.get(s.id) ?? null }));
+  return garantirRebuysCalculados(supabase, sessoes);
 }
 

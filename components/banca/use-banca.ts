@@ -24,11 +24,10 @@ import { saldosPorMoeda } from "@/lib/bankroll/consolidado";
 import { todayISO } from "@/lib/bankroll/format";
 import { useTaxasCambio } from "@/lib/hooks/use-taxas-cambio";
 import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
-import { excludeSessionFromBankroll, type HandSession } from "@/lib/services/hand-session-service";
+import { excludeSessionFromBankroll, isSpinAndGo, type HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentSessions } from "@/lib/services/analysis-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
 import { fetchMostRecentAgentDevice, type AgentDeviceStatus } from "@/lib/services/agent-status-service";
-import { getUsdBrlRate } from "@/lib/services/fx-service";
 import { TIPO_TX } from "./util";
 import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
 import {
@@ -85,7 +84,6 @@ export function useBanca() {
   const [torneiosAgente, setTorneiosAgente] = useState<HandSession[]>([]);
   const [premiosAgente, setPremiosAgente] = useState<TournamentPayout[]>([]);
   const [importando, setImportando] = useState(false);
-  const [erroCotacao, setErroCotacao] = useState(false);
   const [agente, setAgente] = useState<AgentDeviceStatus | null>(null);
   // Corte do botão do Radar: esconde sessões IMPORTADAS jogadas antes
   // dele. Sessão lançada à mão nunca some.
@@ -148,8 +146,14 @@ export function useBanca() {
     [torneiosAgente, todasSessoes],
   );
 
-  async function importarTorneios(taxa: number) {
-    if (pendentesAgente.length === 0 || taxa <= 0) return;
+  // Importa em USD (moeda real do buy-in/hand history) -- nao converte
+  // pra BRL aqui. A conversao pra reais so acontece na consolidacao final
+  // (consolidarEmReais), igual ja acontecia com lancamento manual em
+  // moeda estrangeira. Antes essa importacao gravava tudo como "BRL" ja
+  // convertido, o que misturava sessoes em dolar dentro do extrato de
+  // reais e distorcia os agregados por moeda.
+  async function importarTorneios() {
+    if (pendentesAgente.length === 0) return;
     setImportando(true);
     const novas: Session[] = [];
     for (const hs of pendentesAgente) {
@@ -160,14 +164,14 @@ export function useBanca() {
         const sala = (hs.label.split(" / ")[0] || "").trim();
         const salva = await apiAddSession({
           date: (hs.updated_at || hs.created_at || todayISO()).slice(0, 10),
-          format: "MTT",
-          buyIn: +(buyInUsd * taxa).toFixed(2),
-          reentries: 0,
-          cashout: +(cashoutUsd * taxa).toFixed(2),
+          format: isSpinAndGo(hs) ? "Spin" : "MTT",
+          buyIn: buyInUsd,
+          reentries: hs.reentries ?? 0,
+          cashout: cashoutUsd,
           stake: "",
           venue: sala || undefined,
-          currency: "BRL",
-          notes: `Importado do agente — ${hs.label} (US$ ${buyInUsd.toFixed(2)} × ${taxa.toFixed(2)})`,
+          currency: "USD",
+          notes: `Importado do agente — ${hs.label}`,
           importedHandSessionId: hs.id,
         });
         await linkHandSessionReviews(hs.id, salva.id);
@@ -182,20 +186,7 @@ export function useBanca() {
 
   useEffect(() => {
     if (carregando || pendentesAgente.length === 0 || importando) return;
-    let vivo = true;
-    (async () => {
-      const taxa = await getUsdBrlRate();
-      if (!vivo) return;
-      if (taxa) {
-        setErroCotacao(false);
-        importarTorneios(taxa);
-      } else {
-        setErroCotacao(true);
-      }
-    })();
-    return () => {
-      vivo = false;
-    };
+    importarTorneios();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [carregando, pendentesAgente.length]);
 
@@ -555,7 +546,6 @@ export function useBanca() {
     corteRadar,
     setCorteRadar,
     pendentesAgente,
-    erroCotacao,
     importando,
     // ações
     salvarSessao,

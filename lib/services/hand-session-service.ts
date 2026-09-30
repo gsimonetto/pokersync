@@ -3,8 +3,8 @@ import type { ParsedHand } from "@/lib/poker/hand-parser";
 import { addSession } from "@/lib/services/bankroll-service";
 import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
-import { getUsdBrlRate } from "@/lib/services/fx-service";
 import { todayISO } from "@/lib/bankroll/format";
+import { garantirRebuysCalculados, recalcularRebuys } from "@/lib/services/tournament-rebuy-service";
 
 // Camada de servico do novo agrupador do Revisor. Torneios sao unicos por
 // (user_id, tournament_id_ps) — quando o parser identifica esses campos na
@@ -23,6 +23,14 @@ export interface HandSession {
   format_type: FormatType | null;
   bounty_current: number | null;
   buyin: number | null;
+  // Rebuys/re-entries detectados sozinhos nas maos (ver rebuy-detector.ts):
+  // o buy-in acima e' so' o da entrada inicial, o custo real do torneio e'
+  // buyin * (1 + reentries). reentries_checked_at null = torneio antigo que
+  // ainda nao passou pelo detector (ver garantirRebuysCalculados).
+  reentries: number;
+  reentries_checked_at: string | null;
+  // Tamanho da mesa declarado nas maos ("3-max" = Spin & Go).
+  table_size: number | null;
   stakes: string | null;
   // Campeao automatico (2026-08): true quando alguma mao anexada a essa
   // sessao e' a mao final do torneio vencida pelo heroi (ver
@@ -45,6 +53,9 @@ export interface HandSession {
   bankroll_excluded: boolean;
   created_at: string;
   updated_at: string;
+  // Data da última mão jogada no torneio -- só preenchido por
+  // fetchTournamentSessions (analysis-service.ts), não é coluna.
+  last_played_at?: string | null;
 }
 
 export interface HandSessionWithCount extends HandSession {
@@ -219,7 +230,11 @@ export async function listSessionsWithCount(userId: string): Promise<HandSession
     p_user_id: userId,
   });
   if (error) throw error;
-  return (data ?? []) as HandSessionWithCount[];
+  return garantirRebuysCalculados(supabase, (data ?? []) as HandSessionWithCount[]);
+}
+
+export function isSpinAndGo(s: Pick<HandSession, "kind" | "table_size">): boolean {
+  return s.kind === "tournament" && s.table_size === 3;
 }
 
 // Exclui o torneio/sessao de maos importadas e todas as maos anexadas a
@@ -305,6 +320,12 @@ export async function attachReviewsToSession(reviewIds: string[], sessionId: str
     }
   }
 
+  const tableSize = Math.max(0, ...(hands ?? []).map((h) => h.maxSeats ?? 0));
+  if (tableSize > 0) {
+    await supabase.from("hand_sessions").update({ table_size: tableSize }).eq("id", sessionId).is("table_size", null);
+  }
+  await recalcularRebuys(supabase, [sessionId]);
+
   await touchSession(sessionId);
 }
 
@@ -321,10 +342,13 @@ export async function attachReviewsToSession(reviewIds: string[], sessionId: str
 // fluxo do agente ja fazia.
 //
 // Buy-in/premiacao do hand history vem sempre em USD (mesma convencao
-// documentada em app/banca/page.tsx) -- converte pra BRL usando a
-// cotacao do dia. Se a cotacao falhar, NAO cria a sessao com taxa
-// inventada (1:1 corromperia o valor) -- devolve null e quem chamou
-// avisa o jogador pra tentar de novo.
+// documentada em app/banca/page.tsx) -- grava em USD mesmo, SEM
+// converter pra BRL aqui (antes convertia e gravava currency:"BRL",
+// perdendo a moeda original -- misturava com sessoes em reais no
+// extrato por moeda). A conversao pra reais so acontece na consolidacao
+// final (consolidarEmReais), igual ja acontecia com lancamento manual em
+// moeda estrangeira. Rebuys (handSession.reentries) somam no custo total
+// igual ja fazia o lancamento manual da Banca.
 export async function linkOrCreateBankrollSessionForTournament(params: {
   userId: string;
   handSession: HandSession;
@@ -346,9 +370,6 @@ export async function linkOrCreateBankrollSessionForTournament(params: {
   if (existingErr) throw existingErr;
   if (existing && existing.length > 0) return { created: false, bankrollSessionId: existing[0].id };
 
-  const rate = await getUsdBrlRate();
-  if (!rate || rate <= 0) return null;
-
   let cashoutUsd = 0;
   if (handSession.tournament_id_ps) {
     const payouts = await fetchTournamentPayouts();
@@ -356,17 +377,23 @@ export async function linkOrCreateBankrollSessionForTournament(params: {
     cashoutUsd = payout?.heroPayoutAmount ?? 0;
   }
 
+  // Lido de novo do banco: o objeto recebido pode ser de antes do detector
+  // de rebuy rodar pras mãos recém-anexadas.
+  const { data: atual } = await supabase.from("hand_sessions").select("reentries, table_size").eq("id", handSession.id).maybeSingle();
+  const reentries = atual?.reentries ?? handSession.reentries ?? 0;
+  const tableSize = atual?.table_size ?? handSession.table_size ?? null;
+
   const rawVenue = (handSession.label.split(" / ")[0] || "").trim();
   const saved = await addSession({
     date: handSession.updated_at?.slice(0, 10) || todayISO(),
-    format: "MTT",
-    buyIn: +((handSession.buyin ?? 0) * rate).toFixed(2),
-    reentries: 0,
-    cashout: +(cashoutUsd * rate).toFixed(2),
+    format: isSpinAndGo({ kind: handSession.kind, table_size: tableSize }) ? "Spin" : "MTT",
+    buyIn: handSession.buyin ?? 0,
+    reentries,
+    cashout: cashoutUsd,
     stake: "",
     venue: rawVenue || undefined,
-    currency: "BRL",
-    notes: `Importado via hand history — ${handSession.label} (US$ ${(handSession.buyin ?? 0).toFixed(2)} × ${rate.toFixed(2)})`,
+    currency: "USD",
+    notes: `Importado via hand history — ${handSession.label}`,
     importedHandSessionId: handSession.id,
   });
   await linkHandSessionReviews(handSession.id, saved.id);

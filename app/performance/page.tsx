@@ -42,7 +42,11 @@ import {
   buyinBucketOf,
   fetchTournamentMetrics,
   fetchTournamentSessions,
+  fetchPerformanceResetAt,
+  filtrarPayoutsPorCorte,
   resetPerformanceStats,
+  sessoesBancaDesde,
+  sessoesDesde,
 } from "@/lib/services/analysis-service";
 import type { HandSession } from "@/lib/services/hand-session-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
@@ -105,9 +109,7 @@ export default function PerformancePage() {
   // o addon (mesma logica de lib/plans/plans-data.ts usada em app-shell.tsx).
   const [radarUnlocked, setRadarUnlocked] = useState<boolean | null>(null);
   // Corte do botão do Radar (ver components/radar/radar-module-menu.tsx) --
-  // só afeta Preflop/Postflop/Por posição (fetchAnalysisHandRows). A aba
-  // Estatísticas (Total Games/ROI/ITM/Lucro) vem de fetchTournamentMetrics/
-  // fetchTournamentSessions, que ainda não respeitam esse corte.
+  // junto com o do "Apagar", vira o `corte` que vale pra tela inteira.
   const [radarSince, setRadarSince] = useState<string | null>(null);
 
   useEffect(() => {
@@ -121,23 +123,33 @@ export default function PerformancePage() {
       .catch(() => {});
   }, []);
 
+  // Corte efetivo do Performance: o mais recente entre o "De hoje em
+  // diante" do Radar e o último "Apagar" (performance_reset_at). Vale pra
+  // TUDO daqui -- mãos, torneios, prêmios, rebuys e sessões --, senão o
+  // "Apagar" zerava as estatísticas de mão mas os torneios seguiam somando.
+  const [corte, setCorte] = useState<string | null>(null);
+
   async function loadAll(since: string | null = radarSince) {
     setErro("");
     try {
-      const [r, tourn, sessions, po, banca] = await Promise.all([
-        fetchAnalysisHandRows(since),
-        fetchTournamentMetrics(tournamentBuyinFilter),
+      const resetAt = await fetchPerformanceResetAt().catch(() => null);
+      const corteAtual = [since, resetAt].filter((d): d is string => !!d).sort().pop() ?? null;
+      setCorte(corteAtual);
+      const [r, tourn, todasSessoes, po, banca] = await Promise.all([
+        fetchAnalysisHandRows(corteAtual),
+        fetchTournamentMetrics(tournamentBuyinFilter, corteAtual),
         fetchTournamentSessions(),
         fetchTournamentPayouts(),
         // Sem sessão de banca a tela segue normal (só os gráficos de
         // torneio ficam vazios).
         fetchSessions().catch(() => [] as Session[]),
       ]);
-      setSessoesBanca(banca);
+      const sessions = sessoesDesde(todasSessoes, corteAtual);
+      setSessoesBanca(sessoesBancaDesde(banca, sessions, corteAtual));
       setRows(r);
       setTournament(tourn);
       setTournamentSessions(sessions);
-      setPayouts(po);
+      setPayouts(filtrarPayoutsPorCorte(po, todasSessoes, corteAtual));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao carregar a análise.");
     } finally {
@@ -150,7 +162,7 @@ export default function PerformancePage() {
   // misturar os dois estados.
   async function reloadTournamentMetrics(buyinFilter: BuyinBucket[] = tournamentBuyinFilter) {
     try {
-      setTournament(await fetchTournamentMetrics(buyinFilter));
+      setTournament(await fetchTournamentMetrics(buyinFilter, corte));
     } catch (e) {
       setErro(e instanceof Error ? e.message : "Falha ao recarregar métricas de torneio.");
     }
