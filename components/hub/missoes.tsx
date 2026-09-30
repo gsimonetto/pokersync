@@ -19,6 +19,9 @@ const COR_CATEGORIA: Record<string, string> = {
   bankroll: "#5AA6E0",
   review: "#A855F7",
   habit: "#E0B24C",
+  range: "#e0555a",
+  study: "#22d3ee",
+  radar: "#f472b6",
 };
 
 // Pra onde o cartão leva -- fecha o ciclo "vi a missão -> fui cumprir".
@@ -27,6 +30,9 @@ const DESTINO: Record<string, { href: string; rotulo: string }> = {
   drill: { href: "/treino", rotulo: "Modo Treino" },
   bankroll: { href: "/banca", rotulo: "Gestão de Banca" },
   review: { href: "/revisor", rotulo: "Revisão de Mãos" },
+  range: { href: "/ranges", rotulo: "Ranges" },
+  study: { href: "/modulos", rotulo: "Minhas metas" },
+  radar: { href: "/radar", rotulo: "Radar" },
 };
 
 // Mapeado 1:1 contra os valores reais de missions.icon.
