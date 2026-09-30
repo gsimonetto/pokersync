@@ -1,6 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { parseSession, handDateToISO, type ParsedHand } from "@/lib/poker/hand-parser";
 import type { ProfileCard } from "@/lib/services/profile-card-type";
+import { recalcularRebuys } from "@/lib/services/tournament-rebuy-service";
 
 const BUCKET = "hand-reviews";
 const MAX_IMAGES = 3;
@@ -253,18 +254,57 @@ export async function getThumbUrl(storagePath: string | null): Promise<string | 
   return data?.signedUrl || null;
 }
 
+// Ao excluir a ultima mao de um torneio/sessao, o agrupador (hand_sessions)
+// tambem some da lista do Revisor (pedido explicito: antes ficava "orfao",
+// sem nenhuma mao, mas continuava aparecendo). So' nao apaga se ja existir
+// uma sessao de banca importada a partir dele (bankroll_sessions.
+// imported_hand_session_id) -- Revisor e Gestao de Banca sao fontes de
+// verdade separadas de proposito (ver excludeSessionFromBankroll), entao
+// excluir maos aqui nunca deve arriscar levar junto um lancamento ja feito
+// na Banca.
 export async function deleteReview(reviewId: string) {
   const supabase = createClient();
+  const { data: review, error: fetchErr } = await supabase
+    .from("hand_reviews")
+    .select("hand_session_id")
+    .eq("id", reviewId)
+    .maybeSingle();
+  if (fetchErr) throw fetchErr;
+
   const { error } = await supabase.from("hand_reviews").delete().eq("id", reviewId);
   if (error) throw error;
+
+  const sessionId = review?.hand_session_id;
+  if (!sessionId) return;
+
+  const { count, error: countErr } = await supabase
+    .from("hand_reviews")
+    .select("id", { count: "exact", head: true })
+    .eq("hand_session_id", sessionId);
+  if (countErr) throw countErr;
+  if ((count ?? 0) > 0) {
+    // A mão apagada pode ser justamente a que mostrava o rebuy.
+    await recalcularRebuys(supabase, [sessionId]).catch(() => {});
+    return;
+  }
+
+  const { count: bankCount, error: bankErr } = await supabase
+    .from("bankroll_sessions")
+    .select("id", { count: "exact", head: true })
+    .eq("imported_hand_session_id", sessionId);
+  if (bankErr) throw bankErr;
+  if ((bankCount ?? 0) > 0) return;
+
+  const { error: delErr } = await supabase.from("hand_sessions").delete().eq("id", sessionId);
+  if (delErr) throw delErr;
 }
 
 // "Zerar módulo" do botão do Radar dentro do Revisor de Mãos -- apaga só
 // as mãos que o Agente importou sozinho (source "agent"/"import"), nunca
-// as que o jogador colou ou tirou print manualmente. hand_sessions
-// (torneio agrupador) não é apagada aqui: fica órfã sem mãos, mesmo
-// comportamento já descrito em deleteHandSession/excludeSessionFromBankroll
-// pra torneio sem mão nenhuma.
+// as que o jogador colou ou tirou print manualmente. Mesma limpeza de
+// torneio órfão do deleteReview: hand_sessions que ficaram sem nenhuma mão
+// depois desse apagão também são removidas (exceto as já ligadas a uma
+// sessão de banca, por segurança -- ver deleteReview).
 export async function resetRevisorRadarImports(): Promise<void> {
   const supabase = createClient();
   const { data: userData, error: userErr } = await supabase.auth.getUser();
@@ -276,6 +316,27 @@ export async function resetRevisorRadarImports(): Promise<void> {
     .eq("user_id", userData.user.id)
     .in("source", ["agent", "import"]);
   if (error) throw error;
+
+  try {
+    const { data: sessions } = await supabase.from("hand_sessions").select("id").eq("user_id", userData.user.id);
+    const ids = (sessions ?? []).map((s) => s.id);
+    if (ids.length === 0) return;
+
+    const { data: withReviews } = await supabase.from("hand_reviews").select("hand_session_id").in("hand_session_id", ids);
+    const reviewedIds = new Set((withReviews ?? []).map((r) => r.hand_session_id).filter(Boolean));
+
+    const { data: withBankroll } = await supabase.from("bankroll_sessions").select("imported_hand_session_id").in("imported_hand_session_id", ids);
+    const bankedIds = new Set((withBankroll ?? []).map((r) => r.imported_hand_session_id).filter(Boolean));
+
+    const orphanIds = ids.filter((id) => !reviewedIds.has(id) && !bankedIds.has(id));
+    if (orphanIds.length > 0) {
+      await supabase.from("hand_sessions").delete().in("id", orphanIds);
+    }
+  } catch (e) {
+    // Limpeza best-effort: a exclusao das maos ja aconteceu (acima), nao
+    // vale falhar a acao inteira do jogador por causa dessa faxina extra.
+    console.error("Falha ao limpar torneios orfaos apos zerar radar:", e);
+  }
 }
 
 export async function getReview(reviewId: string): Promise<ReviewDetail> {

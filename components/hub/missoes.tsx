@@ -19,6 +19,9 @@ const COR_CATEGORIA: Record<string, string> = {
   bankroll: "#5AA6E0",
   review: "#A855F7",
   habit: "#E0B24C",
+  range: "#e0555a",
+  study: "#22d3ee",
+  radar: "#f472b6",
 };
 
 // Pra onde o cartão leva -- fecha o ciclo "vi a missão -> fui cumprir".
@@ -27,6 +30,9 @@ const DESTINO: Record<string, { href: string; rotulo: string }> = {
   drill: { href: "/treino", rotulo: "Modo Treino" },
   bankroll: { href: "/banca", rotulo: "Gestão de Banca" },
   review: { href: "/revisor", rotulo: "Revisão de Mãos" },
+  range: { href: "/ranges", rotulo: "Ranges" },
+  study: { href: "/modulos", rotulo: "Minhas metas" },
+  radar: { href: "/radar", rotulo: "Radar" },
 };
 
 // Mapeado 1:1 contra os valores reais de missions.icon.
@@ -49,8 +55,7 @@ const ICONES: Record<string, LucideIcon> = {
 const DIFICULDADE: Record<string, { rotulo: string; cor: string; ordem: number }> = {
   facil: { rotulo: "Fácil", cor: "#22c55e", ordem: 0 },
   media: { rotulo: "Média", cor: "#f59e0b", ordem: 1 },
-  dificil: { rotulo: "Difícil", cor: "#f97316", ordem: 2 },
-  expert: { rotulo: "Expert", cor: "#e0555a", ordem: 3 },
+  dificil: { rotulo: "Difícil", cor: "#e0555a", ordem: 2 },
 };
 
 interface MissaoVista {

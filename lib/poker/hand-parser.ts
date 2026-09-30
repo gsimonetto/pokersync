@@ -541,7 +541,7 @@ function extractHeroFinishPlace(text: string, heroName: string | null): number |
 // existe em torneio PKO/Mystery Bounty. Ancora no heroName exato (em vez
 // do \S+ generico usado em extractHeroFinishPlace) porque nome de
 // jogador pode ter espaco (ex: "Glow of Mind") -- \S+ ia cortar no meio.
-function extractHeroBountiesWon(text: string, heroName: string | null): { count: number; cashWon: number } {
+export function extractHeroBountiesWon(text: string, heroName: string | null): { count: number; cashWon: number } {
   if (!heroName) return { count: 0, cashWon: 0 };
   const escaped = heroName.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
   // Grupo 1 captura o valor do bounty (mesmo em ambos idiomas) -- usado
@@ -552,7 +552,7 @@ function extractHeroBountiesWon(text: string, heroName: string | null): { count:
   let m: RegExpExecArray | null;
   while ((m = re.exec(text)) !== null) {
     count++;
-    cashWon += Number((m[1] ?? m[2]).replace(",", ""));
+    cashWon += valorMonetario(m[1] ?? m[2]);
   }
   return { count, cashWon: Math.round(cashWon * 100) / 100 };
 }
@@ -923,6 +923,21 @@ function computePreflopTags(preflopActions: ParsedAction[], seats: ParsedSeat[],
 // Seat/Lugar + em torneios PKO/Mystery Bounty PT-BR, sufixo ", Bounty de $ X"
 // junto do stack — capturado no grupo 4 (opcional) pra alimentar o bounty
 // automatico do heroi sem precisar digitar manual.
+// Valor em dólar em qualquer idioma do client: "7.50" (EN), "7,50" (PT-BR),
+// "1,234.50", "1.234,50". Bug corrigido (2026-09): o bounty em PT-BR
+// ("Bounty de $ 7,50") perdia a vírgula e virava 750 -- num torneio de
+// $16,50 (7,50 + 7,50 + 1,50) o card mostrava bounty de $750.
+// Regra: com os dois separadores, o último é o decimal; com um só, ele é
+// decimal quando tem 1 ou 2 dígitos depois, e milhar quando tem 3.
+export function valorMonetario(bruto: string): number {
+  const s = bruto.trim();
+  const ultimo = Math.max(s.lastIndexOf("."), s.lastIndexOf(","));
+  if (ultimo === -1) return Number(s);
+  const decimal = s.includes(".") && s.includes(",") ? true : s.length - ultimo - 1 <= 2;
+  if (!decimal) return Number(s.replace(/[.,]/g, ""));
+  return Number(s.slice(0, ultimo).replace(/[.,]/g, "") + "." + s.slice(ultimo + 1));
+}
+
 function extractSeats(
   text: string,
   heroName: string | null
@@ -980,7 +995,7 @@ function extractSeats(
       startingChips: Number(m[3].replace(",", "")),
       isButton: buttonSeat === seatNumber,
       isHero: heroName ? m[2] === heroName : false,
-      bountyValue: m[4] ? Number(m[4].replace(",", "")) : undefined,
+      bountyValue: m[4] ? valorMonetario(m[4]) : undefined,
       position: null,
     });
   }
@@ -1068,13 +1083,14 @@ export function parseHand(rawText: string): ParsedHand {
   const postflopTags = computePostflopTags(streets, heroName);
   const preflopTags = computePreflopTags(preflopActionsForMatchup, seats, heroName);
 
-  // Pedido explicito: "mesas com 3 jogadores sao de sit and go" -- mesa
-  // declarada 3-max desde a primeira mao (maxSeats, ja extraido acima) e'
-  // o sinal de Sit & Go/Spin & Go, nao de MTT normal (MTT so chega a
-  // 3-handed na mesa final, nunca comeca declarada 3-max). extractFormat
-  // sozinho so distingue "Tournament"/"Torneio" de cash, nunca SNG.
+  // Pedido explicito: "jogos com 3 pessoas sao spin and go" -- mesa
+  // declarada 3-max (maxSeats, ja extraido acima) e' Spin & Go, nao MTT
+  // normal (MTT so chega a 3-handed na mesa final, nunca comeca declarada
+  // 3-max). Mesa 2-max continua SNG (heads-up). extractFormat sozinho so
+  // distingue "Tournament"/"Torneio" de cash.
   const rawFormat = extractFormat(rawText);
-  const format = rawFormat === "MTT" && maxSeats !== null && maxSeats <= 3 ? "SNG" : rawFormat;
+  const format =
+    rawFormat === "MTT" && maxSeats === 3 ? "Spin" : rawFormat === "MTT" && maxSeats !== null && maxSeats < 3 ? "SNG" : rawFormat;
 
   const heroBounties = extractHeroBountiesWon(rawText, heroName);
 

@@ -16,6 +16,7 @@ import {
   Flame,
   Snowflake,
   Target,
+  RefreshCw,
 } from "lucide-react";
 import { Painel, StatList } from "@/components/dashboard/kit";
 import { FilterChip } from "@/components/ui/filter-chip";
@@ -125,8 +126,9 @@ export function StatisticsTab({
   // Buy-in em si não soma nada dos torneios só-de-payout (não tem esse
   // dado, ver comentário acima) — só Ganhos e as contagens de premiação
   // ganham os torneios extras.
+  // Com os rebuys detectados nas mãos: cada rebuy é mais um buy-in pago.
   const totalBuyinImportado = useMemo(
-    () => filteredSessions.reduce((acc, s) => acc + (s.buyin ?? 0), 0),
+    () => filteredSessions.reduce((acc, s) => acc + (s.buyin ?? 0) * (1 + (Number(s.reentries) || 0)), 0),
     [filteredSessions]
   );
   const totalGanhosImportado = useMemo(
@@ -164,7 +166,8 @@ export function StatisticsTab({
       >
         <p className="mb-3 -mt-1 text-[11px] leading-relaxed text-muted/70">
           Buy-in e premiação são sempre importados em dólar (hand history/resumo de torneio) — escolha acima se quer ver os
-          valores em dólar ou convertidos pra real na cotação do dia.
+          valores em dólar ou convertidos pra real na cotação do dia. Rebuys são detectados sozinhos nas mãos (você perdeu
+          todas as fichas e voltou ao mesmo torneio) e já entram no investido, no lucro e no ROI.
         </p>
         <StatList
           items={[
@@ -188,6 +191,25 @@ export function StatisticsTab({
                   : null,
               icon: Target,
               tone: metrics.total_bounties_won > 0 ? "bom" : undefined,
+            },
+            {
+              label: "Rebuys",
+              value:
+                metrics.total_rebuys > 0
+                  ? `${metrics.total_rebuys} (${fmtMoneyPlain(metrics.rebuy_cost) ?? "$0"})`
+                  : filteredSessions.length > 0
+                    ? "0"
+                    : null,
+              icon: RefreshCw,
+              tone: metrics.total_rebuys > 0 ? "acima" : undefined,
+            },
+            {
+              label: "Torneios com rebuy",
+              value:
+                metrics.total_games > 0 && metrics.total_rebuys > 0
+                  ? `${metrics.tournaments_with_rebuy} de ${metrics.total_games} (${Math.round((metrics.tournaments_with_rebuy / metrics.total_games) * 100)}%)`
+                  : null,
+              icon: RefreshCw,
             },
             { label: "Jogando desde", value: fmtSince(metrics.since), icon: CalendarClock },
             { label: "Último torneio", value: fmtSince(metrics.until), icon: CalendarCheck },

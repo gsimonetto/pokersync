@@ -204,6 +204,10 @@ export interface TournamentMetrics {
   // Valor em dólar somado dos bounties acima (hand_reviews.parsed_data->
   // heroBountyCashWon) — 0 quando total_bounties_won é 0.
   total_bounty_cash_won: number;
+  // Rebuys/re-entries detectados nas mãos (ver rebuy-detector.ts).
+  total_rebuys: number;
+  tournaments_with_rebuy: number;
+  rebuy_cost: number; // quanto os rebuys custaram (buy-in × rebuys), já dentro de total_invested
 }
 
 export interface BlindLevelPerformance {

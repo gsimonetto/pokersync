@@ -40,7 +40,7 @@ const O_QUE_O_RADAR_BUSCA: Record<RadarImportScope, string> = {
 const TEXTOS: Record<RadarModule, { titulo: string; traz: string; apagar: string }> = {
   banca: {
     titulo: "Radar na Gestão de Banca",
-    traz: "O Radar traz pra cá os torneios que você jogou — buy-in, prêmio e colocação — lidos das mãos e dos resumos de torneio do seu computador. Cada torneio vira uma sessão, convertida de dólar pra real pela cotação do dia.",
+    traz: "O Radar traz pra cá os torneios que você jogou — buy-in, prêmio e colocação — lidos das mãos e dos resumos de torneio do seu computador. Cada torneio vira uma sessão em dólar (a moeda do torneio), já com os rebuys que você fez.",
     apagar: "Apaga as sessões que o Radar criou na Gestão de Banca. As que você registrou à mão ficam. Não dá pra desfazer.",
   },
   revisor: {
@@ -51,7 +51,8 @@ const TEXTOS: Record<RadarModule, { titulo: string; traz: string; apagar: string
   performance: {
     titulo: "Radar no Performance",
     traz: "O Radar alimenta as estatísticas daqui — VPIP, PFR, 3-bet, ROI e o resto — com as mãos e torneios que importou.",
-    apagar: "Zera as estatísticas do Performance. As mãos continuam salvas no Revisor de Mãos. Não dá pra desfazer.",
+    apagar:
+      "Zera tudo o que o Performance mostra: estatísticas, torneios, prêmios, rebuys e lucro jogados até agora. As mãos continuam salvas no Revisor de Mãos e as sessões na Gestão de Banca. Não dá pra desfazer.",
   },
 };
 

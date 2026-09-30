@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Eye, ChevronRight, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
-import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
+import { isSpinAndGo, listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -453,17 +453,30 @@ export function RevisorFila({
                         <span className="truncate text-sm font-semibold text-ink">{s.label}</span>
                         {showsBounty && s.bounty_current != null && (
                           <span className="shrink-0 rounded-full border border-[#FBBF24]/40 bg-[#FBBF24]/10 px-2 py-0.5 text-[10px] font-semibold text-[#FBBF24]">
-                            Bounty ${s.bounty_current}
+                            Bounty US$ {Number(s.bounty_current).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
                           </span>
                         )}
                       </div>
                       <div className="mt-1 flex items-center gap-2 text-[11px] text-muted">
-                        {s.kind === "tournament" && s.format_type && (
-                          <span className="uppercase tracking-wide">
-                            {s.format_type === "pko" ? "PKO" : s.format_type === "mystery" ? "Mystery" : "Regular"}
-                          </span>
+                        {isSpinAndGo(s) ? (
+                          <span className="uppercase tracking-wide">Spin &amp; Go</span>
+                        ) : (
+                          s.kind === "tournament" &&
+                          s.format_type && (
+                            <span className="uppercase tracking-wide">
+                              {s.format_type === "pko" ? "PKO" : s.format_type === "mystery" ? "Mystery" : "Regular"}
+                            </span>
+                          )
                         )}
                         <span>· {s.hand_count} mão{Number(s.hand_count) === 1 ? "" : "s"}</span>
+                        {s.reentries > 0 && (
+                          <span
+                            title="Detectado sozinho: você perdeu todas as fichas e voltou ao mesmo torneio"
+                            className="font-semibold text-[#f59e0b]"
+                          >
+                            · {s.reentries} rebuy{s.reentries === 1 ? "" : "s"}
+                          </span>
+                        )}
                         <span>· {formatDate(s.updated_at)}</span>
                       </div>
                       {/* Progresso: quantas maos desse torneio ja foram

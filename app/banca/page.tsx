@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import { AnimatePresence, MotionConfig, motion } from "framer-motion";
-import { AlertTriangle, Landmark, Plus, ShieldAlert, Wallet } from "lucide-react";
+import { Landmark, Plus, ShieldAlert, Wallet } from "lucide-react";
 import type { Session, Transaction } from "@/lib/bankroll/types";
 import { fmtMoneyIn, suggestFormat } from "@/lib/bankroll/format";
 import { PLATFORMS } from "@/lib/bankroll/platforms";
@@ -199,13 +199,6 @@ export default function BancaPage() {
             </div>
 
             {b.erro && <p className="mb-3 shrink-0 rounded-xl border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{b.erro}</p>}
-            {b.pendentesAgente.length > 0 && b.erroCotacao && (
-              <p className="mb-3 flex shrink-0 items-start gap-2 rounded-xl border border-[#f59e0b]/30 bg-[#f59e0b]/[0.07] px-3 py-2 text-[12.5px] text-ink/90">
-                <AlertTriangle size={15} className="mt-0.5 shrink-0 text-[#f59e0b]" />
-                Não consegui buscar a cotação do dólar pra importar {b.pendentesAgente.length}{" "}
-                {b.pendentesAgente.length === 1 ? "torneio" : "torneios"} do Radar. Tento de novo sozinho na próxima vez que você abrir esta tela.
-              </p>
-            )}
 
             {!b.carregando && (
               <AvisoJornadas pendentes={cron.pendentes} sessoes={b.sessoes} onAplicar={dividirHoras} onDescartar={tirarPendente} />

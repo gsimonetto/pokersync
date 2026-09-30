@@ -9,6 +9,7 @@ import { createHash } from "node:crypto";
 import { splitHands, parseHand, validateParsedHand, handDateToISO, type ParsedHand } from "@/lib/poker/hand-parser";
 import { extractTournamentInfo } from "@/lib/services/hand-session-service";
 import { jogadoAntesDoCorte } from "@/lib/supabase/agent-import-scope";
+import { recalcularRebuys } from "@/lib/services/tournament-rebuy-service";
 
 export interface AgentDeviceInfo {
   deviceId: string;
@@ -123,6 +124,29 @@ async function applyTournamentSignals(supabase: SupabaseClient, sessionId: strin
       if (error) throw error;
     }
   }
+
+  // Bounty atual do herói = o da mão mais recente do lote (em PKO ele
+  // cresce a cada eliminação). Antes ficava pra sempre o da 1ª mão.
+  const comBounty = hands
+    .map((h) => ({ h, bounty: extractTournamentInfo(h).heroBountyFromHand }))
+    .filter((x): x is { h: ParsedHand; bounty: number } => x.bounty != null)
+    .sort((a, b) => (a.h.date ?? "").localeCompare(b.h.date ?? "") || (a.h.handId ?? "").localeCompare(b.h.handId ?? ""));
+  if (comBounty.length > 0) {
+    const { error } = await supabase
+      .from("hand_sessions")
+      .update({ bounty_current: comBounty[comBounty.length - 1].bounty })
+      .eq("id", sessionId);
+    if (error) throw error;
+  }
+
+  const tableSize = Math.max(0, ...hands.map((h) => h.maxSeats ?? 0));
+  if (tableSize > 0) {
+    await supabase.from("hand_sessions").update({ table_size: tableSize }).eq("id", sessionId).is("table_size", null);
+  }
+  // Rebuy olha TODAS as mãos do torneio já salvas (não só as deste lote):
+  // a mão em que o herói quebrou e a mão em que ele voltou podem chegar em
+  // sincronizações diferentes.
+  await recalcularRebuys(supabase, [sessionId]);
 
   const { error: eTouch } = await supabase
     .from("hand_sessions")

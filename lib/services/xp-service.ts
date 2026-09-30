@@ -14,12 +14,12 @@ const PATENTES = [
 
 export const MAX_LEVEL = 99;
 
-// Mesma formula da funcao xp_for_next_level no banco — recalibrada pro
-// teto de 99 (pedido explicito: "nao tao facil nem tao dificil"). A
-// formula antiga (100*level^1.5) levaria a casa dos 10 anos pra chegar
-// no 99 no ritmo novo de missoes (5 diarias+10 semanais+10 mensais).
+// Mesma formula da funcao xp_for_next_level no banco (migration
+// 20260930120000_tarefas_e_nivel_5_anos.sql). Calibrada pra quem faz TUDO
+// -- todas as tarefas + o limite diario de XP de treino/revisao/banca, com
+// a sequencia maxima -- levar 5 anos do nivel 1 ao 99 (~1,92 mi de XP).
 export function xpForNextLevel(level: number) {
-  return Math.round(60 * Math.pow(level, 1.3));
+  return Math.round(115 * Math.pow(level, 1.3));
 }
 
 // Cor do nivel muda a cada 10 (pedido explicito) — 10 faixas cobrindo
@@ -164,9 +164,12 @@ export async function fetchActiveMissions(): Promise<any[]> {
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export async function fetchMissionCatalog(): Promise<any[]> {
   const supabase = createClient();
+  // Só o catálogo em vigor: tarefas aposentadas ficam com active_until no
+  // passado e não podem aparecer na prévia.
   const { data, error } = await supabase
     .from("missions")
     .select("code, title, description, kind, category, goal_base, xp_reward, icon, difficulty")
+    .or(`active_until.is.null,active_until.gt.${new Date().toISOString()}`)
     .order("kind", { ascending: true });
   if (error) throw error;
   return data || [];
