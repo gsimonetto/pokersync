@@ -49,8 +49,7 @@ const ICONES: Record<string, LucideIcon> = {
 const DIFICULDADE: Record<string, { rotulo: string; cor: string; ordem: number }> = {
   facil: { rotulo: "Fácil", cor: "#22c55e", ordem: 0 },
   media: { rotulo: "Média", cor: "#f59e0b", ordem: 1 },
-  dificil: { rotulo: "Difícil", cor: "#f97316", ordem: 2 },
-  expert: { rotulo: "Expert", cor: "#e0555a", ordem: 3 },
+  dificil: { rotulo: "Difícil", cor: "#e0555a", ordem: 2 },
 };
 
 interface MissaoVista {
