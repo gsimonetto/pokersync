@@ -6,6 +6,7 @@ import { FilterChip } from "@/components/ui/filter-chip";
 import { ModalPortal } from "@/components/modal-portal";
 import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 import {
+  BUYIN_BUCKET_LABEL,
   STACK_DEPTH_LABEL,
   TOURNAMENT_STAGE_LABEL,
   HERO_POSITION_LABEL,
@@ -16,7 +17,19 @@ import {
   type TournamentStage,
   type HeroPosition,
   type PreflopActionType,
+  type BuyinBucket,
 } from "@/types/analysis";
+
+const BUYIN_ORDEM: BuyinBucket[] = ["0-10", "10-50", "50-200", "200+"];
+
+/** Filtro de buy-in dos torneios -- mora no mesmo menu dos outros filtros
+ *  (pedido explícito: "esse filtro deve estar junto ao outro do menu"),
+ *  mas o estado é separado: ele só mexe nos números de torneio. */
+export interface FiltroBuyin {
+  selecionados: BuyinBucket[];
+  disponiveis: Set<BuyinBucket>;
+  onChange: (next: BuyinBucket[]) => void;
+}
 
 function toggle<T>(list: T[], value: T): T[] {
   return list.includes(value) ? list.filter((v) => v !== value) : [...list, value];
@@ -46,11 +59,13 @@ export function AnalysisFilters({
   onChange,
   availableStackDepths,
   availablePositions,
+  buyin,
 }: {
   filters: Filters;
   onChange: (next: Filters) => void;
   availableStackDepths: Set<StackDepthBucket>;
   availablePositions: Set<HeroPosition>;
+  buyin?: FiltroBuyin;
 }) {
   const [moreOpen, setMoreOpen] = useState(false);
 
@@ -60,7 +75,8 @@ export function AnalysisFilters({
     filters.stackDepths.length +
     filters.stages.length +
     filters.positions.length +
-    filters.preflopActions.length;
+    filters.preflopActions.length +
+    (buyin?.selecionados.length ?? 0);
 
   function handleModalityChange(v: ModalityValue) {
     onChange({ ...filters, formats: v === "all" ? [] : [v] });
@@ -93,6 +109,21 @@ export function AnalysisFilters({
               <FilterChip label="MTT" active={modality === "mtt"} onClick={() => handleModalityChange("mtt")} />
               <FilterChip label="Cash" active={modality === "cash"} onClick={() => handleModalityChange("cash")} />
             </FilterGroup>
+
+            {buyin && (
+              <FilterGroup label="Buy-in do torneio">
+                {BUYIN_ORDEM.map((b) => (
+                  <FilterChip
+                    key={b}
+                    label={BUYIN_BUCKET_LABEL[b]}
+                    active={buyin.selecionados.includes(b)}
+                    disabled={!buyin.disponiveis.has(b)}
+                    disabledReason="Sem torneio importado nessa faixa de buy-in ainda"
+                    onClick={() => buyin.onChange(toggle(buyin.selecionados, b))}
+                  />
+                ))}
+              </FilterGroup>
+            )}
 
             <FilterGroup label="Profundidade de stack">
               {(Object.keys(STACK_DEPTH_LABEL) as StackDepthBucket[]).map((s) => (
@@ -147,7 +178,10 @@ export function AnalysisFilters({
             {activeCount > 0 && (
               <button
                 type="button"
-                onClick={() => onChange({ ...filters, formats: [], stackDepths: [], stages: [], positions: [], preflopActions: [] })}
+                onClick={() => {
+                  onChange({ ...filters, formats: [], stackDepths: [], stages: [], positions: [], preflopActions: [] });
+                  if (buyin?.selecionados.length) buyin.onChange([]);
+                }}
                 className="text-[11.5px] font-semibold text-muted hover:text-ink"
               >
                 Limpar filtros

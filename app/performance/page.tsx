@@ -203,12 +203,16 @@ export default function PerformancePage() {
     [tournamentSessions]
   );
 
+  // Buy-in dos torneios no mesmo menu de filtros (e nos filtros ativos do
+  // topo), em vez de uma linha solta no fim da Visão geral.
+  const filtroBuyin = { selecionados: tournamentBuyinFilter, disponiveis: availableBuyinBuckets, onChange: handleBuyinFilterChange };
   const filtrosModal = (
     <AnalysisFilters
       filters={filters}
       onChange={setFilters}
       availableStackDepths={availableStackDepths}
       availablePositions={availablePositions}
+      buyin={filtroBuyin}
     />
   );
   const semMaos = rows.length === 0;
@@ -234,7 +238,7 @@ export default function PerformancePage() {
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-2">
-                <FiltrosAtivos filters={filters} onChange={setFilters} />
+                <FiltrosAtivos filters={filters} onChange={setFilters} buyin={filtroBuyin} />
                 {filtrosModal}
                 <RadarModuleMenu
                   module="performance"
@@ -313,8 +317,6 @@ export default function PerformancePage() {
                                   tournamentSessions={tournamentSessions}
                                   payouts={payouts}
                                   buyinFilter={tournamentBuyinFilter}
-                                  onBuyinFilterChange={handleBuyinFilterChange}
-                                  availableBuyinBuckets={availableBuyinBuckets}
                                   currency={currency}
                                   onCurrencyChange={setCurrency}
                                   formatUsd={formatUsd}
