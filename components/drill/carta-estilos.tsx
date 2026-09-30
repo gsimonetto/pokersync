@@ -92,8 +92,8 @@ export function CartaEstilo({
           textAnchor={alinhar}
           fontFamily={fonte}
           fontWeight="700"
-          fontSize={dois ? tamRank * 0.86 : tamRank}
-          letterSpacing={dois ? -tamRank * 0.08 : 0}
+          fontSize={tamRank}
+          letterSpacing={dois ? -tamRank * 0.1 : 0}
           fill={cor}
         >
           {rank}
