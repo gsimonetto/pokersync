@@ -143,7 +143,7 @@ export default function HubPage() {
                     <CartaoNivel progress={progress} onVerPatentes={() => setPatentes(true)} onAbrirCarta={() => setCarta(true)} semMoldura />
                   </PainelCard>
                   <PainelCard title="Missões" icon={<Target size={15} />} ordem={1} rolagem={false}>
-                    <Missoes ativas={ativas} catalogo={catalogo} />
+                    <Missoes ativas={ativas} catalogo={catalogo} temporada={season?.seasonNumber ?? null} />
                   </PainelCard>
                 </div>
               )

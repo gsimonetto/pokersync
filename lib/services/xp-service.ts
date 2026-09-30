@@ -139,7 +139,7 @@ export async function fetchActiveMissions(): Promise<any[]> {
   const { data, error } = await supabase
     .from("user_missions")
     .select(
-      "id, progress, goal_value, status, period_start, completed_at, missions(code, title, description, kind, category, xp_reward, icon, difficulty)"
+      "id, progress, goal_value, status, period_start, completed_at, missions(code, title, description, kind, category, xp_reward, icon, difficulty, temporada)"
     )
     .in("status", ["active", "completed"])
     .gte("period_start", desde)
@@ -160,7 +160,7 @@ export async function fetchMissionCatalog(): Promise<any[]> {
   // passado e não podem aparecer na prévia.
   const { data, error } = await supabase
     .from("missions")
-    .select("code, title, description, kind, category, goal_base, xp_reward, icon, difficulty")
+    .select("code, title, description, kind, category, goal_base, xp_reward, icon, difficulty, temporada")
     .or(`active_until.is.null,active_until.gt.${new Date().toISOString()}`)
     .order("kind", { ascending: true });
   if (error) throw error;
