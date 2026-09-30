@@ -135,6 +135,29 @@ export async function fetchTrainingAccuracy(): Promise<{ hits: number; total: nu
   return { hits: hitsRes.count ?? 0, total: totalRes.count ?? 0 };
 }
 
+// Perda em bb (training_sessions.ev_loss_bb, preenchida no banco pela
+// mesma conta de lib/poker/ev-em-bb.ts) somada no total e hoje -- base do
+// bb/100 do Treino. Maos sem regua de bb (treinos antigos) ficam de fora.
+export interface ResumoEvTreino {
+  total: { maos: number; perdaBb: number };
+  hoje: { maos: number; perdaBb: number };
+}
+
+export async function fetchResumoEvTreino(): Promise<ResumoEvTreino> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("resumo_ev_treino").maybeSingle<{
+    maos: number;
+    perda_bb: number;
+    maos_hoje: number;
+    perda_bb_hoje: number;
+  }>();
+  if (error) throw error;
+  return {
+    total: { maos: data?.maos ?? 0, perdaBb: Number(data?.perda_bb ?? 0) },
+    hoje: { maos: data?.maos_hoje ?? 0, perdaBb: Number(data?.perda_bb_hoje ?? 0) },
+  };
+}
+
 // ---- Sessao diaria retomavel (filtros + progresso do bloco) -------------
 //
 // register_training (RPC chamada a cada mao, ver xp-service.registerTraining)
