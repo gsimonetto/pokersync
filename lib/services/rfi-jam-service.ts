@@ -34,7 +34,7 @@ export interface RfiJamListItem {
 // (ex "btn_vs_bb") — vive aqui (nao em cada tela que consome spot RFI/
 // Jam) pra Treino e Construtor de Ranges nao duplicarem o mesmo mapa.
 export const ALL_POSITIONS = ["UTG", "UTG+1", "MP", "HJ", "CO", "BTN", "SB", "BB"];
-export const POS_TO_TOKEN: Record<string, string> = {
+const POS_TO_TOKEN: Record<string, string> = {
   UTG: "utg",
   "UTG+1": "utg1",
   MP: "mp",
@@ -44,13 +44,9 @@ export const POS_TO_TOKEN: Record<string, string> = {
   SB: "sb",
   BB: "bb",
 };
-export const TOKEN_TO_POS: Record<string, string> = Object.fromEntries(
+const TOKEN_TO_POS: Record<string, string> = Object.fromEntries(
   Object.entries(POS_TO_TOKEN).map(([label, token]) => [token, label])
 );
-
-export function matchupKey(hero: string, villain: string): string {
-  return `${POS_TO_TOKEN[hero]}_vs_${POS_TO_TOKEN[villain]}`;
-}
 
 export function parseMatchup(matchup: string): { hero: string | null; villain: string | null } {
   const [heroToken, villainToken] = matchup.split("_vs_");

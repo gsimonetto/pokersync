@@ -17,7 +17,7 @@ import type { RangePronto } from "@/lib/ranges/prontos";
 // do PokerSync (GTO), os do time e o "range de verdade" (esse só carrega
 // quando alguém pede, porque varre as mãos importadas).
 
-export interface MeuTime {
+interface MeuTime {
   id: string;
   nome: string;
 }

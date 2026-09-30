@@ -18,7 +18,6 @@ export const T = {
 };
 
 export const F = "'Space Grotesk', system-ui, sans-serif";
-export const font = { fontFamily: F };
 
 // Cor por posicao — gradiente de temperatura seguindo a ordem de acao:
 // early frio, late quente. Vira codigo visual reconhecivel sem leitura.
@@ -46,8 +45,6 @@ export const num: React.CSSProperties = {
   fontVariantNumeric: "tabular-nums",
   fontFeatureSettings: "'tnum'",
 };
-
-export const fmtFreq = (v: number) => `${Math.round(v * 100)}%`;
 
 // Estilos de badge por tipo de acao.
 export const ACT: Record<string, { label: string; fg: string; bd: string; bg: string }> = {

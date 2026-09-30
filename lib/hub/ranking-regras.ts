@@ -47,7 +47,7 @@ export function corrida(jogadores: JogadorRanking[]): Corrida {
   return { eu, alvo, faltam, perseguidor, vantagem, proximidadePct };
 }
 
-export interface RelogioTemporada {
+interface RelogioTemporada {
   dia: number;
   totalDias: number;
   pct: number;

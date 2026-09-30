@@ -173,7 +173,7 @@ const FELT_PALETTES = {
   },
 } as const;
 
-export type TableVariant = keyof typeof FELT_PALETTES;
+type TableVariant = keyof typeof FELT_PALETTES;
 
 // Cor do feltro escolhida nas Configurações (M9) -- vale pro Treino e pro
 // Revisor. "padrao" = a cor de cada tela (azul no Treino, vinho no Revisor).
@@ -222,7 +222,7 @@ interface TemaMesa {
 // rgba(...,.35) -> rgba(...,.9): o brilho do feltro vira a luz do LED.
 const aceso = (cor: string) => cor.replace(/[\d.]+\)$/, "0.9)");
 
-export const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
+const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
   arena: {
     aro: (brilho) => ({
       background: "linear-gradient(180deg, #2c2f36 0%, #111317 40%, #050506 100%)",

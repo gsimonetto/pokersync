@@ -15,13 +15,6 @@ export const PERIODOS: { value: RangeOption; label: string }[] = [
   { value: "all", label: "Tudo" },
 ];
 
-export const PERIODO_EXTENSO: Record<RangeOption, string> = {
-  "7D": "Últimos 7 dias",
-  "30D": "Últimos 30 dias",
-  "1Y": "Último ano",
-  all: "Todo o período",
-};
-
 // Mesmos cortes do filtro de buy-in da Performance (types/analysis.ts),
 // mas cobrindo cash e torneio.
 export const FAIXAS_BUYIN: { value: string; label: string; test: (v: number) => boolean }[] = [

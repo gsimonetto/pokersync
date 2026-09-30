@@ -46,7 +46,7 @@ function itens(c: MeuCartao): ItemCompleto[] {
   ];
 }
 
-export function completude(c: MeuCartao): { feitos: number; total: number } {
+function completude(c: MeuCartao): { feitos: number; total: number } {
   const lista = itens(c);
   return { feitos: lista.filter((i) => i.ok).length, total: lista.length };
 }

@@ -20,7 +20,7 @@ export type Moeda = "BRL" | "USD";
 // Cash e Spin são categorias pelo próprio formato -- só MTT/SNG usam a
 // faixa de buy-in pra decidir o stake tier, porque são os únicos formatos
 // em que "quanto custa entrar" varia livremente vaga a vaga.
-export type StakeTier = "micro" | "low" | "medium" | "high" | "cash" | "spin";
+type StakeTier = "micro" | "low" | "medium" | "high" | "cash" | "spin";
 
 export const STAKE_TIER_LABEL: Record<StakeTier, string> = {
   micro: "Micro Stakes",
@@ -95,7 +95,7 @@ export interface Listing {
   expiresAt: string | null;
 }
 
-export interface NewListingInput {
+interface NewListingInput {
   title: string;
   description?: string;
   format: ListingFormat;
@@ -176,7 +176,7 @@ function mapListing(row: Record<string, unknown>): Listing {
 // Os dados do time são fechados pra quem não é do time -- nome, cor, logo
 // e os números nas Vagas vêm de uma RPC que só mostra time com vaga que a
 // pessoa enxerga.
-export async function fetchTimes(teamIds: string[]): Promise<Map<string, TimeNasVagas>> {
+async function fetchTimes(teamIds: string[]): Promise<Map<string, TimeNasVagas>> {
   const ids = [...new Set(teamIds)];
   if (!ids.length) return new Map();
   const supabase = createClient();
@@ -721,7 +721,7 @@ export async function marcarMensagensLidas(applicationId: string): Promise<void>
   window.dispatchEvent(new Event(MENSAGENS_LIDAS));
 }
 
-export interface NaoLidas {
+interface NaoLidas {
   /** Candidatura → quantas mensagens do outro lado ainda sem ler. */
   porCandidatura: Map<string, number>;
   /** Só as das candidaturas da própria pessoa (mensagens do time). */
@@ -738,8 +738,6 @@ export async function fetchNaoLidas(): Promise<NaoLidas> {
     minhas: rows.filter((r) => r.sou_candidato).reduce((s, r) => s + Number(r.nao_lidas), 0),
   };
 }
-
-export const SEM_NAO_LIDAS: NaoLidas = { porCandidatura: new Map(), minhas: 0 };
 
 /** Candidatura aceita ou em análise ainda deixa conversar. */
 export function conversaAberta(status: ApplicationStatus): boolean {

@@ -19,7 +19,7 @@ export interface Denominacao {
 }
 
 // Da maior pra menor -- ordem usada pra quebrar um valor em fichas.
-export const DENOMINACOES: Denominacao[] = [
+const DENOMINACOES: Denominacao[] = [
   { v: 100, cor: "#1b1d22", listra: "#f2c65a", terceira: "#c8102e", selo: "#1b1d22" },
   { v: 25, cor: "#138a4a", listra: "#ffffff", terceira: "#f2c65a", selo: "#138a4a" },
   { v: 5, cor: "#c8102e", listra: "#ffffff", terceira: "#1553b8", selo: "#c8102e" },
@@ -82,7 +82,7 @@ export function FichaAmericana({ d, tamanho }: { d: Denominacao; tamanho: number
 }
 
 // Quanto cada ficha sobe na pilha, em fração do tamanho da ficha.
-export const DEGRAU_PILHA = 0.2;
+const DEGRAU_PILHA = 0.2;
 
 /** Pilha de fichas vista de cima e levemente de lado: a maior embaixo. */
 export function PilhaFichas({ fichas, tamanho }: { fichas: Denominacao[]; tamanho: number }) {

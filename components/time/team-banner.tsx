@@ -6,11 +6,11 @@ import { ArrowLeft, ImagePlus, Trash2, Users } from "lucide-react";
 // Proporcao fixa (4:1) pra quem for montar a arte saber exatamente o
 // tamanho — sem isso a imagem escala pra cobrir a caixa e corta de
 // jeito imprevisivel dependendo da tela.
-export const BANNER_DIMENSOES = "1600 × 400px";
+const BANNER_DIMENSOES = "1600 × 400px";
 // max-h trava a altura em telas largas — sem isso a proporcao 4:1 sozinha
 // deixava o banner gigante em desktop, empurrando as estatisticas do time
 // pra fora da tela sem rolar.
-export const BANNER_PROPORCAO_CLASS = "aspect-[4/1] max-h-[220px]";
+const BANNER_PROPORCAO_CLASS = "aspect-[4/1] max-h-[220px]";
 
 // Fundo padrao (minimalista, tema de time/poker) pra quando o time ainda
 // nao subiu um banner proprio — antes era so' um degrade vazio, meio sem

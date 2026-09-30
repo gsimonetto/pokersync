@@ -9,13 +9,6 @@
 // ------------------------------------------------------------------
 export type GameFormat = "mtt" | "spin" | "sng" | "cash";
 
-export const GAME_FORMAT_LABEL: Record<GameFormat, string> = {
-  mtt: "MTT",
-  spin: "Spin & Go / Hyper",
-  sng: "SnG",
-  cash: "Cash",
-};
-
 // Faixas batem exatamente com `compute_stack_bucket()` no Postgres (stack
 // do herói em bb no início da mão) — não inventamos cortes diferentes dos
 // que o trigger de hand_tags já grava, senão o filtro nunca bateria com
@@ -163,10 +156,6 @@ export interface PostflopMetrics {
   wsd_won_pct: number | null; // Won $ at Showdown
 }
 
-export interface PostflopMetricsByStreet extends PostflopMetrics {
-  street: "flop" | "turn" | "river";
-}
-
 // ------------------------------------------------------------------
 // Torneios — ROI/ITM/cEV/ICM
 // ------------------------------------------------------------------
@@ -208,37 +197,6 @@ export interface TournamentMetrics {
   total_rebuys: number;
   tournaments_with_rebuy: number;
   rebuy_cost: number; // quanto os rebuys custaram (buy-in × rebuys), já dentro de total_invested
-}
-
-export interface BlindLevelPerformance {
-  blindLevelLabel: string; // ex: "50/100"
-  games: number;
-  netResultBB: number | null;
-  cevBB: number | null;
-}
-
-export interface IcmSituationPerformance {
-  situation: string; // ex: "Bolha — push/fold 15bb"
-  occurrences: number;
-  cevDelta: number | null; // impacto cEV médio da decisão
-  icmDelta: number | null; // impacto em $EV ajustado por ICM
-}
-
-export interface PayoutStructureRow {
-  place: number;
-  payoutPct: number;
-  payoutAmount: number | null;
-}
-
-
-// ------------------------------------------------------------------
-// Gráfico principal — Net Won / All-in EV / Volume
-// ------------------------------------------------------------------
-export interface NetWonPoint {
-  date: string; // ISO date
-  netWon: number;
-  allInEv: number | null;
-  cumulativeHandsOrGames: number;
 }
 
 // ------------------------------------------------------------------

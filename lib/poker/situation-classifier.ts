@@ -19,7 +19,7 @@
 import type { ParsedHand, ParsedAction } from "./hand-parser";
 import { createClient } from "@/lib/supabase/client";
 
-export type SituationCanonical =
+type SituationCanonical =
   | "open"
   | "vs_open"
   | "3bet"
@@ -27,7 +27,7 @@ export type SituationCanonical =
   | "4bet"
   | "vs_4bet";
 
-export interface StructuralSituation {
+interface StructuralSituation {
   canonical: SituationCanonical;
   // Numero de raises preflop QUE ACONTECERAM ANTES do hero tomar sua
   // ultima decisao preflop — util pra explicar/debugar a classificacao.
@@ -35,13 +35,6 @@ export interface StructuralSituation {
   // Se hero foi o autor do ultimo raise preflop. Combinado com o count
   // acima, define se hero e' o agressor ("3bet") ou o defensor ("vs_3bet").
   heroWasLastRaiser: boolean;
-}
-
-export class SituationClassifyError extends Error {
-  constructor(message: string) {
-    super(message);
-    this.name = "SituationClassifyError";
-  }
 }
 
 // Preflop = primeira street. Se nao existir, nao ha o que classificar
@@ -60,7 +53,7 @@ function isRaise(a: ParsedAction): boolean {
   return a.action === "raises";
 }
 
-export function classifyStructural(hand: ParsedHand): StructuralSituation | null {
+function classifyStructural(hand: ParsedHand): StructuralSituation | null {
   if (!hand.heroName) return null;
   const actions = preflopActions(hand);
   if (actions.length === 0) return null;
@@ -122,7 +115,7 @@ export function classifyStructural(hand: ParsedHand): StructuralSituation | null
 // hardcoded aqui — se o dicionario nao tiver o canonical, devolve null e
 // o botao "Treinar esse spot" fica oculto (comportamento consistente com
 // resolveSuggestionStreet no drill-service).
-export async function resolveActionForDrillFilter(
+async function resolveActionForDrillFilter(
   canonical: SituationCanonical
 ): Promise<string | null> {
   const supabase = createClient();
@@ -142,7 +135,7 @@ export async function resolveActionForDrillFilter(
 // Conveniencia: tudo em um so — classifica e ja traz o alias pronto pra
 // virar filtro drills.action. Se qualquer etapa falhar, devolve null,
 // que significa "nao ha spot mapeavel — nao mostre botao de treino".
-export interface ResolvedSituation {
+interface ResolvedSituation {
   canonical: SituationCanonical;
   action: string; // valor pra filtrar drills.action
   raisesBeforeHero: number;

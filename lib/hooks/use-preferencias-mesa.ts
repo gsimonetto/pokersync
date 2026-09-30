@@ -19,7 +19,7 @@ export type EstiloCartaPref = "solido" | "classico" | "jumbo";
 /** Estilo da mesa (ver TEMAS_MESA em components/drill/poker-table.tsx). */
 export type EstiloMesa = "arena" | "luxo";
 
-export interface PreferenciasMesa {
+interface PreferenciasMesa {
   /** Cor do feltro (M9). "padrao" = azul no Treino, vinho no Revisor. */
   feltro: CorFeltro;
   /** Baralho de 4 cores (padrão) ou 2 cores (M9). */

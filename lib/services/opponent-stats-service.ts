@@ -28,7 +28,7 @@ export interface OpponentStats {
 // Abaixo disso a estatística é ruído -- amostra pequena demais pra
 // significar alguma coisa (mesmo piso informal usado por trackers de
 // mercado tipo PT4/HM3 antes de confiar num HUD).
-export const MIN_RELIABLE_HANDS = 10;
+const MIN_RELIABLE_HANDS = 10;
 
 export function isSmallSample(stats: Pick<OpponentStats, "handsCount">): boolean {
   return stats.handsCount < MIN_RELIABLE_HANDS;
@@ -51,7 +51,7 @@ function mapRow(row: any): OpponentStats {
   };
 }
 
-export async function fetchOpponentStats(opponentName: string): Promise<OpponentStats | null> {
+async function fetchOpponentStats(opponentName: string): Promise<OpponentStats | null> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("get_opponent_stats", { p_opponent_name: opponentName });
   if (error) throw error;
@@ -63,7 +63,7 @@ export async function fetchOpponentStats(opponentName: string): Promise<Opponent
 // Nomes de todos os assentos que NÃO são o herói -- direto do
 // parsed_data, então funciona mesmo antes da mão estar salva (preview
 // de import, por exemplo).
-export function opponentNamesFromHand(hand: ParsedHand): string[] {
+function opponentNamesFromHand(hand: ParsedHand): string[] {
   if (!hand.heroName) return [];
   return hand.seats.filter((s) => s.playerName && s.playerName !== hand.heroName).map((s) => s.playerName);
 }

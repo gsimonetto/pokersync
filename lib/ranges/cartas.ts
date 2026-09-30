@@ -35,7 +35,7 @@ export function nomeCarta(s: string): string {
 }
 
 /** Mão da célula (linha, coluna) da grade: diagonal = par, acima = suited. */
-export function maoDaCelula(linha: number, coluna: number): string {
+function maoDaCelula(linha: number, coluna: number): string {
   if (linha === coluna) return GRADE[linha] + GRADE[coluna];
   return linha < coluna ? GRADE[linha] + GRADE[coluna] + "s" : GRADE[coluna] + GRADE[linha] + "o";
 }
@@ -48,7 +48,7 @@ export function combosPorMao(mao: string): number {
   return mao[2] === "s" ? 4 : 12;
 }
 
-export function comboTexto(a: Carta, b: Carta): string {
+function comboTexto(a: Carta, b: Carta): string {
   const [alta, baixa] =
     a.v > b.v || (a.v === b.v && NAIPES.indexOf(a.n) < NAIPES.indexOf(b.n)) ? [a, b] : [b, a];
   return cartaTexto(alta) + cartaTexto(baixa);

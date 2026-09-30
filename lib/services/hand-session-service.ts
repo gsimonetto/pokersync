@@ -67,7 +67,7 @@ export interface HandSessionWithCount extends HandSession {
 // pra sessao nova. Extraido do ParsedHand + heuristica: o nome do torneio
 // e' a parte do texto antes do "-" na primeira linha ("PokerStars Hand #X:
 // Tournament #Y, $5+$0.50 USD Hold'em No Limit - Level V").
-export interface ParsedTournamentInfo {
+interface ParsedTournamentInfo {
   tournamentIdPs: string | null;
   tournamentName: string | null;
   buyin: number | null;
@@ -237,22 +237,6 @@ export function isSpinAndGo(s: Pick<HandSession, "kind" | "table_size">): boolea
   return s.kind === "tournament" && s.table_size === 3;
 }
 
-// Exclui o torneio/sessao de maos importadas e todas as maos anexadas a
-// ele -- exclusao explicita de dentro do proprio Revisor (nunca disparada
-// por excluir a sessao de banca correspondente: Gestor de Banca e Revisor
-// de Maos sao fontes de verdade separadas de proposito, ver handleRemove
-// em app/banca/page.tsx). hand_reviews.hand_session_id e' SET NULL ao
-// apagar hand_sessions, entao as maos precisam ser apagadas explicitamente
-// antes — mesma logica de deleteReview() em hand-review-service.ts, so'
-// que em lote.
-export async function deleteHandSession(sessionId: string) {
-  const supabase = createClient();
-  const { error: reviewsError } = await supabase.from("hand_reviews").delete().eq("hand_session_id", sessionId);
-  if (reviewsError) throw reviewsError;
-  const { error } = await supabase.from("hand_sessions").delete().eq("id", sessionId);
-  if (error) throw error;
-}
-
 export async function updateSessionBounty(sessionId: string, bountyCurrent: number | null) {
   const supabase = createClient();
   const { error } = await supabase
@@ -265,7 +249,7 @@ export async function updateSessionBounty(sessionId: string, bountyCurrent: numb
 // Bumpa updated_at pra sessao aparecer no topo da fila. Chamado depois de
 // anexar mao nova a uma sessao existente — o INSERT de hand_review sozinho
 // nao dispara isso porque hand_reviews e sessions estao em tabelas diferentes.
-export async function touchSession(sessionId: string) {
+async function touchSession(sessionId: string) {
   const supabase = createClient();
   const { error } = await supabase
     .from("hand_sessions")

@@ -12,7 +12,7 @@ import { forwardRef, useEffect, useImperativeHandle, useRef } from "react";
 // componente não renderiza nada e o login segue como antes -- ordem
 // segura de ativar: publicar o site com a chave, e SÓ DEPOIS ligar o
 // CAPTCHA no Supabase (ao contrário, todo login falharia).
-export const CAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
+const CAPTCHA_SITE_KEY = process.env.NEXT_PUBLIC_TURNSTILE_SITE_KEY ?? "";
 export const CAPTCHA_ATIVO = CAPTCHA_SITE_KEY.length > 0;
 
 const SCRIPT_SRC = "https://challenges.cloudflare.com/turnstile/v0/api.js?render=explicit";

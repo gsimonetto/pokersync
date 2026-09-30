@@ -15,7 +15,7 @@ export function fracaoDaSemana(ref = new Date()): number {
   return (ref.getDay() + 1) / 7;
 }
 
-export type SituacaoMeta = "concluida" | "atrasada" | "em-dia" | "a-comecar";
+type SituacaoMeta = "concluida" | "atrasada" | "em-dia" | "a-comecar";
 
 /** Folga de 20 pontos antes de chamar de atrasada (mesma regra do Coach). */
 export function situacaoMeta(pctFeito: number, ref = new Date()): SituacaoMeta {

@@ -21,7 +21,7 @@ export type RadarImportScope = "from_now" | "last_3_months" | "full_history";
 
 export const RADAR_IMPORT_SCOPES: RadarImportScope[] = ["from_now", "last_3_months", "full_history"];
 
-export interface RadarImportConfig {
+interface RadarImportConfig {
   scope: RadarImportScope | null;
   /** Com "from_now"/"last_3_months": a partir de quando importar. */
   since: Date | null;

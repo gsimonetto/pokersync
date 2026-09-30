@@ -19,7 +19,7 @@ function sweep(now: number) {
   }
 }
 
-export interface RateLimitResult {
+interface RateLimitResult {
   allowed: boolean;
   retryAfterSeconds: number;
 }

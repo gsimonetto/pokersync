@@ -1,17 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import { inicioDoPeriodo, type TipoMissao } from "@/lib/hub/missoes-regras";
 
-const PATENTES = [
-  "Micro Stakes I", "Micro Stakes II", "Micro Stakes III",
-  "Low Stakes I", "Low Stakes II", "Low Stakes III",
-  "Mid Stakes I", "Mid Stakes II", "Mid Stakes III",
-  "High Stakes I", "High Stakes II", "High Stakes III",
-  "High Roller I", "High Roller II", "High Roller III",
-  "Super High Roller I", "Super High Roller II", "Super High Roller III",
-  "Nosebleeds I", "Nosebleeds II", "Nosebleeds III",
-  "Nosebleeds IV", "Nosebleeds V", "Nosebleeds VI", "Nosebleeds VII",
-];
-
 export const MAX_LEVEL = 99;
 
 // Mesma formula da funcao xp_for_next_level no banco (migration
@@ -68,13 +57,6 @@ export function levelSubTier(level: number): string {
   const posInBand = ((level - 1) % 10) + 1; // 1..10
   const tier = posInBand <= 2 ? 4 : posInBand <= 5 ? 3 : posInBand <= 8 ? 2 : 1;
   return ["", "I", "II", "III", "IV"][tier];
-}
-
-// Legado — nao usado mais na UI (nome de patente em ingles removido a
-// pedido explicito), mantido so pra nao quebrar quem ainda importa.
-export function getPatente(level: number) {
-  if (level >= 25) return "Lenda do Poker";
-  return PATENTES[level - 1] || "Micro Stakes I";
 }
 
 export interface Progress {
@@ -208,32 +190,10 @@ export async function registerTraining({
   return data?.[0];
 }
 
-export async function awardXP({
-  source,
-  category,
-  xpBase,
-  referenceId,
-}: {
-  source: string;
-  category: string;
-  xpBase: number;
-  referenceId?: string | null;
-}) {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("award_xp", {
-    p_source: source,
-    p_category: category,
-    p_xp_base: xpBase,
-    p_reference_id: referenceId || null,
-  });
-  if (error) throw error;
-  return data?.[0];
-}
-
 // --- Ranking global (todos os membros PokerSync) --------------------------
-export type LeaderboardPeriod = "week" | "month" | "season" | "all";
+type LeaderboardPeriod = "week" | "month" | "season" | "all";
 
-export interface LeaderboardEntry {
+interface LeaderboardEntry {
   userId: string;
   name: string;
   level: number;
@@ -242,22 +202,6 @@ export interface LeaderboardEntry {
   rank: number;
   /** Numeros das temporadas que esse jogador ja venceu (Temporada #N) -- [] se nenhuma. */
   championSeasons: number[];
-}
-
-export async function fetchLeaderboard(limit = 100): Promise<LeaderboardEntry[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("get_leaderboard", { p_limit: limit });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return (data ?? []).map((r: any) => ({
-    userId: r.user_id,
-    name: r.name,
-    level: r.level,
-    xpTotal: r.xp_total,
-    streakDays: r.streak_days,
-    rank: Number(r.rank),
-    championSeasons: (r.champion_seasons ?? []).map(Number),
-  }));
 }
 
 // Ranking por periodo (semana/mes/geral) — "geral" e' xp_total vitalicio
@@ -280,7 +224,7 @@ export async function fetchLeaderboardPeriod(period: LeaderboardPeriod, limit = 
   }));
 }
 
-export interface MyRank {
+interface MyRank {
   rank: number;
   xp: number;
   totalPlayers: number;

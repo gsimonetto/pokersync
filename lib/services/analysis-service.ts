@@ -371,23 +371,6 @@ export function computePreflopByPosition(rows: AnalysisHandRow[]): PreflopMetric
   }).filter((p) => p.hands > 0);
 }
 
-// Tendência de uma métrica ao longo do período filtrado — divide as mãos
-// (já ordenadas cronologicamente por fetchAnalysisHandRows) em blocos de
-// tamanho igual e recalcula a métrica em cada um, no espírito do
-// "Graphing" do HM3/PT4. Bloco por volume de mãos, não por data — sessões
-// desiguais no calendário não viram ruído no gráfico. Amostra mínima de
-// 30 mãos pro total pra cada ponto ter uma base decente.
-export function computeMetricTrend(rows: AnalysisHandRow[], metricFn: (subset: AnalysisHandRow[]) => number | null, buckets = 6): number[] {
-  if (rows.length < 30) return [];
-  const chunkSize = Math.ceil(rows.length / buckets);
-  const out: number[] = [];
-  for (let i = 0; i < rows.length; i += chunkSize) {
-    const value = metricFn(rows.slice(i, i + chunkSize));
-    if (value !== null) out.push(value);
-  }
-  return out;
-}
-
 // ============================================================
 // Postflop
 // ============================================================

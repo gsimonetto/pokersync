@@ -55,7 +55,7 @@ import {
 // US$), filtro de plataforma e importação automática dos torneios do
 // agente desktop.
 
-export const SEM_PLATAFORMA = "Sem plataforma";
+const SEM_PLATAFORMA = "Sem plataforma";
 const plataformaDe = (v?: string) => v?.trim() || SEM_PLATAFORMA;
 const moedaDe = (m?: string) => m || "BRL";
 

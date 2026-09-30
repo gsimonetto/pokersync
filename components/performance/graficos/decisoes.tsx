@@ -27,7 +27,7 @@ export type Fatia = { rotulo: string; n: number; cor: string };
 export type Situacao = { nome: string; detalhe: string; base: AnalysisHandRow[]; fatias: Fatia[] };
 export type Grupo = { titulo: string; situacoes: Situacao[] };
 
-export const quantas = (rows: AnalysisHandRow[], f: (r: AnalysisHandRow) => boolean | null | undefined) => rows.filter((r) => f(r)).length;
+const quantas = (rows: AnalysisHandRow[], f: (r: AnalysisHandRow) => boolean | null | undefined) => rows.filter((r) => f(r)).length;
 
 function montar(rows: AnalysisHandRow[]): Grupo[] {
   const levou3bet = rows.filter((r) => r.facedThreeBet === true);

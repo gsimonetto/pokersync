@@ -9,7 +9,7 @@ import { createClient } from "@/lib/supabase/client";
 export type RadarModule = "banca" | "revisor" | "performance";
 export type RadarModuleScope = "from_now" | "full_history";
 
-export interface RadarModuleScopeState {
+interface RadarModuleScopeState {
   scope: RadarModuleScope | null;
   since: string | null;
 }

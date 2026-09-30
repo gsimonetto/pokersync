@@ -85,7 +85,7 @@ function resumir(f: FlopRepresentativo, a: Analise): ResumoFlop {
   };
 }
 
-export function cartasDoFlop(flop: string): Carta[] {
+function cartasDoFlop(flop: string): Carta[] {
   return [flop.slice(0, 2), flop.slice(2, 4), flop.slice(4, 6)].map((c) => lerCarta(c)!);
 }
 
@@ -121,7 +121,7 @@ export function analisarFlops(combos: Map<string, number>, flops: FlopRepresenta
   return flops.map((f) => resumir(f, analisar(combos, cartasDoFlop(f.flop))));
 }
 
-export interface Medias {
+interface Medias {
   parOuMelhor: number;
   topoOuMelhor: number;
   projetoForte: number;

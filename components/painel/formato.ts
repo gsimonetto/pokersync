@@ -35,7 +35,7 @@ export function horas(h: number): string {
 }
 
 /** "terça-feira, 22 de setembro" -> "Terça-feira, 22 de setembro" */
-export function primeiraMaiuscula(txt: string): string {
+function primeiraMaiuscula(txt: string): string {
   return txt ? txt.charAt(0).toUpperCase() + txt.slice(1) : txt;
 }
 
@@ -45,16 +45,6 @@ export function dataLonga(d: Date): string {
       weekday: "long",
       day: "2-digit",
       month: "long",
-    }),
-  );
-}
-
-export function dataCurta(d: Date): string {
-  return primeiraMaiuscula(
-    d.toLocaleDateString("pt-BR", {
-      weekday: "short",
-      day: "numeric",
-      month: "short",
     }),
   );
 }

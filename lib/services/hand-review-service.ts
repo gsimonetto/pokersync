@@ -598,7 +598,7 @@ export async function createImportBatch(userId: string, rawText: string): Promis
   return data;
 }
 
-export async function fetchImportBatch(batchId: string): Promise<ImportBatch> {
+async function fetchImportBatch(batchId: string): Promise<ImportBatch> {
   const supabase = createClient();
   const { data, error } = await supabase.from("hand_import_batches").select("*").eq("id", batchId).single();
   if (error) throw error;

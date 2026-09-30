@@ -16,7 +16,7 @@ interface TeammateBirthdayRow {
 // ============================================================
 
 export type EventType = "aula" | "reuniao" | "outro";
-export type ParticipantStatus = "pendente" | "confirmado" | "recusado";
+type ParticipantStatus = "pendente" | "confirmado" | "recusado";
 
 export interface TeamBirthday {
   userId: string;

@@ -10,12 +10,12 @@ function grossInvested(s: Session) {
 // % da acao que o proprio jogador ficou (100 = banca 100% propria, sem
 // staking). Fora do intervalo (0,100] cai no default — dado invalido nao
 // pode fazer o jogador "desaparecer" da propria sessao.
-export function ownPct(s: Session) {
+function ownPct(s: Session) {
   const p = Number(s.ownPct);
   return p > 0 && p <= 100 ? p : 100;
 }
 
-export function markupOf(s: Session) {
+function markupOf(s: Session) {
   const m = Number(s.markup);
   return m > 0 ? m : 1;
 }
@@ -26,21 +26,17 @@ export function invested(s: Session) {
   return grossInvested(s) * (ownPct(s) / 100);
 }
 
-export function entries(s: Session) {
-  return 1 + (Number(s.reentries) || 0);
-}
-
 // Receita de markup: o backer paga (markup - 1) sobre a fatia que comprou,
 // independente do resultado da sessao — e' o "lucro" do jogador por vender
 // acao acima do valor de face. Zero quando nao ha staking.
-export function markupIncome(s: Session) {
+function markupIncome(s: Session) {
   const backerShare = grossInvested(s) * (1 - ownPct(s) / 100);
   return backerShare * (markupOf(s) - 1);
 }
 
 // Retorno economico do proprio jogador: sua fatia do cashout + o que
 // ganhou vendendo acao. Sem staking (ownPct=100) e' identico a s.cashout.
-export function ownCashout(s: Session) {
+function ownCashout(s: Session) {
   return (Number(s.cashout) || 0) * (ownPct(s) / 100) + markupIncome(s);
 }
 
@@ -51,7 +47,7 @@ export function net(s: Session) {
   return ownCashout(s) - invested(s);
 }
 
-export interface Aggregate {
+interface Aggregate {
   n: number;
   totalInvested: number;
   totalCashout: number;
@@ -192,7 +188,7 @@ export function dailyActivity(sessions: Session[]): Record<string, DayActivity> 
 // Cruza o diario (mood registrado na sessao) com o resultado — pra
 // responder "eu realmente jogo pior quando marco tilt?" com numero, nao
 // so intuicao. So considera sessoes que tem mood preenchido.
-export interface TiltImpact {
+interface TiltImpact {
   tiltN: number;
   tiltRoi: number;
   tiltNet: number;
@@ -240,7 +236,7 @@ export function hourlyRate(sessions: Session[]): { value: number; hoursLogged: n
 // NL200), so' entra Cash com bigBlind preenchido. O intervalo de 95% usa
 // desvio padrao da amostra — sem ele, "8bb/h" de 5 sessoes parece tao
 // solido quanto "8bb/h" de 500, o que e' enganoso.
-export interface BbRateResult {
+interface BbRateResult {
   value: number;
   n: number;
   hoursLogged: number;
@@ -282,7 +278,7 @@ export function currenciesInUse(sessions: Session[], transactions: Transaction[]
 // (Session.venue) com transacoes (Transaction.venue) daquela plataforma.
 // Sessoes/transacoes sem plataforma definida caem em "Sem plataforma" —
 // nao ficam escondidas, mas tambem nao se misturam com o resto.
-export interface PlatformBalance {
+interface PlatformBalance {
   platform: string;
   balance: number;
   sessionsN: number;
@@ -325,16 +321,6 @@ export function platformBalances(sessions: Session[], transactions: Transaction[
 
 export type RangeOption = "7D" | "30D" | "1Y" | "all";
 
-export function filterSeriesByRange(series: SeriesPoint[], range: RangeOption): SeriesPoint[] {
-  if (!series?.length || range === "all") return series;
-  const days = { "7D": 7, "30D": 30, "1Y": 365 }[range];
-  if (!days) return series;
-  const ref = new Date(series[series.length - 1].date + "T12:00:00");
-  const cutoff = new Date(ref);
-  cutoff.setDate(ref.getDate() - days);
-  return series.filter((p) => new Date(p.date + "T12:00:00") >= cutoff);
-}
-
 // Mesmo corte de `filterSeriesByRange`, mas sobre Session[] cru — usado
 // pelo export CSV (que precisa dos campos originais da sessao, nao so o
 // ponto acumulado da serie).
@@ -354,7 +340,7 @@ export function filterSessionsByRange(sessions: Session[], range: RangeOption): 
 // Patrimonio total = base + resultado das sessoes + depositos (ignora pra
 // onde o dinheiro foi depois de sair da mesa — saque/caixinha nao e' perda,
 // so muda de "em jogo" pra "reservado").
-export interface NetWorth {
+interface NetWorth {
   playingBankroll: number;
   netWorth: number;
   withdrawn: number;
@@ -414,7 +400,7 @@ function periodStart(period: "semanal" | "mensal", ref = new Date()): Date {
   return d;
 }
 
-export interface GoalProgress {
+interface GoalProgress {
   goal: Goal;
   current: number;
   pct: number;
@@ -442,7 +428,7 @@ export function goalProgress(goal: Goal, sessions: Session[], studyLogs: StudyLo
 // repetido `simulations` vezes. % de simulacoes que zeram a banca antes
 // do fim do horizonte = risco de ruina estimado. Precisa de amostra
 // minima (15 sessoes) pra nao virar numero aleatorio sem base.
-export interface RiskOfRuinResult {
+interface RiskOfRuinResult {
   ruinPct: number;
   simulations: number;
   horizonSessions: number;
@@ -480,7 +466,7 @@ export function riskOfRuin(
 }
 
 // --- Comparacao de periodos (mes atual vs mes anterior) -------------------
-export interface PeriodComparison {
+interface PeriodComparison {
   current: Aggregate;
   previous: Aggregate;
   currentLabel: string;

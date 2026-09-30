@@ -19,7 +19,7 @@ import { useEscapeToClose } from "@/lib/hooks/use-escape-to-close";
 //   if (!(await confirm("Excluir?"))) return;
 // — em vez de virar maquina de estado com dois callbacks em cada tela.
 
-export interface ConfirmOptions {
+interface ConfirmOptions {
   /** Pergunta principal. Unico campo obrigatorio. */
   message: string;
   title?: string;

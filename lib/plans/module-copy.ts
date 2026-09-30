@@ -6,7 +6,7 @@ import type { ModuleKey } from "./plans-data";
 // realmente tem (ver docs/cockpit/ROADMAP.md pra descricao real de cada
 // modulo) -- pedido explicito: nada de bloco de "diferencial" separado,
 // so' os checks, direto.
-export interface ModuleCopy {
+interface ModuleCopy {
   title: string;
   blurb: string;
   benefits: string[];

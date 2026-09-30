@@ -26,7 +26,7 @@ export interface RangeSalvo {
   donoNome?: string;
 }
 
-export interface RangeEntrada {
+interface RangeEntrada {
   nome: string;
   descricao?: string | null;
   pesos: Pesos;

@@ -9,7 +9,7 @@ import { useNivelDoJogador } from "@/lib/services/nivel-service";
 const EASE = [0.22, 1, 0.36, 1] as const;
 
 /** 0-100: quanto do nível atual já foi feito (o que falta pro próximo). */
-export function progressoDoNivel(nivel: number, xpAtual: number) {
+function progressoDoNivel(nivel: number, xpAtual: number) {
   if (nivel >= MAX_LEVEL) return 100;
   return Math.max(0, Math.min(100, (xpAtual / xpForNextLevel(nivel)) * 100));
 }

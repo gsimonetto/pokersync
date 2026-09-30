@@ -16,13 +16,13 @@ import { RANGE_NOVO, deReal, dePronto, deSalvo, type RangeAtual } from "./use-co
 
 type Fonte = "prontos" | "meus" | "time" | "real" | "top";
 
-export const TOPS = [100, 50, 35, 25, 15, 10, 5];
+const TOPS = [100, 50, 35, 25, 15, 10, 5];
 
 export function rangeTop(p: number): RangeAtual {
   return { ...RANGE_NOVO, nome: p === 100 ? "Qualquer mão" : `Top ${p}% das mãos`, pesos: topPercent(p) };
 }
 
-export function ItemRange({ r, detalhe, onClick }: { r: RangeAtual; detalhe?: string; onClick: () => void }) {
+function ItemRange({ r, detalhe, onClick }: { r: RangeAtual; detalhe?: string; onClick: () => void }) {
   const combos = contarCombos(r.pesos, r.pesosCombo);
   return (
     <button

@@ -9,7 +9,6 @@ import type { Feita, Projeto } from "@/lib/ranges/acertos";
 export const OURO = "#d4af37";
 export const OURO_CLARO = "#e8cb6a";
 export const VERDE = "#34D399";
-export const AZUL = "#3B82F6";
 export const AZUL_CLARO = "#60A5FA";
 export const VERMELHO = "#F87171";
 

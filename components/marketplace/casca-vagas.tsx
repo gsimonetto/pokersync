@@ -10,7 +10,7 @@ import { PerfEstilos } from "@/components/performance/perf-estilos";
 import { AbasAnimadas } from "@/components/performance/abas-animadas";
 import { fetchNaoLidas, MENSAGENS_LIDAS } from "@/lib/services/marketplace-service";
 
-export type AbaVagas = "vagas" | "candidaturas";
+type AbaVagas = "vagas" | "candidaturas";
 
 const ROTA: Record<AbaVagas, string> = {
   vagas: "/marketplace",

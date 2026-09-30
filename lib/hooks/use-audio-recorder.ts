@@ -7,9 +7,9 @@ import { useCallback, useRef, useState } from "react";
 // acompanhar do que resolver uma Promise de dentro de um setInterval).
 // Usado pelo MessageComposer (Central de Conversas e ConversaDrawer).
 
-export type RecorderStatus = "idle" | "recording" | "erro";
+type RecorderStatus = "idle" | "recording" | "erro";
 
-export interface AudioRecordResult {
+interface AudioRecordResult {
   blob: Blob;
   seconds: number;
 }

@@ -50,11 +50,6 @@ export interface CrachaDados {
   etiqueta?: { nome: string; cor: string } | null;
 }
 
-// Mesmas faixas do selo de risco da ficha (calcularScore).
-export function corDoScore(v: number): string {
-  return v < 40 ? "#e0555a" : v < 70 ? "#f59e0b" : "#22c55e";
-}
-
 const BRL_INTEIRO = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 function brlCompacto(v: number): string {

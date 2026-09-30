@@ -269,7 +269,7 @@ function montarDicas(d: PainelDados): Dica[] {
         nivel: "atencao",
         titulo: `${num(prontos.length)} ${prontos.length === 1 ? "jogador pronto" : "jogadores prontos"} pra subir de fase`,
         texto: `${nomes(prontos.map(nome))} ${prontos.length === 1 ? "bateu" : "bateram"} a meta de drills e revisões da fase atual no Funil.`,
-        href: "/time/painel/funil",
+        href: "/time/painel?tab=funil",
         cta: "Abrir o Funil",
       });
     }
@@ -294,7 +294,7 @@ function montarDicas(d: PainelDados): Dica[] {
         nivel: "atencao",
         titulo: `${num(parados.length)} ${parados.length === 1 ? "jogador parado" : "jogadores parados"} há mais de 14 dias`,
         texto: `${nomes(parados.map(nome))} não ${parados.length === 1 ? "fez" : "fizeram"} nenhum drill nem revisão desde que ${parados.length === 1 ? "entrou" : "entraram"} na fase atual.`,
-        href: "/time/painel/funil",
+        href: "/time/painel?tab=funil",
         cta: "Abrir o Funil",
       });
     }
@@ -308,7 +308,7 @@ function montarDicas(d: PainelDados): Dica[] {
         nivel: "atencao",
         titulo: `${num(faltosos.length)} ${faltosos.length === 1 ? "jogador faltando" : "jogadores faltando"} aos eventos`,
         texto: `${nomes(faltosos.map(nome))} ${faltosos.length === 1 ? "faltou" : "faltaram"} a 2 ou mais eventos do time.`,
-        href: "/time/painel/funil",
+        href: "/time/painel?tab=funil",
         cta: "Abrir o Funil",
       });
     }
@@ -328,7 +328,7 @@ function montarDicas(d: PainelDados): Dica[] {
         nivel: tipo === "inatividade" || tipo === "faltas_consecutivas" ? "ruim" : "atencao",
         titulo: `${ALERTA_LABEL[tipo]}: ${num(lista.length)} ${lista.length === 1 ? "jogador" : "jogadores"}`,
         texto: `${nomes(lista.map(nome))}. Aviso gerado nos últimos 14 dias.`,
-        href: "/time/painel/funil",
+        href: "/time/painel?tab=funil",
         cta: "Abrir o Funil",
       });
     }

@@ -20,7 +20,7 @@ import { BOTAO_OURO, CAMPO, COR_NEGATIVO, COR_POSITIVO, ROTULO_REENTRADA, numero
 // Formato e plataforma já vêm com o que o jogador mais usa (sugestões
 // passadas pela página), pra registro em 3 campos.
 
-export interface SugestoesSessao {
+interface SugestoesSessao {
   formato: string;
   plataforma: string;
   moeda: string;

@@ -30,7 +30,7 @@ export interface OpcaoAcao<Id extends string = string> {
 
 // Paleta = a da grade de range do solver (lib/poker/grade-gto.ts), um
 // tom mais fechado pra texto branco ter contraste em cima.
-export const COR_ACAO: Record<TipoAcao, { base: string; topo: string; borda: string }> = {
+const COR_ACAO: Record<TipoAcao, { base: string; topo: string; borda: string }> = {
   fold: { base: "#2B3038", topo: "#3A404A", borda: "rgba(255,255,255,0.14)" },
   check: { base: "#1D4ED8", topo: "#2F64EA", borda: "rgba(147,197,253,0.35)" },
   call: { base: "#1D4ED8", topo: "#2F64EA", borda: "rgba(147,197,253,0.35)" },
@@ -52,7 +52,7 @@ export function fmtBB(v: number): string {
 }
 
 /** Nome curto da jogada com valor, pra frases ("Raise 2,2 BB"). */
-export function nomeComValor(o: OpcaoAcao): string {
+function nomeComValor(o: OpcaoAcao): string {
   return o.valorBb != null ? `${o.verbo} ${fmtBB(o.valorBb)}` : o.verbo;
 }
 
