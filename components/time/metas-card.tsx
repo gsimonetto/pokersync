@@ -147,7 +147,7 @@ export function MetasCard({
             <select
               value={metrica}
               onChange={(e) => setMetrica(e.target.value as GoalMetric)}
-              className="painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             >
               {METRICAS.map((m) => (
                 <option key={m} value={m}>{METRICA_LABEL[m]}</option>
@@ -161,7 +161,7 @@ export function MetasCard({
               min={1}
               value={alvo}
               onChange={(e) => setAlvo(Math.max(1, Number(e.target.value)))}
-              className="w-16 painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="w-16 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             />
           </div>
           <div>
@@ -169,7 +169,7 @@ export function MetasCard({
             <select
               value={periodo}
               onChange={(e) => onPeriodoChange(e.target.value as GoalPeriod)}
-              className="painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             >
               <option value="semana">Semana</option>
               <option value="mes">Mês</option>
@@ -185,7 +185,7 @@ export function MetasCard({
                 setPrazo(e.target.value);
                 setPrazoTocado(true);
               }}
-              className="painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             />
           </div>
           <div className="ml-auto flex gap-1.5">

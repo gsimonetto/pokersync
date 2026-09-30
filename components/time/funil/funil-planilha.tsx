@@ -332,7 +332,7 @@ function CartaoLinha({
         }
       }}
       aria-label={`${i.nome}: abrir cartão`}
-      className="painel-vidro rounded-2xl border border-white/10 p-3 text-[12.5px] outline-none transition-colors active:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-training/60"
+      className="rounded-xl border border-white/10 bg-white/[0.04] p-3 text-[12.5px] outline-none transition-colors active:bg-white/[0.03] focus-visible:ring-2 focus-visible:ring-training/60"
     >
       {/* Nome sozinho na linha (não disputa espaço com o seletor). */}
       <div className="flex items-center gap-2.5">

@@ -176,7 +176,7 @@ function ModalHistoricoFases({ historico, onFechar }: { historico: CardPhaseHist
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-void/70 p-4" onClick={onFechar}>
       <div
-        className="max-h-[80vh] w-full max-w-md overflow-y-auto painel-vidro rounded-2xl border border-white/10 p-5"
+        className="max-h-[80vh] w-full max-w-md overflow-y-auto painel-vidro rounded-3xl border border-white/10 p-5 shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between gap-2">

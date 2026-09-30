@@ -562,7 +562,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   const val = e.target.value;
                   setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: val } : x)));
                 }}
-                className="mt-2 w-full painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[12px] text-ink outline-none disabled:opacity-80"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[12px] text-ink outline-none disabled:opacity-80"
               >
                 <option value="">O que deu errado? (opcional)</option>
                 {reasons.map((r) => (
@@ -603,7 +603,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   onChange={(e) => updateAnswer(idx, e.target.value)}
                   rows={2}
                   placeholder={question.question}
-                  className="mt-1 w-full resize-y painel-vidro rounded-2xl border border-white/10 p-2 text-[12px] text-ink outline-none focus:border-ink/40"
+                  className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-white/[0.04] p-2 text-[12px] text-ink outline-none focus:border-ink/40"
                 />
               </label>
             )}

@@ -213,7 +213,7 @@ export function MinhasMetasModalBody() {
               <select
                 value={goalType}
                 onChange={(e) => setGoalType(e.target.value as GoalType)}
-                className="painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               >
                 <option value="volume">Volume (sessões)</option>
                 <option value="estudo">Estudo (horas)</option>
@@ -224,7 +224,7 @@ export function MinhasMetasModalBody() {
               <select
                 value={goalPeriod}
                 onChange={(e) => onPeriodoChange(e.target.value as GoalPeriod)}
-                className="painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               >
                 <option value="semanal">Semanal</option>
                 <option value="mensal">Mensal</option>
@@ -236,7 +236,7 @@ export function MinhasMetasModalBody() {
                 placeholder="Ex: 12"
                 value={goalTarget}
                 onChange={(e) => setGoalTarget(e.target.value)}
-                className="w-20 painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="w-20 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               />
             </div>
             <div>
@@ -249,7 +249,7 @@ export function MinhasMetasModalBody() {
                   setDeadline(e.target.value);
                   setDeadlineTocado(true);
                 }}
-                className="painel-vidro rounded-2xl border border-white/10 px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               />
             </div>
             <button

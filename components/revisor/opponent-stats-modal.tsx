@@ -39,7 +39,7 @@ export function OpponentStatsModal({ stats, onClose }: { stats: OpponentStats | 
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-void/70 px-4 backdrop-blur-sm">
       <div className="absolute inset-0" onClick={onClose} aria-hidden="true" />
-      <div className="relative w-full max-w-xs painel-vidro rounded-2xl border border-white/10 p-4 shadow-2xl">
+      <div className="relative w-full max-w-xs painel-vidro rounded-3xl border border-white/10 p-4 shadow-2xl shadow-black/60">
         <div className="flex items-center justify-between gap-2">
           <h2 className="truncate text-sm font-bold text-ink" title={stats.opponentName}>
             {stats.opponentName}

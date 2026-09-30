@@ -273,7 +273,7 @@ export function FunilModalCard({
           role="dialog"
           aria-modal="true"
           aria-label={`Cartão de ${item.nome}`}
-          className="max-h-[92vh] w-full max-w-5xl overflow-y-auto painel-vidro rounded-2xl border border-white/10 p-5"
+          className="max-h-[92vh] w-full max-w-5xl overflow-y-auto painel-vidro rounded-3xl border border-white/10 p-5 shadow-2xl shadow-black/60"
           onClick={(e) => e.stopPropagation()}
         >
           {/* Cabeçalho: crachá + onde está + há quanto tempo */}

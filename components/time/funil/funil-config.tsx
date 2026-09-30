@@ -24,7 +24,7 @@ import {
 import type { TeamDashboardRow } from "@/lib/services/team-service";
 import { faixaBuyin } from "@/lib/time/funil-regras";
 
-const INPUT = "w-full painel-vidro rounded-2xl border border-white/10 px-2.5 py-2 text-sm text-ink outline-none focus:border-white/25";
+const INPUT = "w-full rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-2 text-sm text-ink outline-none focus:border-white/25";
 
 function Modal({ titulo, icone, largura = "max-w-lg", onFechar, children }: {
   titulo: string;
@@ -40,7 +40,7 @@ function Modal({ titulo, icone, largura = "max-w-lg", onFechar, children }: {
           role="dialog"
           aria-modal="true"
           aria-label={titulo}
-          className={`max-h-[90vh] w-full ${largura} overflow-y-auto painel-vidro rounded-2xl border border-white/10 p-5`}
+          className={`max-h-[90vh] w-full ${largura} overflow-y-auto painel-vidro rounded-3xl border border-white/10 p-5 shadow-2xl shadow-black/60`}
           onClick={(e) => e.stopPropagation()}
         >
           <div className="flex items-center justify-between">
@@ -322,7 +322,7 @@ export function ModalConfigFunil({ teamId, fases, crmDisponivel, slaPadrao, onFe
               value={sla ?? ""}
               onChange={(e) => setSla(e.target.value === "" ? null : Number(e.target.value))}
               onKeyDown={(e) => e.key === "Enter" && salvarSla()}
-              className="w-20 painel-vidro rounded-2xl border border-white/10 px-2.5 py-1.5 text-sm tabular-nums text-ink outline-none focus:border-white/25"
+              className="w-20 rounded-xl border border-white/10 bg-white/[0.04] px-2.5 py-1.5 text-sm tabular-nums text-ink outline-none focus:border-white/25"
             />
             <span>dias parado na fase</span>
             <button
