@@ -122,12 +122,13 @@ export async function fetchTodayTrainingCount(): Promise<number> {
 // em estado local do componente, entao reiniciava a cada login/reload
 // (bug reportado) -- agora e' sempre lido daqui e so' incrementado
 // localmente enquanto a mesma sessao de navegador dura, pra nao bater no
-// banco a cada mao.
+// banco a cada mao. "Otima" tem dois nomes no banco: 'PERFECT' (o que
+// register_training grava desde setembro) e 'OTIMA' (treinos antigos).
 export async function fetchTrainingAccuracy(): Promise<{ hits: number; total: number }> {
   const supabase = createClient();
   const [totalRes, hitsRes] = await Promise.all([
     supabase.from("training_sessions").select("id", { count: "exact", head: true }),
-    supabase.from("training_sessions").select("id", { count: "exact", head: true }).eq("verdict", "PERFECT"),
+    supabase.from("training_sessions").select("id", { count: "exact", head: true }).in("verdict", ["PERFECT", "OTIMA"]),
   ]);
   if (totalRes.error) throw totalRes.error;
   if (hitsRes.error) throw hitsRes.error;
