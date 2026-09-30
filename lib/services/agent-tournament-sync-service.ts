@@ -66,7 +66,7 @@ export interface AgentTournamentSyncInput {
   files: AgentTournamentSyncFile[];
 }
 
-export interface AgentTournamentSyncResult {
+interface AgentTournamentSyncResult {
   batchId: string;
   totalFiles: number;
   imported: number;

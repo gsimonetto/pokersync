@@ -149,16 +149,16 @@ export function MinhasMetasModalBody() {
       {erro && <p className="text-[12px] text-negative">{erro}</p>}
 
       {goals.length > 0 && (
-        <div className="flex gap-1 rounded-lg bg-elevated p-1 text-[12px] font-semibold">
+        <div className="flex gap-1 rounded-lg bg-white/[0.04] p-1 text-[12px] font-semibold">
           <button
             onClick={() => setAba("ativas")}
-            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "ativas" ? "bg-surface text-ink" : "text-muted"}`}
+            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "ativas" ? "bg-white/[0.1] text-ink" : "text-muted"}`}
           >
             Ativas ({ativas.length})
           </button>
           <button
             onClick={() => setAba("finalizadas")}
-            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "finalizadas" ? "bg-surface text-ink" : "text-muted"}`}
+            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "finalizadas" ? "bg-white/[0.1] text-ink" : "text-muted"}`}
           >
             Finalizadas ({finalizadas.length})
           </button>
@@ -174,7 +174,7 @@ export function MinhasMetasModalBody() {
               {ativas.map((g) => {
                 const p = goalProgress(g, sessions, studyLogs);
                 return (
-                  <li key={g.id} className="rounded-lg border border-hairline bg-elevated p-3">
+                  <li key={g.id} className="rounded-lg border border-hairline bg-white/[0.04] p-3">
                     <div className="flex items-center justify-between gap-3">
                       <span className="text-[13px] font-medium">
                         {g.type === "volume" ? "Volume de sessões" : "Horas de estudo"}
@@ -213,7 +213,7 @@ export function MinhasMetasModalBody() {
               <select
                 value={goalType}
                 onChange={(e) => setGoalType(e.target.value as GoalType)}
-                className="rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               >
                 <option value="volume">Volume (sessões)</option>
                 <option value="estudo">Estudo (horas)</option>
@@ -224,7 +224,7 @@ export function MinhasMetasModalBody() {
               <select
                 value={goalPeriod}
                 onChange={(e) => onPeriodoChange(e.target.value as GoalPeriod)}
-                className="rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               >
                 <option value="semanal">Semanal</option>
                 <option value="mensal">Mensal</option>
@@ -236,7 +236,7 @@ export function MinhasMetasModalBody() {
                 placeholder="Ex: 12"
                 value={goalTarget}
                 onChange={(e) => setGoalTarget(e.target.value)}
-                className="w-20 rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="w-20 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               />
             </div>
             <div>
@@ -249,7 +249,7 @@ export function MinhasMetasModalBody() {
                   setDeadline(e.target.value);
                   setDeadlineTocado(true);
                 }}
-                className="rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+                className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
               />
             </div>
             <button
@@ -262,7 +262,7 @@ export function MinhasMetasModalBody() {
             </button>
           </div>
 
-          <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2">
+          <div className="flex items-center gap-2 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2">
             <BookOpen size={14} className="text-muted" />
             <input
               type="number"
@@ -297,7 +297,7 @@ export function MinhasMetasModalBody() {
                     const p = goalProgress(g, sessions, studyLogs);
                     const atingida = p.pct >= 100;
                     return (
-                      <li key={g.id} className="rounded-lg border border-hairline bg-elevated p-3 opacity-80">
+                      <li key={g.id} className="rounded-lg border border-hairline bg-white/[0.04] p-3 opacity-80">
                         <div className="flex items-center justify-between gap-3">
                           <span className="text-[13px] font-medium">
                             {g.type === "volume" ? "Volume de sessões" : "Horas de estudo"}

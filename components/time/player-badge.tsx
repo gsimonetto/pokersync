@@ -50,11 +50,6 @@ export interface CrachaDados {
   etiqueta?: { nome: string; cor: string } | null;
 }
 
-// Mesmas faixas do selo de risco da ficha (calcularScore).
-export function corDoScore(v: number): string {
-  return v < 40 ? "#e0555a" : v < 70 ? "#f59e0b" : "#22c55e";
-}
-
 const BRL_INTEIRO = new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL", maximumFractionDigits: 0 });
 
 function brlCompacto(v: number): string {
@@ -304,7 +299,7 @@ export function PlayerBadge({
     return (
       <Tag
         {...(onClick ? { type: "button" as const, onClick, "aria-label": ariaLabel ?? `Ver ${dados.nome}` } : {})}
-        className={`flex w-full items-center gap-3 rounded-xl border border-hairline bg-elevated p-3 text-left ${
+        className={`flex w-full items-center gap-3 rounded-xl border border-hairline bg-white/[0.04] p-3 text-left ${
           onClick ? "transition-colors hover:border-white/15" : ""
         }`}
       >

@@ -53,9 +53,3 @@ export async function fetchTournamentPayouts(): Promise<TournamentPayout[]> {
   if (error) throw error;
   return (data ?? []).map(rowToPayout);
 }
-
-export async function deleteTournamentPayout(id: string) {
-  const supabase = createClient();
-  const { error } = await supabase.from("tournament_payouts").delete().eq("id", id);
-  if (error) throw error;
-}

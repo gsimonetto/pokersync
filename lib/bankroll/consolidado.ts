@@ -11,7 +11,7 @@ import type { Session, Transaction } from "./types";
 // A banca inicial cadastrada (bankroll_settings) é sempre em reais, então
 // só entra no saldo de BRL.
 
-export interface SaldoMoeda {
+interface SaldoMoeda {
   moeda: string;
   saldo: number;
   /** Resultado das sessões nessa moeda nos últimos 30 dias. */
@@ -35,7 +35,7 @@ export function saldosPorMoeda(sessoes: Session[], transacoes: Transaction[], ba
   });
 }
 
-export interface BancaConsolidada {
+interface BancaConsolidada {
   /** Total em reais; null quando alguma moeda não tem cotação. */
   total: number | null;
   resultado30d: number | null;

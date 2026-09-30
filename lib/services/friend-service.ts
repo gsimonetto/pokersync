@@ -64,21 +64,6 @@ async function fetchProfilesByIds(ids: string[]): Promise<PerfilBasico[]> {
   return data ?? [];
 }
 
-// Le so' last_seen_at pra uma lista de ids (ex: os membros do time na
-// Central de Conversas, que ja vem de outro lugar sem essa coluna).
-// presence_last_seen (RPC) libera self/amigo/colega de time -- nunca
-// qualquer usuario.
-export async function fetchLastSeenMap(ids: string[]): Promise<Map<string, string | null>> {
-  if (ids.length === 0) return new Map();
-  const supabase = createClient();
-  const { data, error } = (await supabase.rpc("presence_last_seen", { p_ids: ids })) as {
-    data: { id: string; last_seen_at: string | null }[] | null;
-    error: { message: string } | null;
-  };
-  if (error) throw error;
-  return new Map((data ?? []).map((r) => [r.id, r.last_seen_at]));
-}
-
 export interface Friend {
   userId: string;
   nome: string;
@@ -233,7 +218,7 @@ export async function removeFriendship(friendshipId: string) {
 
 export type FriendMessageKind = "texto" | "audio";
 
-export interface FriendMessage {
+interface FriendMessage {
   id: string;
   senderId: string;
   recipientId: string;

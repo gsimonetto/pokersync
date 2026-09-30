@@ -616,7 +616,7 @@ export function ModalNovoEvento({
   return (
     <div className="fixed inset-0 z-50 grid place-items-center bg-void/70 p-4" onClick={onFechar}>
       <div
-        className="max-h-[90vh] w-full max-w-md overflow-y-auto rounded-xl border border-hairline bg-surface p-5"
+        className="max-h-[90vh] w-full max-w-md overflow-y-auto painel-vidro rounded-3xl border border-white/10 p-5 shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
@@ -633,12 +633,12 @@ export function ModalNovoEvento({
               onChange={(e) => setTitulo(e.target.value)}
               maxLength={80}
               placeholder="Ex.: Aula de 3-bet pots"
-              className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none placeholder:text-muted/50 focus:border-ink/40"
+              className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none placeholder:text-muted/50 focus:border-ink/40"
             />
           </Campo>
 
           <Campo label="Tipo">
-            <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+            <div className="flex gap-1 rounded-lg border border-hairline bg-white/[0.04] p-1">
               {(["aula", "reuniao", "outro"] as const).map((t) => (
                 <button
                   key={t}
@@ -659,7 +659,7 @@ export function ModalNovoEvento({
                 type="date"
                 value={data}
                 onChange={(e) => setData(e.target.value)}
-                className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
+                className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
               />
             </Campo>
             <Campo label="Horário">
@@ -667,7 +667,7 @@ export function ModalNovoEvento({
                 type="time"
                 value={hora}
                 onChange={(e) => setHora(e.target.value)}
-                className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
+                className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
               />
             </Campo>
           </div>
@@ -676,7 +676,7 @@ export function ModalNovoEvento({
             <select
               value={duracaoMin}
               onChange={(e) => setDuracaoMin(Number(e.target.value))}
-              className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none"
+              className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none"
             >
               <option value={30}>30 minutos</option>
               <option value={60}>1 hora</option>
@@ -697,7 +697,7 @@ export function ModalNovoEvento({
                     type="date"
                     value={ateData}
                     onChange={(e) => setAteData(e.target.value)}
-                    className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
+                    className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none focus:border-ink/40"
                   />
                 </Campo>
                 <p className="mt-1.5 text-xs text-muted">Cria uma ocorrência por semana, no mesmo dia e horário, até essa data.</p>
@@ -706,7 +706,7 @@ export function ModalNovoEvento({
           </div>
 
           <Campo label="Link (opcional)">
-            <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
+            <div className="flex items-center gap-2 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5">
               <Link2 size={14} className="shrink-0 text-muted" />
               <input
                 value={link}
@@ -724,7 +724,7 @@ export function ModalNovoEvento({
               rows={2}
               maxLength={300}
               placeholder="Ex.: revisão de leaks de 3-bet da semana"
-              className="w-full resize-none rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none placeholder:text-muted/50 focus:border-ink/40"
+              className="w-full resize-none rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none placeholder:text-muted/50 focus:border-ink/40"
             />
           </Campo>
 
@@ -750,7 +750,7 @@ export function ModalNovoEvento({
                     key={j.userId}
                     onClick={() => alternar(j.userId)}
                     className={`flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left text-sm transition-colors ${
-                      selecionados.has(j.userId) ? "bg-ink/10" : "hover:bg-elevated"
+                      selecionados.has(j.userId) ? "bg-ink/10" : "hover:bg-white/[0.05]"
                     }`}
                   >
                     <AvatarNivel userId={j.userId} avatarId={j.avatarId} avatarUrl={j.avatarUrl} tamanho={26} />

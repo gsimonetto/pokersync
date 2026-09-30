@@ -87,7 +87,7 @@ export function TabMaosRecebidas() {
             <select
               value={playerFilter ?? ""}
               onChange={(e) => setPlayerFilter(e.target.value || null)}
-              className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12.5px] text-ink outline-none"
+              className="rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5 text-[12.5px] text-ink outline-none"
             >
               <option value="">Todos os jogadores</option>
               {players.map(([id, name]) => (
@@ -100,7 +100,7 @@ export function TabMaosRecebidas() {
             <select
               value={tournamentFilter ?? ""}
               onChange={(e) => setTournamentFilter(e.target.value || null)}
-              className="rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12.5px] text-ink outline-none"
+              className="rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5 text-[12.5px] text-ink outline-none"
             >
               <option value="">Todos os torneios</option>
               {tournaments.map((t) => (
@@ -165,7 +165,7 @@ export function TabMaosRecebidas() {
                 <li
                   key={s.shareId}
                   onClick={() => router.push(`/revisor?shared=${s.reviewId}`)}
-                  className="flex cursor-pointer items-center gap-3 rounded-xl border border-hairline bg-surface p-3.5 transition-colors hover:border-ink/40"
+                  className="flex cursor-pointer items-center gap-3 painel-vidro rounded-2xl border border-white/10 p-3.5 transition-colors hover:border-ink/40"
                 >
                   <div className="grid h-9 w-9 shrink-0 place-items-center rounded-full bg-void">
                     {s.viewedAt ? (

@@ -107,7 +107,7 @@ export function useCronometro() {
   return { estado, decorridoMs, pausado: estado?.pausadoDesde != null, iniciar, pausar, retomar, encerrar, pendentes, salvarPendentes };
 }
 
-export function formatarDuracao(ms: number): string {
+function formatarDuracao(ms: number): string {
   const total = Math.max(0, Math.floor(ms / 1000));
   const h = Math.floor(total / 3600);
   const m = Math.floor((total % 3600) / 60);
@@ -115,7 +115,7 @@ export function formatarDuracao(ms: number): string {
   return `${String(h).padStart(2, "0")}:${String(m).padStart(2, "0")}:${String(s).padStart(2, "0")}`;
 }
 
-export function horasPorExtenso(h: number): string {
+function horasPorExtenso(h: number): string {
   const min = Math.round(h * 60);
   const hh = Math.floor(min / 60);
   const mm = min % 60;
@@ -129,7 +129,7 @@ export function dataLocal(iso: string): string {
 }
 
 /** Torneios do Radar sem horas, jogados nos dias da jornada. */
-export function torneiosDaJornada(j: Jornada, sessoes: Session[]): Session[] {
+function torneiosDaJornada(j: Jornada, sessoes: Session[]): Session[] {
   const de = dataLocal(j.inicioIso);
   const ate = dataLocal(j.fimIso);
   return sessoes.filter((s) => s.importedHandSessionId && !(Number(s.hours) > 0) && s.date >= de && s.date <= ate);

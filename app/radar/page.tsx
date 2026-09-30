@@ -1,21 +1,18 @@
 "use client";
 
-import { AppShell } from "@/components/app-shell";
 import { RadarPanel } from "@/components/analysis/RadarPanel";
+import { TelaVidro } from "@/components/ui/tela-vidro";
+import { RADAR_COPY } from "@/lib/plans/module-copy";
 
-// Pagina do addon Radar PokerSync -- so' e' alcancada por quem tem o addon
-// (ver ADDON_ROUTES em lib/plans/plans-data.ts + gating em
-// lib/supabase/middleware.ts); quem nao tem cai na modal de upsell antes
-// de chegar aqui. Continua existindo como rota standalone (fora do menu
-// lateral, ver app-shell.tsx) porque o gating de addon precisa de uma URL
-// propria pra redirecionar/travar -- o conteudo em si mora em RadarPanel,
-// reaproveitado tambem dentro da aba "Radar" de Player Evolution.
+// Página do addon Radar PokerSync -- só é alcançada por quem tem o addon
+// (ADDON_ROUTES em lib/plans/plans-data.ts + lib/supabase/middleware.ts).
+// Continua como rota própria porque o bloqueio do addon precisa de uma URL
+// pra redirecionar; o conteúdo é o mesmo RadarPanel da aba "Radar" da
+// Performance.
 export default function RadarPage() {
   return (
-    <AppShell>
-      <main className="w-full px-4 py-6 md:px-6 md:py-10">
-        <RadarPanel />
-      </main>
-    </AppShell>
+    <TelaVidro titulo={RADAR_COPY.title} subtitulo={RADAR_COPY.blurb}>
+      <RadarPanel cabecalho={false} />
+    </TelaVidro>
   );
 }

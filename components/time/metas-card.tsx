@@ -121,7 +121,7 @@ export function MetasCard({
   const listaAtual = aba === "ativas" ? ativas : finalizadas;
 
   return (
-    <section className="rounded-xl border border-hairline bg-surface p-6">
+    <section className="painel-vidro rounded-2xl border border-white/10 p-6">
       <div className="flex items-baseline justify-between gap-3">
         <h2 className="flex items-center gap-1.5 text-base font-semibold">
           <Target size={15} className="text-training" />
@@ -130,7 +130,7 @@ export function MetasCard({
         {podeGerenciar && !criando && (
           <button
             onClick={() => setCriando(true)}
-            className="flex items-center gap-1.5 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] font-semibold text-ink transition-colors hover:border-ink/40"
+            className="flex items-center gap-1.5 rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5 text-[12px] font-semibold text-ink transition-colors hover:border-ink/40"
           >
             <Plus size={13} />
             Nova meta
@@ -141,13 +141,13 @@ export function MetasCard({
       {erro && <p className="mt-2 text-[12px] text-negative">{erro}</p>}
 
       {criando && (
-        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-hairline bg-elevated p-3">
+        <div className="mt-3 flex flex-wrap items-end gap-2 rounded-lg border border-hairline bg-white/[0.04] p-3">
           <div>
             <label className="mb-1 block text-[10px] font-semibold uppercase tracking-[0.06em] text-muted">O quê</label>
             <select
               value={metrica}
               onChange={(e) => setMetrica(e.target.value as GoalMetric)}
-              className="rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             >
               {METRICAS.map((m) => (
                 <option key={m} value={m}>{METRICA_LABEL[m]}</option>
@@ -161,7 +161,7 @@ export function MetasCard({
               min={1}
               value={alvo}
               onChange={(e) => setAlvo(Math.max(1, Number(e.target.value)))}
-              className="w-16 rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="w-16 rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             />
           </div>
           <div>
@@ -169,7 +169,7 @@ export function MetasCard({
             <select
               value={periodo}
               onChange={(e) => onPeriodoChange(e.target.value as GoalPeriod)}
-              className="rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             >
               <option value="semana">Semana</option>
               <option value="mes">Mês</option>
@@ -185,7 +185,7 @@ export function MetasCard({
                 setPrazo(e.target.value);
                 setPrazoTocado(true);
               }}
-              className="rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[13px] text-ink outline-none"
+              className="rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[13px] text-ink outline-none"
             />
           </div>
           <div className="ml-auto flex gap-1.5">
@@ -208,16 +208,16 @@ export function MetasCard({
       )}
 
       {metas.length > 0 && (
-        <div className="mt-4 flex gap-1 rounded-lg bg-elevated p-1 text-[12px] font-semibold">
+        <div className="mt-4 flex gap-1 rounded-lg bg-white/[0.04] p-1 text-[12px] font-semibold">
           <button
             onClick={() => setAba("ativas")}
-            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "ativas" ? "bg-surface text-ink" : "text-muted"}`}
+            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "ativas" ? "bg-white/[0.1] text-ink" : "text-muted"}`}
           >
             Ativas ({ativas.length})
           </button>
           <button
             onClick={() => setAba("finalizadas")}
-            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "finalizadas" ? "bg-surface text-ink" : "text-muted"}`}
+            className={`flex-1 rounded-md py-1.5 transition-colors ${aba === "finalizadas" ? "bg-white/[0.1] text-ink" : "text-muted"}`}
           >
             Finalizadas ({finalizadas.length})
           </button>

@@ -165,7 +165,7 @@ export function TabConvites({
         <div className="mt-4 grid grid-cols-2 items-end gap-2 sm:flex sm:flex-wrap sm:gap-3">
           <Campo label="Entra como">
             <select value={papel} onChange={(e) => setPapel(e.target.value as TeamRole)}
-              className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
+              className="w-full rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
               <option value="player">Jogador</option>
               <option value="coach">Coach</option>
               {meuPapel === "admin" && <option value="admin">Administrador</option>}
@@ -174,14 +174,14 @@ export function TabConvites({
 
           <Campo label="Validade">
             <select value={horas} onChange={(e) => setHoras(Number(e.target.value))}
-              className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
+              className="w-full rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
               {VALIDADES.map((v) => <option key={v.hours} value={v.hours}>{v.label}</option>)}
             </select>
           </Campo>
 
           <Campo label="Usos">
             <select value={usos} onChange={(e) => setUsos(Number(e.target.value))}
-              className="w-full rounded-lg border border-hairline bg-elevated px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
+              className="w-full rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-2 text-sm text-ink outline-none sm:w-auto sm:px-3">
               <option value={1}>1 pessoa</option>
               <option value={5}>Até 5</option>
               <option value={25}>Até 25</option>
@@ -200,7 +200,7 @@ export function TabConvites({
         ) : (
           <ul className="mt-5 space-y-2">
             {ativos.map((i) => (
-              <li key={i.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-hairline bg-elevated px-3 py-2.5">
+              <li key={i.id} className="flex flex-wrap items-center gap-3 rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5">
                 <span className="rounded-full border border-hairline px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider text-muted">
                   {PAPEL[i.role]}
                 </span>

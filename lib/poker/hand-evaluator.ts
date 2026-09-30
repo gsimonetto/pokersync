@@ -1,7 +1,7 @@
 import type { Card } from "@/lib/poker/card";
 
 // Escala de forca de maos, 0 (pior) a 8 (melhor) — ordem padrao de poker.
-export const HAND_TIERS = [
+const HAND_TIERS = [
   "HIGH_CARD",
   "PAIR",
   "TWO_PAIR",
@@ -12,19 +12,7 @@ export const HAND_TIERS = [
   "QUADS",
   "STRAIGHT_FLUSH",
 ] as const;
-export type HandTier = (typeof HAND_TIERS)[number];
-
-export const HAND_TIER_LABEL: Record<HandTier, string> = {
-  HIGH_CARD: "Carta alta",
-  PAIR: "Par",
-  TWO_PAIR: "Dois pares",
-  TRIPS: "Trinca",
-  STRAIGHT: "Sequência",
-  FLUSH: "Flush",
-  FULL_HOUSE: "Full House",
-  QUADS: "Quadra",
-  STRAIGHT_FLUSH: "Straight Flush",
-};
+type HandTier = (typeof HAND_TIERS)[number];
 
 // Maior topo de sequencia presente num conjunto de ranks (trata o As
 // tambem como 1, pra pegar a sequencia A-2-3-4-5). Retorna o rank mais

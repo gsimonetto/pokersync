@@ -11,7 +11,7 @@ import { CartaTexto } from "./pecas";
 // liga e desliga cada combo -- "AKs só de espadas e copas", "KK sem o K♠".
 
 /** Liga/desliga um combo e deixa o dado limpo (sem ajuste que não muda nada). */
-export function mudarCombo(pesos: Pesos, pesosCombo: Pesos, mao: string, combo: string, ligado: boolean): { pesos: Pesos; pesosCombo: Pesos } {
+function mudarCombo(pesos: Pesos, pesosCombo: Pesos, mao: string, combo: string, ligado: boolean): { pesos: Pesos; pesosCombo: Pesos } {
   const combos = combosDaMao(mao);
   const pesoMao = pesos[mao] ?? 0;
   const pc = { ...pesosCombo, [combo]: ligado ? (pesoMao > 0 ? pesoMao : 100) : 0 };

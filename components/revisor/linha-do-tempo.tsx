@@ -24,7 +24,7 @@ export const FATIA_BOARD: Record<string, [number, number]> = { FLOP: [0, 3], TUR
 // Nome do raise no pré-flop, do jeito que quem joga fala: o 1º é a
 // abertura, depois 3-bet, 4-bet... (pedido: "tomei 4bet" -- a faixa
 // dizia "HJ raise 15", sem deixar claro que era a 4-bet).
-export function nomeDoRaisePreflop(ordem: number): string {
+function nomeDoRaisePreflop(ordem: number): string {
   return ordem <= 1 ? "abre" : `${ordem + 1}-bet`;
 }
 

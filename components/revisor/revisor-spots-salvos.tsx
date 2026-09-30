@@ -78,7 +78,7 @@ export function RevisorSpotsSalvos({
         <li
           key={r.id}
           onClick={() => (naMesa.includes(r.id) ? onOpenNaMesa(r.id, naMesa) : onOpen(r.id))}
-          className="flex cursor-pointer gap-3 rounded-xl border border-hairline bg-surface p-3 transition-colors hover:border-ink/40"
+          className="flex cursor-pointer gap-3 painel-vidro rounded-2xl border border-white/10 p-3 transition-colors hover:border-ink/40"
         >
           <div className="flex h-[72px] w-[72px] shrink-0 items-center justify-center overflow-hidden rounded-[10px] bg-void">
             {thumbs[r.id] ? (

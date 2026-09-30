@@ -19,6 +19,4 @@ export const PLATFORMS = [
   "Live / Presencial",
 ] as const;
 
-export type Platform = (typeof PLATFORMS)[number];
-
 export const OUTRO_PLATFORM = "Outro";

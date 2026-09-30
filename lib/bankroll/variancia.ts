@@ -45,7 +45,7 @@ export interface FaixaPasso {
   p90: number;
 }
 
-export interface Variancia {
+interface Variancia {
   amostra: number;
   roiHistorico: number;
   roiUsado: number;

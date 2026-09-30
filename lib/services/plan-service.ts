@@ -1,7 +1,7 @@
 import { createClient } from "@/lib/supabase/client";
 import { toPlanId, type PlanId } from "@/lib/plans/plans-data";
 
-export interface MyPlanState {
+interface MyPlanState {
   plan: PlanId;
   // Radar comprado avulso (user_plans.radar_addon) -- independente do
   // plano, ver isAddonUnlocked em lib/plans/plans-data.ts. false pra

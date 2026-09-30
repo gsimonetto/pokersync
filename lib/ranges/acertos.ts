@@ -65,7 +65,7 @@ function temSequencia(valores: Set<number>): boolean {
   return false;
 }
 
-export function classificar(mao: [Carta, Carta], board: Carta[]): { feita: Feita; projetos: Projeto[] } {
+function classificar(mao: [Carta, Carta], board: Carta[]): { feita: Feita; projetos: Projeto[] } {
   const todas = [...mao, ...board];
   const cont = new Map<number, number>();
   const naipes = new Map<string, number>();
@@ -203,11 +203,6 @@ export function proximaCarta(combos: Map<string, number>, board: Carta[]): { car
       res.push({ carta, forte: tot ? bons / tot : 0 });
     }
   return res;
-}
-
-export function forcaDoRange(analise: Analise): number {
-  if (!analise.total) return 0;
-  return FORTES.reduce((s, f) => s + analise.feitas[f], 0) / analise.total;
 }
 
 /** Textura do board, em palavras. */

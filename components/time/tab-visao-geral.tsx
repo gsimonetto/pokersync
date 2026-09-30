@@ -149,7 +149,7 @@ function GraficoEstudo({ dados, pronto }: { dados: TeamActivityDay[]; pronto: bo
 
   return (
     <div
-      className={`${vidro ? "painel-vidro rounded-3xl border border-white/10 p-4 sm:p-5" : "rounded-xl border border-hairline bg-surface p-5"} transition-all duration-500 delay-75 print:break-inside-avoid ${
+      className={`${vidro ? "painel-vidro rounded-3xl border border-white/10 p-4 sm:p-5" : "painel-vidro rounded-2xl border border-white/10 p-5"} transition-all duration-500 delay-75 print:break-inside-avoid ${
         pronto ? "translate-y-0 opacity-100" : "translate-y-2 opacity-0"
       }`}
     >

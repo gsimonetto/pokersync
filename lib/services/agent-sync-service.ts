@@ -29,7 +29,7 @@ export interface AgentSyncInput {
   files: AgentSyncFile[];
 }
 
-export interface AgentSyncResult {
+interface AgentSyncResult {
   batchId: string;
   totalHands: number;
   imported: number;

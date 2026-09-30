@@ -509,7 +509,7 @@ function SemPlanoCard() {
   return (
     <section className="painel-vidro max-w-xl rounded-3xl border border-white/10 p-6">
       <div className="flex items-start gap-3">
-        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
+        <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-hairline bg-white/[0.04] text-muted">
           <Lock size={18} />
         </span>
         <div>
@@ -553,12 +553,12 @@ function CriarTimeCard({ onCriado, onErro }: { onCriado: () => void; onErro: (s:
           <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Nome do time</label>
           <input value={nome} onChange={(e) => setNome(e.target.value)} maxLength={40}
             placeholder="Ex.: Curitiba Poker Team"
-            className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-ink/40" />
+            className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-sm text-ink outline-none transition-colors placeholder:text-muted/50 focus:border-ink/40" />
         </div>
 
         <div>
           <label className="mb-1.5 block text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">Sua função no time</label>
-          <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+          <div className="flex gap-1 rounded-lg border border-hairline bg-white/[0.04] p-1">
             {(["admin", "coach"] as const).map((r) => (
               <button key={r} onClick={() => setPapel(r)}
                 className={`flex-1 rounded-md px-3 py-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] transition-all ${

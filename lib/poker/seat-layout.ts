@@ -65,7 +65,7 @@ const RING_ORDER_8MAX = ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "HJ", "CO"];
 // e' nele que o hero cai, mesma convencao do modo Replay.
 const HERO_SLOT_INDEX = 0;
 
-export class UnknownHeroPositionError extends Error {
+class UnknownHeroPositionError extends Error {
   constructor(position: string) {
     super(`Posição de hero desconhecida: "${position}". Esperado uma de: ${RING_ORDER_8MAX.join(", ")}.`);
     this.name = "UnknownHeroPositionError";
@@ -121,7 +121,7 @@ const POSITION_LABELS_BY_COUNT: Record<number, string[]> = {
   9: ["BTN", "SB", "BB", "UTG", "UTG+1", "MP", "LJ", "HJ", "CO"],
 };
 
-export class UnsupportedTableSizeError extends Error {
+class UnsupportedTableSizeError extends Error {
   constructor(count: number) {
     super(`Mesa com ${count} jogadores não é suportada (aceito: 2 a 9).`);
     this.name = "UnsupportedTableSizeError";

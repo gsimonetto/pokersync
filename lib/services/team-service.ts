@@ -346,30 +346,10 @@ export async function revokeInvite(inviteId: string) {
   if (error) throw error;
 }
 
-export async function updateMemberRole(userId: string, role: TeamRole) {
-  const supabase = createClient();
-  const patch: Record<string, unknown> = { role };
-  if (role === "coach") patch.is_coach = true;
-  if (role === "player") patch.is_coach = false;
-  const { error } = await supabase.from("team_members").update(patch).eq("user_id", userId);
-  if (error) throw error;
-}
-
-export async function updateMemberIsCoach(userId: string, isCoach: boolean) {
-  const supabase = createClient();
-  const { error } = await supabase.from("team_members").update({ is_coach: isCoach }).eq("user_id", userId);
-  if (error) throw error;
-}
-
 export async function removeMember(userId: string) {
   const supabase = createClient();
   const { error } = await supabase.from("team_members").delete().eq("user_id", userId);
   if (error) throw error;
-}
-
-export async function leaveTeam() {
-  const meId = await getUserId();
-  await removeMember(meId);
 }
 
 // ============================================================
@@ -513,26 +493,6 @@ export async function fetchTeamLeaks(days = 30, limit = 8): Promise<TeamLeak[]> 
   }));
 }
 
-export interface TeamLeakPlayer {
-  userId: string;
-  nome: string;
-  avatarId: number;
-  avatarUrl: string | null;
-}
-
-export async function fetchTeamLeakPlayers(reasonCode: string, street: string, days = 30): Promise<TeamLeakPlayer[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("team_leak_players", { p_reason_code: reasonCode, p_street: street, p_days: days });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((data ?? []) as any[]).map((r) => ({
-    userId: r.user_id,
-    nome: r.nome,
-    avatarId: r.avatar_id ?? 1,
-    avatarUrl: r.avatar_url ?? null,
-  }));
-}
-
 export async function assignTeamDrill(
   reasonCode: string,
   street: string,
@@ -577,7 +537,7 @@ export function diasSemAtividade(lastActivityAt: string | null): number | null {
 // semântica de cor que o Assistente do coach já usa pros blocos de
 // alerta (positive/evolution/negative), não uma paleta nova.
 // ============================================================
-export interface ScoreInput {
+interface ScoreInput {
   treinos: number;
   acertosGto: number;
   maosRevisadas: number;
@@ -587,7 +547,7 @@ export interface ScoreInput {
 
 export type NivelRisco = "baixo" | "medio" | "alto";
 
-export interface EvolutionScore {
+interface EvolutionScore {
   valor: number;
   risco: NivelRisco;
 }
@@ -639,7 +599,7 @@ export async function fetchPlayerScoreHistory(playerId: string, days = 30): Prom
   }));
 }
 
-export type TendenciaScore = "subiu" | "caiu" | "estavel";
+type TendenciaScore = "subiu" | "caiu" | "estavel";
 
 // Compara o score de hoje com o mais antigo disponível até 7 dias atrás
 // -- "estavel" cobre tanto empate quanto histórico curto demais (menos
@@ -763,52 +723,6 @@ export async function fetchPlayerDetail(playerId: string, days = 30): Promise<Pl
   };
 }
 
-export async function fetchPlayerFinancialSeries(playerId: string, days = 30): Promise<FinancialDay[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("team_player_financial_series", { p_player: playerId, p_days: days });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((data ?? []) as any[]).map((r) => ({
-    dia: r.dia,
-    resultado: Number(r.resultado ?? 0),
-    acumulado: Number(r.acumulado ?? 0),
-    sessoes: r.sessoes ?? 0,
-  }));
-}
-
-// Staking/backing (2026-08): sessoes onde o jogador vendeu parte da acao —
-// da' visibilidade pro coach/backer, que antes so' via o resultado bruto
-// (o painel financeiro contava o swing inteiro, mesmo quando so' uma fatia
-// era do jogador). resultadoLiquido ja' vem calculado no banco com a mesma
-// formula do net() do frontend (ver migracao bankroll_session_net).
-export interface PlayerStakingSession {
-  id: string;
-  dia: string;
-  formato: string;
-  ownPct: number;
-  markup: number;
-  backerName: string | null;
-  resultadoLiquido: number;
-  resultadoBruto: number;
-}
-
-export async function fetchPlayerStakingSessions(playerId: string, limit = 20): Promise<PlayerStakingSession[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("team_player_staking_sessions", { p_player: playerId, p_limit: limit });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((data ?? []) as any[]).map((r) => ({
-    id: r.id,
-    dia: r.dia,
-    formato: r.formato,
-    ownPct: Number(r.own_pct ?? 100),
-    markup: Number(r.markup ?? 1),
-    backerName: r.backer_name || null,
-    resultadoLiquido: Number(r.resultado_liquido ?? 0),
-    resultadoBruto: Number(r.resultado_bruto ?? 0),
-  }));
-}
-
 export async function fetchPeriodComparison(days = 30): Promise<PeriodComparison> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc("team_period_comparison", { p_days: days });
@@ -836,28 +750,6 @@ export async function fetchPlayerActivity(playerId: string, days = 30): Promise<
     treinos: r.treinos ?? 0,
     revisoes: r.revisoes ?? 0,
     xp: r.xp ?? 0,
-  }));
-}
-
-export interface PlayerLeak {
-  reasonCode: string;
-  label: string;
-  total: number;
-}
-
-export async function fetchPlayerLeaks(playerId: string, days = 30, limit = 6): Promise<PlayerLeak[]> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("team_player_leaks", {
-    p_player: playerId,
-    p_days: days,
-    p_limit: limit,
-  });
-  if (error) throw error;
-  // eslint-disable-next-line @typescript-eslint/no-explicit-any
-  return ((data ?? []) as any[]).map((r) => ({
-    reasonCode: r.reason_code,
-    label: r.label,
-    total: r.total ?? 0,
   }));
 }
 
@@ -1203,209 +1095,6 @@ export async function deactivatePlayerGoal(goalId: string) {
   const supabase = createClient();
   const { error } = await supabase.rpc("deactivate_player_goal", { p_goal: goalId });
   if (error) throw error;
-}
-
-// ============================================================
-// Chat 1:1, dentro do mesmo time (Central de Conversas)
-// ============================================================
-// RLS libera so remetente e destinatario. Insert sempre via RPC
-// send_team_message (valida "mesmo time" + dispara notificacao de
-// sino; ja suporta kind='audio' desde a v5-arg). Leitura e
-// marcar-como-lida podem ir direto na tabela.
-
-export type TeamMessageKind = "texto" | "audio";
-
-export interface TeamMessage {
-  id: string;
-  teamId: string;
-  senderId: string;
-  recipientId: string;
-  body: string;
-  kind: TeamMessageKind;
-  /** Path dentro do bucket privado "team-audio" (nao a URL publica --
-      o bucket exige signed URL, ver getTeamAudioUrl). */
-  audioUrl: string | null;
-  durationSeconds: number | null;
-  createdAt: string;
-  readAt: string | null;
-}
-
-const TEAM_MESSAGE_COLUMNS =
-  "id, team_id, sender_id, recipient_id, body, kind, audio_url, duration_seconds, created_at, read_at";
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function mapTeamMessage(r: any): TeamMessage {
-  return {
-    id: r.id,
-    teamId: r.team_id,
-    senderId: r.sender_id,
-    recipientId: r.recipient_id,
-    body: r.body,
-    kind: (r.kind as TeamMessageKind) ?? "texto",
-    audioUrl: r.audio_url,
-    durationSeconds: r.duration_seconds,
-    createdAt: r.created_at,
-    readAt: r.read_at,
-  };
-}
-
-export async function fetchTeamThread(otherUserId: string, limit = 100): Promise<TeamMessage[]> {
-  const supabase = createClient();
-  const meId = await getUserId();
-  const { data, error } = await supabase
-    .from("team_messages")
-    .select(TEAM_MESSAGE_COLUMNS)
-    .or(
-      `and(sender_id.eq.${meId},recipient_id.eq.${otherUserId}),and(sender_id.eq.${otherUserId},recipient_id.eq.${meId})`
-    )
-    .order("created_at", { ascending: true })
-    .limit(limit);
-  if (error) throw error;
-  return (data ?? []).map(mapTeamMessage);
-}
-
-export async function sendTeamMessage(recipientId: string, body: string): Promise<string> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("send_team_message", {
-    p_recipient: recipientId,
-    p_body: body,
-  });
-  if (error) throw error;
-  return data as string;
-}
-
-// Upload do blob gravado (webm/opus, ver ChatCenter) pro bucket privado
-// "team-audio". Path segue a convencao exigida pela policy de INSERT
-// (storage.foldername(name)[2] = auth.uid()): "{teamId}/{meId}/{arquivo}".
-// Guardamos so' o path em team_messages.audio_url -- a policy de SELECT
-// casa por sufixo (audio_url LIKE '%'||objects.name), entao path e URL
-// publica funcionariam igual, mas o bucket nao e' publico.
-export async function uploadTeamAudio(teamId: string, blob: Blob): Promise<string> {
-  const supabase = createClient();
-  const meId = await getUserId();
-  const path = `${teamId}/${meId}/${crypto.randomUUID()}.webm`;
-  const { error } = await supabase.storage.from("team-audio").upload(path, blob, {
-    contentType: blob.type || "audio/webm",
-    cacheControl: "3600",
-  });
-  if (error) throw error;
-  return path;
-}
-
-export async function sendTeamAudioMessage(
-  recipientId: string,
-  audioPath: string,
-  durationSeconds: number
-): Promise<string> {
-  const supabase = createClient();
-  const { data, error } = await supabase.rpc("send_team_message", {
-    p_recipient: recipientId,
-    p_body: "",
-    p_kind: "audio",
-    p_audio_url: audioPath,
-    p_duration_seconds: Math.min(120, Math.max(1, Math.round(durationSeconds))),
-  });
-  if (error) throw error;
-  return data as string;
-}
-
-// Bucket privado -- precisa de signed URL pra tocar o audio (curta,
-// so' pro player abrir; nao guardamos/cacheamos entre sessoes).
-export async function getTeamAudioUrl(path: string): Promise<string> {
-  const supabase = createClient();
-  const { data, error } = await supabase.storage.from("team-audio").createSignedUrl(path, 3600);
-  if (error) throw error;
-  return data.signedUrl;
-}
-
-export async function markThreadRead(otherUserId: string) {
-  const supabase = createClient();
-  const meId = await getUserId();
-  const { error } = await supabase
-    .from("team_messages")
-    .update({ read_at: new Date().toISOString() })
-    .eq("sender_id", otherUserId)
-    .eq("recipient_id", meId)
-    .is("read_at", null);
-  if (error) throw error;
-}
-
-// ============================================================
-// Central de Conversas (topbar) -- lista todas as conversas que o
-// usuario ja tem no time, tipo Discord. Reusa fetchMyTeamCached() pra
-// nome/avatar/papel de cada contato (qualquer membro pode conversar
-// com qualquer outro, mesma regra ja validada pelo RPC).
-// ============================================================
-
-export interface TeamThreadSummary {
-  otherUserId: string;
-  nome: string;
-  avatarId: number;
-  avatarUrl: string | null;
-  role: TeamRole;
-  lastMessage: string;
-  lastKind: TeamMessageKind;
-  lastAt: string;
-  lastIsMine: boolean;
-  unreadCount: number;
-}
-
-const THREADS_SCAN_LIMIT = 500;
-
-export async function fetchTeamThreads(): Promise<TeamThreadSummary[]> {
-  const supabase = createClient();
-  const meId = await getUserId();
-  const [{ data: msgs, error }, myTeam] = await Promise.all([
-    supabase
-      .from("team_messages")
-      .select("id, sender_id, recipient_id, body, kind, created_at, read_at")
-      .or(`sender_id.eq.${meId},recipient_id.eq.${meId}`)
-      .order("created_at", { ascending: false })
-      .limit(THREADS_SCAN_LIMIT),
-    fetchMyTeamCached(),
-  ]);
-  if (error) throw error;
-  if (!myTeam) return [];
-
-  const memberById = new Map(myTeam.members.map((m) => [m.userId, m]));
-  const byOther = new Map<string, TeamThreadSummary>();
-
-  for (const m of msgs ?? []) {
-    const otherId = m.sender_id === meId ? m.recipient_id : m.sender_id;
-    const unread = m.recipient_id === meId && !m.read_at;
-    const existing = byOther.get(otherId);
-    if (existing) {
-      if (unread) existing.unreadCount += 1;
-      continue;
-    }
-    const member = memberById.get(otherId);
-    byOther.set(otherId, {
-      otherUserId: otherId,
-      nome: member?.name ?? "Ex-membro do time",
-      avatarId: member?.avatarId ?? 1,
-      avatarUrl: member?.avatarUrl ?? null,
-      role: member?.role ?? "player",
-      lastMessage: m.kind === "audio" ? "🎤 Mensagem de voz" : m.body,
-      lastKind: (m.kind as TeamMessageKind) ?? "texto",
-      lastAt: m.created_at,
-      lastIsMine: m.sender_id === meId,
-      unreadCount: unread ? 1 : 0,
-    });
-  }
-
-  return Array.from(byOther.values()).sort((a, b) => (a.lastAt < b.lastAt ? 1 : -1));
-}
-
-export async function fetchTeamUnreadCount(): Promise<number> {
-  const supabase = createClient();
-  const meId = await getUserId();
-  const { count, error } = await supabase
-    .from("team_messages")
-    .select("id", { count: "exact", head: true })
-    .eq("recipient_id", meId)
-    .is("read_at", null);
-  if (error) throw error;
-  return count ?? 0;
 }
 
 // ============================================================

@@ -2,17 +2,11 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { PerfEstilos } from "@/components/performance/perf-estilos";
 import { useRouter } from "next/navigation";
 import { Users, CircleAlert, LogIn } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
-import {
-  acceptInvite,
-  getInviteInfo,
-  setPerfilVisivelTime,
-  traduzErroTime,
-  type InviteInfo,
-  type TeamRole,
-} from "@/lib/services/team-service";
+import { acceptInvite, getInviteInfo, setPerfilVisivelTime, traduzErroTime, type InviteInfo, type TeamRole } from "@/lib/services/team-service";
 
 // Tela publica do link de convite (/time/convite/<token>).
 // O token nao carrega nenhum dado do time — quem resolve e' a funcao
@@ -79,13 +73,18 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
   const accent = info?.teamAccent || "#5AA6E0";
 
   return (
-    <main className="px-6 py-10 text-ink">
-      <div className="mx-auto max-w-md rounded-xl border border-hairline bg-surface p-6">
+    <main className="perf min-h-screen px-4 py-10 text-ink">
+      <PerfEstilos />
+      <div className="painel-vidro mx-auto max-w-md rounded-3xl border border-white/10 p-6">
         {loading ? (
-          <p className="text-sm text-muted">Carregando convite…</p>
+          <div className="flex flex-col gap-3" aria-hidden>
+            <div className="painel-esqueleto mx-auto size-14 rounded-2xl" />
+            <div className="painel-esqueleto mx-auto h-5 w-40 rounded-lg" />
+            <div className="painel-esqueleto h-10 rounded-xl" />
+          </div>
         ) : !info || !info.valid ? (
           <div className="flex items-start gap-3">
-            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-lg border border-hairline bg-elevated text-muted">
+            <span className="grid h-10 w-10 shrink-0 place-items-center rounded-2xl border border-white/[0.08] bg-white/[0.03] text-muted">
               <CircleAlert size={18} />
             </span>
             <div>
@@ -100,10 +99,7 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
           </div>
         ) : (
           <div className="text-center">
-            <span
-              className="mx-auto grid h-14 w-14 place-items-center rounded-2xl"
-              style={{ backgroundColor: `${accent}22`, color: accent }}
-            >
+            <span className="mx-auto grid h-14 w-14 place-items-center rounded-2xl" style={{ backgroundColor: `${accent}22`, color: accent }}>
               <Users size={24} />
             </span>
             <h1 className="mt-4 text-lg font-semibold">{info.teamName}</h1>
@@ -111,14 +107,10 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
               Você foi convidado para entrar como <strong className="text-ink">{PAPEL[info.role ?? "player"]}</strong>.
             </p>
 
-            {erro && (
-              <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">
-                {erro}
-              </p>
-            )}
+            {erro && <p className="mt-4 rounded-lg border border-negative/35 bg-negative/10 px-3 py-2 text-sm text-negative">{erro}</p>}
 
             {logado && (
-              <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-xl border border-hairline bg-elevated p-3 text-left">
+              <label className="mt-5 flex cursor-pointer items-start gap-2.5 rounded-2xl border border-white/[0.08] bg-white/[0.03] p-3 text-left">
                 <input
                   type="checkbox"
                   checked={mostrarRotina}
@@ -128,8 +120,8 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
                 <span className="text-[12.5px] leading-snug text-muted">
                   <strong className="text-ink">Mostrar minha rotina de treino ao time</strong>
                   <br />
-                  Experiência, turno preferido, horas por dia e dias de treino do seu perfil, para o coach organizar
-                  a agenda com você. Nunca data de nascimento nem contato. Dá para ocultar quando quiser.
+                  Experiência, turno preferido, horas por dia e dias de treino do seu perfil, para o coach organizar a agenda com você. Nunca data de
+                  nascimento nem contato. Dá para ocultar quando quiser.
                 </span>
               </label>
             )}
@@ -148,7 +140,7 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
                 <p className="mt-5 text-sm text-muted">Entre na sua conta para aceitar o convite.</p>
                 <Link
                   href="/login"
-                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-ink px-4 py-2.5 text-sm font-semibold text-void transition-transform hover:scale-[1.02]"
+                  className="mt-3 flex w-full items-center justify-center gap-2 rounded-xl bg-[#d4af37] px-4 py-2.5 text-sm font-semibold text-black transition hover:bg-[#e2c35a] active:scale-[0.97]"
                 >
                   <LogIn size={16} strokeWidth={2.5} />
                   Fazer login
@@ -158,9 +150,9 @@ export default function ConvitePage({ params }: { params: Promise<{ token: strin
             )}
 
             <p className="mt-4 text-xs text-muted">
-              Ao entrar, o time passa a ver sua frequência de estudo, evolução, leaks e o resultado financeiro total
-              (ganhos menos buy-ins) do período — nunca o detalhamento diário da sua gestão de banca pessoal, nem
-              sessões de staking. Suas mãos só ficam visíveis quando você compartilhar.
+              Ao entrar, o time passa a ver sua frequência de estudo, evolução, leaks e o resultado financeiro total (ganhos menos buy-ins) do período
+              — nunca o detalhamento diário da sua gestão de banca pessoal, nem sessões de staking. Suas mãos só ficam visíveis quando você
+              compartilhar.
             </p>
           </div>
         )}

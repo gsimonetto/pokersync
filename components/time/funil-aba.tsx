@@ -6,7 +6,7 @@ import { ModalNovoEvento } from "@/components/time/tab-calendario";
 import { fetchTeamDashboardCached, traduzErroTime, type MyTeam, type TeamDashboardRow } from "@/lib/services/team-service";
 
 // Funil como ABA do painel (antes era página própria em
-// /time/painel/funil, que agora só redireciona pra cá). No computador o
+// /time/painel/funil, que agora é só um redirecionamento no next.config). No computador o
 // quadro precisa de altura pra respirar (colunas + arrastar), então a aba
 // ocupa quase a tela inteira abaixo do menu, e a barra de rolagem
 // horizontal do quadro fica colada no fim dessa área. No celular não:

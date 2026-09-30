@@ -15,13 +15,13 @@ import {
 // interruptor e os textos dos requisitos. Cores do resto do produto:
 // verde = bate, dourado = no meio, vermelho = longe.
 
-export const VERDE = "#34D399";
-export const OURO = "#d4af37";
+const VERDE = "#34D399";
+const OURO = "#d4af37";
 export const OURO_CLARO = "#e8cb6a";
-export const VERMELHO = "#F87171";
+const VERMELHO = "#F87171";
 export const AMBAR = "#f59e0b";
 
-export function corMatch(v: number): string {
+function corMatch(v: number): string {
   return v >= 70 ? VERDE : v >= 50 ? OURO_CLARO : VERMELHO;
 }
 

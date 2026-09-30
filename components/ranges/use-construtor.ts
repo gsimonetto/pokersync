@@ -45,7 +45,7 @@ export interface Selecao {
   feitas: Feita[];
   projetos: Projeto[];
 }
-export const SELECAO_VAZIA: Selecao = { feitas: [], projetos: [] };
+const SELECAO_VAZIA: Selecao = { feitas: [], projetos: [] };
 
 export interface Rua {
   /** 3 = flop, 4 = turn, 5 = river. */
@@ -107,7 +107,7 @@ export function dePronto(p: RangePronto): RangeAtual {
   };
 }
 
-export const NOME_ACAO_REAL = { abrir: "abre", pagar: "paga um aumento", "3bet": "dá 3-bet" } as const;
+const NOME_ACAO_REAL = { abrir: "abre", pagar: "paga um aumento", "3bet": "dá 3-bet" } as const;
 
 export function deReal(r: RangeReal): RangeAtual {
   return {

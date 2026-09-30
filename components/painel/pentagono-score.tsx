@@ -2,8 +2,7 @@
 
 import Link from "next/link";
 import { ArrowRight, TriangleAlert } from "lucide-react";
-import { COMPONENTES } from "@/components/analysis/EvolutionScoreCard";
-import { nivelDoScore, type PlayerPerformance } from "@/lib/services/performance-service";
+import { COMPONENTES_SCORE as COMPONENTES, nivelDoScore, type PlayerPerformance } from "@/lib/services/performance-service";
 import { Numero } from "./painel-card";
 import { PentagonoCircuito, type EixoCircuito } from "@/components/time/pentagono-circuito";
 import { InfoHover, type Explicacao } from "./info-hover";
@@ -15,14 +14,14 @@ import { num } from "./formato";
 // módulo que sobe o pilar mais fraco).
 //
 // Pilares, pesos e textos são os MESMOS do card de Score da Performance
-// (components/analysis/EvolutionScoreCard.tsx, exportados de lá), e as
+// (COMPONENTES_SCORE em lib/services/performance-service.ts), e as
 // faixas de cor também: abaixo de 40 fraco, 40-69 em evolução, 70+ bom.
 //
 // Desenho: o mesmo pentágono 3D ("placa de circuito") da ficha do
 // jogador (components/time/pentagono-circuito.tsx) -- um padrão só de
 // pentágono no produto.
 
-export function corDoScore(v: number): string {
+function corDoScore(v: number): string {
   return v < 40 ? "#e0555a" : v < 70 ? "#f59e0b" : "#22c55e";
 }
 

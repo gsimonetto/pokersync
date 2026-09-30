@@ -161,27 +161,6 @@ export async function resetBancaRadarImports(): Promise<void> {
   if (eExcl) throw eExcl;
 }
 
-// Fechamento de sessao / diario pos-sessao: edita uma sessao ja salva com
-// os campos de reflexao. Nao mexe em resultado/buy-in — so o diario.
-export async function updateSessionDiary(
-  id: string,
-  diary: { mood?: string; tilt?: number; diaryNote?: string }
-): Promise<Session> {
-  const supabase = createClient();
-  const { data, error } = await supabase
-    .from("bankroll_sessions")
-    .update({
-      mood: diary.mood || null,
-      tilt: diary.tilt != null ? Number(diary.tilt) : null,
-      diary_note: diary.diaryNote || null,
-    })
-    .eq("id", id)
-    .select()
-    .single();
-  if (error) throw error;
-  return rowToSession(data);
-}
-
 export async function fetchSettings() {
   const supabase = createClient();
   const { data, error } = await supabase
@@ -206,16 +185,6 @@ export async function saveStopLoss(buyins: number | null) {
   const { error } = await supabase
     .from("bankroll_settings")
     .upsert({ user_id: userId, stop_loss_buyins: buyins, updated_at: new Date().toISOString() }, { onConflict: "user_id" });
-  if (error) throw error;
-}
-
-export async function saveSettings({ bankroll, profile }: { bankroll: number; profile: string }) {
-  const supabase = createClient();
-  const userId = await getUserId();
-  const { error } = await supabase.from("bankroll_settings").upsert(
-    { user_id: userId, bankroll: Number(bankroll) || 0, profile, updated_at: new Date().toISOString() },
-    { onConflict: "user_id" }
-  );
   if (error) throw error;
 }
 

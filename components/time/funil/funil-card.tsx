@@ -80,7 +80,7 @@ export function FunilCard({
         }
       }}
       aria-label={`${item.nome}: abrir cartão`}
-      className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-surface py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-colors hover:border-white/20 focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
+      className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-white/[0.04] py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-colors hover:border-white/20 focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
         pr.pronto ? "border-positive/35" : "border-hairline"
       }`}
     >
@@ -209,7 +209,7 @@ export function FunilCard({
                 if (faseAnterior) onMover(faseAnterior);
               }}
               aria-label={faseAnterior ? `Mover para ${faseAnterior.name}` : undefined}
-              className="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-ink disabled:pointer-events-none disabled:opacity-0"
+              className="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors hover:bg-white/[0.05] hover:text-ink disabled:pointer-events-none disabled:opacity-0"
             >
               <ChevronLeft size={13} />
             </button>
@@ -221,7 +221,7 @@ export function FunilCard({
                 if (faseSeguinte) onMover(faseSeguinte);
               }}
               aria-label={faseSeguinte ? `Mover para ${faseSeguinte.name}` : undefined}
-              className="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors hover:bg-elevated hover:text-ink disabled:pointer-events-none disabled:opacity-0"
+              className="grid h-6 w-6 place-items-center rounded-md text-muted transition-colors hover:bg-white/[0.05] hover:text-ink disabled:pointer-events-none disabled:opacity-0"
             >
               <ChevronRight size={13} />
             </button>

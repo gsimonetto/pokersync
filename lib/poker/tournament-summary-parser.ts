@@ -13,7 +13,7 @@
 // aqui vale pra qualquer sala, PokerStars incluída. Campos que o regex
 // não reconhece ficam `null` — nunca inventamos número.
 
-export interface ParsedTournamentSummary {
+interface ParsedTournamentSummary {
   tournamentIdPs: string | null;
   totalEntrants: number | null;
   prizePool: number | null;

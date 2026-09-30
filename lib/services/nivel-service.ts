@@ -12,7 +12,7 @@ import { createClient } from "@/lib/supabase/client";
 // Sem a RPC no banco (migração ainda não aplicada) tudo volta vazio e a
 // foto aparece com o anel neutro, sem quebrar nada.
 
-export interface NivelJogador {
+interface NivelJogador {
   nivel: number;
   xpAtual: number;
 }
@@ -64,16 +64,6 @@ function pedir(id: string) {
   if (cache.has(id) || pendentes.has(id)) return;
   pendentes.add(id);
   if (!agendado) agendado = setTimeout(buscarPendentes, 20);
-}
-
-/** Guarda um nível que a tela já recebeu por outro caminho (ex.: ranking). */
-export function lembrarNivel(id: string, dados: NivelJogador) {
-  cache.set(id, dados);
-}
-
-/** Esquece um jogador (ex.: o próprio usuário depois de ganhar XP). */
-export function esquecerNivel(id: string) {
-  cache.delete(id);
 }
 
 export function useNivelDoJogador(id: string | null | undefined): NivelJogador | null {

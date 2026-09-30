@@ -21,11 +21,11 @@ import { useId, type ReactNode } from "react";
 // Quadro de desenho: 100 x 143 (proporção de carta de pôquer, 2,5 x 3,5").
 // ============================================================
 
-export type EstiloCarta = "classico" | "jumbo" | "solido" | "noir" | "faixa" | "diagonal" | "vintage" | "cristal";
-export type NaipeKey = "s" | "h" | "d" | "c";
+type EstiloCarta = "classico" | "jumbo" | "solido" | "noir" | "faixa" | "diagonal" | "vintage" | "cristal";
+type NaipeKey = "s" | "h" | "d" | "c";
 
 // Formas dos naipes num quadro 100 x 100.
-export const NAIPE_PATH: Record<NaipeKey, string> = {
+const NAIPE_PATH: Record<NaipeKey, string> = {
   s: "M50 3 C62 22 94 38 94 62 C94 78 80 86 67 83 C60 81 56 77 54 73 C55 84 59 91 67 97 H33 C41 91 45 84 46 73 C44 77 40 81 33 83 C20 86 6 78 6 62 C6 38 38 22 50 3 Z",
   h: "M50 94 C38 82 5 60 5 33 C5 17 17 6 31 6 C40 6 47 11 50 19 C53 11 60 6 69 6 C83 6 95 17 95 33 C95 60 62 82 50 94 Z",
   d: "M50 2 C59 20 73 37 91 50 C73 63 59 80 50 98 C41 80 27 63 9 50 C27 37 41 20 50 2 Z",

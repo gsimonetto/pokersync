@@ -13,18 +13,13 @@ export function fmtMoney(v: number) {
   return money.format(Number(v) || 0);
 }
 
-export function fmtSignedMoney(v: number) {
-  const n = Number(v) || 0;
-  return (n > 0 ? "+" : "") + money.format(n);
-}
-
 // --- Multi-moeda -------------------------------------------------------
 // A maioria dos jogadores so' usa uma moeda (BRL) — esses formatters so'
 // entram em cena quando a tela detecta mais de uma moeda nos dados
 // (ver `currencyFilter` em app/banca/page.tsx), pra nunca somar R$ com
 // $ como se fossem a mesma unidade.
 export const CURRENCIES = ["BRL", "USD", "EUR"] as const;
-export type Currency = (typeof CURRENCIES)[number];
+type Currency = (typeof CURRENCIES)[number];
 
 const CURRENCY_FORMATTERS: Record<Currency, Intl.NumberFormat> = {
   BRL: new Intl.NumberFormat("pt-BR", { style: "currency", currency: "BRL" }),
@@ -50,7 +45,7 @@ export function fmtPct(v: number, digits = 1) {
 
 export const WEEKDAYS = ["Domingo", "Segunda", "Terca", "Quarta", "Quinta", "Sexta", "Sabado"];
 
-export function weekdayIndex(dateStr: string) {
+function weekdayIndex(dateStr: string) {
   return new Date((dateStr || "") + "T12:00:00").getDay();
 }
 
@@ -80,15 +75,6 @@ export function suggestFormat(sessions: Session[], lookback = 10) {
   const count: Record<string, number> = {};
   for (const s of recent) count[s.format] = (count[s.format] || 0) + 1;
   return Object.entries(count).sort((a, b) => b[1] - a[1])[0][0];
-}
-
-export function suggestBuyIn(sessions: Session[], format: string) {
-  const last = [...(sessions || [])].reverse().find((s) => s.format === format);
-  return last ? last.buyIn : "";
-}
-
-export function knownVenues(sessions: Session[]) {
-  return [...new Set((sessions || []).map((s) => s.venue).filter(Boolean))] as string[];
 }
 
 export function todayISO() {

@@ -1,10 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
-  // Construtor de Ranges refeito numa tela só (/ranges, com abas): links
-  // antigos (favoritos, notificações) caem no lugar certo em vez de 404.
+  // Endereços antigos (favoritos, notificações) caem no lugar certo em vez
+  // de 404: o Construtor de Ranges virou uma tela só (/ranges, com abas),
+  // o Funil virou aba do painel do time e a Análise foi consolidada na
+  // Performance.
   async redirects() {
     return [
+      { source: "/time/painel/funil", destination: "/time/painel?tab=funil", permanent: false },
+      { source: "/performance/analise", destination: "/performance", permanent: false },
       { source: "/ranges/biblioteca", destination: "/ranges?aba=meus", permanent: false },
       { source: "/ranges/time", destination: "/ranges?aba=meus", permanent: false },
       { source: "/ranges/equidade", destination: "/ranges", permanent: false },

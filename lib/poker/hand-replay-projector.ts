@@ -651,32 +651,3 @@ function buildHistoryUpToStep(events: StepEvent[], throughStep: number, currentS
   }
   return result;
 }
-
-// Compat: mantido pra outros consumidores que ainda navegam por rua
-// (nenhum hoje, mas preservado pra transicao gradual — se ninguem usar
-// depois de 1-2 releases, remover). O novo caminho e' projectHandAtStep.
-export function projectHandAtStreet(hand: ParsedHand, streetIndex: number): ReplayState {
-  const seatLayout = computeRealSeatLayout(hand.seats, hand.buttonSeat ?? 0, hand.maxSeats ?? hand.seats.length);
-  const bbUnit = hand.bigBlind && hand.bigBlind > 0 ? hand.bigBlind : 1;
-  const events = buildEventList(hand, seatLayout, bbUnit);
-  const targetStreetName = (["preflop", "flop", "turn", "river"] as StreetName[])[streetIndex] ?? "preflop";
-
-  let stepAtEndOfStreet = 0;
-  let sawTarget = targetStreetName === "preflop";
-  let currentStreet: StreetName = "preflop";
-
-  for (let i = 0; i < events.length; i++) {
-    const e = events[i];
-    if (e.kind === "deal") {
-      if (currentStreet === targetStreetName && sawTarget) break;
-      currentStreet = e.street;
-      if (currentStreet === targetStreetName) sawTarget = true;
-    }
-    stepAtEndOfStreet = i + 1;
-    if (sawTarget && (i + 1 >= events.length || events[i + 1]?.kind === "deal") && currentStreet === targetStreetName) {
-      break;
-    }
-  }
-
-  return projectHandAtStep(hand, stepAtEndOfStreet);
-}

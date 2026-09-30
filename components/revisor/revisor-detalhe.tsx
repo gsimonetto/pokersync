@@ -562,7 +562,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   const val = e.target.value;
                   setStreetEvals((prev) => prev.map((x, i) => (i === idx ? { ...x, reason_code: val } : x)));
                 }}
-                className="mt-2 w-full rounded-lg border border-hairline bg-surface px-2 py-1.5 text-[12px] text-ink outline-none disabled:opacity-80"
+                className="mt-2 w-full rounded-xl border border-white/10 bg-white/[0.04] px-2 py-1.5 text-[12px] text-ink outline-none disabled:opacity-80"
               >
                 <option value="">O que deu errado? (opcional)</option>
                 {reasons.map((r) => (
@@ -603,7 +603,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                   onChange={(e) => updateAnswer(idx, e.target.value)}
                   rows={2}
                   placeholder={question.question}
-                  className="mt-1 w-full resize-y rounded-lg border border-hairline bg-surface p-2 text-[12px] text-ink outline-none focus:border-ink/40"
+                  className="mt-1 w-full resize-y rounded-xl border border-white/10 bg-white/[0.04] p-2 text-[12px] text-ink outline-none focus:border-ink/40"
                 />
               </label>
             )}
@@ -926,7 +926,7 @@ export function RevisorDetalhe({ reviewId, onBack }: { reviewId: string; onBack:
                 onChange={(e) => setNewTagLabel(e.target.value)}
                 onKeyDown={(e) => e.key === "Enter" && handleCreateTag()}
                 placeholder="Criar marcador"
-                className="min-w-0 flex-1 rounded-md border border-hairline bg-surface px-2 py-1 text-[11px] text-ink outline-none focus:border-ink/40"
+                className="min-w-0 flex-1 rounded-md border border-white/10 bg-black/30 px-2 py-1 text-[11px] text-ink outline-none focus:border-ink/40"
               />
               <button onClick={handleCreateTag} className="flex shrink-0 items-center gap-1 rounded-md bg-ink px-2 py-1 text-[11px] font-semibold text-void">
                 <Plus size={11} /> Criar

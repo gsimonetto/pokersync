@@ -144,7 +144,7 @@ const COMPONENTES_SCORE: { chave: keyof PlayerPerformance; rotulo: string }[] = 
   { chave: "score_consistencia", rotulo: "Consistência (15%)" },
 ];
 
-export function explicacaoScore(perf: PlayerPerformance | null): Explicacao {
+function explicacaoScore(perf: PlayerPerformance | null): Explicacao {
   return {
     titulo: "Score geral",
     oQueE: "Nota de 0 a 100 que resume sua evolução como jogador. Abaixo de 40 pede atenção; de 70 pra cima está bom.",

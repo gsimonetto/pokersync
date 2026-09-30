@@ -69,7 +69,7 @@ export function AbaInteracoes({
   }, [cardId, playerId]);
 
   return (
-    <div className="space-y-5 rounded-xl border border-hairline bg-elevated/40 p-4">
+    <div className="space-y-5 rounded-xl border border-hairline bg-white/[0.03] p-4">
       <div>
         <div className="mb-2 flex items-center justify-between gap-2">
           <label className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-[0.08em] text-muted">
@@ -97,7 +97,7 @@ export function AbaInteracoes({
         ) : (
           <ul className="mb-3 max-h-[52vh] space-y-2 overflow-y-auto pr-1">
             {comentarios.map((c) => (
-              <li key={c.id} className="rounded-lg border border-hairline bg-elevated px-3 py-2.5">
+              <li key={c.id} className="rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5">
                 <div className="flex items-center justify-between gap-2">
                   <span className="text-[11px] font-semibold text-ink">{c.authorName}</span>
                   <span className="text-[10px] text-muted">
@@ -129,7 +129,7 @@ export function AbaInteracoes({
         ) : (
           <ul className="space-y-1.5">
             {conquistas.map((a) => (
-              <li key={a.missionId} className="flex items-start gap-2 rounded-lg border border-hairline bg-elevated px-2.5 py-2">
+              <li key={a.missionId} className="flex items-start gap-2 rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-2">
                 <Trophy size={14} className="mt-0.5 shrink-0 text-evolution" />
                 <div className="min-w-0 flex-1">
                   <p className="truncate text-[12.5px] font-medium text-ink">{a.title}</p>
@@ -176,7 +176,7 @@ function ModalHistoricoFases({ historico, onFechar }: { historico: CardPhaseHist
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-void/70 p-4" onClick={onFechar}>
       <div
-        className="max-h-[80vh] w-full max-w-md overflow-y-auto rounded-xl border border-hairline bg-surface p-5"
+        className="max-h-[80vh] w-full max-w-md overflow-y-auto painel-vidro rounded-3xl border border-white/10 p-5 shadow-2xl shadow-black/60"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="mb-3 flex items-center justify-between gap-2">
@@ -244,7 +244,7 @@ function ComposerInteracao({
   return (
     <div className="space-y-1.5">
       {arquivo && (
-        <div className="flex items-center gap-2 rounded-lg border border-hairline bg-elevated px-2.5 py-1.5 text-[12px] text-ink">
+        <div className="flex items-center gap-2 rounded-lg border border-hairline bg-white/[0.04] px-2.5 py-1.5 text-[12px] text-ink">
           <Paperclip size={12} className="shrink-0 text-muted" />
           <span className="min-w-0 flex-1 truncate">{arquivo.name}</span>
           <button type="button" onClick={() => setArquivo(null)} className="shrink-0 text-muted hover:text-negative" aria-label="Remover anexo">
@@ -264,7 +264,7 @@ function ComposerInteracao({
         onKeyDown={(e) => (e.key === "Enter" && (e.metaKey || e.ctrlKey)) && !enviando && (e.preventDefault(), enviar())}
         placeholder="Registrar uma interação… (o que foi conversado, combinado, próximos passos)"
         rows={4}
-        className="w-full resize-y rounded-lg border border-hairline bg-elevated px-3 py-2.5 text-[13.5px] leading-relaxed text-ink outline-none placeholder:text-muted/50 focus:border-training/50"
+        className="w-full resize-y rounded-lg border border-hairline bg-white/[0.04] px-3 py-2.5 text-[13.5px] leading-relaxed text-ink outline-none placeholder:text-muted/50 focus:border-training/50"
       />
       <div className="flex items-center justify-between gap-2">
         <div className="flex gap-1.5">

@@ -76,7 +76,7 @@ export function AcoesJogadorModal({
   return (
     <div className="fixed inset-0 z-[60] grid place-items-center bg-void/70 p-4" onClick={onFechar}>
       <div
-        className="w-full max-w-sm rounded-xl border border-hairline bg-surface p-5"
+        className="w-full max-w-sm painel-vidro rounded-2xl border border-white/10 p-5"
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center gap-3">
@@ -100,7 +100,7 @@ export function AcoesJogadorModal({
                 <select
                   value={labelId}
                   onChange={(e) => setLabelId(e.target.value)}
-                  className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
+                  className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-sm text-ink outline-none"
                 >
                   <option value="">Sem etiqueta</option>
                   {labels.map((l) => (
@@ -117,7 +117,7 @@ export function AcoesJogadorModal({
                   <select
                     value={coachId}
                     onChange={(e) => setCoachId(e.target.value)}
-                    className="w-full rounded-lg border border-hairline bg-elevated px-3 py-2 text-sm text-ink outline-none"
+                    className="w-full rounded-lg border border-hairline bg-white/[0.04] px-3 py-2 text-sm text-ink outline-none"
                   >
                     <option value="">Sem coach</option>
                     {coaches.map((c) => (

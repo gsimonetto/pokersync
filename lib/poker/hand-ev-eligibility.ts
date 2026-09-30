@@ -9,7 +9,7 @@ import type { ParsedHand } from "./hand-parser";
 // participante não mostrou, não é elegível — não tenta estimar com range
 // assumido (mesmo princípio do resto do produto: sem dado real, sem
 // número).
-export interface HandEvConfrontation {
+interface HandEvConfrontation {
   // Cartas de CADA jogador envolvido no all-in, na MESMA ordem de
   // stacksBefore -- heroIdx aponta pra posição do herói dentro desses
   // arrays. Com 2 elementos, o confronto é heads-up (endpoint singular);

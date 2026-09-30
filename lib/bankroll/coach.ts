@@ -11,7 +11,7 @@ const DD_WARN = 10;
 const DD_ACTION = 20;
 const LOW_VOLUME = 20;
 
-export interface CoachTip {
+interface CoachTip {
   id: string;
   level: "info" | "good" | "warn" | "bad";
   title: string;
@@ -21,7 +21,7 @@ export interface CoachTip {
   format?: string;
 }
 
-export function drawdownBuyIns(sessions: Session[], avgBuyIn: number) {
+function drawdownBuyIns(sessions: Session[], avgBuyIn: number) {
   const series = evolutionSeries(sessions);
   let peak = 0,
     dd = 0;

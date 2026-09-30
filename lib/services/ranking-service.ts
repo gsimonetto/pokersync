@@ -43,11 +43,6 @@ export interface RankingTemporada {
 
 let rpcNovaDisponivel = true;
 
-/** false depois que o banco respondeu que a função nova não existe. */
-export function rankingCompletoDisponivel() {
-  return rpcNovaDisponivel;
-}
-
 function funcaoAusente(err: { code?: string; message?: string } | null) {
   if (!err) return false;
   return err.code === "PGRST202" || err.code === "42883" || /get_season_ranking/.test(err.message ?? "");

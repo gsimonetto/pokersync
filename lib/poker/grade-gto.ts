@@ -4,9 +4,9 @@
 
 export const RANKS = ["A", "K", "Q", "J", "T", "9", "8", "7", "6", "5", "4", "3", "2"];
 
-export type RaiseType = "raise" | "threebet" | "allin";
+type RaiseType = "raise" | "threebet" | "allin";
 
-export interface RaiseMixEntry {
+interface RaiseMixEntry {
   type: RaiseType;
   weight: number;
 }

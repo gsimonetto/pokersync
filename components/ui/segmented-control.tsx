@@ -3,7 +3,7 @@
 // Controle de 2-4 opcoes MUTUAMENTE EXCLUSIVAS (ex: Missões/Ranking no
 // Hub, Fila/Salvos/Aderência no Revisor, 7d/30d/90d no seletor de
 // periodo, Board/Arquivados no Funil). Padrao unico pro produto inteiro
-// -- pill container (border-hairline bg-elevated p-1) com a opcao ativa
+// -- pill container (border-hairline bg-white/[0.04] p-1) com a opcao ativa
 // em bg-ink text-void, reusado em vez de cada tela montar a propria
 // versao com pequenas diferencas de raio/padding/cor.
 export function SegmentedControl<T extends string | number>({
@@ -16,7 +16,7 @@ export function SegmentedControl<T extends string | number>({
   options: { value: T; label: React.ReactNode }[];
 }) {
   return (
-    <div className="flex gap-1 rounded-lg border border-hairline bg-elevated p-1">
+    <div className="flex gap-1 rounded-lg border border-hairline bg-white/[0.04] p-1">
       {options.map((op) => (
         <button
           key={String(op.value)}

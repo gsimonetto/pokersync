@@ -35,14 +35,14 @@ import { levelColor, levelMaterial, levelSubTier } from "@/lib/services/xp-servi
 // vê o emblema parado.
 // ============================================================
 
-export type Faixa = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
+type Faixa = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7 | 8 | 9;
 
 export function faixaDoNivel(nivel: number): Faixa {
   return Math.min(9, Math.max(0, Math.ceil(nivel / 10) - 1)) as Faixa;
 }
 
 /** IV (acabou de entrar) = 1 marca ... I (prestes a subir) = 4 marcas. */
-export function marcasDaDivisao(nivel: number): number {
+function marcasDaDivisao(nivel: number): number {
   return { IV: 1, III: 2, II: 3, I: 4 }[levelSubTier(nivel)] ?? 1;
 }
 

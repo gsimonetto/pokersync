@@ -21,6 +21,12 @@ jobs:
       - name: Lint
         run: npm run lint
 
+      - name: Tipos
+        run: npm run typecheck
+
+      - name: Testes
+        run: npm test
+
       - name: Build
         env:
           # Valores ficticios -- o build (geracao das paginas) nao

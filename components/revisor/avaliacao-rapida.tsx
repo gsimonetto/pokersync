@@ -26,7 +26,7 @@ import { GRUPO_MESA } from "@/components/drill/mesa-ui";
 // de ~1280px e o balão cobria os assentos de cima em celular baixo
 // (iPhone SE) -- por isso a faixa do celular fica embaixo, não em cima.
 
-export const RUAS_AVALIAVEIS = ["preflop", "flop", "turn", "river"] as const;
+const RUAS_AVALIAVEIS = ["preflop", "flop", "turn", "river"] as const;
 
 const NOTAS = [
   { code: "acertei", label: "Acertei", cor: "#10b981", Icone: Check },
@@ -35,7 +35,7 @@ const NOTAS = [
 ] as const;
 
 /** Salva a nota da rua; devolve false se não gravou. */
-export type AvaliarRua = (rua: string, nota: string) => Promise<boolean>;
+type AvaliarRua = (rua: string, nota: string) => Promise<boolean>;
 
 // "Salvo ✓" por um instante depois de gravar -- o pedido era "salvando a
 // cada rua", então a tela confirma que gravou (não existe botão de salvar).

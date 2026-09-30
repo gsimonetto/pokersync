@@ -142,7 +142,7 @@ export function SeletorBoard({
   );
 }
 
-export function SeletorCartas({
+function SeletorCartas({
   aberto,
   quantas,
   titulo,

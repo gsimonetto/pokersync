@@ -159,7 +159,7 @@ export function Missoes({ ativas, catalogo }: { ativas: Bruto[]; catalogo: Bruto
           "feitas/total" -- o jogador vê onde ainda tem XP na mesa sem
           precisar abrir aba por aba. */}
       <div className="hub-scroll-x -mx-4 overflow-x-auto px-4 sm:mx-0 sm:px-0">
-        <div role="tablist" aria-label="Período das missões" className="flex w-max min-w-full gap-1 rounded-xl border border-hairline bg-elevated p-1">
+        <div role="tablist" aria-label="Período das missões" className="flex w-max min-w-full gap-1 rounded-xl border border-hairline bg-white/[0.04] p-1">
           {abas.map((a) => {
             const Icone = a.icone;
             const itensAba = porTipo.get(a.tipo) ?? [];

@@ -27,7 +27,7 @@ export const ADDON_PRICES: Record<AddonKey, number> = {
   radar: 10000,
 };
 
-export interface ModuleLimit {
+interface ModuleLimit {
   amount: number;
   period: "day" | "month";
   // Free no Modo Treino: 10 sessoes sorteadas por dia, o jogador nao
@@ -35,14 +35,14 @@ export interface ModuleLimit {
   random?: boolean;
 }
 
-export interface ModuleAccess {
+interface ModuleAccess {
   unlocked: boolean;
   // So' existe quando o modulo e' liberado com restricao (planos pagos
   // nao tem `limit`, ficam ilimitados).
   limit?: ModuleLimit;
 }
 
-export interface PlanDef {
+interface PlanDef {
   id: PlanId;
   name: string;
   // null = gratuito. Nos demais, valor em centavos pra nao arredondar
@@ -154,14 +154,14 @@ export function isModuleUnlocked(plan: PlanId, module: ModuleKey): boolean {
   return PLANS[plan].modules[module].unlocked;
 }
 
-export function getModuleLimit(plan: PlanId, module: ModuleKey): ModuleLimit | null {
+function getModuleLimit(plan: PlanId, module: ModuleKey): ModuleLimit | null {
   return PLANS[plan].modules[module].limit ?? null;
 }
 
 // "Incluso no plano" (Team/Team Pro trazem Radar de fabrica). NAO cobre
 // compra avulsa -- pra checagem de acesso de verdade, usar
 // isAddonUnlocked.
-export function hasAddon(plan: PlanId, addon: AddonKey): boolean {
+function hasAddon(plan: PlanId, addon: AddonKey): boolean {
   return PLANS[plan].addons[addon];
 }
 
@@ -223,7 +223,7 @@ export function cheapestPlanUnlockingAddon(addon: AddonKey): PlanDef | null {
 // bloqueados -- no Free eles sao liberados com limite (sessoes/mes), o
 // que e' uma restricao de uso dentro do modulo, nao uma rota inteira
 // vetada, entao ficam de fora do gating de middleware por enquanto.
-export const MODULE_ROUTES: { prefix: string; module: ModuleKey; exclude?: string[] }[] = [
+const MODULE_ROUTES: { prefix: string; module: ModuleKey; exclude?: string[] }[] = [
   { prefix: "/revisor", module: "revisor", exclude: ["/revisor/admin"] },
   { prefix: "/hub", module: "hub" },
   { prefix: "/performance", module: "performance" },
@@ -247,7 +247,7 @@ export function resolveModuleForRoute(pathname: string): ModuleKey | null {
 }
 
 // Mesma ideia que MODULE_ROUTES, pros addons (hoje so' o Radar).
-export const ADDON_ROUTES: { prefix: string; addon: AddonKey }[] = [{ prefix: "/radar", addon: "radar" }];
+const ADDON_ROUTES: { prefix: string; addon: AddonKey }[] = [{ prefix: "/radar", addon: "radar" }];
 
 export function resolveAddonForRoute(pathname: string): AddonKey | null {
   for (const route of ADDON_ROUTES) {
