@@ -13,9 +13,9 @@ import { Missoes } from "@/components/hub/missoes";
 import { Ranking } from "@/components/hub/ranking/ranking";
 import { EmblemaEstilos } from "@/components/hub/patentes/emblema";
 import { CartaPatente } from "@/components/hub/patentes/carta";
-import { SubiuDeNivel, nivelVistoAntes } from "@/components/hub/patentes/subiu";
+import { SubiuDeNivel } from "@/components/hub/patentes/subiu";
 import { fetchProfile, type Profile } from "@/lib/services/profile-service";
-import { fetchActiveMissions, fetchActiveSeason, fetchMissionCatalog, fetchProgress, type Progress, type Season } from "@/lib/services/xp-service";
+import { fetchActiveMissions, fetchActiveSeason, fetchMissionCatalog, fetchProgress, marcarNivelComemorado, type Progress, type Season } from "@/lib/services/xp-service";
 
 type Vista = "missoes" | "ranking";
 
@@ -55,14 +55,17 @@ export default function HubPage() {
   const [carta, setCarta] = useState(false);
   const [subiu, setSubiu] = useState<{ de: number; para: number } | null>(null);
 
-  // Subiu desde a última visita? Compara com o nível que o Hub viu da
-  // última vez (e já grava o atual) -- a comemoração aparece uma vez só.
+  // Subiu desde a última comemoração? O nível já comemorado fica na conta
+  // (não no navegador), então a animação aparece uma vez só, em qualquer
+  // aparelho. Já marca ao abrir: recarregar a página não repete.
   const conferiuSubida = useRef(false);
   useEffect(() => {
     if (!progress || conferiuSubida.current) return;
     conferiuSubida.current = true;
-    const antes = nivelVistoAntes(progress.level);
-    if (antes != null && progress.level > antes) setSubiu({ de: antes, para: progress.level });
+    const visto = progress.nivel_comemorado;
+    if (visto === progress.level) return;
+    if (visto != null && progress.level > visto) setSubiu({ de: visto, para: progress.level });
+    marcarNivelComemorado(progress.level).catch(() => {});
   }, [progress]);
 
   useEffect(() => setVista(vistaDaUrl()), []);

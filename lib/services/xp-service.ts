@@ -67,13 +67,15 @@ export interface Progress {
   streak_best: number;
   combo_gto: number;
   prestige_count: number;
+  /** Último nível cuja comemoração a pessoa já viu (null = conta nova). */
+  nivel_comemorado: number | null;
 }
 
 export async function fetchProgress(): Promise<Progress> {
   const supabase = createClient();
   const { data, error } = await supabase
     .from("user_progress")
-    .select("level, xp_current, xp_total, streak_days, streak_best, combo_gto, prestige_count")
+    .select("level, xp_current, xp_total, streak_days, streak_best, combo_gto, prestige_count, nivel_comemorado")
     .maybeSingle();
   if (error) throw error;
   return (
@@ -85,8 +87,16 @@ export async function fetchProgress(): Promise<Progress> {
       streak_best: 0,
       combo_gto: 0,
       prestige_count: 0,
+      nivel_comemorado: null,
     }
   );
+}
+
+/** Marca a subida de nível como já comemorada -- na conta, vale em qualquer aparelho. */
+export async function marcarNivelComemorado(nivel: number): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.rpc("marcar_nivel_comemorado", { p_nivel: nivel });
+  if (error) throw error;
 }
 
 // Últimos 7 dias (mais antigo -> hoje), cada um true se o jogador
