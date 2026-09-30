@@ -5,7 +5,7 @@ import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import { ArrowDown, ArrowUp, Crosshair, Globe, LocateFixed, RefreshCw, Shield, Sparkles, TrendingUp, Trophy, UsersRound, X, type LucideIcon } from "lucide-react";
 import { EASE, Esqueleto, PainelCard } from "@/components/painel/painel-card";
-import { checkSeasonNotifications, settleExpiredSeasons, type Season } from "@/lib/services/xp-service";
+import { checkSeasonNotifications, fetchProximaTemporada, settleExpiredSeasons, type Season } from "@/lib/services/xp-service";
 import { fetchRankingTemporada, type EscopoRanking, type JogadorRanking, type RankingTemporada } from "@/lib/services/ranking-service";
 import { corrida as calcCorrida, lembrarPosicao, posicaoVistaAntes } from "@/lib/hub/ranking-regras";
 import { Podio } from "@/components/hub/ranking/podio";
@@ -47,6 +47,13 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
   const [destaque, setDestaque] = useState<string | null>(null);
   const linhas = useRef(new Map<string, HTMLElement>());
   const podioRef = useRef<HTMLDivElement>(null);
+  const [proxima, setProxima] = useState<{ numero: number; inicio: string; premio: string | null } | null>(null);
+
+  // Sem temporada valendo (ex.: antes do lançamento): mostra quando a próxima começa.
+  useEffect(() => {
+    if (season) return;
+    fetchProximaTemporada().then(setProxima).catch(() => {});
+  }, [season]);
 
   // Recorte lembrado entre visitas (conveniência local).
   useEffect(() => setEscopo(escopoSalvo()), []);
@@ -122,10 +129,13 @@ export function Ranking({ season, onIrParaMissoes }: { season: Season | null; on
   }, [eu]);
 
   if (!season) {
+    const data = proxima ? new Date(proxima.inicio + "T12:00:00").toLocaleDateString("pt-BR", { day: "2-digit", month: "long", year: "numeric" }) : null;
     return (
       <PainelCard title="Ranking da temporada" icon={<Trophy size={15} />} rolagem={false}>
-        <Vazio icone={Trophy} titulo="Nenhuma temporada ativa no momento">
-          Assim que uma nova temporada abrir, o ranking e o pódio aparecem aqui.
+        <Vazio icone={Trophy} titulo={proxima ? `Temporada ${proxima.numero} começa em ${data}` : "Nenhuma temporada ativa no momento"}>
+          {proxima
+            ? `Todo mundo começa junto, do zero.${proxima.premio ? ` Prêmio: ${proxima.premio}.` : ""}`
+            : "Assim que uma nova temporada abrir, o ranking e o pódio aparecem aqui."}
         </Vazio>
       </PainelCard>
     );

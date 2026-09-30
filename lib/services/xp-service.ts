@@ -282,6 +282,21 @@ export async function fetchActiveSeason(): Promise<Season | null> {
   };
 }
 
+/** Próxima temporada agendada (ex.: a Temporada 1 do lançamento), ou null. */
+export async function fetchProximaTemporada(): Promise<{ numero: number; inicio: string; premio: string | null } | null> {
+  const supabase = createClient();
+  const hoje = new Date().toISOString().slice(0, 10);
+  const { data, error } = await supabase
+    .from("leaderboard_seasons_numbered")
+    .select("season_number, starts_at, reward_title")
+    .gt("starts_at", hoje)
+    .order("starts_at", { ascending: true })
+    .limit(1)
+    .maybeSingle();
+  if (error) throw error;
+  return data ? { numero: Number(data.season_number), inicio: data.starts_at, premio: data.reward_title || null } : null;
+}
+
 // Apura o campeao de qualquer temporada ja encerrada que ainda nao tem
 // vencedor registrado (idempotente) -- chamada de leve ao abrir a vista
 // de Ranking, sem depender de cron: a temporada "liquida" na proxima vez
