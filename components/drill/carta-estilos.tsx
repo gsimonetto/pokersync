@@ -92,8 +92,8 @@ export function CartaEstilo({
           textAnchor={alinhar}
           fontFamily={fonte}
           fontWeight="700"
-          fontSize={dois ? tamRank * 0.86 : tamRank}
-          letterSpacing={dois ? -tamRank * 0.08 : 0}
+          fontSize={tamRank}
+          letterSpacing={dois ? -tamRank * 0.1 : 0}
           fill={cor}
         >
           {rank}
@@ -136,14 +136,16 @@ export function CartaEstilo({
       // Jumbo: índice gigante (padrão de cartas de torneio) no canto de
       // cima -- que é a parte que continua visível quando as cartas do
       // herói ficam em leque, uma cobrindo a outra. Naipe logo embaixo e
-      // um naipe grande no canto oposto.
+      // um naipe grande no canto oposto. Todo valor (inclusive o "10") tem
+      // a mesma altura: o "10" só fica um pouco mais justo entre os dígitos
+      // -- antes ele usava fonte menor e parecia uma carta "menor".
       corpo = (
         <>
           {papel}
-          <text x="7" y={dois ? 48 : 50} fontFamily={FONTE} fontWeight="800" fontSize={dois ? 42 : 52} letterSpacing={dois ? -4 : 0} fill={tinta}>
+          <text x="7" y="50" fontFamily={FONTE} fontWeight="800" fontSize="52" letterSpacing={dois ? -5 : 0} fill={tinta}>
             {rank}
           </text>
-          <Naipe n={n} x={dois ? 21 : 21} y={dois ? 70 : 72} tam={pequena ? 30 : 26} fill={tinta} />
+          <Naipe n={n} x={21} y={72} tam={pequena ? 30 : 26} fill={tinta} />
           <Naipe n={n} x={68} y={110} tam={pequena ? 46 : 42} fill={tinta} extra={<path d={NAIPE_PATH[n]} fill={`url(#${id("tinta")})`} />} />
           {!pequena && <rect x="5" y="5" width="90" height="133" rx="5" fill="none" stroke={tinta} strokeOpacity=".12" strokeWidth=".8" />}
         </>
