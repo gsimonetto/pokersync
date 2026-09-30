@@ -117,18 +117,20 @@ export async function fetchTodayTrainingCount(): Promise<number> {
 }
 
 // Acerto/erro ACUMULADO do jogador em todo o historico de training_sessions
-// -- nao e' uma contagem de sessao/pagina, e' o placar "X/Y otimas" mostrado
+// -- nao e' uma contagem de sessao/pagina, e' o placar "X% acertos" mostrado
 // no cabecalho do Treino (rfi-jam-drill.tsx). Antes esse numero vivia so'
 // em estado local do componente, entao reiniciava a cada login/reload
 // (bug reportado) -- agora e' sempre lido daqui e so' incrementado
 // localmente enquanto a mesma sessao de navegador dura, pra nao bater no
-// banco a cada mao. "Otima" tem dois nomes no banco: 'PERFECT' (o que
-// register_training grava desde setembro) e 'OTIMA' (treinos antigos).
+// banco a cada mao. Acerto = jogada que o GTO usa (melhor ou correta,
+// ver lib/poker/gto-verdict.ts), com os dois vocabularios do banco:
+// 'PERFECT'/'OK' (register_training, desde setembro) e 'OTIMA'/'ACEITAVEL'
+// (treinos antigos).
 export async function fetchTrainingAccuracy(): Promise<{ hits: number; total: number }> {
   const supabase = createClient();
   const [totalRes, hitsRes] = await Promise.all([
     supabase.from("training_sessions").select("id", { count: "exact", head: true }),
-    supabase.from("training_sessions").select("id", { count: "exact", head: true }).in("verdict", ["PERFECT", "OTIMA"]),
+    supabase.from("training_sessions").select("id", { count: "exact", head: true }).in("verdict", ["PERFECT", "OK", "OTIMA", "ACEITAVEL"]),
   ]);
   if (totalRes.error) throw totalRes.error;
   if (hitsRes.error) throw hitsRes.error;

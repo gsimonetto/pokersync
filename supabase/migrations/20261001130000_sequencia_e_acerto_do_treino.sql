@@ -15,9 +15,12 @@
 --    com os nomes da RPC register_training ('PERFECT'/'OK'/'MEDIOCRE'/
 --    'BLUNDER'), mas a view do Score e as telas do Time ainda contavam
 --    só os nomes antigos ('OTIMA'/'ACEITAVEL'/'ERRO_GRAVE'). Resultado:
---    "Acerto GTO 0%" e Conhecimento 0 no pentágono. Acerto passa a ser
---    ótima nos dois vocabulários -- a mesma conta do placar do Treino
---    ("X de Y mãos ótimas") e da register_training (v_hit).
+--    "Acerto GTO 0%" e Conhecimento 0 no pentágono.
+--    E acerto passa a seguir o modelo do GTO Wizard (pedido explícito):
+--    qualquer jogada que o GTO usa -- melhor jogada ou jogada correta
+--    (OTIMA/ACEITAVEL, hoje PERFECT/OK). Vale pro Score, pro Time, pro
+--    placar "Hoje" do Treino (register_training) e pro app
+--    (lib/poker/gto-verdict.ts).
 --
 -- 3) Consistência (sessões por semana) media só entre a primeira e a
 --    última sessão: quem parou de registrar há meses mantinha a nota.
@@ -97,7 +100,8 @@ select cron.schedule('zerar-sequencias-paradas', '1 3 * * *', 'select public.zer
 select public.zerar_sequencias_paradas();
 
 -- ---------------------------------------------------------------------
--- 2) Funções do Time e linha do tempo com os dois vocabulários
+-- 2) Funções do Time, linha do tempo e placar do dia com os dois
+--    vocabulários e acerto = melhor jogada + jogada correta
 -- ---------------------------------------------------------------------
 -- Troca só o trecho do veredito dentro da definição atual de cada
 -- função (o resto fica idêntico). Rodar de novo não muda nada: depois da
@@ -112,13 +116,14 @@ begin
       from pg_proc p
       join pg_namespace n on n.oid = p.pronamespace
      where n.nspname = 'public'
-       and p.proname in ('team_dashboard', 'team_period_comparison', 'team_player_detail', 'snapshot_team_scores', 'get_player_timeline')
+       and p.proname in ('team_dashboard', 'team_period_comparison', 'team_player_detail', 'snapshot_team_scores', 'get_player_timeline', 'register_training')
   loop
     v := pg_get_functiondef(r.oid);
-    v := replace(v, 'ts.verdict = ''OTIMA''', 'ts.verdict in (''OTIMA'', ''PERFECT'')');
-    v := replace(v, 'ts.verdict=''OTIMA''', 'ts.verdict in (''OTIMA'', ''PERFECT'')');
+    v := replace(v, 'ts.verdict = ''OTIMA''', 'ts.verdict in (''OTIMA'', ''ACEITAVEL'', ''PERFECT'', ''OK'')');
+    v := replace(v, 'ts.verdict=''OTIMA''', 'ts.verdict in (''OTIMA'', ''ACEITAVEL'', ''PERFECT'', ''OK'')');
     v := replace(v, 'ts.verdict = ''ERRO_GRAVE''', 'ts.verdict in (''ERRO_GRAVE'', ''BLUNDER'')');
     v := replace(v, 'ts.verdict IN (''OTIMA'',''ACEITAVEL'')', 'ts.verdict IN (''OTIMA'',''ACEITAVEL'',''PERFECT'',''OK'')');
+    v := replace(v, 'v_hit := case when p_verdict = ''PERFECT'' then 1 else 0 end', 'v_hit := case when p_verdict in (''PERFECT'', ''OK'') then 1 else 0 end');
     execute v;
   end loop;
 end $$;
@@ -202,10 +207,10 @@ create materialized view public.player_performance_snapshot as
            from hand_reviews
           group by hand_reviews.user_id
         ), training_agg as (
-         -- Acerto = mão ótima, nos dois vocabulários (ver topo do arquivo).
+         -- Acerto = jogada que o GTO usa, nos dois vocabulários (ver topo do arquivo).
          select training_sessions.user_id,
             count(*) as num_drills,
-            round(count(*) filter (where training_sessions.verdict = any (array['OTIMA'::text, 'PERFECT'::text]))::numeric / nullif(count(*), 0)::numeric * 100::numeric, 2) as taxa_acerto_treino_pct
+            round(count(*) filter (where training_sessions.verdict = any (array['OTIMA'::text, 'ACEITAVEL'::text, 'PERFECT'::text, 'OK'::text]))::numeric / nullif(count(*), 0)::numeric * 100::numeric, 2) as taxa_acerto_treino_pct
            from training_sessions
           group by training_sessions.user_id
         ), leak_agg as (

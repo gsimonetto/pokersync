@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Loader2, Lock, SlidersHorizontal, X, CheckCircle2, XCircle, Info, Check, RotateCcw } from "lucide-react";
-import { classifyFrequency, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
+import { classificarJogada, ehAcerto, nomeDoVeredito, verdictColor, type Verdict } from "@/lib/poker/gto-verdict";
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
@@ -43,10 +43,10 @@ function SeloAcerto({ total, acertos, pct, curto = false }: { total: number; ace
   return (
     <span
       className={`${INFO_MESA} ${curto ? "max-w-[38vw]" : ""}`}
-      title={total > 0 ? `${acertos} de ${total} mãos ótimas desde o início` : "Suas respostas aparecem aqui"}
+      title={total > 0 ? `${acertos} de ${total} mãos certas desde o início (jogadas que o GTO usa)` : "Suas respostas aparecem aqui"}
     >
       <span className="size-2 shrink-0 rounded-full" style={{ background: accuracyChipColor(total, pct) }} />
-      <span className="truncate">{total > 0 ? (curto ? `${pct}% ótimas` : `Histórico · ${pct}% ótimas`) : curto ? "Sem histórico" : "Sem histórico ainda"}</span>
+      <span className="truncate">{total > 0 ? (curto ? `${pct}% acertos` : `Histórico · ${pct}% acertos`) : curto ? "Sem histórico" : "Sem histórico ainda"}</span>
     </span>
   );
 }
@@ -194,14 +194,6 @@ function nomeDoDistrator(label: string | null): string {
   if (label === "Call") return "call";
   return "essa jogada";
 }
-
-const VERDICT_LABEL: Record<Verdict, string> = {
-  OTIMA: "Jogada Ótima",
-  ACEITAVEL: "Aceitável",
-  ERRO_LEVE: "Erro Leve",
-  ERRO_GRAVE: "Erro Grave",
-  UNKNOWN: "Sem dados do solver",
-};
 
 const STACK_OPTIONS = [10, 15, 20, 25, 30, 40, 50, 60];
 
@@ -1010,10 +1002,11 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     return chosen === "fold" ? 1 - round.freq : round.freq;
   }, [round, chosen]);
 
+  // Frequência + custo em bb, no modelo do GTO Wizard (ver gto-verdict.ts).
   const verdict: Verdict | null = useMemo(() => {
     if (chosenFreq == null) return null;
-    return classifyFrequency(chosenFreq);
-  }, [chosenFreq]);
+    return classificarJogada(chosenFreq, gapBb);
+  }, [chosenFreq, gapBb]);
 
   // O veredito real (acertei/errei) NUNCA é substituído por "MARGINAL" --
   // antes o rótulo virava "MARGINAL" sempre que o gap era pequeno,
@@ -1021,9 +1014,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // podem cair num spot "marginal" e um ter acertado, outro não -- o
   // rótulo não podia dizer isso). "Marginal" agora é uma tag SEPARADA,
   // ao lado do veredito, não no lugar dele.
-  const displayLabel = verdict ? VERDICT_LABEL[verdict] : undefined;
-  const displayColor = verdict ? verdictColor(verdict) : undefined;
-  const isGoodVerdict = verdict === "OTIMA" || verdict === "ACEITAVEL";
+  const displayLabel = verdict ? nomeDoVeredito(verdict, gapBb) : undefined;
+  const displayColor = verdict ? verdictColor(verdict, gapBb) : undefined;
+  const isGoodVerdict = ehAcerto(verdict);
   const chosenFreqPct = chosenFreq != null ? Math.round(chosenFreq * 100) : null;
   // Gap relativo ao que está em jogo -- em vez do valor absoluto (que
   // depende da escala de ICM/premiação daquele torneio especifico, sem
@@ -1086,7 +1079,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
   useEffect(() => {
     if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
-    const isHit = verdict === "OTIMA";
+    const isHit = ehAcerto(verdict);
     setStats((prev) => ({ hits: prev.hits + (isHit ? 1 : 0), total: prev.total + 1 }));
     setBlockProgress((prev) => ({ hands: (prev?.hands ?? 0) + 1, hits: (prev?.hits ?? 0) + (isHit ? 1 : 0) }));
     if (perdaBb != null)
@@ -1098,7 +1091,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
             }
           : prev,
       );
-    const isGood = verdict === "OTIMA" || verdict === "ACEITAVEL";
+    const isGood = isHit;
     onRoundComplete?.();
     registerTraining({
       spotId: spot?.spotId ?? null,
@@ -1506,7 +1499,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                     Hoje: {blockProgress.hands} {blockProgress.hands === 1 ? "mão" : "mãos"}
                   </span>
                 )}
-                {/* Mesmo texto do chip do computador ("67% ótimas", com o
+                {/* Mesmo texto do chip do computador ("67% acertos", com o
                     total no toque/hover) -- "142/214 · 66%" não dizia o
                     que era contado. */}
                 <SeloAcerto total={stats.total} acertos={stats.hits} pct={sessionPct} curto />
@@ -1603,7 +1596,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
           {blockProgress && (
             <span style={{ fontFamily: F, fontSize: 11.5, fontWeight: 600, color: "rgba(255,255,255,0.55)", whiteSpace: "nowrap" }}>
               Hoje: {blockProgress.hands} {blockProgress.hands === 1 ? "mão" : "mãos"}
-              {blockProgress.hands > 0 ? ` · ${Math.round((blockProgress.hits / blockProgress.hands) * 100)}% ótimas` : ""}
+              {blockProgress.hands > 0 ? ` · ${Math.round((blockProgress.hits / blockProgress.hands) * 100)}% acertos` : ""}
               {resumoEv && resumoEv.hoje.maos > 0 && (
                 <span title="Quanto você deixa na mesa a cada 100 mãos, comparado ao GTO (hoje)"> · {bb100Curto(bbPor100(resumoEv.hoje.perdaBb, resumoEv.hoje.maos))} bb/100</span>
               )}

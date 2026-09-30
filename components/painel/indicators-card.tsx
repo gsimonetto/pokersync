@@ -93,7 +93,7 @@ function montar(perf: PlayerPerformance | null, progresso: Progress | null): Ind
         titulo: "Acerto no treino",
         oQueE: "Em quantas decisões dos drills você escolheu a jogada certa (GTO), somando todo o seu histórico.",
         origem: "Modo Treino",
-        comoCalcula: "Mãos ótimas ÷ mãos respondidas (a mesma conta do placar do Treino). Também vale 20% do Score (Conhecimento).",
+        comoCalcula: "Mãos em que você jogou algo que o GTO usa (melhor jogada ou jogada correta) ÷ mãos respondidas — a mesma conta do placar do Treino. Também vale 20% do Score (Conhecimento).",
       },
     });
   }
