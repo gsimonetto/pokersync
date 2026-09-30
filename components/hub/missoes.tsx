@@ -5,7 +5,7 @@ import Link from "next/link";
 import { motion } from "framer-motion";
 import {
   BookOpen, Calendar, Check, CheckCircle2, ChevronRight, Circle, ClipboardList, Clock, Flame, HelpCircle,
-  Notebook, Scale, Shield, Spade, Target, TrendingUp, Trophy, type LucideIcon,
+  Notebook, Scale, Shield, Sparkles, Spade, Target, TrendingUp, Trophy, type LucideIcon,
 } from "lucide-react";
 import { EASE } from "@/components/painel/painel-card";
 import { proximaRenovacao, tempoAte, type TipoMissao } from "@/lib/hub/missoes-regras";
@@ -70,12 +70,15 @@ interface MissaoVista {
   progresso: number;
   meta: number;
   concluida: boolean;
+  /** Estreou nesta temporada (missions.temporada = temporada atual). */
+  nova: boolean;
 }
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 type Bruto = any;
 
-function normalizar(ativas: Bruto[], catalogo: Bruto[]): { itens: MissaoVista[]; previa: boolean } {
+function normalizar(ativas: Bruto[], catalogo: Bruto[], temporada: number): { itens: MissaoVista[]; previa: boolean } {
+  const ehNova = (t: number | null | undefined) => t != null && t === temporada;
   if (ativas.length > 0) {
     return {
       previa: false,
@@ -91,12 +94,14 @@ function normalizar(ativas: Bruto[], catalogo: Bruto[]): { itens: MissaoVista[];
         progresso: Math.min(um.progress ?? 0, um.goal_value ?? 1),
         meta: Math.max(1, um.goal_value ?? 1),
         concluida: um.status === "completed",
+        nova: ehNova(um.missions?.temporada),
       })),
     };
   }
   return {
     previa: true,
-    itens: catalogo.map((m, i) => ({
+    // Tarefas de temporadas que ainda não começaram ficam fora da prévia.
+    itens: catalogo.filter((m) => m.temporada == null || m.temporada <= temporada).map((m, i) => ({
       chave: m.code ?? String(i),
       tipo: m.kind ?? "daily",
       titulo: m.title,
@@ -108,6 +113,7 @@ function normalizar(ativas: Bruto[], catalogo: Bruto[]): { itens: MissaoVista[];
       progresso: 0,
       meta: Math.max(1, m.goal_base ?? 1),
       concluida: false,
+      nova: ehNova(m.temporada),
     })),
   };
 }
@@ -129,8 +135,8 @@ function ordenar(a: MissaoVista, b: MissaoVista) {
   return da - db;
 }
 
-export function Missoes({ ativas, catalogo }: { ativas: Bruto[]; catalogo: Bruto[] }) {
-  const { itens, previa } = useMemo(() => normalizar(ativas, catalogo), [ativas, catalogo]);
+export function Missoes({ ativas, catalogo, temporada }: { ativas: Bruto[]; catalogo: Bruto[]; temporada: number | null }) {
+  const { itens, previa } = useMemo(() => normalizar(ativas, catalogo, temporada ?? 0), [ativas, catalogo, temporada]);
   const porTipo = useMemo(() => {
     const m = new Map<TipoMissao, MissaoVista[]>();
     for (const a of ABAS) m.set(a.tipo, itens.filter((i) => i.tipo === a.tipo).sort(ordenar));
@@ -293,6 +299,15 @@ function CartaoMissao({ m, previa }: { m: MissaoVista; previa: boolean }) {
           </span>
         </span>
         <span className="mt-2 flex items-center gap-2 text-[11px]">
+          {m.nova && (
+            <span
+              className="flex items-center gap-1 rounded-full px-1.5 py-px font-semibold text-[#d4af37]"
+              style={{ background: "rgba(212,175,55,0.12)", boxShadow: "inset 0 0 0 1px rgba(212,175,55,0.35)" }}
+              title="Tarefa nova desta temporada"
+            >
+              <Sparkles size={11} strokeWidth={2} /> Nova
+            </span>
+          )}
           {dif && (
             <span className="flex items-center gap-1" style={{ color: dif.cor }}>
               <span className="h-1.5 w-1.5 rounded-full" style={{ background: dif.cor }} />
