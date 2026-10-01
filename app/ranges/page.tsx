@@ -20,7 +20,7 @@ import { RANGE_NOVO, deReal, dePronto, deSalvo, useConstrutor, type OutroRange, 
 import { createClient } from "@/lib/supabase/client";
 import { cartaTexto, lerCarta } from "@/lib/ranges/cartas";
 import { escreverTextoRange } from "@/lib/ranges/notacao";
-import type { ContraOQue } from "@/lib/ranges/link-da-mao";
+import { FOLGA_STACK, stackParecido, type ContraOQue } from "@/lib/ranges/link-da-mao";
 import type { RangePronto } from "@/lib/ranges/prontos";
 import { abrirRange, listarMeusRanges, listarProntos, rangeReal, type AcaoReal, type RangeSalvo } from "@/lib/services/range-service";
 
@@ -45,6 +45,10 @@ const ABAS = [
   { value: "meus" as Aba, label: "Meus ranges", icon: BookOpen },
 ];
 
+// Menos mãos que isso numa situação não dizem o que a pessoa costuma fazer:
+// o range de verdade não abre sozinho pelo link do Revisor.
+const MINIMO_MAOS_REAL = 30;
+
 const CONTRAS: ContraOQue[] = ["nada", "limp", "aumento", "allin", "varios"];
 
 /** A situação da mão tem "range de verdade"? (abrir com ninguém no pote;
@@ -59,12 +63,18 @@ function acaoReal(acao: string, contra: ContraOQue): AcaoReal | null {
 const POSICAO_PARECIDA: Record<string, string> = { "UTG+1": "UTG", MP: "UTG", "MP+1": "UTG", LJ: "UTG", HJ: "CO" };
 
 /** O range pronto da MESMA situação da mão: mesma posição, mesma ação e
- *  mesmo "contra" (aumento normal, all-in...), contra o mesmo jogador;
- *  só o stack pode ser o mais perto. Sem um assim, nenhum -- nunca o range
- *  de outra situação (pedido explícito: "não pode trazer nada errado"). */
+ *  mesmo "contra" (aumento normal, all-in...), contra o mesmo jogador, e
+ *  stack parecido (até 25% de diferença; o mais perto deles). Sem um
+ *  assim, nenhum -- nunca o range de outra situação (pedido explícito:
+ *  "não pode trazer nada errado"; "precisa ser verificado o stack"). */
 function prontoDoSpot(prontos: RangePronto[], pos: string, stack: number | null, acao: string, contra: ContraOQue, vs: string | null): RangePronto | null {
   const lista = prontos.filter(
-    (p) => p.posicao === pos && p.acao === acao && p.contra === contra && (contra === "nada" || contra === "limp" || p.vsPosicao === vs),
+    (p) =>
+      p.posicao === pos &&
+      p.acao === acao &&
+      p.contra === contra &&
+      (contra === "nada" || contra === "limp" || p.vsPosicao === vs) &&
+      (stack == null || stackParecido(p.stack, stack)),
   );
   if (!lista.length) return null;
   const alvo = stack ?? 40;
@@ -72,17 +82,22 @@ function prontoDoSpot(prontos: RangePronto[], pos: string, stack: number | null,
 }
 
 /** Um range salvo da pessoa pro mesmo spot: mesma posição e ação, contra o
- *  mesmo jogador quando os dois dizem, stack até 10bb de diferença. */
+ *  mesmo jogador e com stack parecido quando os dois dizem. */
 function meuDoSpot(meus: RangeSalvo[], pos: string, stack: number | null, acao: string, vs: string | null): RangeSalvo | null {
   const lista = meus.filter(
     (r) =>
       r.posicao === pos &&
       r.acao === acao &&
       (!vs || !r.vsPosicao || r.vsPosicao === vs) &&
-      (stack == null || r.stack == null || Math.abs(r.stack - stack) <= 10),
+      (stack == null || r.stack == null || stackParecido(r.stack, stack)),
   );
   if (!lista.length) return null;
   return [...lista].sort((a, b) => Math.abs((a.stack ?? 40) - (stack ?? 40)) - Math.abs((b.stack ?? 40) - (stack ?? 40)))[0];
+}
+
+/** "40 a 62bb": a faixa de stack que conta como parecida. */
+function faixaDeStack(stack: number): string {
+  return `${Math.ceil(stack / FOLGA_STACK)} a ${Math.floor(stack * FOLGA_STACK)}bb`;
 }
 
 function lerBoardDaUrl(texto: string | null): string[] {
@@ -168,13 +183,23 @@ export default function RangesPage() {
               setAviso(`Ainda não temos range pronto pro ${pos}: abrimos o do ${parecida}, a posição mais parecida.`);
               return;
             }
-            // Sem range pronto da situação: o seu range de verdade dela.
+            // Sem range pronto da situação: o seu range de verdade dela,
+            // se tiver mãos suficientes pra dizer alguma coisa.
             const real = acaoReal(acao, contra);
             if (real) {
-              const achado = (await rangeReal(real, contra === "aumento" || contra === "allin" ? contra : null)).find((x) => x.posicao === pos);
-              if (achado) {
+              const achado = (await rangeReal(real, contra === "aumento" || contra === "allin" ? contra : null, stack)).find((x) => x.posicao === pos);
+              if (achado && achado.oportunidades >= MINIMO_MAOS_REAL) {
                 carregar(deReal(achado));
-                setAviso(`Ainda não temos range pronto do PokerSync pra essa situação: abrimos o que você costuma fazer nela, montado com as suas mãos.`);
+                setAviso(
+                  `Ainda não temos range pronto do PokerSync pra essa situação: abrimos o que você costuma fazer nela${stack ? ` com stack parecido (${faixaDeStack(stack)})` : ""}, montado com as suas mãos.`,
+                );
+                return;
+              }
+              if (achado) {
+                carregar({ ...RANGE_NOVO });
+                setAviso(
+                  `Ainda não temos range pronto pra essa situação, e você tem só ${achado.oportunidades} ${achado.oportunidades === 1 ? "mão" : "mãos"} nela${stack ? ` com stack parecido (${faixaDeStack(stack)})` : ""}: pouco pra montar o seu range de verdade. Abrimos um range em branco pra você montar o seu.`,
+                );
                 return;
               }
             }
