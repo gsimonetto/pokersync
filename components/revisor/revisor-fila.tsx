@@ -4,7 +4,7 @@ import { useEffect, useMemo, useState } from "react";
 import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Flag, Search, X, Eye, ChevronRight, PenLine, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
-import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
+import { excluirTorneio, listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
@@ -367,6 +367,22 @@ export function RevisorFila({
     }
   }
 
+  async function excluirUmTorneio(s: HandSessionWithCount) {
+    const ok = await confirm({
+      title: "Excluir torneio",
+      message: `Apagar "${s.label}" e as ${s.hand_count} mãos dele do Revisor, com as análises e anotações? Isso não pode ser desfeito. A sessão na Gestão de Banca continua lá.`,
+      confirmLabel: "Excluir torneio",
+    });
+    if (!ok) return;
+    try {
+      await excluirTorneio(s.id);
+      setSessionsList((prev) => prev.filter((x) => x.id !== s.id));
+      setMaosFiltraveis((prev) => (prev ? prev.filter((m) => m.sessao !== s.id) : prev));
+    } catch {
+      setSessionsError("Não consegui excluir o torneio. Tente de novo.");
+    }
+  }
+
   async function handleDelete(id: string) {
     if (!(await confirm({ title: "Excluir mão", message: "Essa ação não pode ser desfeita.", confirmLabel: "Excluir" }))) return;
     try {
@@ -690,6 +706,7 @@ export function RevisorFila({
                         colocacao={s.tournament_id_ps ? colocacoes.get(s.tournament_id_ps) : undefined}
                         bounties={bountiesGanhos.get(s.id) ?? 0}
                         onAbrir={() => onOpenSession(s.id)}
+                        onExcluir={() => excluirUmTorneio(s)}
                         indice={idx}
                         maosNoFiltro={filtroDeMao ? maosPorSessao.get(s.id) : undefined}
                       />

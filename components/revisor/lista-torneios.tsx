@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, ChevronRight, Clock, Coins, Flag, Medal, PlayCircle, Trophy } from "lucide-react";
+import { CheckCircle2, ChevronRight, Clock, Coins, Flag, Medal, PlayCircle, Trash2, Trophy } from "lucide-react";
 import { fmtMoneyIn, fmtSignedMoneyIn } from "@/lib/bankroll/format";
 import { isSpinAndGo, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 
@@ -139,6 +139,7 @@ export function CardTorneio({
   colocacao,
   bounties,
   onAbrir,
+  onExcluir,
   indice = 0,
   maosNoFiltro,
 }: {
@@ -148,6 +149,8 @@ export function CardTorneio({
   /** Bounties ganhos nas mãos (US$). */
   bounties: number;
   onAbrir: () => void;
+  /** Exclui este torneio (com as mãos dele) -- pede confirmação antes. */
+  onExcluir?: () => void;
   indice?: number;
   /** Com filtro de mãos ativo: quantas mãos deste torneio batem. */
   maosNoFiltro?: number;
@@ -172,10 +175,20 @@ export function CardTorneio({
 
   return (
     <li style={{ animationDelay: `${Math.min(indice, 10) * 30}ms` }} className="fade-in-up">
-      <button
-        type="button"
+      {/* div com papel de botão (e não <button>): dentro dele fica o botão
+          de excluir, e botão dentro de botão não é permitido. */}
+      <div
+        role="button"
+        tabIndex={0}
         onClick={onAbrir}
-        className="painel-vidro group flex h-full w-full flex-col gap-3 rounded-2xl border border-white/10 p-4 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-lg"
+        onKeyDown={(e) => {
+          if (e.target !== e.currentTarget) return;
+          if (e.key === "Enter" || e.key === " ") {
+            e.preventDefault();
+            onAbrir();
+          }
+        }}
+        className="painel-vidro group flex h-full w-full cursor-pointer flex-col gap-3 rounded-2xl border border-white/10 p-4 text-left transition-all duration-150 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-lg focus-visible:outline focus-visible:outline-2 focus-visible:outline-[#E0B24C]"
       >
         {/* Cabeçalho: sala, nome (buy-in), formato e estado da revisão. */}
         <div className="flex items-start gap-3">
@@ -278,8 +291,22 @@ export function CardTorneio({
           >
             {meta.acao} <ChevronRight size={14} />
           </span>
+          {onExcluir && (
+            <button
+              type="button"
+              onClick={(e) => {
+                e.stopPropagation();
+                onExcluir();
+              }}
+              aria-label={`Excluir o torneio ${s.label}`}
+              title="Excluir este torneio"
+              className="grid h-9 w-9 shrink-0 place-items-center rounded-xl border border-white/10 text-muted transition-colors hover:border-[#F87171]/50 hover:bg-[#F87171]/10 hover:text-[#F87171]"
+            >
+              <Trash2 size={15} />
+            </button>
+          )}
         </div>
-      </button>
+      </div>
     </li>
   );
 }

@@ -233,6 +233,19 @@ export async function listSessionsWithCount(userId: string): Promise<HandSession
   return garantirRebuysCalculados(supabase, (data ?? []) as HandSessionWithCount[]);
 }
 
+/** Exclui um torneio/sessão do Revisor com todas as mãos dele (pedido
+ *  explícito: botão de excluir em cada card). As análises, marcadores e
+ *  EV das mãos saem junto (ON DELETE CASCADE). A sessão da Gestão de
+ *  Banca que veio dele fica -- é dinheiro que de fato entrou/saiu --, só
+ *  perde o vínculo (imported_hand_session_id vira null). */
+export async function excluirTorneio(sessionId: string): Promise<void> {
+  const supabase = createClient();
+  const { error: eMaos } = await supabase.from("hand_reviews").delete().eq("hand_session_id", sessionId);
+  if (eMaos) throw eMaos;
+  const { error } = await supabase.from("hand_sessions").delete().eq("id", sessionId);
+  if (error) throw error;
+}
+
 export function isSpinAndGo(s: Pick<HandSession, "kind" | "table_size">): boolean {
   return s.kind === "tournament" && s.table_size === 3;
 }
