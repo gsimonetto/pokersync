@@ -44,7 +44,7 @@ function isHiddenRoute(pathname: string) {
 // "/revisor/admin" tambem fica de fora: painel oculto (sem link no fluxo
 // do jogador, acesso direto por URL restrito a um unico e-mail) que
 // nunca foi migrado pro AppShell.
-const APP_SHELL_ROUTE_PREFIXES = ["/inicio", "/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace", "/configuracoes", "/notificacoes"];
+const APP_SHELL_ROUTE_PREFIXES = ["/inicio", "/modulos", "/banca", "/revisor", "/hub", "/performance", "/ranges", "/time", "/treino", "/planos", "/radar", "/minha-conta", "/marketplace", "/configuracoes", "/notificacoes", "/perfil"];
 const APP_SHELL_EXCLUDED_PREFIXES = ["/time/convite", "/revisor/admin"];
 
 function usaAppShell(pathname: string) {
