@@ -42,6 +42,11 @@ export interface Session {
   // "Importada" e o filtro de importadas na Gestão de Banca. null/undefined
   // = lançada à mão pelo jogador.
   importedHandSessionId?: string | null;
+  // Bounties (2026-10): o que a sessão rendeu eliminando jogadores em
+  // torneio PKO/Mystery Bounty, à parte do cashout (prêmio por colocação).
+  // Soma no resultado; não conta pro ITM. Nas sessões importadas vem
+  // sozinho das mãos (bounties_dos_torneios no banco).
+  bounties?: number;
 }
 
 // rakeback/bonus: dinheiro que entra fora das mesas (conta como lucro).

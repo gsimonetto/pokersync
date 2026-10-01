@@ -1,6 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
-import { addSession } from "@/lib/services/bankroll-service";
+import { addSession, fetchBountiesDosTorneios } from "@/lib/services/bankroll-service";
 import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { todayISO } from "@/lib/bankroll/format";
@@ -367,6 +367,12 @@ export async function linkOrCreateBankrollSessionForTournament(params: {
   const reentries = atual?.reentries ?? handSession.reentries ?? 0;
   const tableSize = atual?.table_size ?? handSession.table_size ?? null;
 
+  // Bounties ganhos no torneio, somados das mãos (a Banca ainda confere
+  // de novo a cada visita, ver sincronizarBounties em use-banca.ts).
+  const bounties = await fetchBountiesDosTorneios()
+    .then((m) => m.get(handSession.id) ?? 0)
+    .catch(() => 0);
+
   const rawVenue = (handSession.label.split(" / ")[0] || "").trim();
   const saved = await addSession({
     date: handSession.updated_at?.slice(0, 10) || todayISO(),
@@ -374,6 +380,7 @@ export async function linkOrCreateBankrollSessionForTournament(params: {
     buyIn: handSession.buyin ?? 0,
     reentries,
     cashout: cashoutUsd,
+    bounties,
     stake: "",
     venue: rawVenue || undefined,
     currency: "USD",

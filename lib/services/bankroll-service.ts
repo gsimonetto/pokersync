@@ -27,6 +27,7 @@ function rowToSession(r: any): Session {
     markup: r.markup != null ? Number(r.markup) : undefined,
     backerName: r.backer_name || undefined,
     importedHandSessionId: r.imported_hand_session_id || null,
+    bounties: Number(r.bounties) || 0,
   };
 }
 
@@ -54,6 +55,7 @@ function sessionToRow(s: Partial<Session>, userId: string) {
     markup: s.markup != null && String(s.markup) !== "" ? Number(s.markup) : null,
     backer_name: s.backerName || null,
     imported_hand_session_id: s.importedHandSessionId || null,
+    bounties: Number(s.bounties) || 0,
   };
 }
 
@@ -84,7 +86,7 @@ export async function addSession(session: Omit<Session, "id">): Promise<Session>
     .select()
     .single();
   if (error) throw error;
-  const profit = (Number(session.cashout) || 0) - (Number(session.buyIn) || 0);
+  const profit = (Number(session.cashout) || 0) + (Number(session.bounties) || 0) - (Number(session.buyIn) || 0);
   const xpBase = profit > 0 ? 30 : 20;
   try {
     await supabase.rpc("award_xp", {
@@ -437,5 +439,23 @@ export async function notifyBrmAlert(title: string, body: string) {
     p_kind: "warning",
     p_action_url: "/banca",
   });
+  if (error) throw error;
+}
+
+/** Bounties ganhos em cada torneio importado (id do hand_sessions -> valor
+ *  em dólar), somados das mãos. Torneio sem bounty não aparece (= 0). */
+export async function fetchBountiesDosTorneios(): Promise<Map<string, number>> {
+  const supabase = createClient();
+  const { data, error } = await supabase.rpc("bounties_dos_torneios");
+  if (error) throw error;
+  const out = new Map<string, number>();
+  for (const l of (data ?? []) as { hand_session_id: string; valor: number | string }[]) out.set(l.hand_session_id, Number(l.valor) || 0);
+  return out;
+}
+
+/** Grava só o bounty de uma sessão (o resto da linha fica como está). */
+export async function atualizarBountiesDaSessao(id: string, bounties: number): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("bankroll_sessions").update({ bounties }).eq("id", id);
   if (error) throw error;
 }

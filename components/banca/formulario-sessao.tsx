@@ -5,7 +5,7 @@ import { AnimatePresence, motion } from "framer-motion";
 import { BookOpen, ChevronDown, Landmark, SlidersHorizontal } from "lucide-react";
 import type { Session } from "@/lib/bankroll/types";
 import { net } from "@/lib/bankroll/calc";
-import { CURRENCIES, FORMATS, fmtSignedMoneyIn, todayISO } from "@/lib/bankroll/format";
+import { CURRENCIES, FORMATS, TOURNEY_FORMATS, fmtMoneyIn, fmtSignedMoneyIn, todayISO } from "@/lib/bankroll/format";
 import { OUTRO_PLATFORM, PLATFORMS } from "@/lib/bankroll/platforms";
 import { Modal } from "@/components/ui/modal";
 import { EASE } from "@/components/painel/painel-card";
@@ -112,6 +112,7 @@ export function FormularioSessao({
   const [buyIn, setBuyIn] = useState("");
   const [reentradas, setReentradas] = useState("");
   const [cashout, setCashout] = useState("");
+  const [bounties, setBounties] = useState("");
   const [stake, setStake] = useState("");
   const [sala, setSala] = useState(sugestoes.plataforma);
   const [salaOutra, setSalaOutra] = useState("");
@@ -144,6 +145,7 @@ export function FormularioSessao({
     setBuyIn(s ? String(s.buyIn) : "");
     setReentradas(s?.reentries ? String(s.reentries) : "");
     setCashout(s ? String(s.cashout) : "");
+    setBounties(s?.bounties ? String(s.bounties) : "");
     setStake(s?.stake ?? "");
     setSala(s ? (conhecida ? (s.venue as string) : s.venue ? OUTRO_PLATFORM : PLATFORMS[0]) : sugestoes.plataforma);
     setSalaOutra(s && !conhecida ? s.venue ?? "" : "");
@@ -161,7 +163,7 @@ export function FormularioSessao({
     setMarkup(s?.markup != null ? String(s.markup) : "");
     setBacker(s?.backerName ?? "");
     setAbrirDetalhes(
-      Boolean(inicial?.hours != null || (s && (s.time || s.hours != null || s.stake || s.reentries || s.notes || (s.currency && s.currency !== "BRL")))),
+      Boolean(inicial?.hours != null || (s && (s.time || s.hours != null || s.stake || s.reentries || s.bounties || s.notes || (s.currency && s.currency !== "BRL")))),
     );
     setAbrirDiario(Boolean(s && (s.mood || s.tilt != null || s.diaryNote)));
     setAbrirStaking(Boolean(s && (s.rake != null || s.rakeback != null || s.ownPct != null || s.markup != null || s.backerName)));
@@ -170,6 +172,9 @@ export function FormularioSessao({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [aberto, sessao, inicial]);
 
+  const importada = Boolean(sessao?.importedHandSessionId);
+  // Bounty só existe em torneio (o campo só aparece nele).
+  const torneio = TOURNEY_FORMATS.has(formato);
   const rascunho: Session = {
     id: sessao?.id ?? `tmp-${Date.now()}`,
     date: data,
@@ -178,6 +183,8 @@ export function FormularioSessao({
     buyIn: numero(buyIn) || 0,
     reentries: numero(reentradas) || 0,
     cashout: numero(cashout) || 0,
+    // Importada: o bounty vem das mãos e não se edita aqui.
+    bounties: importada ? sessao?.bounties ?? 0 : numero(bounties) || 0,
     stake,
     hours: horas ? numero(horas) : undefined,
     venue: (sala === OUTRO_PLATFORM ? salaOutra.trim() : sala) || undefined,
@@ -271,6 +278,18 @@ export function FormularioSessao({
           <Rotulo texto={ROTULO_REENTRADA[formato] ?? "Reentradas"}>
             <input inputMode="numeric" placeholder="0" value={reentradas} onChange={(e) => setReentradas(e.target.value)} className={CAMPO} />
           </Rotulo>
+          {torneio && (
+            <Rotulo texto={`Bounties (${moeda})`}>
+              {importada ? (
+                // Sessão importada: o valor vem sozinho das eliminações nas mãos.
+                <p className={`${CAMPO} tabular-nums text-muted`} title="Somado das suas mãos (linhas de eliminação do torneio)">
+                  {fmtMoneyIn(sessao?.bounties ?? 0, moeda)} · das mãos
+                </p>
+              ) : (
+                <input inputMode="decimal" placeholder="0,00" value={bounties} onChange={(e) => setBounties(e.target.value)} className={CAMPO} />
+              )}
+            </Rotulo>
+          )}
           <Rotulo texto="Stake">
             <input placeholder="Ex.: NL50, $22" value={stake} onChange={(e) => setStake(e.target.value)} className={CAMPO} />
           </Rotulo>

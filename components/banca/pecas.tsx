@@ -6,7 +6,7 @@ import { BookOpen, Pencil, Trash2, type LucideIcon } from "lucide-react";
 import type { BrmReading } from "@/lib/bankroll/calc";
 import { net } from "@/lib/bankroll/calc";
 import type { Session } from "@/lib/bankroll/types";
-import { fmtSignedMoneyIn } from "@/lib/bankroll/format";
+import { fmtMoneyIn, fmtSignedMoneyIn } from "@/lib/bankroll/format";
 import { EASE, Linha, Numero, Selo } from "@/components/painel/painel-card";
 import { InfoHover, type Explicacao } from "@/components/painel/info-hover";
 import { COR_ALERTA, COR_NEGATIVO, COR_POSITIVO, dataCurta, num1 } from "./util";
@@ -83,10 +83,13 @@ export function LinhaSessao({
 }) {
   const r = net(s);
   const rebuys = Number(s.reentries) || 0;
+  const bounties = Number(s.bounties) || 0;
   const extras = [
     s.stake,
     // O rebuy já entra no resultado (buy-in × (1 + rebuys)); aqui ele aparece escrito.
     rebuys > 0 ? `${rebuys} ${rebuys === 1 ? "rebuy" : "rebuys"}` : null,
+    // Bounty também já está no resultado; escrito à parte pra dar pra conferir.
+    bounties > 0 ? `+${fmtMoneyIn(bounties, moeda)} em bounties` : null,
     s.mood === "tilt" ? "tilt" : s.mood,
     s.ownPct != null && s.ownPct < 100 ? `${s.ownPct}% sua` : null,
   ].filter(Boolean);
