@@ -1,6 +1,6 @@
 "use client";
 
-import { CheckCircle2, ChevronRight, Clock, Coins, Flag, Medal, PlayCircle, Trash2, Trophy } from "lucide-react";
+import { CheckCircle2, ChevronRight, Clock, Coins, Medal, PlayCircle, Spade, Trash2, Trophy } from "lucide-react";
 import { fmtMoneyIn, fmtSignedMoneyIn } from "@/lib/bankroll/format";
 import { isSpinAndGo, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 
@@ -94,6 +94,35 @@ function formatoDoTorneio(s: HandSessionWithCount): string | null {
 function partesDoNome(label: string): { sala: string | null; nome: string } {
   const i = label.indexOf(" / ");
   return i > 0 ? { sala: label.slice(0, i), nome: label.slice(i + 3) } : { sala: null, nome: label };
+}
+
+/** Ícone da sala no card (pedido explícito: "quero que traga o ícone do
+ *  PokerStars" no lugar da bandeira). PokerStars: espada branca com a
+ *  estrela vermelha no fundo vermelho; outra sala: a sigla dela; sem sala
+ *  (mão colada sem cabeçalho): uma espada. Cash usa as fichas. */
+function IconeDaSala({ sala, cash }: { sala: string | null; cash: boolean }) {
+  const nome = (sala ?? "").toLowerCase().replace(/\s+/g, "");
+  if (nome.includes("pokerstars"))
+    return (
+      <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" style={{ background: "linear-gradient(180deg,#d4262c,#a3141a)" }} title="PokerStars">
+        <svg width="32" height="32" viewBox="4 2.5 16 18.5" aria-hidden>
+          <path d="M12 3C12 3 5 9 5 13.2c0 2.4 1.9 4.1 4 4.1 1.1 0 2-.5 2.6-1.2l-1 4.4h2.8l-1-4.4c.6.7 1.5 1.2 2.6 1.2 2.1 0 4-1.7 4-4.1C19 9 12 3 12 3z" fill="#fff" />
+          <polygon points="12.00,9.50 12.71,11.43 14.76,11.50 13.14,12.77 13.70,14.75 12.00,13.60 10.30,14.75 10.86,12.77 9.24,11.50 11.29,11.43" fill="#c8161d" />
+        </svg>
+      </span>
+    );
+  const sigla = nome.includes("gg") ? "GG" : nome.includes("888") ? "888" : nome.includes("party") ? "PP" : nome.includes("winamax") ? "WA" : null;
+  return (
+    <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.04] ring-1 ring-inset ring-white/[0.08]" title={sala ?? undefined}>
+      {cash ? (
+        <Coins size={17} className="text-evolution" />
+      ) : sigla ? (
+        <span className="text-[12px] font-black tracking-tight text-ink">{sigla}</span>
+      ) : (
+        <Spade size={17} className="text-review" fill="currentColor" />
+      )}
+    </span>
+  );
 }
 
 function Colocacao({ s, c }: { s: HandSessionWithCount; c: ColocacaoTorneio | undefined }) {
@@ -192,9 +221,7 @@ export function CardTorneio({
       >
         {/* Cabeçalho: sala, nome (buy-in), formato e estado da revisão. */}
         <div className="flex items-start gap-3">
-          <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.04] ring-1 ring-inset ring-white/[0.08]">
-            {s.kind === "tournament" ? <Flag size={17} className="text-review" /> : <Coins size={17} className="text-evolution" />}
-          </span>
+          <IconeDaSala sala={sala} cash={s.kind !== "tournament"} />
           <span className="min-w-0 flex-1">
             <span className="block truncate text-[11px] font-medium uppercase tracking-[0.08em] text-muted">{sala ?? (s.kind === "tournament" ? "Torneio" : "Cash")}</span>
             <span className="flex items-center gap-2">

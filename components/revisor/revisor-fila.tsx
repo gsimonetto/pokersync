@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Flag, Search, X, Eye, ChevronRight, PenLine, Zap } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Spade, Search, X, Eye, ChevronRight, PenLine, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { excluirTorneio, listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
@@ -509,7 +509,7 @@ export function RevisorFila({
                 {pctVistas}% revisado
               </span>
               <span>
-                <Flag size={11} className="mr-1 inline" />
+                <Spade size={11} className="mr-1 inline" />
                 {nTorneios} {nTorneios === 1 ? "torneio" : "torneios"}
                 {nCash > 0 ? ` · ${nCash} cash` : ""}
               </span>
