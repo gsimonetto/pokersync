@@ -95,13 +95,19 @@ export function useBanca() {
     let vivo = true;
     (async () => {
       try {
+        // Os torneios vêm antes das sessões: carregá-los recalcula os
+        // rebuys que ainda não foram contados e grava o número novo na
+        // sessão da banca -- lendo as duas juntas, a tela mostrava o valor
+        // velho até a próxima visita (pedido explícito: "rebuy no gestor
+        // de banca não está contando").
+        const torneios = fetchTournamentSessions();
         const [s, cfg, tx, brm, annos, tourn, payouts] = await Promise.all([
-          fetchSessions(),
+          torneios.then(() => fetchSessions(), () => fetchSessions()),
           fetchSettings(),
           fetchTransactions(),
           fetchBrmThresholds(),
           fetchAnnotations(),
-          fetchTournamentSessions(),
+          torneios,
           fetchTournamentPayouts(),
         ]);
         if (!vivo) return;

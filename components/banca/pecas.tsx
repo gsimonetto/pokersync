@@ -82,7 +82,14 @@ export function LinhaSessao({
   compacta?: boolean;
 }) {
   const r = net(s);
-  const extras = [s.stake, s.mood === "tilt" ? "tilt" : s.mood, s.ownPct != null && s.ownPct < 100 ? `${s.ownPct}% sua` : null].filter(Boolean);
+  const rebuys = Number(s.reentries) || 0;
+  const extras = [
+    s.stake,
+    // O rebuy já entra no resultado (buy-in × (1 + rebuys)); aqui ele aparece escrito.
+    rebuys > 0 ? `${rebuys} ${rebuys === 1 ? "rebuy" : "rebuys"}` : null,
+    s.mood === "tilt" ? "tilt" : s.mood,
+    s.ownPct != null && s.ownPct < 100 ? `${s.ownPct}% sua` : null,
+  ].filter(Boolean);
   const sub = [s.venue || "Sem plataforma", s.notes, s.diaryNote].filter(Boolean).join(" · ");
   const conteudo = (
     <>
