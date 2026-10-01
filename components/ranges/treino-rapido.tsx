@@ -60,6 +60,7 @@ export function TreinoRapido({
   nome,
   pesos,
   pesosCombo,
+  acao = null,
   onFechar,
 }: {
   aberto: boolean;
@@ -67,6 +68,8 @@ export function TreinoRapido({
   nome: string;
   pesos: Pesos;
   pesosCombo: Pesos;
+  /** Ação do range -- a grade pinta na cor dela. */
+  acao?: string | null;
   onFechar: () => void;
 }) {
   const [rodada, setRodada] = useState<Rodada | null>(null);
@@ -165,7 +168,7 @@ export function TreinoRapido({
                 </span>
               </div>
               <div className="mx-auto w-full max-w-[340px]">
-                <GradeRange pesos={pesos} pesosCombo={pesosCombo} modo={semModo} pincel={100} somenteLeitura destacarMao={rodada.mao} />
+                <GradeRange pesos={pesos} pesosCombo={pesosCombo} modo={semModo} pincel={100} somenteLeitura destacarMao={rodada.mao} acao={acao} />
               </div>
               <button type="button" onClick={proxima} className={`${BOTAO_OURO} py-3`} autoFocus>
                 Próxima mão <ChevronRight size={16} />

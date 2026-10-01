@@ -39,7 +39,7 @@ function Cartao({
   return (
     <article className="painel-vidro flex gap-3 rounded-2xl border border-white/10 p-3">
       <button type="button" onClick={onAbrir} aria-label={`Abrir ${r.nome}`} className="shrink-0 self-start rounded-md transition hover:brightness-125">
-        <MiniGrade pesos={r.pesos} pesosCombo={r.pesosCombo} />
+        <MiniGrade pesos={r.pesos} pesosCombo={r.pesosCombo} acao={r.acao} />
       </button>
       <div className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13.5px] font-semibold">{r.nome}</span>
