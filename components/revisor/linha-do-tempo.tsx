@@ -62,28 +62,6 @@ export function CartaTexto({ card }: { card: string }) {
   );
 }
 
-/** Carta do board em miniatura (fundo escuro, número + naipe na cor do baralho). */
-function MiniCarta({ card }: { card: string }) {
-  return (
-    <span
-      style={{
-        display: "inline-grid",
-        placeItems: "center",
-        minWidth: 22,
-        height: 18,
-        padding: "0 3px",
-        borderRadius: 4,
-        fontSize: 11,
-        lineHeight: 1,
-        background: "rgba(255,255,255,0.08)",
-        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
-      }}
-    >
-      <CartaTexto card={card} />
-    </span>
-  );
-}
-
 type ItemAcao = { pos: string | null; texto: string; hero: boolean; folds: boolean };
 
 export function LinhaDoTempo({
@@ -117,21 +95,21 @@ export function LinhaDoTempo({
         flexShrink: 0,
         // Direita maior: o botao flutuante de ajuda (canto inferior
         // direito da tela) ficava por cima do resultado.
-        padding: "8px 72px 8px 8px",
+        padding: "6px 72px 6px 6px",
         borderRadius: 14,
         border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
-      {/* Cada rua num quadro próprio (pedido explícito: "separe melhor
-          essa parte, está bagunçado demais"): cabeçalho com o nome e as
-          cartas da rua, e embaixo uma ação por linha, com a posição
-          alinhada -- antes eram pílulas soltas uma atrás da outra. O
-          pré-flop é mais largo (é a rua com mais ação) e, quando passa de
-          3 linhas, as ações continuam numa segunda coluna. */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) repeat(3, minmax(0, 1fr))", gap: 6, minWidth: 0 }}>
+      {/* Uma linha por rua (pedido explícito: "não precisa trazer as
+          cartas, já estão no board; quero as ações, mas separadas, numa
+          linha que não fique confusa"): o nome da rua numa coluna fixa e
+          as ações em sequência, separadas por setas -- as suas em
+          dourado, os folds dos outros agrupados e apagados. A rua em que
+          o replay está fica marcada; as que ainda não chegaram, apagadas. */}
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, minWidth: 0 }}>
         {ruas.map((r) => {
           const fatia = FATIA_BOARD[r.street];
-          const cartas = fatia ? board.slice(fatia[0], fatia[1]).filter((c): c is string => Boolean(c)) : [];
+          const cartas = fatia ? board.slice(fatia[0], fatia[1]).filter(Boolean) : [];
           const alcancada = r.street === "PREFLOP" || cartas.length > 0 || r.actions.length > 0;
           // Folds seguidos de outros jogadores viram um contador só
           // ("4 folds") -- a mão real de 8 jogadores tem mais fold do que
@@ -157,74 +135,50 @@ export function LinhaDoTempo({
             <div
               key={r.street}
               style={{
-                minWidth: 0,
-                overflow: "hidden",
                 display: "flex",
-                flexDirection: "column",
-                gap: 5,
-                padding: "6px 9px",
-                borderRadius: 10,
-                background: r.current ? "rgba(212,175,55,0.06)" : "rgba(255,255,255,0.025)",
-                border: `1px solid ${r.current ? "rgba(212,175,55,0.35)" : "rgba(255,255,255,0.06)"}`,
-                opacity: alcancada ? 1 : 0.35,
+                alignItems: "center",
+                gap: 10,
+                minWidth: 0,
+                height: 19,
+                padding: "0 8px",
+                borderRadius: 6,
+                background: r.current ? "rgba(212,175,55,0.08)" : "transparent",
+                opacity: alcancada ? 1 : 0.3,
               }}
             >
-              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, minHeight: 18 }}>
-                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: r.current ? "#FFFFFF" : "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>
-                  {NOME_RUA[r.street] ?? r.street}
-                </span>
-                {cartas.length > 0 && (
-                  <span style={{ display: "flex", gap: 3 }}>
-                    {cartas.map((c) => (
-                      <MiniCarta key={c} card={c} />
-                    ))}
-                  </span>
-                )}
-              </div>
-              {itens.length === 0 ? (
-                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>—</span>
-              ) : (
-                <div style={{ display: "grid", gridAutoFlow: "column", gridTemplateRows: "repeat(3, 16px)", gridAutoColumns: "max-content", justifyContent: "start", columnGap: 18, rowGap: 1 }}>
-                  {itens.map((it, i) => (
-                    <div
-                      key={i}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        minWidth: 0,
-                        fontSize: 11,
-                        lineHeight: "16px",
-                        whiteSpace: "nowrap",
-                        ...num,
-                      }}
-                    >
+              <span
+                style={{
+                  width: 62,
+                  flexShrink: 0,
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: r.current ? "#d4af37" : "rgba(255,255,255,0.45)",
+                  borderRight: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                {NOME_RUA[r.street] ?? r.street}
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", fontSize: 11.5, ...num }}>
+                {itens.length === 0 ? (
+                  <span style={{ color: "rgba(255,255,255,0.3)" }}>—</span>
+                ) : (
+                  itens.map((it, i) => (
+                    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                      {i > 0 && <span style={{ color: "rgba(255,255,255,0.22)", fontSize: 11 }}>›</span>}
                       {it.folds ? (
-                        <span style={{ color: "rgba(255,255,255,0.32)", fontStyle: "italic" }}>{it.texto}</span>
+                        <span style={{ color: "rgba(255,255,255,0.32)" }}>{it.texto}</span>
                       ) : (
-                        <>
-                          <span
-                            style={{
-                              width: 34,
-                              flexShrink: 0,
-                              fontSize: 10,
-                              fontWeight: 700,
-                              color: it.hero ? "#d4af37" : "rgba(255,255,255,0.45)",
-                              overflow: "hidden",
-                              textOverflow: "ellipsis",
-                            }}
-                          >
-                            {it.pos}
-                          </span>
-                          <span style={{ color: it.hero ? "#F3D77A" : "rgba(255,255,255,0.85)", fontWeight: it.hero ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis" }}>
-                            {it.texto}
-                          </span>
-                        </>
+                        <span>
+                          <b style={{ fontWeight: 700, color: it.hero ? "#d4af37" : "rgba(255,255,255,0.55)" }}>{it.pos}</b>{" "}
+                          <span style={{ fontWeight: it.hero ? 700 : 500, color: it.hero ? "#F3D77A" : "rgba(255,255,255,0.88)" }}>{it.texto}</span>
+                        </span>
                       )}
-                    </div>
-                  ))}
-                </div>
-              )}
+                    </span>
+                  ))
+                )}
+              </span>
             </div>
           );
         })}
