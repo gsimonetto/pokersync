@@ -27,7 +27,8 @@ const MIN_CELULA = 3;
 type Celula = { rotulo: string; n: number; vpip: number; pfr: number; call: number; raise: number; tresBet: number; ids: string[] };
 
 const LEGENDA = [
-  { cor: COR_ACAO.fold, rotulo: "Fold" },
+  // BB que só dá check (sem colocar ficha) não conta como VPIP -- entra aqui.
+  { cor: COR_ACAO.fold, rotulo: "Fold / check" },
   { cor: COR_ACAO.call, rotulo: "Call / limp" },
   { cor: COR_ACAO.raise, rotulo: "Raise" },
   { cor: COR_ACAO.threebet, rotulo: "3-bet ou mais" },
@@ -158,7 +159,7 @@ export function MatrizMaos({ rows, ordem = 0 }: { rows: AnalysisHandRow[]; ordem
               </p>
               {foco.c.n > 0 && (
                 <p className="mt-1 tabular-nums text-ink/90">
-                  Fold {Math.round(((foco.c.n - foco.c.call - foco.c.raise - foco.c.tresBet) / foco.c.n) * 100)}% · Call {Math.round((foco.c.call / foco.c.n) * 100)}% ·
+                  Fold/check {Math.round(((foco.c.n - foco.c.call - foco.c.raise - foco.c.tresBet) / foco.c.n) * 100)}% · Call {Math.round((foco.c.call / foco.c.n) * 100)}% ·
                   Raise {Math.round((foco.c.raise / foco.c.n) * 100)}% · 3-bet {Math.round((foco.c.tresBet / foco.c.n) * 100)}%
                 </p>
               )}

@@ -14,7 +14,7 @@ export interface LinhaPreflop {
   structure?: string | null;
 }
 
-export type Acao = "abrir" | "pagar" | "3bet" | "allin" | "completar" | "check" | "aumentar" | "outra";
+export type Acao = "abrir" | "pagar" | "3bet" | "allin" | "completar" | "completar_allin" | "check" | "aumentar" | "outra";
 
 export interface RangePronto {
   id: string; // "spot_id:action_label"
@@ -29,7 +29,9 @@ export interface RangePronto {
 
 const VERBOS: { chave: string; texto: string; acao: Acao; vs: boolean }[] = [
   { chave: "RFI", texto: "abre", acao: "abrir", vs: false },
-  { chave: "COMPLETE_OR_SHOVE", texto: "completa ou vai de all-in", acao: "completar", vs: false },
+  // Range misto (limp + all-in na mesma grade, sem separar qual mão vai pra
+  // qual) -- ação própria pra não pintar de "call" o que também é all-in.
+  { chave: "COMPLETE_OR_SHOVE", texto: "completa ou vai de all-in", acao: "completar_allin", vs: false },
   { chave: "COMPLETE", texto: "completa", acao: "completar", vs: false },
   { chave: "CALL_VS_MINRAISE", texto: "paga min-raise", acao: "pagar", vs: true },
   { chave: "CALL_VS_SHOVE", texto: "paga all-in", acao: "pagar", vs: true },
@@ -72,13 +74,16 @@ export const NOME_ACAO: Record<Acao, string> = {
   "3bet": "3-bet",
   allin: "All-in",
   completar: "Completar",
+  completar_allin: "Completar ou all-in",
   check: "Check",
   aumentar: "Aumentar",
   outra: "Outra",
 };
 
-/** Cor da ação de um range (a mesma paleta da grade do Treino). Range sem
- *  ação definida fica no dourado do produto. */
+/** Cor da ação de um range (a mesma paleta da grade do Treino): raise
+ *  verde; call, limp (completar) e check azul -- as jogadas passivas;
+ *  3-bet laranja; all-in vermelho. Range sem ação definida ou misto
+ *  (completar ou all-in, sem separar as mãos) fica no dourado do produto. */
 export function corDaAcao(acao: string | null | undefined): string {
   if (acao === "abrir" || acao === "aumentar") return COR_ACAO.raise;
   if (acao === "pagar" || acao === "completar" || acao === "check") return COR_ACAO.call;
