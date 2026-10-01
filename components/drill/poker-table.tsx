@@ -543,7 +543,7 @@ function alturaCartasAcima(seat: SeatLayoutSlot, state: SeatState): number {
 }
 
 function Seat({
-  seat, state, isDealer, pot, scale, heroScale = 1, centrarNaPlaca = false, opponentStats, onOpponentClick,
+  seat, state, isDealer, pot, scale, heroScale = 1, centrarNaPlaca = false, bountyNaEsquerda = false, opponentStats, onOpponentClick,
 }: {
   seat: SeatLayoutSlot;
   state: SeatState;
@@ -560,6 +560,10 @@ function Seat({
   // do hero pode ser um pouco maior") -- multiplica em cima do `scale`
   // geral (responsivo por largura da mesa), nao o substitui.
   heroScale?: number;
+  // Selo do bounty na quina ESQUERDA da placa em vez da direita: só nos
+  // assentos colados na borda direita da mesa em pé (celular), onde a
+  // placa já encosta na borda da tela e o selo à direita ficaria cortado.
+  bountyNaEsquerda?: boolean;
   // Perfil consolidado do oponente sentado nesse assento, se ja existir
   // (Revisor de Maos) -- so' preenchido pra assentos nao-hero com
   // historico. Ausente (undefined) em qualquer outro contexto (Treino),
@@ -676,14 +680,13 @@ function Seat({
   // nome, ainda que pequena. Trocado por `bottom: 100%` (o badge fica
   // INTEIRO acima da placa, encostado na borda de cima) + `right: 0`
   // (alinhado com a quina direita) -- toca a quina sem nunca sobrepor.
-  // Revisado (pedido explícito): "o nome da posição encostado no nome do
-  // jogador, o bounty deve aparecer ao lado e não no meio, atrapalhando o
-  // alinhamento". Agora o badge fica ao lado da etiqueta de posição, na
-  // mesma linha e fora do fluxo (absolute) -- a etiqueta continua
-  // centralizada em cima da placa e encostada nela. Sempre do lado de
-  // DENTRO da mesa (assento na metade direita -> badge à esquerda), pra
-  // nunca passar da borda; e é obstáculo pras fichas de aposta desviarem.
-  const bountyDentro = seat.x > 50 ? { right: "100%", marginRight: 4 } : { left: "100%", marginLeft: 4 };
+  // Revisado (pedido explícito): "o valor do bounty grudado no quadrado
+  // onde fica o nome e o stack, mais na ponta direita em cima". O selo
+  // fica preso na quina de cima/direita da placa: metade da altura sobre
+  // a borda e a maior parte pra fora à direita -- gruda na quina sem
+  // cobrir o nome nem a etiqueta de posição (que fica centralizada em
+  // cima da placa). Fora do fluxo (absolute): não mexe no alinhamento.
+  // É obstáculo pras fichas de aposta desviarem.
   // Valor mostrado = o que quem eliminar o jogador ganha em dinheiro
   // (pedido explícito). No PKO é METADE do bounty listado no hand history
   // -- a outra metade vai pro bounty de quem eliminou. O valor cheio
@@ -696,9 +699,8 @@ function Seat({
       title={`Eliminar este jogador vale $${dinheiro(premioBounty)} (metade do bounty de $${dinheiro(bountyValue)})`}
       style={{
         position: "absolute",
-        ...bountyDentro,
-        top: "50%",
-        transform: "translateY(-50%)",
+        top: 0,
+        ...(bountyNaEsquerda ? { left: 0, transform: "translate(-55%, -72%)" } : { right: 0, transform: "translate(55%, -72%)" }),
         zIndex: 4,
         display: "flex",
         alignItems: "center",
@@ -723,7 +725,6 @@ function Seat({
   const seatInfo = (
     <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
       <div style={{ position: "relative", zIndex: 1 }}>
-        {bountyChip}
         {isDealer && (
           <div
             style={{
@@ -777,6 +778,7 @@ function Seat({
       {!empty && (
         // Encostada na etiqueta de posição (sem vão entre as duas).
         <div style={{ position: "relative" }}>
+          {bountyChip}
           <div
             data-placa=""
             style={{
@@ -1449,6 +1451,7 @@ export function PokerTable({
             scale={seatScale}
             heroScale={heroScale}
             centrarNaPlaca={centrarNaPlaca}
+            bountyNaEsquerda={aspectRatioValue < 1 && s.x > 75}
             opponentStats={s.playerName ? opponentStats?.[s.playerName] : undefined}
             onOpponentClick={onOpponentClick}
           />
