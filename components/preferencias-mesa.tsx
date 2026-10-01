@@ -1,6 +1,7 @@
 "use client";
 
 import { Check } from "lucide-react";
+import { BordaMesa, TexturaFeltro, sombraDoFeltro } from "@/components/drill/acabamento-mesa";
 import { Card } from "@/components/drill/card";
 import {
   salvarPreferenciaMesa,
@@ -29,24 +30,27 @@ const FELTROS: { valor: CorFeltro; rotulo: string; fundo: string }[] = [
   { valor: "grafite", rotulo: "Grafite", fundo: "radial-gradient(circle at 50% 40%, #3A3F47, #1D2025)" },
 ];
 
-const MESAS: { valor: EstiloMesa; rotulo: string; descricao: string; aro: string; feltro: string; filete: string }[] = [
+const MESAS: { valor: EstiloMesa; rotulo: string; descricao: string; feltro: string; brilho: string }[] = [
   {
     valor: "arena",
     rotulo: "Arena (padrão)",
     descricao: "Mesa final de TV: couro preto e LED",
-    aro: "linear-gradient(180deg, #2c2f36, #050506)",
     feltro: "radial-gradient(60% 70% at 50% 42%, #1f6fb8, #0c3058 70%, #061a33)",
-    filete: "0 0 0 2px #000, 0 0 16px -2px rgba(59,130,246,.9)",
+    brilho: "rgba(24,88,168,.38)",
   },
   {
     valor: "luxo",
     rotulo: "Luxo Moderno",
     descricao: "Nogueira, latão e feltro camurça",
-    aro: "repeating-linear-gradient(95deg, #5a331b 0 3px, #6b3e22 3px 7px, #4a2914 7px 9px, #633a1f 9px 14px)",
     feltro: "radial-gradient(60% 70% at 50% 42%, #2c6a52, #123327 75%, #0a1f18)",
-    filete: "0 0 0 2px #c9a45c",
+    brilho: "rgba(44,106,82,.35)",
   },
 ];
+
+// Miniatura: mesma borda e feltro da mesa de verdade (acabamento-mesa),
+// numa mesa oval de 150x56.
+const MINI_CANTO = "19% / 50%";
+const MINI_BORDA = 7;
 
 const CARTAS: { valor: EstiloCartaPref; rotulo: string }[] = [
   { valor: "solido", rotulo: "Cor Sólida (padrão)" },
@@ -111,8 +115,14 @@ export function PreferenciasMesaPainel() {
                   ativo ? "border-[#d4af37]/50 bg-[#d4af37]/[0.08]" : "border-white/10 bg-white/[0.03] hover:border-white/20"
                 }`}
               >
-                <span className="relative block h-14 w-full max-w-[150px] rounded-full p-[7px]" style={{ background: m.aro }}>
-                  <span className="block h-full w-full rounded-full" style={{ background: m.feltro, boxShadow: m.filete }} />
+                <span className="relative block h-14 w-full max-w-[150px]">
+                  <BordaMesa estilo={m.valor} cornerRadius={MINI_CANTO} aspecto={150 / 56} espessura={MINI_BORDA} brilho={m.brilho} />
+                  <span
+                    className="absolute overflow-hidden"
+                    style={{ inset: MINI_BORDA, borderRadius: MINI_CANTO, background: m.feltro, boxShadow: sombraDoFeltro(MINI_BORDA) }}
+                  >
+                    <TexturaFeltro estilo={m.valor} />
+                  </span>
                 </span>
                 <span className={`text-[11.5px] font-semibold ${ativo ? "text-ink" : "text-muted"}`}>{m.rotulo}</span>
                 <span className="text-[10.5px] text-muted">{m.descricao}</span>
