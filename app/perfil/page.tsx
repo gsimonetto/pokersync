@@ -15,7 +15,7 @@ import { fetchProgress, type Progress } from "@/lib/services/xp-service";
 import { fetchRankingTemporada } from "@/lib/services/ranking-service";
 import { fetchMyAchievements } from "@/lib/services/achievements-service";
 import { fetchTournamentMetrics } from "@/lib/services/analysis-service";
-import { fetchTrainingAccuracy } from "@/lib/services/drill-service";
+import { listSessionsWithCount } from "@/lib/services/hand-session-service";
 import type { TournamentMetrics } from "@/types/analysis";
 
 // Meu perfil: só a carta do jogador (pedido explícito: "a primeira
@@ -24,6 +24,9 @@ import type { TournamentMetrics } from "@/types/analysis";
 
 const pct = (v: number) => `${v.toLocaleString("pt-BR", { maximumFractionDigits: 1 })}%`;
 const inteiro = (v: number) => v.toLocaleString("pt-BR");
+/** "$1.821" -- sem centavos; de 100 mil pra cima, "$123 mil". */
+const dolar = (v: number) =>
+  v >= 100_000 ? `$${Math.round(v / 1000).toLocaleString("pt-BR")} mil` : `$${Math.round(v).toLocaleString("pt-BR")}`;
 
 export default function PerfilPage() {
   const [perfil, setPerfil] = useState<Profile | null>(null);
@@ -31,8 +34,7 @@ export default function PerfilPage() {
   const [posicao, setPosicao] = useState<number | null>(null);
   const [fundador, setFundador] = useState(false);
   const [metricas, setMetricas] = useState<TournamentMetrics | null>(null);
-  const [treino, setTreino] = useState<{ hits: number; total: number } | null>(null);
-  const [maosVistas, setMaosVistas] = useState<number | null>(null);
+  const [mesasFinais, setMesasFinais] = useState<number | null>(null);
 
   useEffect(() => {
     let vivo = true;
@@ -52,18 +54,13 @@ export default function PerfilPage() {
     fetchTournamentMetrics()
       .then((m) => vivo && setMetricas(m))
       .catch(() => {});
-    fetchTrainingAccuracy()
-      .then((t) => vivo && setTreino(t))
-      .catch(() => {});
     supabase.auth.getUser().then(({ data }) => {
       const uid = data.user?.id;
       if (!uid) return;
-      supabase
-        .from("hand_reviews")
-        .select("id", { count: "exact", head: true })
-        .eq("user_id", uid)
-        .not("viewed_in_replayer_at", "is", null)
-        .then(({ count }) => vivo && setMaosVistas(count ?? 0));
+      // Mesas finais: campeão, 2º/3º ou eliminado dentro da mesa final.
+      listSessionsWithCount(uid)
+        .then((ss) => vivo && setMesasFinais(ss.filter((x) => x.kind === "tournament" && (x.champion || x.final_place != null || x.reached_ft)).length))
+        .catch(() => {});
     });
     return () => {
       vivo = false;
@@ -73,17 +70,26 @@ export default function PerfilPage() {
   const nivel = progress?.level ?? 1;
   const m = MATERIAIS[faixaDoNivel(nivel)];
   const temTorneio = (metricas?.total_games ?? 0) > 0;
+  // Prêmio total pelo Radar (pedido explícito: "não é do gestor de
+  // banca, é o total puxado pelo radar"): premiação dos resumos dos
+  // torneios + bounties ganhos nas mãos.
+  const premio = metricas ? (metricas.total_cashout ?? 0) + (metricas.total_bounty_cash_won ?? 0) : null;
+  const destaque: AtributoCarta = {
+    sigla: "PRÊMIO TOTAL",
+    nome: "Prêmios dos torneios (resumos que o Radar trouxe) + bounties ganhos nas mãos",
+    valor: premio != null ? dolar(premio) : null,
+  };
   const atributos: AtributoCarta[] = [
     { sigla: "ITM", nome: "ITM: % dos torneios em que ficou no dinheiro", valor: temTorneio && metricas?.itm_pct != null ? pct(metricas.itm_pct) : null },
     {
       sigla: "ROI",
       nome: "ROI: lucro ÷ investido nos torneios",
-      valor: temTorneio && metricas?.roi_pct != null ? `${metricas.roi_pct > 0 ? "+" : ""}${pct(metricas.roi_pct)}` : null,
+      valor: temTorneio && metricas?.roi_pct != null ? `${metricas.roi_pct > 0 ? "+" : ""}${pct(Math.round(metricas.roi_pct))}` : null,
     },
+    { sigla: "ABI", nome: "ABI: buy-in médio dos torneios", valor: temTorneio && metricas?.avg_buyin != null ? (metricas.avg_buyin < 100 ? `$${metricas.avg_buyin.toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}` : dolar(metricas.avg_buyin)) : null },
     { sigla: "TRN", nome: "Torneios jogados", valor: metricas ? inteiro(metricas.total_games) : null },
     { sigla: "KO", nome: "Bounties: jogadores eliminados em PKO", valor: metricas ? inteiro(metricas.total_bounties_won) : null },
-    { sigla: "GTO", nome: "Acerto no modo Treino", valor: treino && treino.total > 0 ? pct(Math.round((treino.hits / treino.total) * 100)) : null },
-    { sigla: "REV", nome: "Mãos revisadas na mesa", valor: maosVistas != null ? inteiro(maosVistas) : null },
+    { sigla: "FT", nome: "Mesas finais (inclui títulos e pódios)", valor: mesasFinais != null ? inteiro(mesasFinais) : null },
   ];
 
   const nome = perfil?.apelido || perfil?.nome?.split(" ").slice(-1)[0] || "Jogador";
@@ -110,6 +116,7 @@ export default function PerfilPage() {
                 avatarUrl={perfil?.avatar_url}
                 fundador={fundador}
                 atributos={atributos}
+                destaque={destaque}
                 rodape={posicao ? `#${posicao} na temporada` : null}
               />
             </div>
