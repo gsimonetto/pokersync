@@ -205,6 +205,8 @@ interface TemaMesa {
   feltroPadrao?: { background: string; glow: string };
   luz: string;
   linhaAposta: string;
+  /** Cor da marca PokerSync impressa no feltro (bem apagada). */
+  marca: string;
   placa: { fundo: string; borda: string; nome: string; valor: string };
   pill: { fundo: string; borda: string; texto: string };
   pote: { fundo: string; borda: string; texto: string; brilho: string };
@@ -215,6 +217,7 @@ const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
   arena: {
     luz: "radial-gradient(40% 45% at 50% 40%, rgba(255,255,255,.12), transparent 70%)",
     linhaAposta: "rgba(255,255,255,.12)",
+    marca: "rgba(255,255,255,.075)",
     placa: { fundo: "linear-gradient(180deg, rgba(30,34,42,.94), rgba(10,12,15,.94))", borda: "rgba(255,255,255,.12)", nome: "rgba(255,255,255,.8)", valor: "#F5D48C" },
     pill: { fundo: "rgba(0,0,0,.75)", borda: "rgba(255,255,255,.18)", texto: "#FFFFFF" },
     pote: { fundo: "linear-gradient(180deg,#000000,#0A0A0A)", borda: "rgba(255,255,255,.20)", texto: "#FFFFFF", brilho: "0 0 20px rgba(52,211,153,.20)" },
@@ -227,6 +230,7 @@ const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
     },
     luz: "radial-gradient(45% 50% at 50% 38%, rgba(255,240,210,.12), transparent 70%)",
     linhaAposta: "rgba(201,164,92,.35)",
+    marca: "rgba(214,178,105,.2)",
     placa: { fundo: "radial-gradient(120% 120% at 30% 0%, #3a2616, #1a0f08 70%)", borda: "#8A6A32", nome: "#F5E3B8", valor: "#FFFFFF" },
     pill: { fundo: "rgba(20,12,6,.92)", borda: "#8A6A32", texto: "#F5E3B8" },
     pote: { fundo: "linear-gradient(180deg, #2a1a0e, #140c06)", borda: "#C9A45C", texto: "#F5E3B8", brilho: "0 0 18px rgba(201,164,92,.25)" },
@@ -1318,12 +1322,31 @@ export function PokerTable({
             boxShadow: sombraDoFeltro(espessuraBorda),
           }}
         >
-          {/* Textura do feltro, luz no centro e linha de aposta. Sem marca
-              escrita no feltro: no anel de 8 lugares ela caía atrás do
-              assento do topo. */}
+          {/* Textura do feltro, luz no centro e linha de aposta. */}
           <TexturaFeltro estilo={mesa} />
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: tema.luz }} />
           <div style={{ position: "absolute", inset: "12% 9%", borderRadius: cornerRadius, pointerEvents: "none", border: `1px solid ${tema.linhaAposta}` }} />
+          {/* Marca PokerSync impressa no pano (pedido explícito: "sem
+              atrapalhar a visualização"). Só a palavra, bem apagada, no
+              vão entre o board e o herói -- no topo ela caía atrás do
+              assento de cima. Fica no feltro, então cartas, fichas e
+              placas passam por cima. */}
+          <div
+            aria-hidden
+            style={{
+              position: "absolute",
+              left: "50%",
+              top: "68%",
+              width: aspectRatioValue < 1 ? "56%" : "38%",
+              maxWidth: 440,
+              aspectRatio: "775 / 62",
+              transform: "translate(-50%, -50%)",
+              pointerEvents: "none",
+              background: tema.marca,
+              WebkitMask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
+              mask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
+            }}
+          />
         </div>
 
         {/* FIX (2026-09): desceu de 44% pra 48% — com cartas SEMPRE em cima
