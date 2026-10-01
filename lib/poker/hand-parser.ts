@@ -1017,14 +1017,18 @@ function extractPreambleBlindActions(text: string, playerPattern: string = "\\S+
     // comentário equivalente em extractStreetActions.
     const postM = l.match(new RegExp(`^(${P}):\\s+(?:posts|paga o|coloca)\\s+(?:the\\s+)?(small blind|big blind|ante)\\s+\\$?([\\d.,]+)`, "i"));
     if (postM) {
-      actions.push({ player: postM[1], action: "posts", amount: Number(postM[3].replace(",", "")) });
+      // postType também aqui (bug corrigido 2026-10): no PokerStars os
+      // posts ficam todos antes de "*** HOLE CARDS ***" e saíam sem tipo --
+      // o ante ia somado à aposta do blind e o detector de rebuy errava a
+      // conta de "perdeu tudo" justo pelo valor do ante.
+      actions.push({ player: postM[1], action: "posts", amount: Number(postM[3].replace(",", "")), postType: postM[2].toLowerCase() as ParsedAction["postType"] });
       continue;
     }
     // 888poker (RADAR-004): mesmo post, sem ":" e valor entre colchetes --
     // ver comentario equivalente em extractStreetActions.
     const postNoColonM = l.match(new RegExp(`^(${P})\\s+posts\\s+(small blind|big blind|ante)\\s+\\[\\$?([\\d.,]+)\\]`, "i"));
     if (postNoColonM) {
-      actions.push({ player: postNoColonM[1], action: "posts", amount: Number(postNoColonM[3].replace(",", "")) });
+      actions.push({ player: postNoColonM[1], action: "posts", amount: Number(postNoColonM[3].replace(",", "")), postType: postNoColonM[2].toLowerCase() as ParsedAction["postType"] });
     }
   }
   return actions;
