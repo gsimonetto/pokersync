@@ -61,11 +61,15 @@ export function CartaEstilo({
   estilo,
   largura,
   baralho = "4cores",
+  soCantoDeCima = false,
 }: {
   card: string;
   estilo: EstiloCarta;
   largura: number;
   baralho?: "4cores" | "2cores";
+  /** Desenho da carta pequena (só o canto de cima, índice grande) em
+   *  qualquer tamanho -- cartas que ficam com o canto de baixo coberto. */
+  soCantoDeCima?: boolean;
 }) {
   const uid = useId().replace(/:/g, "");
   const id = (s: string) => `${uid}-${s}`;
@@ -74,7 +78,7 @@ export function CartaEstilo({
   const n = card.slice(-1).toLowerCase() as NaipeKey;
   const n2 = baralho === "2cores" ? ({ s: "s", h: "h", d: "h", c: "s" } as const)[n] : n; // cor do 2 cores
   const altura = Math.round((largura * 143) / 100);
-  const pequena = largura < 44;
+  const pequena = largura < 44 || soCantoDeCima;
   const dois = rank.length === 2;
 
   const tinta = estilo === "noir" ? TINTA_NOIR[n2] : estilo === "solido" ? "#ffffff" : estilo === "vintage" ? TINTA_VINTAGE[n2] : TINTA_4[n2];
@@ -93,9 +97,28 @@ export function CartaEstilo({
   const VAO = 0.2;
   const indice = (tamRank: number, tamNaipe: number, x: number, yRank: number, alinhar: "start" | "end", naipeAntes: boolean, cor: string, filtro?: string, fonte = FONTE, peso = "700") => {
     // Meia largura da coluna: "10" é mais largo que uma letra só.
-    const meia = tamRank * (dois ? 0.47 : 0.32);
+    const meia = tamRank * (dois ? 0.4 : 0.32);
     const centro = alinhar === "start" ? x + meia : x - meia;
     const yNaipe = naipeAntes ? yRank - tamRank * (ALTURA_LETRA + VAO) - tamNaipe / 2 : yRank + tamRank * VAO + tamNaipe / 2;
+    // "10" com o "1" desenhado reto (pedido explícito): o "1" da Space
+    // Grotesk tem um tracinho inclinado no topo que, pequeno, parece
+    // apóstrofo ("'10"). Haste com a espessura do traço da fonte em
+    // negrito (~14%) e a altura das maiúsculas, seguida do "0" da fonte.
+    if (dois && fonte === FONTE) {
+      const haste = tamRank * 0.145;
+      const vaoDigitos = tamRank * 0.09;
+      const larguraZero = tamRank * 0.55;
+      const inicio = centro - (haste + vaoDigitos + larguraZero) / 2;
+      return (
+        <g filter={filtro}>
+          <rect x={inicio} y={yRank - tamRank * 0.7} width={haste} height={tamRank * 0.7} rx={tamRank * 0.012} fill={cor} />
+          <text x={inicio + haste + vaoDigitos - tamRank * 0.05} y={yRank} fontFamily={fonte} fontWeight={peso} fontSize={tamRank} fill={cor}>
+            0
+          </text>
+          <Naipe n={n} x={centro} y={yNaipe} tam={tamNaipe} fill={cor} />
+        </g>
+      );
+    }
     return (
       <g filter={filtro}>
         <text

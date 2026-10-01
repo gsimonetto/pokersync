@@ -69,7 +69,18 @@ export function Card({
     );
   }
   if (!"shdc".includes(card.slice(-1).toLowerCase())) return null;
-  return <CartaEstilo card={card} estilo={estilo ?? preferencias.carta} largura={largura} baralho={baralho ?? preferencias.baralho} />;
+  // Cartas dos outros jogadores ficam atrás da etiqueta de posição, que
+  // cobre o canto de baixo: elas usam o desenho só com o canto de cima,
+  // índice grande (pedido explícito).
+  return (
+    <CartaEstilo
+      card={card}
+      estilo={estilo ?? preferencias.carta}
+      largura={largura}
+      baralho={baralho ?? preferencias.baralho}
+      soCantoDeCima={size === "villain"}
+    />
+  );
 }
 
 // CardBackPair (imagem do verso das cartas viradas) removido a pedido
