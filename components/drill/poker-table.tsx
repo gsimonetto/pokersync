@@ -4,6 +4,7 @@ import { createContext, useCallback, useContext, useEffect, useLayoutEffect, use
 import { Info, Target, Trophy } from "lucide-react";
 import { Card, alturaDaCarta, sortCardsDesc } from "./card";
 import { PilhaFichas, quebrarEmFichas } from "./ficha-americana";
+import { BordaMesa, TexturaFeltro, espessuraDaBorda, sombraDoFeltro } from "./acabamento-mesa";
 import { VooDeFichas, duracaoDoVoo, type Ponto, type Voo } from "./voo-fichas";
 import { F, POS, ACT, num } from "@/lib/poker/drill-theme";
 import type { SeatLayoutSlot } from "@/lib/poker/seat-layout";
@@ -198,17 +199,8 @@ const FELTROS_ESCOLHIDOS: Record<Exclude<CorFeltro, "padrao">, { background: str
 //          feltro, holofote no centro, placas de vidro escuro.
 //   Luxo:  borda de nogueira com veio, filete de latão, feltro camurça,
 //          placas de couro, fichas bordô.
-const RUIDO = `url("data:image/svg+xml;utf8,${encodeURIComponent(
-  "<svg xmlns='http://www.w3.org/2000/svg' width='180' height='180'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='.85' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 1  0 0 0 0 1  0 0 0 .55 0'/></filter><rect width='100%' height='100%' filter='url(#n)'/></svg>",
-)}")`;
-
+// A borda e a textura do feltro (os materiais) ficam em acabamento-mesa.tsx.
 interface TemaMesa {
-  /** Borda em volta do feltro; recebe o brilho do feltro (vira o LED na Arena). */
-  aro: (brilho: string) => React.CSSProperties;
-  /** Ruído por cima da borda (veio da madeira). */
-  aroComVeio?: boolean;
-  /** Anéis logo em volta do feltro (filete). */
-  feltroBorda: string[];
   /** Feltro quando a cor escolhida é "Padrão" (sem isso: a cor da tela). */
   feltroPadrao?: { background: string; glow: string };
   luz: string;
@@ -219,16 +211,8 @@ interface TemaMesa {
   dealer: React.CSSProperties;
 }
 
-// rgba(...,.35) -> rgba(...,.9): o brilho do feltro vira a luz do LED.
-const aceso = (cor: string) => cor.replace(/[\d.]+\)$/, "0.9)");
-
 const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
   arena: {
-    aro: (brilho) => ({
-      background: "linear-gradient(180deg, #2c2f36 0%, #111317 40%, #050506 100%)",
-      boxShadow: `0 0 0 1px #000, inset 0 2px 0 rgba(255,255,255,.14), inset 0 -2px 4px rgba(0,0,0,.8), 0 0 28px -6px ${aceso(brilho)}, 0 30px 70px rgba(0,0,0,.8)`,
-    }),
-    feltroBorda: ["0 0 0 2px #000", "0 0 0 3.5px rgba(255,255,255,.08)"],
     luz: "radial-gradient(40% 45% at 50% 40%, rgba(255,255,255,.12), transparent 70%)",
     linhaAposta: "rgba(255,255,255,.12)",
     placa: { fundo: "linear-gradient(180deg, rgba(30,34,42,.94), rgba(10,12,15,.94))", borda: "rgba(255,255,255,.12)", nome: "rgba(255,255,255,.8)", valor: "#F5D48C" },
@@ -237,13 +221,6 @@ const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
     dealer: { background: "radial-gradient(circle at 35% 30%, #ffffff, #d9d9d9)", color: "#111111", boxShadow: "0 2px 6px rgba(0,0,0,.6)" },
   },
   luxo: {
-    aro: () => ({
-      background:
-        "radial-gradient(120% 80% at 50% 0%, rgba(255,220,170,.25), transparent 50%), repeating-linear-gradient(95deg, #5a331b 0 3px, #6b3e22 3px 7px, #4a2914 7px 9px, #633a1f 9px 14px)",
-      boxShadow: "0 30px 70px rgba(0,0,0,.85), inset 0 2px 0 rgba(255,230,190,.35), inset 0 -3px 6px rgba(0,0,0,.6), 0 0 0 1px #1a0e06",
-    }),
-    aroComVeio: true,
-    feltroBorda: ["0 0 0 2px #C9A45C", "0 0 0 3px #5A4318"],
     feltroPadrao: {
       background: "radial-gradient(65% 75% at 50% 40%, #2C6A52 0%, #1D4D3B 35%, #123327 65%, #0A1F18 100%)",
       glow: "rgba(44,106,82,.35)",
@@ -1067,6 +1044,7 @@ export function PokerTable({
   const aspectRatioValue = parseAspectRatio(aspectRatio);
   const medidaMesa = useSeatScale(tableBoxRef, aspectRatioValue, minSeatScale);
   const seatScale = medidaMesa.scale * escalaAssentos;
+  const espessuraBorda = espessuraDaBorda(medidaMesa.largura, medidaMesa.altura);
   const emFichas = !sufixo;
   const vel = animacao === "rapida" ? 0.4 : 1;
 
@@ -1325,32 +1303,25 @@ export function PokerTable({
         ref={tableBoxRef}
       >
         {/* Borda da mesa (couro na Arena, nogueira no Luxo) -- ocupa a
-            faixa entre a caixa e o feltro. */}
-        <div style={{ position: "absolute", inset: 0, borderRadius: cornerRadius, pointerEvents: "none", ...tema.aro(felt.glow) }}>
-          {tema.aroComVeio && (
-            <div style={{ position: "absolute", inset: 0, borderRadius: cornerRadius, backgroundImage: RUIDO, backgroundSize: "90px 260px", opacity: 0.35, mixBlendMode: "overlay" }} />
-          )}
-        </div>
+            faixa entre a caixa e o feltro. Mesma largura em volta toda
+            (antes era % da largura e da altura: no celular, em pé, os
+            lados ficavam finos e o topo grosso). */}
+        <BordaMesa estilo={mesa} cornerRadius={cornerRadius} aspecto={aspectRatioValue} espessura={espessuraBorda} brilho={felt.glow} />
 
         <div
           style={{
             position: "absolute",
-            inset: "2.8% 2%",
+            inset: espessuraBorda,
             borderRadius: cornerRadius,
             background: felt.background,
             overflow: "hidden",
-            boxShadow: [
-              ...tema.feltroBorda,
-              `0 0 40px ${felt.glow}`,
-              "inset 0 2px 30px rgba(255,255,255,.06)",
-              "inset 0 -30px 80px rgba(0,0,0,.65)",
-            ].join(", "),
+            boxShadow: sombraDoFeltro(espessuraBorda),
           }}
         >
           {/* Textura do feltro, luz no centro e linha de aposta. Sem marca
               escrita no feltro: no anel de 8 lugares ela caía atrás do
               assento do topo. */}
-          <div style={{ position: "absolute", inset: 0, pointerEvents: "none", backgroundImage: RUIDO, opacity: 0.14, mixBlendMode: "overlay" }} />
+          <TexturaFeltro estilo={mesa} />
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: tema.luz }} />
           <div style={{ position: "absolute", inset: "12% 9%", borderRadius: cornerRadius, pointerEvents: "none", border: `1px solid ${tema.linhaAposta}` }} />
         </div>
