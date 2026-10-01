@@ -62,6 +62,30 @@ export function CartaTexto({ card }: { card: string }) {
   );
 }
 
+/** Carta do board em miniatura (fundo escuro, número + naipe na cor do baralho). */
+function MiniCarta({ card }: { card: string }) {
+  return (
+    <span
+      style={{
+        display: "inline-grid",
+        placeItems: "center",
+        minWidth: 22,
+        height: 18,
+        padding: "0 3px",
+        borderRadius: 4,
+        fontSize: 11,
+        lineHeight: 1,
+        background: "rgba(255,255,255,0.08)",
+        boxShadow: "inset 0 0 0 1px rgba(255,255,255,0.12)",
+      }}
+    >
+      <CartaTexto card={card} />
+    </span>
+  );
+}
+
+type ItemAcao = { pos: string | null; texto: string; hero: boolean; folds: boolean };
+
 export function LinhaDoTempo({
   ruas,
   board,
@@ -88,18 +112,23 @@ export function LinhaDoTempo({
         display: "grid",
         gridTemplateColumns: "minmax(0, 1fr) auto",
         alignItems: "stretch",
-        gap: 12,
+        gap: 10,
         height: 96,
         flexShrink: 0,
         // Direita maior: o botao flutuante de ajuda (canto inferior
         // direito da tela) ficava por cima do resultado.
-        padding: "9px 72px 9px 12px",
+        padding: "8px 72px 8px 8px",
         borderRadius: 14,
         border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
-      {/* Pre-flop mais largo: e' a rua com mais acao (8 jogadores). */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) repeat(3, minmax(0, 1fr))", gap: 12, minWidth: 0 }}>
+      {/* Cada rua num quadro próprio (pedido explícito: "separe melhor
+          essa parte, está bagunçado demais"): cabeçalho com o nome e as
+          cartas da rua, e embaixo uma ação por linha, com a posição
+          alinhada -- antes eram pílulas soltas uma atrás da outra. O
+          pré-flop é mais largo (é a rua com mais ação) e, quando passa de
+          3 linhas, as ações continuam numa segunda coluna. */}
+      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.5fr) repeat(3, minmax(0, 1fr))", gap: 6, minWidth: 0 }}>
         {ruas.map((r) => {
           const fatia = FATIA_BOARD[r.street];
           const cartas = fatia ? board.slice(fatia[0], fatia[1]).filter((c): c is string => Boolean(c)) : [];
@@ -107,11 +136,11 @@ export function LinhaDoTempo({
           // Folds seguidos de outros jogadores viram um contador só
           // ("4 folds") -- a mão real de 8 jogadores tem mais fold do que
           // qualquer outra coisa, e isso escondia as ações que importam.
-          const itens: { texto: string; hero: boolean; fraco: boolean }[] = [];
+          const itens: ItemAcao[] = [];
           let folds = 0;
           const nomes = nomesDosRaises(r.street, r.actions);
           const soltarFolds = () => {
-            if (folds > 0) itens.push({ texto: folds === 1 ? "1 fold" : `${folds} folds`, hero: false, fraco: true });
+            if (folds > 0) itens.push({ pos: null, texto: folds === 1 ? "1 fold" : `${folds} folds`, hero: false, folds: true });
             folds = 0;
           };
           for (const [i, a] of r.actions.entries()) {
@@ -121,48 +150,81 @@ export function LinhaDoTempo({
               continue;
             }
             soltarFolds();
-            itens.push({ texto: `${hero ? "Você" : a.pos} ${rotuloAcao(a.label, nomes[i])}`, hero, fraco: false });
+            itens.push({ pos: hero ? "Você" : a.pos, texto: rotuloAcao(a.label, nomes[i]), hero, folds: false });
           }
           soltarFolds();
           return (
-            <div key={r.street} style={{ minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 4, opacity: alcancada ? 1 : 0.35 }}>
-              {/* flexWrap: com a faixa estreita (tela de ~1024) as cartas
-                  da rua passavam por cima da coluna do lado -- agora
-                  descem pra linha de baixo. */}
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 6, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                <span style={{ color: r.current ? "#FFFFFF" : "rgba(255,255,255,0.45)" }}>{NOME_RUA[r.street] ?? r.street}</span>
+            <div
+              key={r.street}
+              style={{
+                minWidth: 0,
+                overflow: "hidden",
+                display: "flex",
+                flexDirection: "column",
+                gap: 5,
+                padding: "6px 9px",
+                borderRadius: 10,
+                background: r.current ? "rgba(212,175,55,0.06)" : "rgba(255,255,255,0.025)",
+                border: `1px solid ${r.current ? "rgba(212,175,55,0.35)" : "rgba(255,255,255,0.06)"}`,
+                opacity: alcancada ? 1 : 0.35,
+              }}
+            >
+              <div style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: 6, minHeight: 18 }}>
+                <span style={{ fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: r.current ? "#FFFFFF" : "rgba(255,255,255,0.5)", whiteSpace: "nowrap" }}>
+                  {NOME_RUA[r.street] ?? r.street}
+                </span>
                 {cartas.length > 0 && (
-                  <span style={{ display: "flex", flexWrap: "wrap", gap: 3, fontSize: 11, letterSpacing: 0, textTransform: "none" }}>
+                  <span style={{ display: "flex", gap: 3 }}>
                     {cartas.map((c) => (
-                      <CartaTexto key={c} card={c} />
+                      <MiniCarta key={c} card={c} />
                     ))}
                   </span>
                 )}
               </div>
-              <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 3, overflow: "hidden", maxHeight: 60 }}>
-                {itens.length === 0 ? (
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>—</span>
-                ) : (
-                  itens.map((it, i) => (
-                    <span
+              {itens.length === 0 ? (
+                <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>—</span>
+              ) : (
+                <div style={{ display: "grid", gridAutoFlow: "column", gridTemplateRows: "repeat(3, 16px)", gridAutoColumns: "max-content", justifyContent: "start", columnGap: 18, rowGap: 1 }}>
+                  {itens.map((it, i) => (
+                    <div
                       key={i}
                       style={{
-                        fontSize: 10.5,
-                        lineHeight: "18px",
-                        padding: "0 6px",
-                        borderRadius: 6,
+                        display: "flex",
+                        alignItems: "center",
+                        gap: 6,
+                        minWidth: 0,
+                        fontSize: 11,
+                        lineHeight: "16px",
                         whiteSpace: "nowrap",
                         ...num,
-                        color: it.hero ? "#111111" : it.fraco ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.82)",
-                        background: it.hero ? "#d4af37" : it.fraco ? "transparent" : "rgba(255,255,255,0.07)",
-                        fontWeight: it.hero ? 700 : 500,
                       }}
                     >
-                      {it.texto}
-                    </span>
-                  ))
-                )}
-              </div>
+                      {it.folds ? (
+                        <span style={{ color: "rgba(255,255,255,0.32)", fontStyle: "italic" }}>{it.texto}</span>
+                      ) : (
+                        <>
+                          <span
+                            style={{
+                              width: 34,
+                              flexShrink: 0,
+                              fontSize: 10,
+                              fontWeight: 700,
+                              color: it.hero ? "#d4af37" : "rgba(255,255,255,0.45)",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                            }}
+                          >
+                            {it.pos}
+                          </span>
+                          <span style={{ color: it.hero ? "#F3D77A" : "rgba(255,255,255,0.85)", fontWeight: it.hero ? 700 : 500, overflow: "hidden", textOverflow: "ellipsis" }}>
+                            {it.texto}
+                          </span>
+                        </>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
             </div>
           );
         })}
