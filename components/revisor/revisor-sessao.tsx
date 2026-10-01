@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
-import { AlertTriangle, Loader2, Search, X, List, ArrowLeft, Maximize2, Minimize2, Zap, Eye } from "lucide-react";
+import { AlertTriangle, Loader2, Search, X, List, ArrowLeft, Maximize2, Minimize2, PanelLeftClose, PanelLeftOpen } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { RevisorHandTable } from "./revisor-hand-table";
 import { classeIconeMesa } from "@/components/drill/mesa-ui";
@@ -64,6 +64,9 @@ const GRID_FALLBACK_HEIGHT = "calc(100vh - 240px)"; // usado so' ate a 1a medica
 // ainda mais espaco da viewport (BOTTOM_PADDING_PX bem menor) e sobe o
 // piso minimo (GRID_MIN_HEIGHT) pra telas mais baixas.
 const GRID_MIN_HEIGHT = 640;
+// Até essa largura (px) a lista de mãos ganha o botão de ocultar.
+const LARGURA_TELA_MENOR = 1366;
+const CHAVE_LISTA_OCULTA = "revisor:lista-oculta";
 const BOTTOM_PADDING_PX = 8;
 
 interface HandInListing {
@@ -110,7 +113,7 @@ interface HandInListing {
   }[];
 }
 
-// Resumo da mao pra lista (resultado em bb, all-in, showdown) -- reparseia
+// Resumo da mao pra lista (resultado em bb) -- reparseia
 // o hand_history bruto (mesma fonte da mesa, entao o numero da lista bate
 // com o stack final mostrado no replayer) e so' cai no parsed_data salvo
 // quando nao ha texto. Custo medido: ~0,3 ms por mao.
@@ -141,25 +144,6 @@ function HeroCardsPreview({ cards }: { cards: string[] }) {
         <HalfCard key={i} card={c} size="mini" />
       ))}
     </div>
-  );
-}
-
-// Selo minusculo da lista (icone de all-in / showdown) -- icone em vez de
-// texto porque a coluna tem 220px e "ALL-IN" + "SHOWDOWN" nao cabiam ao
-// lado do resultado; o significado aparece ao passar o mouse.
-function SeloMao({ cor, titulo, children }: { cor: string; titulo: string; children: ReactNode }) {
-  return (
-    <span
-      title={titulo}
-      aria-label={titulo}
-      style={{
-        display: "grid", placeItems: "center", width: 15, height: 15,
-        borderRadius: 4, color: cor,
-        background: `${cor}1F`, border: `1px solid ${cor}40`,
-      }}
-    >
-      {children}
-    </span>
   );
 }
 
@@ -271,6 +255,34 @@ export function RevisorSessao({
   // overlay deslizante, fecha sozinha ao selecionar uma mao (a mesa e' o
   // destino, nao a lista).
   const [listOpen, setListOpen] = useState(false);
+  // Telas menores do computador (notebook, tablet deitado): a coluna da
+  // lista come a largura da mesa, entao ganha um botao de ocultar (pedido
+  // explicito: "o revisor deve abrir um botão de ocultar para nao ocupar
+  // espaço da mesa"). A escolha fica salva no navegador.
+  const [telaMenor, setTelaMenor] = useState(false);
+  const [listaOculta, setListaOculta] = useState(false);
+  useEffect(() => {
+    const mq = window.matchMedia(`(max-width: ${LARGURA_TELA_MENOR}px)`);
+    const atualizar = () => setTelaMenor(mq.matches);
+    atualizar();
+    mq.addEventListener("change", atualizar);
+    try {
+      setListaOculta(localStorage.getItem(CHAVE_LISTA_OCULTA) === "1");
+    } catch {
+      // sem acesso ao armazenamento: começa com a lista aberta
+    }
+    return () => mq.removeEventListener("change", atualizar);
+  }, []);
+  const ocultarLista = useCallback((v: boolean) => {
+    setListaOculta(v);
+    try {
+      localStorage.setItem(CHAVE_LISTA_OCULTA, v ? "1" : "0");
+    } catch {
+      // sem acesso ao armazenamento: vale só nesta visita
+    }
+  }, []);
+  // Em tela grande a lista sempre aparece, mesmo que tenha ficado oculta.
+  const listaEscondida = !isMobile && telaMenor && listaOculta;
   // Alvo pra onde RevisorHandTable porta os botoes Salvar/Compartilhar/
   // Analisar no modo tela-cheia (pedido explicito: "os icones precisam
   // ficar ao lado do filtro la em cima") -- state (nao ref simples)
@@ -441,7 +453,7 @@ export function RevisorSessao({
     return [...map.entries()].map(([id, label]) => ({ id, label })).sort((a, b) => a.label.localeCompare(b.label));
   }, [hands]);
 
-  // Resumo por mao (resultado em bb / all-in / showdown), calculado uma
+  // Resumo por mao (resultado em bb), calculado uma
   // vez por carga da lista.
   const resumos = useMemo(() => {
     const out: Record<string, ResumoMao | null> = {};
@@ -576,6 +588,19 @@ export function RevisorSessao({
             >
               <Search size={13} />
             </button>
+            {!isMobile && telaMenor && (
+              <button
+                onClick={() => ocultarLista(true)}
+                aria-label="Ocultar lista de mãos"
+                title="Ocultar lista de mãos (mais espaço pra mesa)"
+                style={{
+                  all: "unset", cursor: "pointer", display: "grid", placeItems: "center",
+                  width: 22, height: 22, borderRadius: 6, color: "rgba(255,255,255,0.5)",
+                }}
+              >
+                <PanelLeftClose size={14} />
+              </button>
+            )}
             {isMobile && (
               <button
                 onClick={() => setListOpen(false)}
@@ -805,9 +830,9 @@ export function RevisorSessao({
                     )}
                   </div>
                 </div>
-                {/* Resultado do heroi na mao (bb) + selos de all-in /
-                    showdown -- o que mais ajuda a escolher QUAL mao
-                    rever primeiro. */}
+                {/* Resultado do heroi na mao (bb) -- o que mais ajuda a
+                    escolher QUAL mao rever primeiro. Os selos de all-in e
+                    showdown sairam (pedido explicito). */}
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 3, flexShrink: 0 }}>
                   {bb != null && (
                     <span
@@ -817,20 +842,6 @@ export function RevisorSessao({
                       }}
                     >
                       {formatarBb(bb)}
-                    </span>
-                  )}
-                  {(resumo?.allIn || resumo?.showdown) && (
-                    <span style={{ display: "flex", gap: 3 }}>
-                      {resumo.allIn && (
-                        <SeloMao cor="#F87171" titulo="Você foi all-in nessa mão">
-                          <Zap size={9} strokeWidth={2.4} />
-                        </SeloMao>
-                      )}
-                      {resumo.showdown && (
-                        <SeloMao cor="#60A5FA" titulo="Foi ao showdown (as cartas foram mostradas)">
-                          <Eye size={9} strokeWidth={2.4} />
-                        </SeloMao>
-                      )}
                     </span>
                   )}
                 </div>
@@ -1002,7 +1013,8 @@ export function RevisorSessao({
           display: "grid",
           // 236px (era 220): "Mão 2" virava "Mã..." quando o resultado
           // era largo ("+14,8 BB").
-          gridTemplateColumns: "236px 1fr",
+          // Lista oculta: só uma faixa fina com o botão de mostrar de volta.
+          gridTemplateColumns: listaEscondida ? "40px 1fr" : "236px 1fr",
           gap: 12,
           height: gridHeight ? `${gridHeight}px` : GRID_FALLBACK_HEIGHT,
           minHeight: GRID_MIN_HEIGHT,
@@ -1019,8 +1031,33 @@ export function RevisorSessao({
             minHeight: 0,
           }}
         >
-          {listPanel}
-          <div ref={setAvaliacaoSlotEl} style={{ flexShrink: 0 }} />
+          {listaEscondida && (
+            <button
+              onClick={() => ocultarLista(false)}
+              aria-label="Mostrar lista de mãos"
+              title="Mostrar lista de mãos"
+              style={{
+                all: "unset", cursor: "pointer", display: "flex", flexDirection: "column", alignItems: "center",
+                gap: 10, padding: "12px 0", color: "rgba(255,255,255,0.6)",
+              }}
+            >
+              <PanelLeftOpen size={16} />
+              <span
+                style={{
+                  writingMode: "vertical-rl", transform: "rotate(180deg)", fontSize: 10, fontWeight: 500,
+                  letterSpacing: "0.14em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)",
+                }}
+              >
+                Mãos ({filteredHands.length})
+              </span>
+            </button>
+          )}
+          {/* Oculta, a lista continua montada (rolagem e o slot da
+              avaliação ficam como estavam) -- só some da tela. */}
+          <div style={{ display: listaEscondida ? "none" : "contents" }}>
+            {listPanel}
+            <div ref={setAvaliacaoSlotEl} style={{ flexShrink: 0 }} />
+          </div>
         </aside>
 
         {/* overflow "auto" (era "hidden") — pedido explicito: "botoes de
