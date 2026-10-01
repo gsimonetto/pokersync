@@ -2,7 +2,7 @@
 
 import { useEffect, useRef, useState, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
-import { ArrowLeft, Bookmark, ListChecks, Plus, SlidersHorizontal } from "lucide-react";
+import { ArrowLeft, Bookmark, ListChecks, Plus } from "lucide-react";
 import { AppShell } from "@/components/app-shell";
 import { PainelVisual } from "@/components/dashboard/kit";
 import { PerfEstilos } from "@/components/performance/perf-estilos";
@@ -15,9 +15,8 @@ import { RevisorNovaMao } from "@/components/revisor/revisor-nova-mao";
 import { RevisorDetalhe } from "@/components/revisor/revisor-detalhe";
 import { RevisorSessao } from "@/components/revisor/revisor-sessao";
 import { RevisorSpotsSalvos } from "@/components/revisor/revisor-spots-salvos";
-import { RevisorFiltrosAvancados } from "@/components/revisor/revisor-filtros-avancados";
 
-type Screen = "fila" | "salvos" | "filtros" | "filtro-replay" | "nova" | "sessao" | "detalhe";
+type Screen = "fila" | "salvos" | "filtro-replay" | "nova" | "sessao" | "detalhe";
 
 // Navegacao interna do Revisor de Maos (2026-08 v2): agora inclui a tela
 // "sessao" (master-detail de torneio/cash). Fluxo esperado:
@@ -55,12 +54,12 @@ function RevisorPageInner() {
   const filterLabel = searchParams.get("label") ?? undefined;
   const [selectedReviewId, setSelectedReviewId] = useState<string | null>(sharedParam);
   const [selectedSessionId, setSelectedSessionId] = useState<string | null>(null);
-  // Resultado dos Filtros avancados que o jogador clicou pra ver na mesa
+  // Resultado dos filtros da Fila que o jogador clicou pra ver na mesa
   // (replayer) -- guardado enquanto ele navega pro "Analisar mao" e volta,
   // pra reabrir o mesmo conjunto de maos filtradas em vez de voltar pro
   // formulario de filtro.
   const [filtroReviewIds, setFiltroReviewIds] = useState<string[]>(filterHandIds ?? (sharedParam ? [sharedParam] : []));
-  // De onde veio a lista aberta na mesa: Filtros avançados, Salvos, um
+  // De onde veio a lista aberta na mesa: filtros da Fila, Salvos, um
   // link com filtro (Performance) ou uma mao compartilhada -- decide o
   // título e pra onde "voltar".
   const [filtroOrigem, setFiltroOrigem] = useState<"filtros" | "salvos" | "link" | "compartilhada">(
@@ -112,11 +111,6 @@ function RevisorPageInner() {
     setSelectedSessionId(null);
     setScreen("salvos");
   }
-  function goFiltros() {
-    setSelectedReviewId(null);
-    setSelectedSessionId(null);
-    setScreen("filtros");
-  }
   function goNova() {
     setScreen("nova");
   }
@@ -158,7 +152,7 @@ function RevisorPageInner() {
     else if (filtroOrigem === "link" || filtroOrigem === "compartilhada") {
       router.replace("/revisor");
       goFila();
-    } else goFiltros();
+    } else goFila();
   }
   function goDetalheFromFiltroReplay(reviewId: string) {
     setDetalheOrigin("filtro-replay");
@@ -181,7 +175,7 @@ function RevisorPageInner() {
     }
   }
 
-  const emLista = screen === "fila" || screen === "salvos" || screen === "filtros";
+  const emLista = screen === "fila" || screen === "salvos";
 
   return (
     <AppShell>
@@ -216,13 +210,12 @@ function RevisorPageInner() {
           </header>
           <div className="sticky top-0 z-30 -mx-4 mb-3.5 border-b border-white/[0.06] bg-black/70 px-4 pt-1 backdrop-blur-xl md:-mx-6 md:px-6">
             <AbasAnimadas
-              value={screen as "fila" | "salvos" | "filtros"}
-              onChange={(s) => (s === "fila" ? goFila() : s === "salvos" ? goSalvos() : goFiltros())}
+              value={screen as "fila" | "salvos"}
+              onChange={(s) => (s === "fila" ? goFila() : goSalvos())}
               rotulo="Seções do Revisor de Mãos"
               options={[
                 { value: "fila", label: "Fila", icon: ListChecks },
                 { value: "salvos", label: "Salvos", icon: Bookmark },
-                { value: "filtros", label: "Filtros avançados", icon: SlidersHorizontal },
               ]}
             />
           </div>
@@ -247,10 +240,9 @@ function RevisorPageInner() {
         )}
 
         {screen === "fila" && (
-          <RevisorFila key={filaVersao} onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} />
+          <RevisorFila key={filaVersao} onNova={goNova} onOpen={goDetalhe} onOpenSession={goSessao} onOpenMaos={goFiltroReplay} />
         )}
         {screen === "salvos" && <RevisorSpotsSalvos onOpen={goDetalheFromSalvos} onOpenNaMesa={goSalvosNaMesa} />}
-        {screen === "filtros" && <RevisorFiltrosAvancados onOpen={goFiltroReplay} />}
         {screen === "filtro-replay" && filtroReviewIds.length > 0 && (
           <RevisorSessao
             reviewIds={filtroReviewIds}
@@ -261,7 +253,7 @@ function RevisorPageInner() {
                   ? (filterLabel ?? "Mãos filtradas")
                   : filtroOrigem === "compartilhada"
                     ? "Mão compartilhada"
-                    : "Filtros avançados"
+                    : "Mãos filtradas"
             }
             initialSelectedId={selectedReviewId ?? undefined}
             onOpenHand={goDetalheFromFiltroReplay}
