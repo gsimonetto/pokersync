@@ -28,14 +28,15 @@ export interface OpcaoAcao<Id extends string = string> {
   valorBb?: number | null;
 }
 
-// Paleta = a da grade de range do solver (lib/poker/grade-gto.ts), um
-// tom mais fechado pra texto branco ter contraste em cima.
+// Paleta = a da grade 13x13 (lib/poker/grade-gto.ts: fold azul, call
+// verde, raise vermelho, all-in laranja), um tom mais fechado pra texto
+// branco ter contraste em cima. Check segue o call (jogada passiva).
 const COR_ACAO: Record<TipoAcao, { base: string; topo: string; borda: string }> = {
-  fold: { base: "#2B3038", topo: "#3A404A", borda: "rgba(255,255,255,0.14)" },
-  check: { base: "#1D4ED8", topo: "#2F64EA", borda: "rgba(147,197,253,0.35)" },
-  call: { base: "#1D4ED8", topo: "#2F64EA", borda: "rgba(147,197,253,0.35)" },
-  raise: { base: "#15803D", topo: "#1C9A4B", borda: "rgba(134,239,172,0.35)" },
-  allin: { base: "#C62828", topo: "#DE3A3A", borda: "rgba(252,165,165,0.35)" },
+  fold: { base: "#1D4ED8", topo: "#2F64EA", borda: "rgba(147,197,253,0.35)" },
+  check: { base: "#15803D", topo: "#1C9A4B", borda: "rgba(134,239,172,0.35)" },
+  call: { base: "#15803D", topo: "#1C9A4B", borda: "rgba(134,239,172,0.35)" },
+  raise: { base: "#C62828", topo: "#DE3A3A", borda: "rgba(252,165,165,0.35)" },
+  allin: { base: "#C2620A", topo: "#DE7A12", borda: "rgba(253,211,138,0.4)" },
 };
 
 const PESO: Record<TipoAcao, number> = { fold: 0, check: 1, call: 1, raise: 2, allin: 3 };
