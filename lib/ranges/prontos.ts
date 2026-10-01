@@ -5,6 +5,7 @@
 
 import { COR_ACAO } from "@/lib/poker/grade-gto";
 import { lerTextoRange, type Pesos } from "./notacao";
+import type { ContraOQue } from "./link-da-mao";
 
 export interface LinhaPreflop {
   spot_id: string;
@@ -23,25 +24,31 @@ export interface RangePronto {
   vsPosicao: string | null;
   stack: number;
   acao: Acao;
+  /** O que o herói enfrenta (null: ação que o PokerSync não conhece). */
+  contra: ContraOQue | null;
   spotId: string;
   pesos: Pesos;
 }
 
-const VERBOS: { chave: string; texto: string; acao: Acao; vs: boolean }[] = [
-  { chave: "RFI", texto: "abre", acao: "abrir", vs: false },
+// contra: o que o herói enfrenta no spot (o mesmo "contra" do link do
+// Revisor, lib/ranges/link-da-mao.ts) -- pra um aumento normal nunca abrir
+// o range de pagar all-in, e vice-versa.
+const VERBOS: { chave: string; texto: string; acao: Acao; vs: boolean; contra: ContraOQue }[] = [
+  { chave: "RFI", texto: "abre", acao: "abrir", vs: false, contra: "nada" },
+  { chave: "SHOVE", texto: "vai de all-in", acao: "allin", vs: false, contra: "nada" },
   // Range misto (limp + all-in na mesma grade, sem separar qual mão vai pra
   // qual) -- ação própria pra não pintar de "call" o que também é all-in.
-  { chave: "COMPLETE_OR_SHOVE", texto: "completa ou vai de all-in", acao: "completar_allin", vs: false },
-  { chave: "COMPLETE", texto: "completa", acao: "completar", vs: false },
-  { chave: "CALL_VS_MINRAISE", texto: "paga min-raise", acao: "pagar", vs: true },
-  { chave: "CALL_VS_SHOVE", texto: "paga all-in", acao: "pagar", vs: true },
-  { chave: "FLAT_CALL", texto: "paga", acao: "pagar", vs: true },
-  { chave: "CALL", texto: "paga", acao: "pagar", vs: true },
-  { chave: "3BET_SHOVE", texto: "3-bet all-in", acao: "allin", vs: true },
-  { chave: "3BET_NON_JAM", texto: "3-bet (sem all-in)", acao: "3bet", vs: true },
-  { chave: "3BET", texto: "3-bet", acao: "3bet", vs: true },
-  { chave: "CHECK_BEHIND", texto: "dá check", acao: "check", vs: true },
-  { chave: "RAISE_VS_LIMP", texto: "aumenta o limp", acao: "aumentar", vs: true },
+  { chave: "COMPLETE_OR_SHOVE", texto: "completa ou vai de all-in", acao: "completar_allin", vs: false, contra: "nada" },
+  { chave: "COMPLETE", texto: "completa", acao: "completar", vs: false, contra: "nada" },
+  { chave: "CALL_VS_MINRAISE", texto: "paga min-raise", acao: "pagar", vs: true, contra: "aumento" },
+  { chave: "CALL_VS_SHOVE", texto: "paga all-in", acao: "pagar", vs: true, contra: "allin" },
+  { chave: "FLAT_CALL", texto: "paga", acao: "pagar", vs: true, contra: "aumento" },
+  { chave: "CALL", texto: "paga", acao: "pagar", vs: true, contra: "aumento" },
+  { chave: "3BET_SHOVE", texto: "3-bet all-in", acao: "allin", vs: true, contra: "aumento" },
+  { chave: "3BET_NON_JAM", texto: "3-bet (sem all-in)", acao: "3bet", vs: true, contra: "aumento" },
+  { chave: "3BET", texto: "3-bet", acao: "3bet", vs: true, contra: "aumento" },
+  { chave: "CHECK_BEHIND", texto: "dá check", acao: "check", vs: true, contra: "limp" },
+  { chave: "RAISE_VS_LIMP", texto: "aumenta o limp", acao: "aumentar", vs: true, contra: "limp" },
 ];
 
 export function traduzirPronto(l: LinhaPreflop): RangePronto {
@@ -63,6 +70,7 @@ export function traduzirPronto(l: LinhaPreflop): RangePronto {
     vsPosicao,
     stack: l.stack_bb,
     acao: verbo?.acao ?? "outra",
+    contra: verbo?.contra ?? null,
     spotId: l.spot_id,
     pesos: lerTextoRange(l.range_string).pesos,
   };

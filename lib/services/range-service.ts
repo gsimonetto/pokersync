@@ -228,20 +228,27 @@ export type AcaoReal = "abrir" | "pagar" | "3bet";
 export interface RangeReal {
   posicao: string;
   acao: AcaoReal;
+  /** Só contra um aumento normal ou só contra um all-in (sem: os dois). */
+  contra?: "aumento" | "allin" | null;
+  /** Só mãos com stack efetivo parecido com esse (BB). */
+  stack?: number | null;
   /** Peso de cada mão = quantas vezes fez / quantas vezes teve a chance. */
   pesos: Pesos;
   oportunidades: number;
   vezes: number;
 }
 
-/** "Seu range de verdade", por posição, montado com as mãos importadas. */
-export async function rangeReal(acao: AcaoReal): Promise<RangeReal[]> {
+/** "Seu range de verdade", por posição, montado com as mãos importadas.
+ *  contra (pagar e 3-bet): só as mãos contra um aumento normal ou só as
+ *  contra um all-in. stack (BB): só as mãos com stack efetivo parecido
+ *  (até 10% de diferença, a mesma folga do Construtor). */
+export async function rangeReal(acao: AcaoReal, contra: "aumento" | "allin" | null = null, stack: number | null = null): Promise<RangeReal[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc("range_real", { p_acao: acao });
+  const { data, error } = await supabase.rpc("range_real_situacao", { p_acao: acao, p_contra: contra, p_stack: stack });
   if (error) throw error;
   const porPosicao = new Map<string, RangeReal>();
   for (const l of (data ?? []) as { posicao: string; mao: string; vezes: number; oportunidades: number }[]) {
-    const r = porPosicao.get(l.posicao) ?? { posicao: l.posicao, acao, pesos: {}, oportunidades: 0, vezes: 0 };
+    const r = porPosicao.get(l.posicao) ?? { posicao: l.posicao, acao, contra, stack, pesos: {}, oportunidades: 0, vezes: 0 };
     r.oportunidades += l.oportunidades;
     r.vezes += l.vezes;
     if (l.vezes > 0) r.pesos[l.mao] = Math.round((l.vezes / l.oportunidades) * 100);
