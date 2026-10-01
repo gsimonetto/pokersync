@@ -80,25 +80,37 @@ export function CartaEstilo({
   const tinta = estilo === "noir" ? TINTA_NOIR[n2] : estilo === "solido" ? "#ffffff" : estilo === "vintage" ? TINTA_VINTAGE[n2] : TINTA_4[n2];
   const corNaipe = TINTA_4[n2];
 
-  // Índice (valor) -- cresce na carta pequena, que só mostra o canto de cima.
-  const indice = (tamRank: number, tamNaipe: number, x: number, yRank: number, alinhar: "start" | "end", naipeAntes: boolean, cor: string, filtro?: string, fonte = FONTE) => {
-    const xNaipe = alinhar === "start" ? x + (dois ? tamRank * 0.55 : tamRank * 0.3) : x - (dois ? tamRank * 0.55 : tamRank * 0.3);
-    const yNaipe = naipeAntes ? yRank - tamRank * 0.92 - tamNaipe * 0.5 : yRank + tamNaipe * 0.72;
+  // Índice (valor + naipe) -- cresce na carta pequena, que só mostra o
+  // canto de cima. Revisado (pedido explícito: "alinhe melhor o naipe com
+  // o número, o coração está mais pra cima"), medindo a Space Grotesk
+  // negrito: letra com 71% da altura da fonte e a perna do Q descendo
+  // 18%. Antes o vão número-naipe era 12% em cima (o naipe encostava no
+  // Q) e 21% embaixo, e o naipe ia por uma largura estimada da letra.
+  // Agora número e naipe ficam centralizados na MESMA coluna e com o
+  // MESMO vão (20%) nos dois cantos. `x` é a borda da coluna (esquerda
+  // em cima, direita embaixo).
+  const ALTURA_LETRA = 0.71;
+  const VAO = 0.2;
+  const indice = (tamRank: number, tamNaipe: number, x: number, yRank: number, alinhar: "start" | "end", naipeAntes: boolean, cor: string, filtro?: string, fonte = FONTE, peso = "700") => {
+    // Meia largura da coluna: "10" é mais largo que uma letra só.
+    const meia = tamRank * (dois ? 0.47 : 0.32);
+    const centro = alinhar === "start" ? x + meia : x - meia;
+    const yNaipe = naipeAntes ? yRank - tamRank * (ALTURA_LETRA + VAO) - tamNaipe / 2 : yRank + tamRank * VAO + tamNaipe / 2;
     return (
       <g filter={filtro}>
         <text
-          x={x}
+          x={centro}
           y={yRank}
-          textAnchor={alinhar}
+          textAnchor="middle"
           fontFamily={fonte}
-          fontWeight="700"
+          fontWeight={peso}
           fontSize={tamRank}
           letterSpacing={dois ? -tamRank * 0.1 : 0}
           fill={cor}
         >
           {rank}
         </text>
-        <Naipe n={n} x={xNaipe} y={yNaipe} tam={tamNaipe} fill={cor} />
+        <Naipe n={n} x={centro} y={yNaipe} tam={tamNaipe} fill={cor} />
       </g>
     );
   };
@@ -121,13 +133,13 @@ export function CartaEstilo({
           {pequena ? (
             <>
               {indice(52, 30, 9, 50, "start", false, tinta)}
-              <Naipe n={n} x={64} y={104} tam={50} fill={tinta} />
+              <Naipe n={n} x={67} y={107} tam={48} fill={tinta} />
             </>
           ) : (
             <>
               {indice(34, 19, 9, 34, "start", false, tinta)}
               <Naipe n={n} x={50} y={71} tam={44} fill={tinta} extra={<path d={NAIPE_PATH[n]} fill={`url(#${id("tinta")})`} />} />
-              {indice(30, 16, 91, 134, "end", true, tinta)}
+              {indice(34, 19, 91, 131, "end", true, tinta)}
             </>
           )}
         </>
@@ -142,10 +154,7 @@ export function CartaEstilo({
       corpo = (
         <>
           {papel}
-          <text x="7" y="50" fontFamily={FONTE} fontWeight="800" fontSize="52" letterSpacing={dois ? -5 : 0} fill={tinta}>
-            {rank}
-          </text>
-          <Naipe n={n} x={21} y={72} tam={pequena ? 30 : 26} fill={tinta} />
+          {indice(52, pequena ? 30 : 26, 7, 50, "start", false, tinta, undefined, FONTE, "800")}
           <Naipe n={n} x={68} y={110} tam={pequena ? 46 : 42} fill={tinta} extra={<path d={NAIPE_PATH[n]} fill={`url(#${id("tinta")})`} />} />
           {!pequena && <rect x="5" y="5" width="90" height="133" rx="5" fill="none" stroke={tinta} strokeOpacity=".12" strokeWidth=".8" />}
         </>
@@ -161,7 +170,7 @@ export function CartaEstilo({
         {pequena ? (
           <>
             {indice(52, 30, 9, 50, "start", false, "#fff", `url(#${id("relevo")})`)}
-            <Naipe n={n} x={64} y={104} tam={50} fill="#fff" />
+            <Naipe n={n} x={67} y={107} tam={48} fill="#fff" />
           </>
         ) : (
           <>
@@ -169,7 +178,7 @@ export function CartaEstilo({
             <g filter={`url(#${id("relevo")})`}>
               <Naipe n={n} x={50} y={71} tam={44} fill="#fff" />
             </g>
-            {indice(30, 16, 91, 134, "end", true, "#fff", `url(#${id("relevo")})`)}
+            {indice(34, 19, 91, 131, "end", true, "#fff", `url(#${id("relevo")})`)}
           </>
         )}
       </>
@@ -236,7 +245,7 @@ export function CartaEstilo({
         {pequena ? (
           <>
             {indice(50, 28, 9, 50, "start", false, tinta, undefined, SERIFA)}
-            <Naipe n={n} x={64} y={104} tam={50} fill={tinta} />
+            <Naipe n={n} x={67} y={107} tam={48} fill={tinta} />
           </>
         ) : (
           <>
@@ -271,7 +280,7 @@ export function CartaEstilo({
           <>
             {indice(52, 30, 9, 50, "start", false, "#fff", `url(#${id("brilhoTinta")})`)}
             <g filter={`url(#${id("brilhoTinta")})`}>
-              <Naipe n={n} x={64} y={104} tam={50} fill="#fff" />
+              <Naipe n={n} x={67} y={107} tam={48} fill="#fff" />
             </g>
           </>
         ) : (
