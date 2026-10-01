@@ -24,7 +24,12 @@ export interface HandDecision {
 /** Mão ausente do mapa = fold 100%. */
 export type RangeHands = Record<string, HandDecision>;
 
-const RAISE_TYPE_COLOR: Record<RaiseType, string> = { raise: "#22c55e", threebet: "#f59e0b", allin: "#e0555a" };
+/** Cores das ações em toda grade de range do PokerSync (Treino, Construtor,
+ *  biblioteca, Performance): fold cinza, call azul, raise verde, 3-bet
+ *  laranja, all-in vermelho. */
+export const COR_ACAO = { fold: "#c4c7c8", call: "#3b82f6", raise: "#22c55e", threebet: "#f59e0b", allin: "#e0555a" } as const;
+
+const RAISE_TYPE_COLOR: Record<RaiseType, string> = { raise: COR_ACAO.raise, threebet: COR_ACAO.threebet, allin: COR_ACAO.allin };
 const EMPTY_DECISION: HandDecision = { fold: 100, call: 0, raise: 0 };
 
 export function getDecision(hands: RangeHands, label: string): HandDecision {
@@ -43,8 +48,8 @@ export function getHandLabel(rowIdx: number, colIdx: number): string {
 // raise (verde, laranja no 3-bet, vermelho no all-in). Fold 100% fica
 // quase invisível de propósito -- só o que tem ação chama atenção.
 export function cellBackground(d: HandDecision): string {
-  const foldC = "#c4c7c8",
-    callC = "#3b82f6";
+  const foldC = COR_ACAO.fold,
+    callC = COR_ACAO.call;
   const foldEnd = d.fold;
   const callEnd = d.fold + d.call;
   const stops = [`${foldC}22 0%`, `${foldC}22 ${foldEnd}%`, `${callC} ${foldEnd}%`, `${callC} ${callEnd}%`];

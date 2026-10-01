@@ -30,7 +30,7 @@ function ItemRange({ r, detalhe, onClick }: { r: RangeAtual; detalhe?: string; o
       onClick={onClick}
       className="flex w-full items-center gap-3 rounded-xl border border-white/[0.07] bg-white/[0.02] p-2.5 text-left transition hover:border-white/20 hover:bg-white/[0.05]"
     >
-      <MiniGrade pesos={r.pesos} pesosCombo={r.pesosCombo} largura={58} />
+      <MiniGrade pesos={r.pesos} pesosCombo={r.pesosCombo} largura={58} acao={r.acao} />
       <span className="flex min-w-0 flex-1 flex-col">
         <span className="truncate text-[13px] font-semibold text-ink">{r.nome}</span>
         <span className="tnum text-[11.5px] text-muted">

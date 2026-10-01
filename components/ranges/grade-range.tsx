@@ -3,7 +3,14 @@
 import { useMemo, useRef } from "react";
 import { TODAS_AS_MAOS, combosDaMao } from "@/lib/ranges/cartas";
 import { pesoDaMao, type Pesos } from "@/lib/ranges/notacao";
+import { COR_ACAO } from "@/lib/poker/grade-gto";
+import { corDaAcao } from "@/lib/ranges/prontos";
 import { corEquidade } from "./pecas";
+
+// Fora do range = fold: cinza fraco, igual à grade do Treino.
+const FUNDO_FOLD = `${COR_ACAO.fold}1f`;
+// Texto escuro sobre as cores claras (dourado, verde, laranja); branco no azul e no vermelho.
+const CORES_CLARAS = new Set<string>(["#d4af37", COR_ACAO.raise, COR_ACAO.threebet]);
 
 // Grade 13x13 do Construtor. Pinta clicando ou arrastando (no celular:
 // toque numa mão, ou arraste de lado); botão direito (ou segurar o dedo)
@@ -41,6 +48,7 @@ export function GradeRange({
   somenteLeitura = false,
   destacarMao = null,
   compacta = true,
+  acao = null,
 }: {
   pesos: Pesos;
   pesosCombo: Pesos;
@@ -53,7 +61,12 @@ export function GradeRange({
   somenteLeitura?: boolean;
   destacarMao?: string | null;
   compacta?: boolean;
+  /** Ação do range ("abrir", "pagar", "3bet", "allin"...): pinta a mão na
+   *  cor dessa ação (raise verde, call azul, 3-bet laranja, all-in
+   *  vermelho); sem ação, dourado. */
+  acao?: string | null;
 }) {
+  const corRange = corDaAcao(acao);
   const traco = useRef<Traco | null>(null);
 
   const celulas = useMemo(
@@ -61,14 +74,14 @@ export function GradeRange({
       TODAS_AS_MAOS.map((mao) => {
         const p = pesoDaMao(pesos, pesosCombo, mao);
         const temCombo = combosDaMao(mao).some((c) => c in pesosCombo);
-        let fundo = "rgba(255,255,255,0.035)";
+        let fundo = modo.tipo === "range" ? FUNDO_FOLD : "rgba(255,255,255,0.035)";
         let cor = "rgba(255,255,255,0.3)";
         let preenche: { cor: string; altura: number } | null = null;
         let extra: string | null = null;
         if (modo.tipo === "range") {
           if (p > 0) {
-            preenche = { cor: "rgba(212,175,55,0.9)", altura: p };
-            cor = p >= 60 ? "#1b1606" : "#FFFFFF";
+            preenche = { cor: corRange, altura: p };
+            cor = p >= 60 && CORES_CLARAS.has(corRange) ? "#141414" : "#FFFFFF";
           }
         } else if (modo.tipo === "destaque") {
           // só as mãos que chegaram nessa rua entram na conta
@@ -102,7 +115,7 @@ export function GradeRange({
         }
         return { mao, p, temCombo, fundo, cor, preenche, extra };
       }),
-    [pesos, pesosCombo, modo],
+    [pesos, pesosCombo, modo, corRange],
   );
 
   const pesoDe = (mao: string) => celulas.find((c) => c.mao === mao)?.p ?? 0;

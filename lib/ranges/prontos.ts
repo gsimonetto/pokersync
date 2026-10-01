@@ -3,6 +3,7 @@
 // leitura -- "BTN_RFI" no spot "mtt_40bb_btn_vs_bb_srp" vira "BTN abre ·
 // 40bb", com posição, contra quem e a ação.
 
+import { COR_ACAO } from "@/lib/poker/grade-gto";
 import { lerTextoRange, type Pesos } from "./notacao";
 
 export interface LinhaPreflop {
@@ -75,3 +76,15 @@ export const NOME_ACAO: Record<Acao, string> = {
   aumentar: "Aumentar",
   outra: "Outra",
 };
+
+/** Cor da ação de um range (a mesma paleta da grade do Treino). Range sem
+ *  ação definida fica no dourado do produto. */
+export function corDaAcao(acao: string | null | undefined): string {
+  if (acao === "abrir" || acao === "aumentar") return COR_ACAO.raise;
+  if (acao === "pagar" || acao === "completar" || acao === "check") return COR_ACAO.call;
+  if (acao === "3bet") return COR_ACAO.threebet;
+  if (acao === "allin") return COR_ACAO.allin;
+  return COR_SEM_ACAO;
+}
+
+export const COR_SEM_ACAO = "#d4af37";

@@ -294,6 +294,7 @@ export default function RangesPage() {
               nome={treino?.nome ?? ""}
               pesos={treino?.pesos ?? {}}
               pesosCombo={treino?.pesosCombo ?? {}}
+              acao={treino?.acao ?? null}
               onFechar={() => setTreino(null)}
             />
           </main>

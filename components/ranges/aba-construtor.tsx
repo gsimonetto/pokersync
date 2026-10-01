@@ -7,7 +7,8 @@ import { BOTAO_ICONE, BOTAO_OURO, BOTAO_VIDRO } from "@/components/banca/util";
 import { FEITAS, PROJETOS, fracaoPorMao } from "@/lib/ranges/acertos";
 import { combosPorMao, maoDoCombo, TODAS_AS_MAOS } from "@/lib/ranges/cartas";
 import { pesoDaMao, topPercent, type Pesos } from "@/lib/ranges/notacao";
-import { NOME_ACAO, type Acao } from "@/lib/ranges/prontos";
+import { COR_ACAO } from "@/lib/poker/grade-gto";
+import { NOME_ACAO, corDaAcao, type Acao } from "@/lib/ranges/prontos";
 import { atualizarRange, compartilharComTime, criarRange } from "@/lib/services/range-service";
 import { CaminhoRuas } from "./caminho-ruas";
 import { EscolherRange, rangeTop } from "./escolher-range";
@@ -440,6 +441,7 @@ export function AbaConstrutor({
               onNaipes={(mao, ancora) => setNaipes({ mao, ancora })}
               onPassar={setPassando}
               somenteLeitura={gradeSoLeitura}
+              acao={range.acao}
             />
             <div className="mt-2.5 flex min-h-[18px] flex-wrap items-center justify-between gap-2 text-[11.5px] text-muted">
               {infoMao ? (
@@ -449,6 +451,19 @@ export function AbaConstrutor({
                   <span className="h-2.5 w-2.5 rounded-sm" style={{ background: modoGrade.cor }} />
                   {(destaque.tipo === "feita" ? FEITAS : PROJETOS).find((x) => x.k === destaque.k)?.nome} (
                   {numCombos(destaque.tipo === "feita" ? ruaAtual!.analise.feitas[destaque.k] : ruaAtual!.analise.projetos[destaque.k])} combos)
+                </span>
+              ) : modoGrade.tipo === "range" ? (
+                // Legenda das cores: a ação do range e o fold (fora do range).
+                <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: corDaAcao(range.acao) }} />
+                    {range.acao ? NOME_ACAO[range.acao as Acao] ?? range.acao : "No range"}
+                  </span>
+                  <span className="inline-flex items-center gap-1.5">
+                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: `${COR_ACAO.fold}55` }} />
+                    Fold
+                  </span>
+                  <span className="hidden sm:inline">· arraste pra pintar · botão direito escolhe os naipes</span>
                 </span>
               ) : (
                 <span className="hidden sm:inline">Arraste pra pintar várias mãos · botão direito escolhe os naipes</span>

@@ -3,9 +3,30 @@
 import { memo } from "react";
 import { TODAS_AS_MAOS } from "@/lib/ranges/cartas";
 import { pesoDaMao, type Pesos } from "@/lib/ranges/notacao";
+import { COR_ACAO } from "@/lib/poker/grade-gto";
+import { corDaAcao } from "@/lib/ranges/prontos";
 
-// Grade 13x13 em miniatura (cartões da biblioteca): mais dourado = mais peso.
-export const MiniGrade = memo(function MiniGrade({ pesos, pesosCombo = {}, largura = 104 }: { pesos: Pesos; pesosCombo?: Pesos; largura?: number }) {
+// "#rrggbb" + transparência 0..1 -> "rgba(...)".
+function comAlfa(hex: string, a: number): string {
+  const n = parseInt(hex.slice(1), 16);
+  return `rgba(${(n >> 16) & 255},${(n >> 8) & 255},${n & 255},${a.toFixed(3)})`;
+}
+
+// Grade 13x13 em miniatura (cartões da biblioteca): a mão no range ganha a
+// cor da ação (raise verde, call azul, 3-bet laranja, all-in vermelho;
+// sem ação, dourado) -- mais forte = mais peso. Fora do range: cinza (fold).
+export const MiniGrade = memo(function MiniGrade({
+  pesos,
+  pesosCombo = {},
+  largura = 104,
+  acao = null,
+}: {
+  pesos: Pesos;
+  pesosCombo?: Pesos;
+  largura?: number;
+  acao?: string | null;
+}) {
+  const cor = corDaAcao(acao);
   return (
     <div className="grid shrink-0 gap-px" style={{ gridTemplateColumns: "repeat(13, 1fr)", width: largura }} aria-hidden="true">
       {TODAS_AS_MAOS.map((mao) => {
@@ -14,7 +35,7 @@ export const MiniGrade = memo(function MiniGrade({ pesos, pesosCombo = {}, largu
           <span
             key={mao}
             className="aspect-square rounded-[1px]"
-            style={{ background: p > 0 ? `rgba(212,175,55,${0.2 + (0.72 * p) / 100})` : "rgba(255,255,255,0.06)" }}
+            style={{ background: p > 0 ? comAlfa(cor, 0.25 + (0.7 * p) / 100) : comAlfa(COR_ACAO.fold, 0.1) }}
           />
         );
       })}
