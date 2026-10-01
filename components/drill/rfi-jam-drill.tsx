@@ -16,6 +16,7 @@ import { useIsMobile } from "@/lib/hooks/use-is-mobile";
 import { FilterChip as SharedFilterChip } from "@/components/ui/filter-chip";
 import {
   ALL_POSITIONS,
+  faseDisponivel,
   getRfiJamSpot,
   listRfiJamSpots,
   parseMatchup,
@@ -76,8 +77,10 @@ function comboCount(label: string): number {
   return label.endsWith("s") ? 4 : 12;
 }
 
-function dealWeightedHand(): string {
-  const weights = ALL_LABELS.map(comboCount);
+function dealWeightedHand(peso?: (label: string) => number): string {
+  let weights = ALL_LABELS.map((l) => comboCount(l) * (peso ? peso(l) : 1));
+  // Range vazio (peso zero em tudo) -- volta pro sorteio sem filtro.
+  if (peso && weights.every((w) => w <= 0)) weights = ALL_LABELS.map(comboCount);
   const total = weights.reduce((s, w) => s + w, 0);
   let r = Math.random() * total;
   for (let i = 0; i < ALL_LABELS.length; i++) {
@@ -113,11 +116,31 @@ function classToDisplayCards(label: string): [string, string] {
 // spots de push/fold) e o BB responde; "vs All-in" = você abriu e levou
 // all-in. Antes a 1a fase se chamava "vs Open" -- mas ninguém abriu antes
 // de quem decide.
-const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam"; label: string }[] = [
+// Motor v2 (ante, call do BB e all-in de quem abre): "vs All-in direto" =
+// o BB diante de quem abriu indo all-in de cara.
+const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam" | "bbCallJam"; label: string }[] = [
   { key: "sbOpen", label: "RFI (abrir)" },
   { key: "bbJam", label: "vs RFI (responder)" },
   { key: "sbCallJam", label: "vs All-in (pagar)" },
+  { key: "bbCallJam", label: "vs All-in direto (BB)" },
 ];
+type FaseKey = (typeof PHASES)[number]["key"];
+
+// Mesmas cores da grade (lib/poker/grade-gto.ts): raise verde, all-in vermelho, call azul.
+function corDaAcao(action: RfiJamPhaseRaw["action"]): string {
+  return action === "allin" ? "#e0555a" : action === "call" ? "#3b82f6" : "#22c55e";
+}
+
+// Dados da fase no spot e, no motor v2, a segunda ação real dela (quem
+// abre: all-in além do raise; BB diante do raise: call além do all-in).
+function faseDoSpot(spot: RfiJamSpot, key: FaseKey): RfiJamPhaseRaw | undefined {
+  return spot[key];
+}
+function faseExtra(spot: RfiJamSpot, key: FaseKey): RfiJamPhaseRaw | undefined {
+  if (key === "sbOpen") return spot.sbJam;
+  if (key === "bbJam") return spot.bbCallRaise;
+  return undefined;
+}
 
 // FIX (pedido explicito: "ter apenas uma nomenclatura All in/raise/
 // fold/call/limp") -- nomes dos botoes de acao usam so' esses 5 termos
@@ -239,13 +262,17 @@ const VERDICT_TO_RPC: Record<Verdict, string> = {
   UNKNOWN: "MEDIOCRE",
 };
 
-type Escolha = "fold" | "action" | "distractor";
+// "action" = a ação principal da fase; "extra" = a segunda ação real
+// (motor v2); "distractor" = jogada que o GTO nem considera (só nos spots
+// antigos, que têm uma ação só além do fold).
+type Escolha = "fold" | "action" | "extra" | "distractor";
 
 interface Round {
   label: string;
   freq: number;
   ev: number;
   gap: number;
+  extra?: { freq: number; ev: number; action: RfiJamPhaseRaw["action"] };
 }
 
 // Mesmo FilterChip usado em Revisor e Biblioteca de Ranges (pedido
@@ -503,19 +530,31 @@ const comSinal = (v: number) => (Math.abs(v) < 0.005 ? "0 bb" : `${v > 0 ? "+" :
 //   1. O que cada jogada vale?  (frequência do GTO + valor vs fold)
 //   2. Quanto EU perdi?         (0 bb se jogou como o GTO)
 //   3. Como estou indo?         (bb/100 de hoje e do total)
+/** Uma linha da janela de detalhes: jogada, frequência do GTO e valor vs fold (bb). */
+interface LinhaDetalhe {
+  id: Escolha;
+  label: string;
+  pct: number;
+  /** Valor comparado a foldar, em bb. null = sem régua de bb ou jogada fora do GTO. */
+  evBb: number | null;
+  foraDoGto?: boolean;
+}
+
 function EvDetailsModal({
-  onClose, actionLabel, distractorLabel, chosen, foldPct, actionPct, gapRelativePct, evAcaoBb, perdaBb, stackBb, resumo, isMarginal, isGoodVerdict,
+  onClose, linhas, chosen, melhorLabel, melhorPct, vantagemBb, escolhidaLabel, distractorNome, gapRelativePct, perdaBb, stackBb, resumo, isMarginal, isGoodVerdict,
 }: {
   onClose: () => void;
-  actionLabel: string;
-  distractorLabel: string | null;
-  chosen: "fold" | "action" | "distractor";
-  foldPct: number;
-  actionPct: number;
+  linhas: LinhaDetalhe[];
+  chosen: Escolha;
+  /** Jogada de maior valor e quantas vezes o GTO a joga. */
+  melhorLabel: string;
+  melhorPct: number;
+  /** Quanto a melhor rende a mais que a segunda melhor (bb). */
+  vantagemBb: number | null;
+  escolhidaLabel: string;
+  distractorNome: string | null;
   /** Fallback quando o spot não tem régua de bb. */
   gapRelativePct: number | null;
-  /** Valor da ação comparado a foldar, em bb (null = sem régua). */
-  evAcaoBb: number | null;
   /** O que o jogador perdeu nessa mão, em bb (null = sem régua). */
   perdaBb: number | null;
   stackBb: number;
@@ -524,9 +563,7 @@ function EvDetailsModal({
   isGoodVerdict: boolean;
 }) {
   useEscapeToClose(onClose);
-  const temBb = evAcaoBb != null && perdaBb != null;
-  const melhor = evAcaoBb != null && evAcaoBb > 0 ? actionLabel : "Fold";
-  const escolhida = chosen === "fold" ? "Fold" : chosen === "action" ? actionLabel : nomeDoDistrator(distractorLabel);
+  const temBb = perdaBb != null && linhas.some((l) => l.evBb != null);
   const semPerda = perdaBb != null ? perdaBb < 0.005 : isGoodVerdict;
   const hoje = resumo ? bbPor100(resumo.hoje.perdaBb, resumo.hoje.maos) : null;
   const total = resumo ? bbPor100(resumo.total.perdaBb, resumo.total.maos) : null;
@@ -560,20 +597,25 @@ function EvDetailsModal({
                 <span style={{ ...TITULO_SECAO, letterSpacing: "0.04em" }}>GTO · valor</span>
               </div>
               <div style={{ marginTop: 10, display: "flex", flexDirection: "column", gap: 8 }}>
-                <LinhaJogada label="Fold" pct={foldPct} valor={temBb ? "0 bb" : "—"} highlighted={chosen === "fold"} />
-                <LinhaJogada label={actionLabel} pct={actionPct} valor={evAcaoBb != null ? comSinal(evAcaoBb) : "—"} highlighted={chosen === "action"} />
-                {distractorLabel && <LinhaJogada label={distractorLabel} pct={0} valor="fora do GTO" highlighted={chosen === "distractor"} />}
+                {linhas.map((l) => (
+                  <LinhaJogada
+                    key={l.id}
+                    label={l.label}
+                    pct={l.pct}
+                    valor={l.foraDoGto ? "fora do GTO" : l.evBb != null ? comSinal(l.evBb) : "—"}
+                    highlighted={chosen === l.id}
+                  />
+                ))}
               </div>
               <p style={NOTA}>
                 {isMarginal ? (
                   <>
-                    As duas jogadas valem praticamente o mesmo aqui — por isso o GTO mistura {actionPct}/{foldPct}. Não é indecisão, é assim que o equilíbrio funciona
-                    nesse spot.
+                    As jogadas do GTO valem praticamente o mesmo aqui — por isso ele mistura. Não é indecisão, é assim que o equilíbrio funciona nesse spot.
                   </>
-                ) : temBb ? (
+                ) : temBb && vantagemBb != null ? (
                   <>
-                    Valor comparado a foldar (Fold = 0). {melhor} rende {fmtBbEv(Math.abs(evAcaoBb!))} a mais — por isso o GTO joga {melhor}{" "}
-                    {melhor === "Fold" ? foldPct : actionPct}% das vezes.
+                    Valor comparado a foldar (Fold = 0). {melhorLabel} rende {fmtBbEv(vantagemBb)} a mais que a segunda melhor — por isso o GTO joga {melhorLabel}{" "}
+                    {melhorPct}% das vezes.
                   </>
                 ) : (
                   <>A barra mostra quantas vezes o GTO escolhe cada jogada nesse spot.</>
@@ -588,15 +630,15 @@ function EvDetailsModal({
                 <span style={{ fontSize: 28, fontWeight: 800, fontVariantNumeric: "tabular-nums", color: semPerda ? "#34D399" : isMarginal ? "#f5a524" : "#F87171" }}>
                   {perdaBb != null ? comSinal(-perdaBb) : gapRelativePct != null ? `${pct1(isGoodVerdict ? 0 : gapRelativePct)}%` : "—"}
                 </span>
-                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)" }}>{semPerda ? "você jogou como o GTO" : `jogando ${escolhida} em vez de ${melhor}`}</span>
+                <span style={{ fontSize: 11.5, color: "rgba(255,255,255,0.45)" }}>{semPerda ? "você jogou como o GTO" : `jogando ${escolhidaLabel} em vez de ${melhorLabel}`}</span>
               </div>
               <p style={NOTA}>
                 {semPerda ? (
                   <>Sua jogada faz parte da estratégia do GTO nesse spot — nada perdido.</>
                 ) : chosen === "distractor" ? (
                   <>
-                    O motor não calcula {nomeDoDistrator(distractorLabel)} aqui (o GTO nunca considera essa jogada). O número é o mínimo que você abriu mão: a diferença entre
-                    as duas jogadas que o GTO usa.
+                    O motor não calcula {distractorNome ?? "essa jogada"} aqui (o GTO nunca considera essa jogada). O número é o mínimo que você abriu mão: a diferença entre
+                    a melhor e a pior jogada que o GTO usa.
                   </>
                 ) : perdaBb != null ? (
                   <>
@@ -681,7 +723,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   const [heroPos, setHeroPos] = useState<string>("SB");
   const [villainPos, setVillainPos] = useState<string>("BB");
   const [stackBb, setStackBb] = useState<number>(15);
-  const [phaseKey, setPhaseKey] = useState<(typeof PHASES)[number]["key"]>("sbOpen");
+  const [phaseKey, setPhaseKey] = useState<FaseKey>("sbOpen");
   const [heroAny, setHeroAny] = useState(false);
   const [villainAny, setVillainAny] = useState(false);
   const [stackAny, setStackAny] = useState(false);
@@ -818,7 +860,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     setHeroPos(resumeFilters.heroPos);
     setVillainPos(resumeFilters.villainPos);
     setStackBb(resumeFilters.stackBb);
-    setPhaseKey(resumeFilters.phaseKey as (typeof PHASES)[number]["key"]);
+    setPhaseKey(resumeFilters.phaseKey as FaseKey);
     setHeroAny(resumeFilters.heroAny);
     setVillainAny(resumeFilters.villainAny);
     setStackAny(resumeFilters.stackAny);
@@ -879,16 +921,22 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
 
   const currentPhase: RfiJamPhaseRaw | null = useMemo(() => {
     if (!spot) return null;
-    if (phaseKey === "sbOpen") return spot.sbOpen;
-    if (phaseKey === "bbJam") return spot.bbJam;
-    return spot.sbCallJam ?? null;
+    return faseDoSpot(spot, phaseKey) ?? null;
   }, [spot, phaseKey]);
 
-  const nextRound = useCallback((phase: RfiJamPhaseRaw) => {
-    const label = dealWeightedHand();
+  const nextRound = useCallback((s: RfiJamSpot, key: FaseKey) => {
+    const phase = faseDoSpot(s, key);
+    if (!phase) return;
+    // "vs All-in (pagar)" no motor v2: quem abriu e levou all-in tem mão
+    // do range de RAISE -- sorteia ponderado por ele (no v1 a mão era
+    // qualquer uma, e o nó pouco alcançado ensinava ruído).
+    const peso = key === "sbCallJam" && s.totals ? (l: string) => s.sbOpen.hands[l]?.[0] ?? 0 : undefined;
+    const label = dealWeightedHand(peso);
     const hand = phase.hands[label] ?? [0, phase.ev_fold, 0];
     const [freq, ev, gap] = hand;
-    setRound({ label, freq, ev, gap });
+    const extraPhase = faseExtra(s, key);
+    const ex = extraPhase?.hands[label];
+    setRound({ label, freq, ev, gap, extra: extraPhase && ex ? { freq: ex[0], ev: ex[1], action: extraPhase.action } : undefined });
     setChosen(null);
     setDetailsOpen(false);
   }, []);
@@ -939,7 +987,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       if (!(stackAny || s.stackBb === stackBb)) return false;
       if (!phaseAny) {
         const cached = spotCache[s.spotId];
-        if (cached && !cached[phaseKey]) return false;
+        if (cached && !faseDisponivel(cached, phaseKey)) return false;
       }
       return true;
     });
@@ -956,7 +1004,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     // Sorteio de Situação (quando "Qualquer") so' entre as fases que
     // ESSE spot realmente tem -- Push/Fold sorteia so' entre as 2 dele,
     // nunca cai numa "vs All-in (pagar)" vazia.
-    const availablePhases = PHASES.filter((p) => Boolean(pickedSpot[p.key]));
+    const availablePhases = PHASES.filter((p) => faseDisponivel(pickedSpot, p.key));
     const resolvedPhaseKey = phaseAny
       ? (availablePhases[Math.floor(Math.random() * availablePhases.length)] ?? PHASES[0]).key
       : phaseKey;
@@ -969,7 +1017,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     setSpot(pickedSpot);
     setLoading(false);
     setError("");
-    const phase = pickedSpot[resolvedPhaseKey];
+    const phase = faseDisponivel(pickedSpot, resolvedPhaseKey) ? faseDoSpot(pickedSpot, resolvedPhaseKey) : undefined;
     if (!phase) {
       // Situação fixa que esse spot não resolve (ex: escolheu "vs
       // All-in (pagar)" mas o pool só tinha esse Push/Fold em cache no
@@ -977,7 +1025,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       setRound(null);
       return;
     }
-    nextRound(phase);
+    nextRound(pickedSpot, resolvedPhaseKey);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [roundSeed, spotCache]);
 
@@ -985,54 +1033,57 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // de cada jogada em equity de premiação, que muda de escala a cada
   // stack. Em bb dá pra comparar mãos e somar em bb/100.
   const valorBb = useMemo(() => (spot ? valorDoBb(spot) : null), [spot]);
-  // Diferença entre as duas jogadas do GTO, em bb.
-  const gapBb = round ? emBb(round.gap, valorBb) : null;
-  // "As duas valem quase o mesmo": abaixo de 0,1 bb. Sem régua, o limite
+  // Opções reais do GTO nessa decisão: fold + a ação da fase (+ a
+  // segunda ação no motor v2), cada uma com a frequência e o valor (escala
+  // do motor). Fold = o que sobra da frequência.
+  const opcoesGto = useMemo(() => {
+    if (!round || !currentPhase) return [] as { id: Escolha; freq: number; ev: number }[];
+    const lista: { id: Escolha; freq: number; ev: number }[] = [
+      { id: "fold", freq: Math.max(0, 1 - round.freq - (round.extra?.freq ?? 0)), ev: currentPhase.ev_fold },
+      { id: "action", freq: round.freq, ev: round.ev },
+    ];
+    if (round.extra) lista.push({ id: "extra", freq: round.extra.freq, ev: round.extra.ev });
+    return lista;
+  }, [round, currentPhase]);
+  const evsDesc = opcoesGto.map((o) => o.ev).sort((a, b) => b - a);
+  const melhorEv = evsDesc[0] ?? 0;
+  // Diferença entre a melhor e a segunda melhor jogada do GTO, em bb.
+  const gapBb = evsDesc.length >= 2 ? emBb(evsDesc[0] - evsDesc[1], valorBb) : null;
+  // "As jogadas valem quase o mesmo": abaixo de 0,1 bb. Sem régua, o limite
   // antigo na escala do motor (que com 15 bb dá ~0,09 bb).
   const isMarginal = round ? (gapBb != null ? gapBb < MARGINAL_GAP_BB : round.gap < MARGINAL_GAP_THRESHOLD) : false;
 
-  // Frequência da opção escolhida na estratégia do GTO -- fold e a ação
-  // resolvida vêm do solver; o distrator (3o botão, sempre uma jogada
-  // que o solver não recomenda) não existe na estratégia dele, então a
-  // frequência dele é 0 por definição (não é uma aproximação, é o fato
-  // de essa opção nunca aparecer na mistura ótima).
+  // Frequência da opção escolhida na estratégia do GTO. O distrator (só
+  // nos spots antigos) não existe na estratégia dele: frequência 0.
   const chosenFreq = useMemo(() => {
     if (!round || !chosen) return null;
     if (chosen === "distractor") return 0;
-    return chosen === "fold" ? 1 - round.freq : round.freq;
-  }, [round, chosen]);
+    return opcoesGto.find((o) => o.id === chosen)?.freq ?? 0;
+  }, [round, chosen, opcoesGto]);
+
+  // Quanto a escolha custa (escala do motor): melhor valor − valor da
+  // escolhida. Distrator: no mínimo a distância até a pior jogada do GTO.
+  const perdaMotor = useMemo(() => {
+    if (!chosen || opcoesGto.length === 0) return null;
+    const ev = chosen === "distractor" ? Math.min(...opcoesGto.map((o) => o.ev)) : opcoesGto.find((o) => o.id === chosen)?.ev;
+    return ev == null ? null : Math.max(0, melhorEv - ev);
+  }, [chosen, opcoesGto, melhorEv]);
+  const perdaEscolhaBb = perdaMotor != null ? emBb(perdaMotor, valorBb) : null;
 
   // Frequência + custo em bb, no modelo do GTO Wizard (ver gto-verdict.ts).
   const verdict: Verdict | null = useMemo(() => {
     if (chosenFreq == null) return null;
-    return classificarJogada(chosenFreq, gapBb);
-  }, [chosenFreq, gapBb]);
+    return classificarJogada(chosenFreq, perdaEscolhaBb);
+  }, [chosenFreq, perdaEscolhaBb]);
 
   // O veredito real (acertei/errei) NUNCA é substituído por "MARGINAL" --
-  // antes o rótulo virava "MARGINAL" sempre que o gap era pequeno,
-  // escondendo se a jogada escolhida era boa ou ruim (dois jogadores
-  // podem cair num spot "marginal" e um ter acertado, outro não -- o
-  // rótulo não podia dizer isso). "Marginal" agora é uma tag SEPARADA,
-  // ao lado do veredito, não no lugar dele.
-  const displayLabel = verdict ? nomeDoVeredito(verdict, gapBb) : undefined;
-  const displayColor = verdict ? verdictColor(verdict, gapBb) : undefined;
+  // "Marginal" é uma tag SEPARADA, ao lado do veredito, não no lugar dele.
+  const displayLabel = verdict ? nomeDoVeredito(verdict, perdaEscolhaBb) : undefined;
+  const displayColor = verdict ? verdictColor(verdict, perdaEscolhaBb) : undefined;
   const isGoodVerdict = ehAcerto(verdict);
   const chosenFreqPct = chosenFreq != null ? Math.round(chosenFreq * 100) : null;
-  // Gap relativo ao que está em jogo -- em vez do valor absoluto (que
-  // depende da escala de ICM/premiação daquele torneio especifico, sem
-  // significado isolado), a DIFERENÇA em % de uma opção pra outra é
-  // comparável entre spots, independente da escala.
-  //
-  // Fix (2026-08): denominador era a MEDIA das duas EVs -- quando a
-  // opção errada tem EV bem menor que a certa (justamente o caso de
-  // "Erro Grave", o mais importante de comunicar direito), a média
-  // encolhe e a % estoura bem acima de 100 (visto em teste real: 290%,
-  // 298%). Isso não lê como "você perdeu quase 3x o valor" pra ninguém
-  // -- lê como número quebrado, bem na hora que o feedback mais importa.
-  // Denominador agora é a MAIOR das duas EVs (o valor da melhor opção
-  // disponível) -- como as duas são fatias de equity ICM (sempre ≥0), a
-  // diferença nunca passa da maior das duas, então a % fica sempre ≤100
-  // e lê como "você abriu mão de X% do valor que a melhor opção tinha".
+  // Fallback sem régua de bb: diferença em % do valor da melhor opção
+  // (denominador = a MAIOR das duas EVs, fica sempre ≤ 100%).
   const gapRelativePct = round && currentPhase
     ? (() => {
         const denom = Math.max(currentPhase.ev_fold, round.ev);
@@ -1040,42 +1091,61 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       })()
     : null;
 
-  // Valor da ação comparado a foldar, e o que o jogador perdeu (0 quando
-  // escolheu uma jogada da estratégia do GTO -- mesma regra do ev_loss
-  // gravado em registerTraining).
-  const evAcaoBb = round && currentPhase ? emBb(round.ev - currentPhase.ev_fold, valorBb) : null;
-  const perdaBb = gapBb == null ? null : isGoodVerdict ? 0 : Math.max(0, gapBb);
+  // O que o jogador perdeu (0 quando escolheu uma jogada da estratégia do
+  // GTO -- mesma regra do ev_loss gravado em registerTraining).
+  const perdaBb = perdaEscolhaBb == null ? null : isGoodVerdict ? 0 : perdaEscolhaBb;
 
   const actionLabel = currentPhase ? ACTION_LABEL[currentPhase.action] : "";
+  const extraLabel = round?.extra ? ACTION_LABEL[round.extra.action] : "";
   // Range do GTO do spot atual (grade ao lado da mesa, ver RangeDoSpot).
   const rangeDoSpot = useMemo(() => (spot ? rfiJamSpotToRangeHands(spot)[phaseKey] : {}), [spot, phaseKey]);
-  const distractorLabel = getDistractorLabel(phaseKey, currentPhase?.action, spot?.effectiveStack ?? null);
+  // Com duas ações reais (motor v2) já são 3 botões de verdade -- sem distrator.
+  const distractorLabel = spot && faseExtra(spot, phaseKey) ? null : getDistractorLabel(phaseKey, currentPhase?.action, spot?.effectiveStack ?? null);
+
+  const nomeOpcao = useCallback(
+    (id: Escolha) => (id === "fold" ? "Fold" : id === "action" ? actionLabel : id === "extra" ? extraLabel : distractorLabel ?? "essa jogada"),
+    [actionLabel, extraLabel, distractorLabel],
+  );
+  // A mais jogada pelo GTO e a de maior valor.
+  const maisJogada = opcoesGto.length ? opcoesGto.reduce((a, b) => (b.freq > a.freq ? b : a)) : null;
+  const melhorOpcao = opcoesGto.length ? opcoesGto.reduce((a, b) => (b.ev > a.ev ? b : a)) : null;
+
+  // Linhas da janela de detalhes.
+  const linhasDetalhe: LinhaDetalhe[] = useMemo(() => {
+    if (!currentPhase) return [];
+    const linhas: LinhaDetalhe[] = opcoesGto.map((o) => ({
+      id: o.id,
+      label: nomeOpcao(o.id),
+      pct: Math.round(o.freq * 100),
+      evBb: emBb(o.ev - currentPhase.ev_fold, valorBb),
+    }));
+    if (distractorLabel) linhas.push({ id: "distractor", label: distractorLabel, pct: 0, evBb: null, foraDoGto: true });
+    return linhas;
+  }, [opcoesGto, currentPhase, valorBb, distractorLabel, nomeOpcao]);
 
   // Uma frase só, sem "equity"/"ICM"/"gap" -- é o que aparece por
   // padrão depois de cada mão. Quem quer os números de verdade clica
   // em "Ver detalhes" (abre o EvDetailsModal, que tem o resto).
   const plainFeedback = useMemo(() => {
-    if (!round || !chosen || !currentPhase) return null;
-    const actionPct = Math.round(round.freq * 100);
-    const foldPct = 100 - actionPct;
-    // Distrator: não tem EV real calculado (o solver nunca resolve
-    // essa jogada), então a frase não tenta comparar valor -- só avisa
-    // que essa opção nem entra na conta do GTO aqui.
-    if (chosen === "distractor")
-      return `O GTO nunca joga ${nomeDoDistrator(distractorLabel)} aqui: as opções dele são Fold (${foldPct}%) e ${actionLabel} (${actionPct}%).`;
-    if (isMarginal) return `As duas jogadas valem praticamente o mesmo aqui (Fold ${foldPct}% · ${actionLabel} ${actionPct}%) — não tinha erro grave possível.`;
-    const chosenLabel = chosen === "fold" ? "Fold" : actionLabel;
-    const otherLabel = chosen === "fold" ? actionLabel : "Fold";
-    const chosenPct = chosen === "fold" ? foldPct : actionPct;
-    const otherPct = 100 - chosenPct;
-    // Antes: "Aceitável" dizia "o GTO também prefere X na maioria das
-    // vezes" mesmo quando X era a jogada MENOS frequente (ex.: All-in 31%
-    // vs Fold 69%) -- a frase contradizia os números do próprio spot.
-    if (chosenPct >= 97) return `Boa escolha — o GTO sempre joga ${chosenLabel} aqui.`;
-    if (chosenPct >= 50) return `Boa escolha — o GTO também joga ${chosenLabel} na maioria das vezes aqui (${chosenPct}%).`;
-    if (isGoodVerdict) return `O GTO mistura aqui: ${otherLabel} ${otherPct}% e ${chosenLabel} ${chosenPct}%. Sua jogada vale, mas a mais comum é ${otherLabel}.`;
-    return otherPct >= 97 ? `O GTO sempre joga ${otherLabel} aqui.` : `O GTO prefere ${otherLabel} na maioria das vezes aqui (${otherPct}%).`;
-  }, [round, chosen, currentPhase, isMarginal, isGoodVerdict, actionLabel, distractorLabel]);
+    if (!round || !chosen || !currentPhase || opcoesGto.length === 0 || !maisJogada) return null;
+    const pct = (o: { freq: number }) => Math.round(o.freq * 100);
+    const juntar = (itens: string[]) => (itens.length <= 1 ? itens.join("") : `${itens.slice(0, -1).join(", ")} e ${itens[itens.length - 1]}`);
+    const mistura = juntar(
+      [...opcoesGto].filter((o) => pct(o) > 0).sort((a, b) => b.freq - a.freq).map((o) => `${nomeOpcao(o.id)} ${pct(o)}%`),
+    );
+    // Distrator: não tem EV real calculado (o solver nunca resolve essa
+    // jogada) -- só avisa que essa opção nem entra na conta do GTO aqui.
+    if (chosen === "distractor") return `O GTO nunca joga ${nomeDoDistrator(distractorLabel)} aqui: as opções dele são ${juntar(opcoesGto.map((o) => `${nomeOpcao(o.id)} (${pct(o)}%)`))}.`;
+    if (isMarginal && (perdaEscolhaBb ?? 0) < MARGINAL_GAP_BB) return `As jogadas do GTO valem praticamente o mesmo aqui (${mistura}) — não tinha erro grave possível.`;
+    const escolhida = opcoesGto.find((o) => o.id === chosen);
+    const chosenPct = escolhida ? pct(escolhida) : 0;
+    const topo = nomeOpcao(maisJogada.id);
+    const topoPct = pct(maisJogada);
+    if (chosenPct >= 97) return `Boa escolha — o GTO sempre joga ${nomeOpcao(chosen)} aqui.`;
+    if (chosen === maisJogada.id) return `Boa escolha — o GTO também prefere ${nomeOpcao(chosen)} aqui (${chosenPct}%).`;
+    if (isGoodVerdict) return `O GTO mistura aqui: ${mistura}. Sua jogada vale, mas a mais comum é ${topo}.`;
+    return topoPct >= 97 ? `O GTO sempre joga ${topo} aqui.` : `O GTO prefere ${topo} aqui (${topoPct}%).`;
+  }, [round, chosen, currentPhase, opcoesGto, maisJogada, isMarginal, perdaEscolhaBb, isGoodVerdict, distractorLabel, nomeOpcao]);
 
   useEffect(() => {
     if (!chosen || !verdict || verdict === "UNKNOWN" || !round) return;
@@ -1096,8 +1166,9 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     registerTraining({
       spotId: spot?.spotId ?? null,
       verdict: VERDICT_TO_RPC[verdict],
-      evLoss: isGood ? 0 : Math.max(0, round.gap),
-      userAction: chosen === "fold" ? "FOLD" : chosen === "distractor" ? "OUTRA" : currentPhase?.action ?? null,
+      evLoss: isGood ? 0 : perdaMotor ?? Math.max(0, round.gap),
+      userAction:
+        chosen === "fold" ? "FOLD" : chosen === "distractor" ? "OUTRA" : chosen === "extra" ? round.extra?.action ?? null : currentPhase?.action ?? null,
       filters: { heroPos, villainPos, stackBb, phaseKey, heroAny, villainAny, stackAny, phaseAny },
     }).catch(() => {
       // XP e' um bonus, nao pode travar o treino se a rede falhar
@@ -1117,8 +1188,16 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // "Posição Herói" -- sem isso, na fase bbJam quem decide (o defensor)
   // podia cair fora do slot de baixo, quebrando a convencao de "hero
   // sempre embaixo" que o resto do produto (Replay) já segue.
-  const activeHeroSeat = phaseKey === "bbJam" ? villainPos : heroPos;
-  const activeVillainSeat = phaseKey === "bbJam" ? heroPos : villainPos;
+  const bbDecide = phaseKey === "bbJam" || phaseKey === "bbCallJam";
+  const activeHeroSeat = bbDecide ? villainPos : heroPos;
+  const activeVillainSeat = bbDecide ? heroPos : villainPos;
+  // Motor v2: BB ante (morto, não entra no all-in) e, no BTN vs BB, o
+  // blind do SB que já largou -- os dois ficam no pote desde o início.
+  const ante = spot?.ante ?? 0;
+  // O vilão já está all-in quando você decide? (vs All-in; vs All-in
+  // direto; e o vs RFI dos spots de push/fold, onde o BB responde a um
+  // all-in do SB.)
+  const vilaoAllIn = phaseKey === "sbCallJam" || phaseKey === "bbCallJam" || (phaseKey === "bbJam" && currentPhase?.action === "call");
 
   const { seatLayout, layoutError } = useMemo(() => {
     try {
@@ -1138,6 +1217,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   const SB_BLIND_BB = 0.5;
   const BB_BLIND_BB = 1;
   const seatBlind = useCallback((pos: string) => (pos === "SB" ? SB_BLIND_BB : pos === "BB" ? BB_BLIND_BB : 0), []);
+  const mortoNoPote = spot && spot.ante != null ? Math.max(0, spot.pot - seatBlind(heroPos) - seatBlind(villainPos)) : 0;
 
   // FIX (2a rodada, bug reportado: "nao apareceu a acao do vilao na
   // mesa"): a 1a versao tentava derivar o valor do vilao de `spot.pot -
@@ -1177,12 +1257,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     // abertura, nao mais o blind cru (0.5bb) que so vale antes de agir.
     // Usar so seatBlind() aqui subestimava a ficha do SB na mesa.
     const decidingBlind = phaseKey === "sbCallJam" ? OPEN_RAISE_APPROX_BB : seatBlind(activeHeroSeat);
-    // bbJam de push/fold (o BB so' paga ou folda): o vilao foi ALL-IN,
-    // nao abriu -- a mesa mostrava 2,2 BB na frente dele.
-    const vilaoFoiAllIn = phaseKey === "sbCallJam" || (phaseKey === "bbJam" && currentPhase?.action === "call");
-    const villainCommitted = vilaoFoiAllIn ? spot.effectiveStack : OPEN_RAISE_APPROX_BB;
+    // All-in do vilão = o stack dele (o BB tem o ante a menos, que é morto).
+    const villainCommitted = vilaoAllIn ? spot.effectiveStack - (activeVillainSeat === "BB" ? ante : 0) : OPEN_RAISE_APPROX_BB;
     return { [activeHeroSeat]: decidingBlind, [activeVillainSeat]: villainCommitted };
-  }, [spot, phaseKey, heroPos, villainPos, activeHeroSeat, activeVillainSeat, seatBlind, currentPhase]);
+  }, [spot, phaseKey, heroPos, villainPos, activeHeroSeat, activeVillainSeat, seatBlind, vilaoAllIn, ante]);
 
   // FIX (bug reportado): "o SPR no celular esta errado, esta fixo um
   // valor que nao condiz" + "o pote precisa contar tanto a aposta do bb
@@ -1195,8 +1273,8 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
   // agora usa essa soma em vez do campo fixo do spot.
   const potBb = useMemo(() => {
     if (!streetCommitments) return spot?.pot ?? 0;
-    return Object.values(streetCommitments).reduce((sum, v) => sum + v, 0);
-  }, [streetCommitments, spot]);
+    return Object.values(streetCommitments).reduce((sum, v) => sum + v, 0) + mortoNoPote;
+  }, [streetCommitments, spot, mortoNoPote]);
 
   // Botões no padrão das salas (ver barra-de-acao.tsx): tipo + valor de
   // cada opção, em BB. Call = quanto FALTA pagar (desconta o que quem
@@ -1207,22 +1285,28 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     if (!currentPhase || !spot) return [];
     const stack = spot.effectiveStack;
     const jaColocou = phaseKey === "sbCallJam" ? OPEN_RAISE_APPROX_BB : seatBlind(activeHeroSeat);
-    const faltaPagar = (total: number) => Math.max(0, total - jaColocou);
-    const lista: OpcaoAcao<Escolha>[] = [{ id: "fold", tipo: "fold", verbo: "Fold" }];
-    if (currentPhase.action === "open") lista.push({ id: "action", tipo: "raise", verbo: "Raise", valorBb: OPEN_RAISE_APPROX_BB });
-    else if (currentPhase.action === "allin") lista.push({ id: "action", tipo: "allin", verbo: "All-in", valorBb: stack });
-    else lista.push({ id: "action", tipo: "call", verbo: "Call", valorBb: faltaPagar(stack) });
+    // Fichas que quem decide ainda tem atrás (o BB já pagou o ante, que é morto).
+    const atras = Math.max(0, stack - jaColocou - (activeHeroSeat === "BB" ? ante : 0));
+    const faltaPagar = (total: number) => Math.min(atras, Math.max(0, total - jaColocou));
+    const allInTotal = jaColocou + atras;
+    const allInVilao = stack - (activeVillainSeat === "BB" ? ante : 0);
+    const botao = (id: Escolha, action: RfiJamPhaseRaw["action"]): OpcaoAcao<Escolha> =>
+      action === "open"
+        ? { id, tipo: "raise", verbo: "Raise", valorBb: OPEN_RAISE_APPROX_BB }
+        : action === "allin"
+        ? { id, tipo: "allin", verbo: "All-in", valorBb: allInTotal }
+        : { id, tipo: "call", verbo: "Call", valorBb: faltaPagar(vilaoAllIn ? allInVilao : OPEN_RAISE_APPROX_BB) };
+    const lista: OpcaoAcao<Escolha>[] = [{ id: "fold", tipo: "fold", verbo: "Fold" }, botao("action", currentPhase.action)];
+    const extraPhase = faseExtra(spot, phaseKey);
+    if (extraPhase) lista.push(botao("extra", extraPhase.action));
     // Limp nas salas é o próprio botão Call (completar o blind).
     if (distractorLabel === OPEN_LIMP_LABEL) lista.push({ id: "distractor", tipo: "call", verbo: "Call", valorBb: faltaPagar(1) });
     else if (distractorLabel === OPEN_SMALL_RAISE_LABEL) lista.push({ id: "distractor", tipo: "raise", verbo: "Raise", valorBb: 2 });
     else if (distractorLabel === "Call") lista.push({ id: "distractor", tipo: "call", verbo: "Call", valorBb: faltaPagar(OPEN_RAISE_APPROX_BB) });
     return ordenarOpcoes(lista);
-  }, [currentPhase, spot, phaseKey, activeHeroSeat, distractorLabel, seatBlind]);
+  }, [currentPhase, spot, phaseKey, activeHeroSeat, activeVillainSeat, distractorLabel, seatBlind, ante, vilaoAllIn]);
   const opcaoEscolhida = chosen ? opcoes.find((o) => o.id === chosen) ?? null : null;
 
-  // O vilão já está all-in quando você decide? (vs All-in, e o vs RFI dos
-  // spots de push/fold, onde o BB responde a um all-in do SB.)
-  const vilaoAllIn = phaseKey === "sbCallJam" || (phaseKey === "bbJam" && currentPhase?.action === "call");
 
   // Depois da resposta a mesa mostra a SUA jogada também, como a sala: a
   // ficha na sua frente vira o valor do call/raise/all-in e o pote cresce.
@@ -1232,7 +1316,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     const total = opcaoEscolhida.tipo === "call" ? antes + opcaoEscolhida.valorBb : opcaoEscolhida.valorBb;
     return { ...streetCommitments, [activeHeroSeat]: total };
   }, [streetCommitments, opcaoEscolhida, activeHeroSeat]);
-  const potNaMesa = commitsNaMesa ? Object.values(commitsNaMesa).reduce((a, b) => a + b, 0) : potBb;
+  const potNaMesa = commitsNaMesa ? Object.values(commitsNaMesa).reduce((a, b) => a + b, 0) + mortoNoPote : potBb;
 
   // Diante de um all-in: quanto de equidade você precisa pra pagar (o que
   // você paga ÷ pote depois do call) -- a conta que todo jogador faz de
@@ -1241,17 +1325,17 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     if (!streetCommitments || !vilaoAllIn) return null;
     const paga = (streetCommitments[activeVillainSeat] ?? 0) - (streetCommitments[activeHeroSeat] ?? 0);
     if (paga <= 0) return null;
-    const potFinal = Object.values(streetCommitments).reduce((a, b) => a + b, 0) + paga;
+    const potFinal = Object.values(streetCommitments).reduce((a, b) => a + b, 0) + mortoNoPote + paga;
     return (paga / potFinal) * 100;
-  }, [streetCommitments, vilaoAllIn, activeHeroSeat, activeVillainSeat]);
+  }, [streetCommitments, vilaoAllIn, activeHeroSeat, activeVillainSeat, mortoNoPote]);
 
   // O que aconteceu antes da sua decisão, no jeito que a sala narra.
   const situacaoTexto = !spot
     ? ""
     : phaseKey === "sbOpen"
     ? "Foldaram até você."
-    : phaseKey === "bbJam"
-    ? currentPhase?.action === "call"
+    : phaseKey === "bbJam" || phaseKey === "bbCallJam"
+    ? vilaoAllIn
       ? `${activeVillainSeat} foi all-in (${fmtBB(spot.effectiveStack)}).`
       : `${activeVillainSeat} abriu para ${fmtBB(OPEN_RAISE_APPROX_BB)}.`
     : `Você abriu ${fmtBB(OPEN_RAISE_APPROX_BB)} e o ${activeVillainSeat} foi all-in (${fmtBB(spot.effectiveStack)}).`;
@@ -1311,8 +1395,10 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
     const idxDecisor = ALL_POSITIONS.indexOf(activeHeroSeat);
     const seats: Record<string, SeatState> = {};
     ALL_POSITIONS.forEach((pos, i) => {
+      // O BB já pagou o ante (morto): tem isso a menos atrás.
+      const atras = (p: string) => Math.max(0, stack - naMesa(p) - (p === "BB" ? ante : 0));
       if (pos === activeHeroSeat) {
-        const restante = Math.max(0, stack - naMesa(pos));
+        const restante = atras(pos);
         const foldou = chosen === "fold";
         // Pagar um all-in do mesmo tamanho também deixa você all-in.
         const heroAllIn = !!chosen && !foldou && restante <= 0.05;
@@ -1325,19 +1411,19 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
       } else if (pos === activeVillainSeat) {
         seats[pos] = vilaoAllIn
           ? { status: "live", stack: 0, action: { type: "allin", size: stack } }
-          : { status: "live", stack: Math.max(0, stack - naMesa(pos)) };
+          : { status: "live", stack: atras(pos) };
       } else if (phaseKey === "sbOpen" && i > idxDecisor) {
         // Ainda não agiu (ex.: o SB quando o BTN abre) -- o spot assume
         // que ele larga, mas nessa hora ele ainda está com cartas.
-        seats[pos] = { status: "live", stack: Math.max(0, stack - naMesa(pos)) };
+        seats[pos] = { status: "live", stack: atras(pos) };
       } else {
-        seats[pos] = { status: "folded", stack: Math.max(0, stack - naMesa(pos)), action: { type: "fold" } };
+        seats[pos] = { status: "folded", stack: atras(pos), action: { type: "fold" } };
       }
     });
     const spr = potNaMesa > 0 ? Math.round((stack / potNaMesa) * 10) / 10 : null;
     // SPR e "pra pagar" só fazem sentido ANTES da sua decisão.
     return { pot: Math.round(potNaMesa * 10) / 10, spr: chosen ? null : spr, potOddsPct: chosen ? null : potOddsPct, board: [], history: [], seats };
-  }, [spot, round, chosen, activeHeroSeat, activeVillainSeat, commitsNaMesa, potNaMesa, vilaoAllIn, phaseKey, potOddsPct]);
+  }, [spot, round, chosen, activeHeroSeat, activeVillainSeat, commitsNaMesa, potNaMesa, vilaoAllIn, phaseKey, potOddsPct, ante]);
 
   // Ficha voando do assento que ja agiu (activeVillainSeat) ate' o pote —
   // so' nas fases onde alguem ja jogou antes do jogador decidir (bbJam:
@@ -1889,13 +1975,14 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                 {detailsOpen && chosen && round && currentPhase && (
                   <EvDetailsModal
                     onClose={() => setDetailsOpen(false)}
-                    actionLabel={actionLabel}
-                    distractorLabel={distractorLabel}
+                    linhas={linhasDetalhe}
                     chosen={chosen}
-                    foldPct={Math.round((1 - round.freq) * 100)}
-                    actionPct={Math.round(round.freq * 100)}
+                    melhorLabel={melhorOpcao ? nomeOpcao(melhorOpcao.id) : actionLabel}
+                    melhorPct={melhorOpcao ? Math.round(melhorOpcao.freq * 100) : 0}
+                    vantagemBb={gapBb}
+                    escolhidaLabel={chosen === "distractor" ? nomeDoDistrator(distractorLabel) : nomeOpcao(chosen)}
+                    distractorNome={distractorLabel ? nomeDoDistrator(distractorLabel) : null}
                     gapRelativePct={gapRelativePct}
-                    evAcaoBb={evAcaoBb}
                     perdaBb={perdaBb}
                     stackBb={stackBb}
                     resumo={resumoEv}
@@ -1963,10 +2050,8 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                       titulo="Range do GTO"
                       subtitulo={`${activeHeroSeat} decide · ${PHASES.find((p) => p.key === phaseKey)?.label ?? ""} · ${fmtBB(stackBb)}`}
                       legenda={[
-                        {
-                          cor: currentPhase.action === "allin" ? "#e0555a" : currentPhase.action === "call" ? "#3b82f6" : "#22c55e",
-                          rotulo: actionLabel,
-                        },
+                        { cor: corDaAcao(currentPhase.action), rotulo: actionLabel },
+                        ...(round.extra ? [{ cor: corDaAcao(round.extra.action), rotulo: extraLabel }] : []),
                         { cor: "#c4c7c855", rotulo: "Fold" },
                       ]}
                     />
