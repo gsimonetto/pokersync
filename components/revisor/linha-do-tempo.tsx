@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Target } from "lucide-react";
-import { F, SUITS, num } from "@/lib/poker/drill-theme";
+import { F, POS, SUITS, num } from "@/lib/poker/drill-theme";
 import { formatarBb } from "@/lib/poker/hand-summary";
 import type { HistoryStep } from "@/components/drill/poker-table";
 import { usePreferenciasMesa } from "@/lib/hooks/use-preferencias-mesa";
@@ -62,7 +62,42 @@ export function CartaTexto({ card }: { card: string }) {
   );
 }
 
-type ItemAcao = { pos: string | null; texto: string; hero: boolean; folds: boolean };
+type ItemAcao = {
+  /** O que aparece na etiqueta: a posição, ou "Você" nas suas ações. */
+  pos: string | null;
+  /** Posição de verdade (pra cor), inclusive nas suas ações. */
+  posicao: string | null;
+  texto: string;
+  hero: boolean;
+  folds: boolean;
+};
+
+/** Etiqueta da posição na cor do jogador na mesa (a mesma do assento). */
+function EtiquetaPosicao({ texto, posicao, largura }: { texto: string | null; posicao: string | null; largura: number }) {
+  const cor = posicao ? POS[posicao] : undefined;
+  return (
+    <span
+      style={{
+        width: largura,
+        flexShrink: 0,
+        display: "inline-grid",
+        placeItems: "center",
+        height: 16,
+        borderRadius: 5,
+        fontSize: 9.5,
+        fontWeight: 800,
+        letterSpacing: "0.02em",
+        color: cor ? cor.glow : "rgba(255,255,255,0.6)",
+        background: cor ? `${cor.base}24` : "rgba(255,255,255,0.06)",
+        boxShadow: `inset 0 0 0 1px ${cor ? `${cor.base}66` : "rgba(255,255,255,0.12)"}`,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+      }}
+    >
+      {texto}
+    </span>
+  );
+}
 
 /** Ações da rua prontas pra mostrar: folds seguidos dos outros viram um
  *  contador só ("4 folds") -- a mão real de 8 jogadores tem mais fold do
@@ -72,7 +107,7 @@ function itensDaRua(r: HistoryStep, heroPos: string | null): ItemAcao[] {
   let folds = 0;
   const nomes = nomesDosRaises(r.street, r.actions);
   const soltarFolds = () => {
-    if (folds > 0) itens.push({ pos: null, texto: folds === 1 ? "1 fold" : `${folds} folds`, hero: false, folds: true });
+    if (folds > 0) itens.push({ pos: null, posicao: null, texto: folds === 1 ? "1 fold" : `${folds} folds`, hero: false, folds: true });
     folds = 0;
   };
   for (const [i, a] of r.actions.entries()) {
@@ -82,7 +117,7 @@ function itensDaRua(r: HistoryStep, heroPos: string | null): ItemAcao[] {
       continue;
     }
     soltarFolds();
-    itens.push({ pos: hero ? "Você" : a.pos, texto: rotuloAcao(a.label, nomes[i]), hero, folds: false });
+    itens.push({ pos: hero ? "Você" : a.pos, posicao: a.pos, texto: rotuloAcao(a.label, nomes[i]), hero, folds: false });
   }
   soltarFolds();
   return itens;
@@ -183,12 +218,12 @@ export function LinhaDoTempoLateral({
               ) : (
                 <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
                   {itens.map((it, i) => (
-                    <li key={i} style={{ display: "flex", alignItems: "baseline", gap: 8, fontSize: 12, lineHeight: "17px", ...num }}>
+                    <li key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, lineHeight: "18px", ...num }}>
                       {it.folds ? (
                         <span style={{ color: "rgba(255,255,255,0.32)" }}>{it.texto}</span>
                       ) : (
                         <>
-                          <span style={{ width: 38, flexShrink: 0, fontSize: 10.5, fontWeight: 700, color: it.hero ? "#d4af37" : "rgba(255,255,255,0.45)" }}>{it.pos}</span>
+                          <EtiquetaPosicao texto={it.pos} posicao={it.posicao} largura={42} />
                           <span style={{ fontWeight: it.hero ? 700 : 500, color: it.hero ? "#F3D77A" : "rgba(255,255,255,0.88)" }}>{it.texto}</span>
                         </>
                       )}
@@ -299,8 +334,8 @@ export function LinhaDoTempo({
                       {it.folds ? (
                         <span style={{ color: "rgba(255,255,255,0.32)" }}>{it.texto}</span>
                       ) : (
-                        <span>
-                          <b style={{ fontWeight: 700, color: it.hero ? "#d4af37" : "rgba(255,255,255,0.55)" }}>{it.pos}</b>{" "}
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                          <EtiquetaPosicao texto={it.pos} posicao={it.posicao} largura={it.hero ? 38 : 32} />
                           <span style={{ fontWeight: it.hero ? 700 : 500, color: it.hero ? "#F3D77A" : "rgba(255,255,255,0.88)" }}>{it.texto}</span>
                         </span>
                       )}
