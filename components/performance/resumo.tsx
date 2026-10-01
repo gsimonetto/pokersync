@@ -167,7 +167,7 @@ export function ResumoPerformance({
         titulo: "ROI de torneios",
         oQueE: "Quanto voltou de lucro pra cada real investido em buy-ins de torneio.",
         origem: "Gestão de Banca · sessões de torneio",
-        comoCalcula: "Lucro total ÷ total investido (buy-ins e reentradas). Segue o filtro de buy-in desta tela (Visão geral).",
+        comoCalcula: "Lucro total (prêmios + bounties − buy-ins) ÷ total investido (buy-ins e reentradas). Segue o filtro de buy-in desta tela (Visão geral).",
       },
     },
   ];

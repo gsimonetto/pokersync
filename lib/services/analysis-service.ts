@@ -4,6 +4,7 @@ import type { Session } from "@/lib/bankroll/types";
 import { extractHeroBountiesWon } from "@/lib/poker/hand-parser";
 import { fetchHandEvResults } from "@/lib/services/hand-ev-service";
 import { fetchTournamentPayouts, type TournamentPayout } from "@/lib/services/tournament-payout-service";
+import { fetchBountiesDosTorneios } from "@/lib/services/bankroll-service";
 import { garantirRebuysCalculados } from "@/lib/services/tournament-rebuy-service";
 import {
   type AnalysisFilters,
@@ -473,16 +474,24 @@ interface ImportedTournament {
   cost: number;
   rebuys: number;
   payout: number | null;
+  /** Bounties ganhos nas mãos deste torneio (US$). */
+  bounties: number;
   date: string;
 }
 
+/** O que o torneio devolveu: prêmio por colocação + bounties (pedido
+ *  explícito: o ROI tem que contar os bounties dos PKO). */
+const retornoDo = (t: ImportedTournament) => (t.payout ?? 0) + t.bounties;
+
 export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = [], corte: string | null = null): Promise<TournamentMetrics> {
-  const [todasSessoes, payoutsAll, evResultsAll, totalBountiesWon, handIdsSince] = await Promise.all([
+  const [todasSessoes, payoutsAll, evResultsAll, totalBountiesWon, handIdsSince, bountiesPorTorneio] = await Promise.all([
     fetchTournamentSessions(),
     fetchTournamentPayouts(),
     fetchHandEvResults(),
     fetchTotalBountiesWon(corte),
     corte ? fetchImportedHandIdsSince(corte) : Promise.resolve(null),
+    // Sem a função no banco, o ROI fica como antes (só prêmio).
+    fetchBountiesDosTorneios().catch(() => new Map<string, number>()),
   ]);
   const sessionsAll = sessoesDesde(todasSessoes, corte);
   const payouts = filtrarPayoutsPorCorte(payoutsAll, todasSessoes, corte);
@@ -499,6 +508,7 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = [], c
         cost: s.buyin * (1 + rebuys),
         rebuys,
         payout: (s.tournament_id_ps ? payoutByTournament.get(s.tournament_id_ps)?.heroPayoutAmount : null) ?? null,
+        bounties: bountiesPorTorneio.get(s.id) ?? 0,
         date: (s.last_played_at ?? s.updated_at).slice(0, 10),
       };
     });
@@ -506,7 +516,10 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = [], c
   const invested = tournaments.reduce((acc, t) => acc + t.cost, 0);
   const totalRebuys = tournaments.reduce((acc, t) => acc + t.rebuys, 0);
   const rebuyCost = tournaments.reduce((acc, t) => acc + t.buyin * t.rebuys, 0);
+  // Prêmio por colocação (total_cashout) e, à parte, o retorno total com
+  // os bounties -- é ele que entra no lucro e no ROI.
   const returned = tournaments.reduce((acc, t) => acc + (t.payout ?? 0), 0);
+  const retornoTotal = tournaments.reduce((acc, t) => acc + retornoDo(t), 0);
   const itmCount = tournaments.filter((t) => (t.payout ?? 0) > 0).length;
   // "Jogando desde" / "último torneio" — datas extremas da amostra
   // filtrada, pro resumo financeiro estilo SharkScope (não é a data de
@@ -520,7 +533,7 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = [], c
   // tamanho do buy-in, o outro não.
   const avgBuyin = tournaments.length > 0 ? tournaments.reduce((acc, t) => acc + t.buyin, 0) / tournaments.length : null;
   const perGameRois = tournaments
-    .map((t) => (t.cost > 0 ? (((t.payout ?? 0) - t.cost) / t.cost) * 100 : null))
+    .map((t) => (t.cost > 0 ? ((retornoDo(t) - t.cost) / t.cost) * 100 : null))
     .filter((r): r is number => r !== null);
   const avgRoiPct = perGameRois.length > 0 ? perGameRois.reduce((a, b) => a + b, 0) / perGameRois.length : null;
 
@@ -530,7 +543,7 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = [], c
   const netByDay = new Map<string, number>();
   for (const t of tournaments) {
     gamesByDay.set(t.date, (gamesByDay.get(t.date) ?? 0) + 1);
-    const net = (t.payout ?? 0) - t.cost;
+    const net = retornoDo(t) - t.cost;
     netByDay.set(t.date, (netByDay.get(t.date) ?? 0) + net);
   }
   const activeDays = gamesByDay.size;
@@ -576,14 +589,14 @@ export async function fetchTournamentMetrics(buyinBuckets: BuyinBucket[] = [], c
 
   return {
     total_games: tournaments.length,
-    roi_pct: invested > 0 ? Math.round(((returned - invested) / invested) * 1000) / 10 : null,
+    roi_pct: invested > 0 ? Math.round(((retornoTotal - invested) / invested) * 1000) / 10 : null,
     itm_pct: tournaments.length > 0 ? pct(itmCount, tournaments.length) : null,
-    total_profit: tournaments.length > 0 ? Math.round((returned - invested) * 100) / 100 : null,
+    total_profit: tournaments.length > 0 ? Math.round((retornoTotal - invested) * 100) / 100 : null,
     total_invested: tournaments.length > 0 ? Math.round(invested * 100) / 100 : null,
     total_cashout: tournaments.length > 0 ? Math.round(returned * 100) / 100 : null,
     since,
     until,
-    avg_profit_per_game: tournaments.length > 0 ? Math.round(((returned - invested) / tournaments.length) * 100) / 100 : null,
+    avg_profit_per_game: tournaments.length > 0 ? Math.round(((retornoTotal - invested) / tournaments.length) * 100) / 100 : null,
     avg_buyin: avgBuyin !== null ? Math.round(avgBuyin * 100) / 100 : null,
     avg_roi_pct: avgRoiPct !== null ? Math.round(avgRoiPct * 10) / 10 : null,
     active_days: activeDays,
