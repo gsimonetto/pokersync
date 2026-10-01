@@ -1,14 +1,24 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Coins, Flag, Search, X, Medal, Eye, ChevronRight, PenLine } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Flag, Search, X, Eye, ChevronRight, PenLine } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
-import { isSpinAndGo, listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
+import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
 import { useConfirm } from "@/components/confirm-dialog";
 import { FilterChip } from "@/components/ui/filter-chip";
 import { SegmentedControl } from "@/components/ui/segmented-control";
 import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service";
+import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
+import { fetchBountiesDosTorneios } from "@/lib/services/bankroll-service";
+import {
+  CardTorneio,
+  diaDoTorneio,
+  estadoDaRevisao,
+  rotuloDoDia,
+  type ColocacaoTorneio,
+  type ProgressoTorneio,
+} from "@/components/revisor/lista-torneios";
 
 const IMPORTED_HAND_SOURCES = ["agent", "import"];
 
@@ -54,6 +64,11 @@ export function RevisorFila({
   const [sessionSearchOpen, setSessionSearchOpen] = useState(false);
   const [sessionSearchQuery, setSessionSearchQuery] = useState("");
   const [sessionsError, setSessionsError] = useState("");
+  // Colocação/prêmio (resumo do torneio, por id da sala) e bounties ganhos
+  // (por torneio) -- complementos do card; se falharem, o card mostra "—".
+  const [colocacoes, setColocacoes] = useState<Map<string, ColocacaoTorneio>>(new Map());
+  const [bountiesGanhos, setBountiesGanhos] = useState<Map<string, number>>(new Map());
+  const [filtroRevisao, setFiltroRevisao] = useState<"todos" | "pendentes" | "revisados">("todos");
 
   // ---- Mãos avulsas (comportamento antigo) ----
   const [filter, setFilter] = useState("todas");
@@ -116,7 +131,7 @@ export function RevisorFila({
   // Mesma consulta enxuta alimenta tambem o PROGRESSO de cada torneio
   // (quantas maos ja foram vistas na mesa / analisadas) -- sem isso o
   // resumo do topo so' sabia contar maos importadas, nao revisadas.
-  const [progresso, setProgresso] = useState<Record<string, { vistas: number; total: number; concluidas: number }>>({});
+  const [progresso, setProgresso] = useState<Record<string, ProgressoTorneio>>({});
   useEffect(() => {
     if (!userId || sessionsList.length === 0) {
       setRadarVisibleSessionIds(null);
@@ -127,7 +142,7 @@ export function RevisorFila({
       const supabase = createClient();
       const { data, error: qErr } = await supabase
         .from("hand_reviews")
-        .select("hand_session_id, source, created_at, viewed_in_replayer_at, status")
+        .select("hand_session_id, source, created_at, viewed_in_replayer_at, status, data:parsed_data->>date")
         .eq("user_id", userId)
         .in(
           "hand_session_id",
@@ -138,16 +153,20 @@ export function RevisorFila({
         return;
       }
       const visible = new Set<string>();
-      const prog: Record<string, { vistas: number; total: number; concluidas: number }> = {};
+      const prog: Record<string, ProgressoTorneio> = {};
       for (const row of data ?? []) {
         const sessionId = row.hand_session_id as string;
         const isImported = IMPORTED_HAND_SOURCES.includes(row.source as string);
         const recentEnough = !radarSince || !isImported || (row.created_at as string) >= radarSince;
         if (recentEnough) visible.add(sessionId);
-        const p = (prog[sessionId] ??= { vistas: 0, total: 0, concluidas: 0 });
+        const p = (prog[sessionId] ??= { vistas: 0, total: 0, concluidas: 0, inicio: null, fim: null });
         p.total++;
         if (row.viewed_in_replayer_at) p.vistas++;
         if (row.status === "concluida") p.concluidas++;
+        // "AAAA/MM/DD HH:MM:SS ..." compara certo como texto.
+        const quando = typeof row.data === "string" ? row.data : null;
+        if (quando && (!p.inicio || quando < p.inicio)) p.inicio = quando;
+        if (quando && (!p.fim || quando > p.fim)) p.fim = quando;
       }
       setRadarVisibleSessionIds(radarSince ? visible : null);
       setProgresso(prog);
@@ -163,6 +182,16 @@ export function RevisorFila({
   async function loadSessions() {
     setSessionsLoading(true);
     setSessionsError("");
+    fetchTournamentPayouts()
+      .then((ps) => {
+        const m = new Map<string, ColocacaoTorneio>();
+        for (const x of ps) if (x.tournamentIdPs) m.set(x.tournamentIdPs, { lugar: x.heroFinishPlace ?? null, inscritos: x.totalEntrants ?? null, premio: x.heroPayoutAmount ?? null });
+        setColocacoes(m);
+      })
+      .catch(() => {});
+    fetchBountiesDosTorneios()
+      .then(setBountiesGanhos)
+      .catch(() => {});
     try {
       const rows = await listSessionsWithCount(userId!);
       setSessionsList(rows);
@@ -237,9 +266,42 @@ export function RevisorFila({
     return sessionsList.filter((s) => {
       if (radarVisibleSessionIds && !radarVisibleSessionIds.has(s.id)) return false;
       if (q && !s.label.toLowerCase().includes(q)) return false;
+      if (filtroRevisao !== "todos") {
+        const revisado = estadoDaRevisao(progresso[s.id], Number(s.hand_count || 0)) === "revisado";
+        if (filtroRevisao === "revisados" ? !revisado : revisado) return false;
+      }
       return true;
     });
-  }, [sessionsList, sessionSearchQuery, radarVisibleSessionIds]);
+  }, [sessionsList, sessionSearchQuery, radarVisibleSessionIds, filtroRevisao, progresso]);
+
+  // Quantos torneios faltam revisar / já revisados (contagem dos filtros).
+  const contagemRevisao = useMemo(() => {
+    let revisados = 0;
+    for (const s of sessionsList) if (estadoDaRevisao(progresso[s.id], Number(s.hand_count || 0)) === "revisado") revisados++;
+    return { revisados, pendentes: sessionsList.length - revisados };
+  }, [sessionsList, progresso]);
+
+  // Cards agrupados por dia jogado (mais recente primeiro).
+  const gruposPorDia = useMemo(() => {
+    const grupos: { chave: string; rotulo: string; itens: HandSessionWithCount[] }[] = [];
+    const ordenadas = [...filteredSessions].sort((a, b) => diaDoTorneio(b, progresso[b.id]).getTime() - diaDoTorneio(a, progresso[a.id]).getTime());
+    for (const s of ordenadas) {
+      const d = diaDoTorneio(s, progresso[s.id]);
+      const chave = `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+      let g = grupos.find((x) => x.chave === chave);
+      if (!g) grupos.push((g = { chave, rotulo: rotuloDoDia(d), itens: [] }));
+      g.itens.push(s);
+    }
+    return grupos;
+  }, [filteredSessions, progresso]);
+
+  // "Continuar de onde parei": o torneio mais recente que já começou a
+  // rever e não terminou; sem nenhum assim, o mais recente ainda por ver.
+  const proximoTorneio = useMemo(() => {
+    const ordenadas = [...sessionsList].sort((a, b) => diaDoTorneio(b, progresso[b.id]).getTime() - diaDoTorneio(a, progresso[a.id]).getTime());
+    const estado = (s: HandSessionWithCount) => estadoDaRevisao(progresso[s.id], Number(s.hand_count || 0));
+    return ordenadas.find((s) => estado(s) === "andamento") ?? ordenadas.find((s) => estado(s) === "novo") ?? null;
+  }, [sessionsList, progresso]);
 
   // "Quantos torneios e quantas maos foram revisadas" -- pedido explicito
   // pra substituir o resumo antigo (Acertei/Errei/Duvida, que media
@@ -274,29 +336,50 @@ export function RevisorFila({
 
   return (
     <div>
-      {/* Resumo do topo: o que falta revisar, nao so' o que foi importado. */}
+      {/* Resumo do topo num painel só: quanto da revisão já foi feito e
+          um atalho pro torneio que falta terminar (antes eram 3 cards
+          grandes com pouca informação). */}
       {!sessionsLoading && sessionsList.length > 0 && (
-        <ul className="fade-in-up mb-4 grid grid-cols-3 gap-2.5">
-          <KpiFila
-            icone={Flag}
-            rotulo="Torneios e sessões"
-            valor={String(sessionsList.length)}
-            detalhe={`${nTorneios} ${nTorneios === 1 ? "torneio" : "torneios"} · ${nCash} cash`}
-          />
-          <KpiFila
-            icone={Eye}
-            rotulo="Mãos vistas na mesa"
-            valor={`${resumoProgresso.vistas} de ${totalHands}`}
-            detalhe={`${pctVistas}% revisado`}
-            barra={pctVistas}
-          />
-          <KpiFila
-            icone={CheckCircle2}
-            rotulo="Análises concluídas"
-            valor={String(resumoProgresso.concluidas)}
-            detalhe="com avaliação e anotação"
-          />
-        </ul>
+        <div className="painel-vidro fade-in-up mb-4 flex flex-col gap-3 rounded-2xl border border-white/10 p-4 sm:flex-row sm:items-center sm:gap-5">
+          <div className="min-w-0 flex-1">
+            <p className="text-[11px] font-medium uppercase tracking-[0.1em] text-muted">Sua revisão</p>
+            <p className="tnum mt-1 text-[22px] font-bold leading-none tracking-[-0.02em] text-ink">
+              {resumoProgresso.vistas} <span className="text-[14px] font-medium text-muted">de {totalHands} mãos vistas</span>
+            </p>
+            <div className="mt-2.5 h-1.5 max-w-[420px] overflow-hidden rounded-full bg-white/[0.08]">
+              <div className="h-full rounded-full bg-gradient-to-r from-[#5AA6E0] to-[#34D399]" style={{ width: `${pctVistas}%` }} />
+            </div>
+            <p className="mt-2 flex flex-wrap gap-x-3 gap-y-0.5 text-[11.5px] text-muted">
+              <span>
+                <Eye size={11} className="mr-1 inline" />
+                {pctVistas}% revisado
+              </span>
+              <span>
+                <Flag size={11} className="mr-1 inline" />
+                {nTorneios} {nTorneios === 1 ? "torneio" : "torneios"}
+                {nCash > 0 ? ` · ${nCash} cash` : ""}
+              </span>
+              <span>
+                <CheckCircle2 size={11} className="mr-1 inline" />
+                {resumoProgresso.concluidas} {resumoProgresso.concluidas === 1 ? "análise concluída" : "análises concluídas"}
+              </span>
+            </p>
+          </div>
+          {proximoTorneio && (
+            <button
+              type="button"
+              onClick={() => onOpenSession(proximoTorneio.id)}
+              className="flex shrink-0 items-center gap-3 rounded-xl border border-[#E0B24C]/30 bg-[#E0B24C]/[0.08] px-4 py-2.5 text-left transition hover:border-[#E0B24C]/60 hover:bg-[#E0B24C]/[0.14]"
+            >
+              <PlayCircle size={20} className="shrink-0 text-[#E0B24C]" />
+              <span className="min-w-0">
+                <span className="block text-[11px] text-muted">Continuar de onde parou</span>
+                <span className="block max-w-[220px] truncate text-[13.5px] font-semibold text-ink">{proximoTorneio.label}</span>
+              </span>
+              <ChevronRight size={16} className="shrink-0 text-[#E0B24C]" />
+            </button>
+          )}
+        </div>
       )}
       {/* Toolbar unica: abas + chips + busca na mesma linha -- mesmo
           padrao do Funil (Time > Painel), em vez de cada grupo de filtro
@@ -326,6 +409,9 @@ export function RevisorFila({
             >
               <Search size={13} />
             </button>
+            <FilterChip label={`Todos (${sessionsList.length})`} active={filtroRevisao === "todos"} onClick={() => setFiltroRevisao("todos")} />
+            <FilterChip label={`Para revisar (${contagemRevisao.pendentes})`} active={filtroRevisao === "pendentes"} onClick={() => setFiltroRevisao("pendentes")} />
+            <FilterChip label={`Revisados (${contagemRevisao.revisados})`} active={filtroRevisao === "revisados"} onClick={() => setFiltroRevisao("revisados")} />
           </>
         )}
 
@@ -382,143 +468,31 @@ export function RevisorFila({
               Nenhum torneio/sessão encontrado pra esse filtro.
             </div>
           ) : (
-            <ul className="flex flex-col gap-2.5">
-              {filteredSessions.map((s, idx) => {
-                const showsBounty = s.kind === "tournament" && (s.format_type === "pko" || s.format_type === "mystery");
-                const p = progresso[s.id];
-                const total = p?.total ?? Number(s.hand_count || 0);
-                const vistas = p?.vistas ?? 0;
-                const pct = total > 0 ? Math.round((vistas / total) * 100) : 0;
-                const completo = total > 0 && vistas >= total;
-                return (
-                  <li
-                    key={s.id}
-                    onClick={() => onOpenSession(s.id)}
-                    style={{ animationDelay: `${Math.min(idx, 10) * 30}ms` }}
-                    className="painel-vidro fade-in-up flex cursor-pointer items-center gap-3 rounded-2xl border border-white/10 p-3.5 transition-all duration-150 hover:-translate-y-0.5 hover:border-white/20 hover:shadow-lg"
-                  >
-                    <div className="relative flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-white/[0.04] ring-1 ring-inset ring-white/[0.08]">
-                      {/* Icone generico de torneio virou "Flag" (pedido
-                          explicito): a taca deixou de ser automatica pra
-                          TODO torneio — agora so aparece (selo no canto)
-                          quando a sessao realmente foi vencida pelo
-                          heroi (s.champion, setado automaticamente ao
-                          detectar ParsedHand.wonTournament no import). */}
-                      {s.kind === "tournament" ? (
-                        <Flag size={18} className="text-review" />
-                      ) : (
-                        <Coins size={18} className="text-evolution" />
-                      )}
-                      {s.champion && (
-                        <span
-                          title="Campeão do torneio"
-                          className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-evolution shadow-[0_0_8px_rgba(245,158,11,.65)]"
-                        >
-                          <Trophy size={11} className="text-void" />
-                        </span>
-                      )}
-                      {!s.champion && s.final_place === 2 && (
-                        <span
-                          title="2º lugar"
-                          className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-[#C0C6CC] shadow-[0_0_8px_rgba(192,198,204,.55)]"
-                        >
-                          <Medal size={11} className="text-void" />
-                        </span>
-                      )}
-                      {!s.champion && s.final_place === 3 && (
-                        <span
-                          title="3º lugar"
-                          className="absolute -right-1 -top-1 grid h-5 w-5 place-items-center rounded-full bg-[#CD7F32] shadow-[0_0_8px_rgba(205,127,50,.55)]"
-                        >
-                          <Medal size={11} className="text-void" />
-                        </span>
-                      )}
-                      {/* FT (mesa final): heroi eliminado dentro do tamanho
-                          da mesa final da propria mao, mas fora do podio —
-                          ver heuristica/cautela em heroFinishPlace no
-                          hand-parser.ts. Selo em texto (nao tem icone
-                          universal pra "final table"). */}
-                      {!s.champion && s.final_place == null && s.reached_ft && (
-                        <span
-                          title="Chegou na mesa final"
-                          className="absolute -right-1.5 -top-1.5 grid h-5 min-w-5 place-items-center rounded-full bg-ink px-1 shadow-[0_0_8px_rgba(255,255,255,.35)]"
-                        >
-                          <span className="text-[8.5px] font-bold text-void">FT</span>
-                        </span>
-                      )}
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                      <div className="flex items-center justify-between gap-2">
-                        <span className="truncate text-sm font-semibold text-ink">{s.label}</span>
-                        {showsBounty && s.bounty_current != null && (
-                          <span className="shrink-0 rounded-full border border-[#FBBF24]/40 bg-[#FBBF24]/10 px-2 py-0.5 text-[10px] font-semibold text-[#FBBF24]">
-                            Bounty US$ {Number(s.bounty_current).toLocaleString("pt-BR", { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
-                          </span>
-                        )}
-                      </div>
-                      <div className="mt-1 flex items-center gap-2 text-[11px] text-muted">
-                        {isSpinAndGo(s) ? (
-                          <span className="uppercase tracking-wide">Spin &amp; Go</span>
-                        ) : (
-                          s.kind === "tournament" &&
-                          s.format_type && (
-                            <span className="uppercase tracking-wide">
-                              {s.format_type === "pko" ? "PKO" : s.format_type === "mystery" ? "Mystery" : "Regular"}
-                            </span>
-                          )
-                        )}
-                        <span>· {s.hand_count} mão{Number(s.hand_count) === 1 ? "" : "s"}</span>
-                        {s.reentries > 0 && (
-                          <span
-                            title="Detectado sozinho: você perdeu todas as fichas e voltou ao mesmo torneio"
-                            className="font-semibold text-[#f59e0b]"
-                          >
-                            · {s.reentries} rebuy{s.reentries === 1 ? "" : "s"}
-                          </span>
-                        )}
-                        <span>· {formatDate(s.updated_at)}</span>
-                      </div>
-                      {/* Progresso: quantas maos desse torneio ja foram
-                          vistas na mesa (e quantas tem analise concluida). */}
-                      {total > 0 && (
-                        <div className="mt-2 flex items-center gap-2.5">
-                          <div className="h-1.5 w-full max-w-[220px] overflow-hidden rounded-full bg-white/[0.08]">
-                            <div
-                              className="h-full rounded-full"
-                              style={{ width: `${pct}%`, background: completo ? "#34D399" : "linear-gradient(90deg, #5AA6E0, #34D399)" }}
-                            />
-                          </div>
-                          <span className="shrink-0 text-[11px] text-muted">
-                            <b className="font-semibold text-ink">{vistas}</b> de {total} vistas
-                            {p && p.concluidas > 0 && <> · {p.concluidas} analisada{p.concluidas === 1 ? "" : "s"}</>}
-                          </span>
-                        </div>
-                      )}
-                    </div>
-                    {/* Continua da primeira mao ainda nao vista (a tela da
-                        sessao ja abre nela). */}
-                    <span
-                      className={`hidden shrink-0 items-center gap-1 rounded-xl border px-3 py-1.5 text-[12px] font-semibold sm:inline-flex ${
-                        completo
-                          ? "border-[#34D399]/30 bg-[#34D399]/10 text-[#34D399]"
-                          : "border-white/10 bg-white/[0.05] text-ink/90"
-                      }`}
-                    >
-                      {completo ? (
-                        <>
-                          <CheckCircle2 size={13} /> Revisado
-                        </>
-                      ) : (
-                        <>
-                          {vistas === 0 ? "Começar" : "Continuar"} <ChevronRight size={14} />
-                        </>
-                      )}
+            <div className="flex flex-col gap-5">
+              {gruposPorDia.map((g) => (
+                <section key={g.chave}>
+                  <h3 className="mb-2.5 flex items-baseline gap-2 text-[12.5px] font-semibold capitalize text-ink/90">
+                    {g.rotulo}
+                    <span className="font-normal normal-case text-muted">
+                      · {g.itens.length} {g.itens.length === 1 ? "torneio" : "torneios"}
                     </span>
-                  </li>
-                );
-              })}
-            </ul>
+                  </h3>
+                  <ul className="grid grid-cols-1 gap-3 md:grid-cols-2 2xl:grid-cols-3">
+                    {g.itens.map((s, idx) => (
+                      <CardTorneio
+                        key={s.id}
+                        s={s}
+                        progresso={progresso[s.id]}
+                        colocacao={s.tournament_id_ps ? colocacoes.get(s.tournament_id_ps) : undefined}
+                        bounties={bountiesGanhos.get(s.id) ?? 0}
+                        onAbrir={() => onOpenSession(s.id)}
+                        indice={idx}
+                      />
+                    ))}
+                  </ul>
+                </section>
+              ))}
+            </div>
           )}
         </>
       )}
@@ -660,40 +634,6 @@ function ReviewCard({
           )}
         </div>
       </div>
-    </li>
-  );
-}
-
-// Numero do resumo do topo -- mesmo desenho dos indicadores da Performance
-// e da Gestao de Banca (rotulo + icone em cima, numero grande, detalhe
-// embaixo), num card de vidro.
-function KpiFila({
-  icone: Icone,
-  rotulo,
-  valor,
-  detalhe,
-  barra,
-}: {
-  icone: typeof Clock;
-  rotulo: string;
-  valor: string;
-  detalhe: string;
-  /** 0-100: barra fina de progresso embaixo do numero. */
-  barra?: number;
-}) {
-  return (
-    <li className="painel-vidro flex min-w-0 flex-col gap-1.5 rounded-2xl border border-white/10 p-3 sm:p-3.5">
-      <span className="flex items-start justify-between gap-2">
-        <span className="min-w-0 text-[11px] leading-tight text-muted/80 sm:text-[11.5px]">{rotulo}</span>
-        <Icone size={14} className="hidden shrink-0 text-muted sm:block" aria-hidden />
-      </span>
-      <p className="tnum truncate text-[17px] font-bold leading-none tracking-[-0.02em] sm:text-[22px]">{valor}</p>
-      {barra != null && (
-        <div className="h-1 overflow-hidden rounded-full bg-white/[0.08]">
-          <div className="h-full rounded-full bg-gradient-to-r from-[#5AA6E0] to-[#34D399]" style={{ width: `${barra}%` }} />
-        </div>
-      )}
-      <span className="truncate text-[10.5px] leading-tight text-muted/80 sm:text-[11px]">{detalhe}</span>
     </li>
   );
 }
