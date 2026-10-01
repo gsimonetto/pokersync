@@ -684,10 +684,16 @@ function Seat({
   // DENTRO da mesa (assento na metade direita -> badge à esquerda), pra
   // nunca passar da borda; e é obstáculo pras fichas de aposta desviarem.
   const bountyDentro = seat.x > 50 ? { right: "100%", marginRight: 4 } : { left: "100%", marginLeft: 4 };
-  const bountyChip = !empty && bountyValue != null && (
+  // Valor mostrado = o que quem eliminar o jogador ganha em dinheiro
+  // (pedido explícito). No PKO é METADE do bounty listado no hand history
+  // -- a outra metade vai pro bounty de quem eliminou. O valor cheio
+  // continua em state.bountyValue (é ele que alimenta o bounty da sessão).
+  const premioBounty = bountyValue != null ? Math.round((bountyValue / 2) * 100) / 100 : null;
+  const dinheiro = (v: number) => (Number.isInteger(v) ? String(v) : v.toFixed(2));
+  const bountyChip = !empty && bountyValue != null && premioBounty != null && (
     <div
       data-obstaculo=""
-      title={`Bounty de $${bountyValue}`}
+      title={`Eliminar este jogador vale $${dinheiro(premioBounty)} (metade do bounty de $${dinheiro(bountyValue)})`}
       style={{
         position: "absolute",
         ...bountyDentro,
@@ -710,7 +716,7 @@ function Seat({
         ...num,
       }}
     >
-      <Target size={8} />${bountyValue}
+      <Target size={8} />${dinheiro(premioBounty)}
     </div>
   );
 
