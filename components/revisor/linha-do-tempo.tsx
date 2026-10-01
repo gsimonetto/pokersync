@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { Target } from "lucide-react";
-import { F, SUITS, num } from "@/lib/poker/drill-theme";
+import { F, POS, SUITS, num } from "@/lib/poker/drill-theme";
 import { formatarBb } from "@/lib/poker/hand-summary";
 import type { HistoryStep } from "@/components/drill/poker-table";
 import { usePreferenciasMesa } from "@/lib/hooks/use-preferencias-mesa";
@@ -62,6 +62,193 @@ export function CartaTexto({ card }: { card: string }) {
   );
 }
 
+type ItemAcao = {
+  /** O que aparece na etiqueta: a posição, ou "Você" nas suas ações. */
+  pos: string | null;
+  /** Posição de verdade (pra cor), inclusive nas suas ações. */
+  posicao: string | null;
+  texto: string;
+  hero: boolean;
+  folds: boolean;
+};
+
+/** Etiqueta da posição na cor do jogador na mesa (a mesma do assento). */
+function EtiquetaPosicao({ texto, posicao, largura }: { texto: string | null; posicao: string | null; largura: number }) {
+  const cor = posicao ? POS[posicao] : undefined;
+  return (
+    <span
+      style={{
+        width: largura,
+        flexShrink: 0,
+        display: "inline-grid",
+        placeItems: "center",
+        height: 16,
+        borderRadius: 5,
+        fontSize: 9.5,
+        fontWeight: 800,
+        letterSpacing: "0.02em",
+        color: cor ? cor.glow : "rgba(255,255,255,0.6)",
+        background: cor ? `${cor.base}24` : "rgba(255,255,255,0.06)",
+        boxShadow: `inset 0 0 0 1px ${cor ? `${cor.base}66` : "rgba(255,255,255,0.12)"}`,
+        whiteSpace: "nowrap",
+        overflow: "hidden",
+      }}
+    >
+      {texto}
+    </span>
+  );
+}
+
+/** Ações da rua prontas pra mostrar: folds seguidos dos outros viram um
+ *  contador só ("4 folds") -- a mão real de 8 jogadores tem mais fold do
+ *  que qualquer outra coisa, e isso escondia as ações que importam. */
+function itensDaRua(r: HistoryStep, heroPos: string | null): ItemAcao[] {
+  const itens: ItemAcao[] = [];
+  let folds = 0;
+  const nomes = nomesDosRaises(r.street, r.actions);
+  const soltarFolds = () => {
+    if (folds > 0) itens.push({ pos: null, posicao: null, texto: folds === 1 ? "1 fold" : `${folds} folds`, hero: false, folds: true });
+    folds = 0;
+  };
+  for (const [i, a] of r.actions.entries()) {
+    const hero = a.pos === heroPos;
+    if (a.label === "fold" && !hero) {
+      folds++;
+      continue;
+    }
+    soltarFolds();
+    itens.push({ pos: hero ? "Você" : a.pos, posicao: a.pos, texto: rotuloAcao(a.label, nomes[i]), hero, folds: false });
+  }
+  soltarFolds();
+  return itens;
+}
+
+function ruaAlcancada(r: HistoryStep, board: (string | null)[]): boolean {
+  const fatia = FATIA_BOARD[r.street];
+  const cartas = fatia ? board.slice(fatia[0], fatia[1]).filter(Boolean) : [];
+  return r.street === "PREFLOP" || cartas.length > 0 || r.actions.length > 0;
+}
+
+function PilulaResultado({ resultadoBb, emFichas }: { resultadoBb: number; emFichas: boolean }) {
+  return (
+    <span
+      style={{
+        fontSize: 12,
+        fontWeight: 700,
+        padding: "4px 10px",
+        borderRadius: 999,
+        whiteSpace: "nowrap",
+        ...num,
+        color: resultadoBb >= 0 ? "#34D399" : "#F87171",
+        background: resultadoBb >= 0 ? "rgba(52,211,153,0.12)" : "rgba(248,113,113,0.12)",
+        border: `1px solid ${resultadoBb >= 0 ? "rgba(52,211,153,0.35)" : "rgba(248,113,113,0.35)"}`,
+      }}
+    >
+      {resultadoBb >= 0 ? "Você ganhou " : "Você perdeu "}
+      {emFichas ? `${Math.abs(resultadoBb).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} fichas` : formatarBb(Math.abs(resultadoBb)).replace(/^\+/, "")}
+    </span>
+  );
+}
+
+function LinkTreinar({ href }: { href: string }) {
+  return (
+    <Link
+      href={href}
+      style={{
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        gap: 6,
+        background: "rgba(255,255,255,0.08)",
+        border: "1px solid rgba(255,255,255,0.25)",
+        color: "#FFFFFF",
+        borderRadius: 10,
+        padding: "6px 12px",
+        fontSize: 12,
+        fontWeight: 500,
+        textDecoration: "none",
+        whiteSpace: "nowrap",
+      }}
+    >
+      <Target size={13} /> Treinar esse spot
+    </Link>
+  );
+}
+
+/** Ações da mão em pé, numa coluna ao lado da mesa (pedido explícito: usar
+ *  o espaço vazio do lado da mesa). Uma rua embaixo da outra, uma ação por
+ *  linha com a posição alinhada; no fim, o resultado e o Treinar. */
+export function LinhaDoTempoLateral({
+  ruas,
+  board,
+  heroPos,
+  resultadoBb,
+  emFichas = false,
+  trainHref,
+}: {
+  ruas: HistoryStep[];
+  board: (string | null)[];
+  heroPos: string | null;
+  resultadoBb: number | null;
+  emFichas?: boolean;
+  trainHref: string | null;
+}) {
+  return (
+    <aside style={{ fontFamily: F, display: "flex", flexDirection: "column", gap: 10, minHeight: 0, height: "100%" }}>
+      <p style={{ margin: 0, fontSize: 10, fontWeight: 700, letterSpacing: "0.12em", textTransform: "uppercase", color: "rgba(255,255,255,0.4)" }}>Ações da mão</p>
+      <div style={{ display: "flex", flexDirection: "column", gap: 8, minHeight: 0, overflowY: "auto", paddingRight: 2 }}>
+        {ruas.map((r) => {
+          const itens = itensDaRua(r, heroPos);
+          return (
+            <section
+              key={r.street}
+              style={{
+                padding: "8px 10px",
+                borderRadius: 10,
+                background: r.current ? "rgba(212,175,55,0.07)" : "rgba(255,255,255,0.025)",
+                border: `1px solid ${r.current ? "rgba(212,175,55,0.35)" : "rgba(255,255,255,0.06)"}`,
+                opacity: ruaAlcancada(r, board) ? 1 : 0.3,
+              }}
+            >
+              <p style={{ margin: "0 0 5px", fontSize: 10, fontWeight: 700, letterSpacing: "0.1em", textTransform: "uppercase", color: r.current ? "#d4af37" : "rgba(255,255,255,0.5)" }}>
+                {NOME_RUA[r.street] ?? r.street}
+              </p>
+              {itens.length === 0 ? (
+                <p style={{ margin: 0, fontSize: 11.5, color: "rgba(255,255,255,0.3)" }}>—</p>
+              ) : (
+                <ul style={{ margin: 0, padding: 0, listStyle: "none", display: "flex", flexDirection: "column", gap: 3 }}>
+                  {itens.map((it, i) => (
+                    <li key={i} style={{ display: "flex", alignItems: "center", gap: 8, fontSize: 12, lineHeight: "18px", ...num }}>
+                      {it.folds ? (
+                        <span style={{ color: "rgba(255,255,255,0.32)" }}>{it.texto}</span>
+                      ) : (
+                        <>
+                          <EtiquetaPosicao texto={it.pos} posicao={it.posicao} largura={42} />
+                          <span style={{ fontWeight: it.hero ? 700 : 500, color: it.hero ? "#F3D77A" : "rgba(255,255,255,0.88)" }}>{it.texto}</span>
+                        </>
+                      )}
+                    </li>
+                  ))}
+                </ul>
+              )}
+            </section>
+          );
+        })}
+      </div>
+      {(resultadoBb != null || trainHref) && (
+        <div style={{ marginTop: "auto", display: "flex", flexDirection: "column", alignItems: "stretch", gap: 8, paddingTop: 4 }}>
+          {resultadoBb != null && (
+            <div style={{ display: "flex", justifyContent: "center" }}>
+              <PilulaResultado resultadoBb={resultadoBb} emFichas={emFichas} />
+            </div>
+          )}
+          {trainHref && <LinkTreinar href={trainHref} />}
+        </div>
+      )}
+    </aside>
+  );
+}
+
 export function LinhaDoTempo({
   ruas,
   board,
@@ -88,81 +275,74 @@ export function LinhaDoTempo({
         display: "grid",
         gridTemplateColumns: "minmax(0, 1fr) auto",
         alignItems: "stretch",
-        gap: 12,
+        gap: 10,
         height: 96,
         flexShrink: 0,
         // Direita maior: o botao flutuante de ajuda (canto inferior
         // direito da tela) ficava por cima do resultado.
-        padding: "9px 72px 9px 12px",
+        padding: "6px 72px 6px 6px",
         borderRadius: 14,
         border: "1px solid rgba(255,255,255,0.08)",
       }}
     >
-      {/* Pre-flop mais largo: e' a rua com mais acao (8 jogadores). */}
-      <div style={{ display: "grid", gridTemplateColumns: "minmax(0, 1.6fr) repeat(3, minmax(0, 1fr))", gap: 12, minWidth: 0 }}>
+      {/* Uma linha por rua (pedido explícito: "não precisa trazer as
+          cartas, já estão no board; quero as ações, mas separadas, numa
+          linha que não fique confusa"): o nome da rua numa coluna fixa e
+          as ações em sequência, separadas por setas -- as suas em
+          dourado, os folds dos outros agrupados e apagados. A rua em que
+          o replay está fica marcada; as que ainda não chegaram, apagadas. */}
+      <div style={{ display: "flex", flexDirection: "column", justifyContent: "center", gap: 2, minWidth: 0 }}>
         {ruas.map((r) => {
-          const fatia = FATIA_BOARD[r.street];
-          const cartas = fatia ? board.slice(fatia[0], fatia[1]).filter((c): c is string => Boolean(c)) : [];
-          const alcancada = r.street === "PREFLOP" || cartas.length > 0 || r.actions.length > 0;
-          // Folds seguidos de outros jogadores viram um contador só
-          // ("4 folds") -- a mão real de 8 jogadores tem mais fold do que
-          // qualquer outra coisa, e isso escondia as ações que importam.
-          const itens: { texto: string; hero: boolean; fraco: boolean }[] = [];
-          let folds = 0;
-          const nomes = nomesDosRaises(r.street, r.actions);
-          const soltarFolds = () => {
-            if (folds > 0) itens.push({ texto: folds === 1 ? "1 fold" : `${folds} folds`, hero: false, fraco: true });
-            folds = 0;
-          };
-          for (const [i, a] of r.actions.entries()) {
-            const hero = a.pos === heroPos;
-            if (a.label === "fold" && !hero) {
-              folds++;
-              continue;
-            }
-            soltarFolds();
-            itens.push({ texto: `${hero ? "Você" : a.pos} ${rotuloAcao(a.label, nomes[i])}`, hero, fraco: false });
-          }
-          soltarFolds();
+          const alcancada = ruaAlcancada(r, board);
+          const itens = itensDaRua(r, heroPos);
           return (
-            <div key={r.street} style={{ minWidth: 0, overflow: "hidden", display: "flex", flexDirection: "column", gap: 4, opacity: alcancada ? 1 : 0.35 }}>
-              {/* flexWrap: com a faixa estreita (tela de ~1024) as cartas
-                  da rua passavam por cima da coluna do lado -- agora
-                  descem pra linha de baixo. */}
-              <div style={{ display: "flex", flexWrap: "wrap", alignItems: "baseline", columnGap: 6, fontSize: 10, fontWeight: 600, letterSpacing: "0.08em", textTransform: "uppercase" }}>
-                <span style={{ color: r.current ? "#FFFFFF" : "rgba(255,255,255,0.45)" }}>{NOME_RUA[r.street] ?? r.street}</span>
-                {cartas.length > 0 && (
-                  <span style={{ display: "flex", flexWrap: "wrap", gap: 3, fontSize: 11, letterSpacing: 0, textTransform: "none" }}>
-                    {cartas.map((c) => (
-                      <CartaTexto key={c} card={c} />
-                    ))}
-                  </span>
-                )}
-              </div>
-              <div style={{ display: "flex", flexWrap: "wrap", alignContent: "flex-start", gap: 3, overflow: "hidden", maxHeight: 60 }}>
+            <div
+              key={r.street}
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 10,
+                minWidth: 0,
+                height: 19,
+                padding: "0 8px",
+                borderRadius: 6,
+                background: r.current ? "rgba(212,175,55,0.08)" : "transparent",
+                opacity: alcancada ? 1 : 0.3,
+              }}
+            >
+              <span
+                style={{
+                  width: 62,
+                  flexShrink: 0,
+                  fontSize: 9.5,
+                  fontWeight: 700,
+                  letterSpacing: "0.1em",
+                  textTransform: "uppercase",
+                  color: r.current ? "#d4af37" : "rgba(255,255,255,0.45)",
+                  borderRight: "1px solid rgba(255,255,255,0.1)",
+                }}
+              >
+                {NOME_RUA[r.street] ?? r.street}
+              </span>
+              <span style={{ display: "flex", alignItems: "center", gap: 7, minWidth: 0, overflow: "hidden", whiteSpace: "nowrap", fontSize: 11.5, ...num }}>
                 {itens.length === 0 ? (
-                  <span style={{ fontSize: 11, color: "rgba(255,255,255,0.3)" }}>—</span>
+                  <span style={{ color: "rgba(255,255,255,0.3)" }}>—</span>
                 ) : (
                   itens.map((it, i) => (
-                    <span
-                      key={i}
-                      style={{
-                        fontSize: 10.5,
-                        lineHeight: "18px",
-                        padding: "0 6px",
-                        borderRadius: 6,
-                        whiteSpace: "nowrap",
-                        ...num,
-                        color: it.hero ? "#111111" : it.fraco ? "rgba(255,255,255,0.38)" : "rgba(255,255,255,0.82)",
-                        background: it.hero ? "#d4af37" : it.fraco ? "transparent" : "rgba(255,255,255,0.07)",
-                        fontWeight: it.hero ? 700 : 500,
-                      }}
-                    >
-                      {it.texto}
+                    <span key={i} style={{ display: "inline-flex", alignItems: "center", gap: 7 }}>
+                      {i > 0 && <span style={{ color: "rgba(255,255,255,0.22)", fontSize: 11 }}>›</span>}
+                      {it.folds ? (
+                        <span style={{ color: "rgba(255,255,255,0.32)" }}>{it.texto}</span>
+                      ) : (
+                        <span style={{ display: "inline-flex", alignItems: "center", gap: 5 }}>
+                          <EtiquetaPosicao texto={it.pos} posicao={it.posicao} largura={it.hero ? 38 : 32} />
+                          <span style={{ fontWeight: it.hero ? 700 : 500, color: it.hero ? "#F3D77A" : "rgba(255,255,255,0.88)" }}>{it.texto}</span>
+                        </span>
+                      )}
                     </span>
                   ))
                 )}
-              </div>
+              </span>
             </div>
           );
         })}
@@ -172,39 +352,8 @@ export function LinhaDoTempo({
           Treino quando existe drill pra esse spot. Sem drill, fica vazio
           -- antes aparecia um "Sem drill correspondente" solto. */}
       <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", justifyContent: "center", gap: 6, minWidth: 0 }}>
-        {resultadoBb != null && (
-          <span
-            style={{
-              fontSize: 12,
-              fontWeight: 700,
-              padding: "4px 10px",
-              borderRadius: 999,
-              whiteSpace: "nowrap",
-              ...num,
-              color: resultadoBb >= 0 ? "#34D399" : "#F87171",
-              background: resultadoBb >= 0 ? "rgba(52,211,153,0.12)" : "rgba(248,113,113,0.12)",
-              border: `1px solid ${resultadoBb >= 0 ? "rgba(52,211,153,0.35)" : "rgba(248,113,113,0.35)"}`,
-            }}
-          >
-            {resultadoBb >= 0 ? "Você ganhou " : "Você perdeu "}
-            {emFichas
-              ? `${Math.abs(resultadoBb).toLocaleString("pt-BR", { maximumFractionDigits: 0 })} fichas`
-              : formatarBb(Math.abs(resultadoBb)).replace(/^\+/, "")}
-          </span>
-        )}
-        {trainHref && (
-          <Link
-            href={trainHref}
-            style={{
-              display: "flex", alignItems: "center", gap: 6,
-              background: "rgba(255,255,255,0.08)", border: "1px solid rgba(255,255,255,0.25)",
-              color: "#FFFFFF", borderRadius: 10, padding: "6px 12px",
-              fontSize: 12, fontWeight: 500, textDecoration: "none", whiteSpace: "nowrap",
-            }}
-          >
-            <Target size={13} /> Treinar esse spot
-          </Link>
-        )}
+        {resultadoBb != null && <PilulaResultado resultadoBb={resultadoBb} emFichas={emFichas} />}
+        {trainHref && <LinkTreinar href={trainHref} />}
       </div>
     </div>
   );

@@ -20,7 +20,7 @@ import { linkConstrutorDaMao } from "@/lib/ranges/link-da-mao";
 import { equidade, nomeDaJogada } from "@/lib/poker/jogada";
 import { F, T } from "@/lib/poker/drill-theme";
 import { salvarPreferenciaMesa, usePreferenciasMesa, type UnidadeValor } from "@/lib/hooks/use-preferencias-mesa";
-import { LinhaDoTempo } from "./linha-do-tempo";
+import { LinhaDoTempo, LinhaDoTempoLateral } from "./linha-do-tempo";
 import { CHIP_MESA, ControlesReplay, INFO_MESA, OURO_MESA, SegmentoMesa, classeIconeMesa } from "@/components/drill/mesa-ui";
 import { CartaoAvaliacao, FaixaAvaliacaoCelular } from "./avaliacao-rapida";
 
@@ -141,6 +141,11 @@ function ChipButton({
   );
 }
 
+// Largura do card da mesa (px) a partir da qual as ações da mão vão pra
+// uma coluna ao lado da mesa, em vez da faixa embaixo.
+const LARGURA_ACOES_AO_LADO = 900;
+const LARGURA_COLUNA_ACOES = 230;
+
 export function RevisorHandTable({
   parsedHand,
   tournamentName,
@@ -252,6 +257,10 @@ export function RevisorHandTable({
   // desktop apertada, sem depender do tipo de aparelho.
   const cardRef = useRef<HTMLDivElement>(null);
   const [compact, setCompact] = useState(false);
+  // Card largo o bastante pra ter as ações numa coluna ao lado da mesa
+  // (pedido explícito: usar o espaço vazio do lado); mais estreito, elas
+  // ficam na faixa embaixo.
+  const [acoesAoLado, setAcoesAoLado] = useState(false);
   useEffect(() => {
     const el = cardRef.current;
     if (!el) return;
@@ -259,6 +268,7 @@ export function RevisorHandTable({
       const width = entries[0]?.contentRect.width;
       if (!width) return;
       setCompact(width < 560);
+      setAcoesAoLado(width >= LARGURA_ACOES_AO_LADO);
     });
     observer.observe(el);
     return () => observer.disconnect();
@@ -953,7 +963,8 @@ export function RevisorHandTable({
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. position:relative pra sustentar os overlays
             do modo mobile (blinds fosco + dock de navegacao) abaixo. */}
-        <div style={{ flex: 1, minHeight: 0, position: "relative" }}>
+        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 28 }}>
+        <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative" }}>
           <PokerTable
             hand={mesaComInfo ?? replayState.tableHand}
             seats={isMobile && mobileSeatLayout ? mobileSeatLayout : replayState.seatLayout}
@@ -1010,6 +1021,19 @@ export function RevisorHandTable({
               />
             </div>
           )}
+        </div>
+        {!isMobile && acoesAoLado && (
+          <div style={{ width: LARGURA_COLUNA_ACOES, flexShrink: 0, minHeight: 0, marginBottom: -40 }}>
+            <LinhaDoTempoLateral
+              ruas={replayState.tableHand.history}
+              board={replayState.tableHand.board}
+              heroPos={heroPos}
+              resultadoBb={isLastStep ? (emFichas ? resultadoFichas : resumo.resultadoBb) : null}
+              emFichas={emFichas}
+              trainHref={trainHref}
+            />
+          </div>
+        )}
         </div>
 
         {/* Celular: nota da rua numa faixa fina EMBAIXO da mesa, fora dela
@@ -1089,7 +1113,7 @@ export function RevisorHandTable({
           LinhaDoTempo): a mesa acima mede o espaco que sobra, e uma
           faixa que mudasse de altura (antes: link "Treinar" x texto "Sem
           drill") fazia a mesa piscar redimensionando. */}
-      {!isMobile && (
+      {!isMobile && !acoesAoLado && (
         <LinhaDoTempo
           ruas={replayState.tableHand.history}
           board={replayState.tableHand.board}
