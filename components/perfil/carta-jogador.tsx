@@ -27,7 +27,7 @@ export interface AtributoCarta {
 // Formato da carta: cantos de cima chanfrados e a base em ponta suave.
 const FORMA = "polygon(9% 0, 91% 0, 100% 5.5%, 100% 91%, 50% 100%, 0 91%, 0 5.5%)";
 const LARGURA = 340;
-const ALTURA = 540;
+const ALTURA = 590;
 
 export function CartaJogador({
   nome,
@@ -38,6 +38,7 @@ export function CartaJogador({
   fundador,
   atributos,
   rodape,
+  destaque,
 }: {
   /** Nome grande da carta (apelido ou sobrenome). */
   nome: string;
@@ -49,6 +50,8 @@ export function CartaJogador({
   /** Seis atributos: os três primeiros na coluna da esquerda. */
   atributos: AtributoCarta[];
   rodape?: string | null;
+  /** Número de destaque numa linha só, entre o nome e os atributos. */
+  destaque?: AtributoCarta;
 }) {
   const m = MATERIAIS[faixaDoNivel(nivel)];
   const reduzir = useReducedMotion();
@@ -171,7 +174,30 @@ export function CartaJogador({
           </div>
 
           {/* Atributos: duas colunas, valor alinhado à direita e sigla à esquerda. */}
-          <div style={{ position: "absolute", top: 324, left: 26, right: 26, display: "grid", gridTemplateColumns: "1fr 1px 1fr", columnGap: 14 }}>
+          {destaque && (
+            <div
+              title={destaque.nome}
+              style={{
+                position: "absolute",
+                top: 320,
+                left: 40,
+                right: 40,
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "space-between",
+                padding: "9px 16px",
+                borderRadius: 14,
+                background: `linear-gradient(90deg, ${m.base}26, ${m.base}0d)`,
+                boxShadow: `inset 0 0 0 1px ${m.claro}33`,
+              }}
+            >
+              <span style={{ fontSize: 11.5, fontWeight: 800, letterSpacing: "0.14em", color: m.claro }}>{destaque.sigla}</span>
+              <span className="tnum" style={{ fontSize: 24, fontWeight: 800, color: "#fff", letterSpacing: "-0.02em", lineHeight: 1 }}>
+                {destaque.valor ?? "—"}
+              </span>
+            </div>
+          )}
+          <div style={{ position: "absolute", top: destaque ? 384 : 324, left: 26, right: 26, display: "grid", gridTemplateColumns: "1fr 1px 1fr", columnGap: 14 }}>
             <Coluna itens={esquerda} cor={m.claro} />
             <span aria-hidden style={{ background: `linear-gradient(180deg, transparent, ${m.claro}66, transparent)` }} />
             <Coluna itens={direita} cor={m.claro} />

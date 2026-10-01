@@ -163,9 +163,9 @@ export interface TournamentMetrics {
   total_games: number;
   roi_pct: number | null;
   itm_pct: number | null;
-  total_profit: number | null;
+  total_profit: number | null; // prêmios + bounties − investido
   total_invested: number | null; // soma de buy-in + re-entries
-  total_cashout: number | null; // soma de tudo que voltou (premiação)
+  total_cashout: number | null; // soma da premiação por colocação (sem bounties)
   since: string | null; // ISO date do primeiro torneio registrado
   until: string | null; // ISO date do torneio mais recente
   avg_profit_per_game: number | null;
