@@ -453,15 +453,15 @@ export function AbaConstrutor({
                   {numCombos(destaque.tipo === "feita" ? ruaAtual!.analise.feitas[destaque.k] : ruaAtual!.analise.projetos[destaque.k])} combos)
                 </span>
               ) : modoGrade.tipo === "range" ? (
-                // Legenda das cores: a ação do range e o fold (fora do range).
+                // Legenda das cores: a ação do range e o que está fora dele.
                 <span className="inline-flex flex-wrap items-center gap-x-3 gap-y-1">
                   <span className="inline-flex items-center gap-1.5">
                     <span className="h-2.5 w-2.5 rounded-sm" style={{ background: corDaAcao(range.acao) }} />
                     {range.acao ? NOME_ACAO[range.acao as Acao] ?? range.acao : "No range"}
                   </span>
                   <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: `${COR_ACAO.fold}55` }} />
-                    Fold
+                    <span className="h-2.5 w-2.5 rounded-sm" style={{ background: `${COR_ACAO.fora}55` }} />
+                    Fora do range
                   </span>
                   <span className="hidden sm:inline">· arraste pra pintar · botão direito escolhe os naipes</span>
                 </span>

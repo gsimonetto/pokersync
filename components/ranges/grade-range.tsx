@@ -7,10 +7,10 @@ import { COR_ACAO } from "@/lib/poker/grade-gto";
 import { corDaAcao } from "@/lib/ranges/prontos";
 import { corEquidade } from "./pecas";
 
-// Fora do range = fold: cinza fraco, igual à grade do Treino.
-const FUNDO_FOLD = `${COR_ACAO.fold}1f`;
-// Texto escuro sobre as cores claras (dourado, verde, laranja); branco no azul e no vermelho.
-const CORES_CLARAS = new Set<string>(["#d4af37", COR_ACAO.raise, COR_ACAO.threebet]);
+// Fora do range: cinza fraco.
+const FUNDO_FORA = `${COR_ACAO.fora}1f`;
+// Texto escuro sobre as cores claras (dourado, verde, laranja); branco no azul e nos vermelhos.
+const CORES_CLARAS = new Set<string>(["#d4af37", COR_ACAO.call, COR_ACAO.allin]);
 
 // Grade 13x13 do Construtor. Pinta clicando ou arrastando (no celular:
 // toque numa mão, ou arraste de lado); botão direito (ou segurar o dedo)
@@ -62,8 +62,8 @@ export function GradeRange({
   destacarMao?: string | null;
   compacta?: boolean;
   /** Ação do range ("abrir", "pagar", "3bet", "allin"...): pinta a mão na
-   *  cor dessa ação (raise verde, call azul, 3-bet laranja, all-in
-   *  vermelho); sem ação, dourado. */
+   *  cor dessa ação (raise vermelho, call verde, 3-bet vermelho escuro,
+   *  all-in laranja); sem ação, dourado. */
   acao?: string | null;
 }) {
   const corRange = corDaAcao(acao);
@@ -74,7 +74,7 @@ export function GradeRange({
       TODAS_AS_MAOS.map((mao) => {
         const p = pesoDaMao(pesos, pesosCombo, mao);
         const temCombo = combosDaMao(mao).some((c) => c in pesosCombo);
-        let fundo = modo.tipo === "range" ? FUNDO_FOLD : "rgba(255,255,255,0.035)";
+        let fundo = modo.tipo === "range" ? FUNDO_FORA : "rgba(255,255,255,0.035)";
         let cor = "rgba(255,255,255,0.3)";
         let preenche: { cor: string; altura: number } | null = null;
         let extra: string | null = null;
