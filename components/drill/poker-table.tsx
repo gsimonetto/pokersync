@@ -577,6 +577,16 @@ function Seat({
 
   const col = acting ? posCol : { base: NEUTRAL, glow: NEUTRAL_GLOW };
   const opacity = SEAT_OPACITY[status];
+  // Assento com cartas na mesa nunca fica transparente (pedido explícito:
+  // "a carta fica atrás do nome, mas não pode ser transparente a ponto de
+  // aparecer a linha atrás"): o "apagado" de quem não está na vez vira
+  // escurecimento do bloco inteiro. Sem cartas (fold sem mão, assento
+  // vazio), continua a transparência de sempre.
+  const temCartas = hero ? !!cards && cards.length > 0 : revealedVillainCards || (!empty && status !== "folded");
+  const cinza = status === "folded" ? "grayscale(0.5)" : "";
+  const apagado: React.CSSProperties = temCartas
+    ? { filter: `${cinza} ${opacity < 1 ? `brightness(${opacity})` : ""}`.trim() || "none" }
+    : { opacity, filter: cinza || "none" };
   // Metade da altura das cartas, já na escala do assento: é quanto o bloco
   // sobe pra placa (e não o bloco inteiro) ficar no ponto do anel.
   const subirPelaCarta = centrarNaPlaca ? (alturaCartasAcima(seat, state) * effectiveScale) / 2 : 0;
@@ -734,7 +744,9 @@ function Seat({
               ? "rgba(255,255,255,.03)"
               : acting
               ? `linear-gradient(160deg, ${col.glow}, ${col.base})`
-              : `${(posCol?.base ?? NEUTRAL)}CC`,
+              : // Mesma cor de antes (80%), mas sobre fundo escuro sólido: a carta
+                // fica atrás da etiqueta e não pode aparecer através dela.
+                `linear-gradient(${(posCol?.base ?? NEUTRAL)}CC, ${(posCol?.base ?? NEUTRAL)}CC), #0c0e11`,
             border: empty ? "1px dashed rgba(255,255,255,.15)" : acting ? "1px solid rgba(255,255,255,.4)" : "1px solid rgba(255,255,255,.14)",
             boxShadow: acting ? `0 0 14px ${col.glow}` : "0 2px 6px rgba(0,0,0,.45)",
             transition: "all 200ms ease",
@@ -819,8 +831,7 @@ function Seat({
         // de ancoragem na mesa nunca se move, so' o conteudo do assento
         // (carta+placa+texto) fica menor quando a mesa e' estreita.
         transform: `translate(-50%, calc(-50% - ${subirPelaCarta}px)) scale(${effectiveScale})`,
-        opacity,
-        filter: status === "folded" ? "grayscale(0.5)" : "none",
+        ...apagado,
         transition: "opacity 220ms ease, filter 220ms ease, transform 150ms ease",
         zIndex: acting ? 5 : 2,
         animation: acting ? "seatPulse 2s ease-in-out infinite" : "none",
