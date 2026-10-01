@@ -87,7 +87,7 @@ export function todayISO() {
 // Cobre o pedido de "relatorio por periodo" — a UI ja filtra `sessions`
 // pelo range antes de chamar isso.
 export function sessionsToCSV(sessions: Session[], resultOf: (s: Session) => number): string {
-  const header = ["Data", "Formato", "Buy-in", "Reentradas", "Cashout", "Resultado", "Stake", "Moeda", "Local", "Notas"];
+  const header = ["Data", "Formato", "Buy-in", "Reentradas", "Cashout", "Bounties", "Resultado", "Stake", "Moeda", "Local", "Notas"];
   const esc = (v: unknown) => `"${String(v ?? "").replace(/"/g, '""')}"`;
   const rows = sessions.map((s) => [
     s.date,
@@ -95,6 +95,7 @@ export function sessionsToCSV(sessions: Session[], resultOf: (s: Session) => num
     s.buyIn,
     s.reentries,
     s.cashout,
+    s.bounties || 0,
     resultOf(s).toFixed(2),
     s.stake || "",
     s.currency || "BRL",

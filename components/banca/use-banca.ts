@@ -33,11 +33,13 @@ import { fetchRadarModuleScope } from "@/lib/services/radar-module-scope-service
 import {
   addAnnotation as apiAddAnnotation,
   addSession as apiAddSession,
+  atualizarBountiesDaSessao,
   addTransaction as apiAddTransaction,
   deleteAnnotation as apiDeleteAnnotation,
   deleteSession as apiDeleteSession,
   deleteTransaction as apiDeleteTransaction,
   fetchAnnotations,
+  fetchBountiesDosTorneios,
   fetchBrmThresholds,
   fetchSessions,
   fetchSettings,
@@ -58,6 +60,25 @@ import {
 const SEM_PLATAFORMA = "Sem plataforma";
 const plataformaDe = (v?: string) => v?.trim() || SEM_PLATAFORMA;
 const moedaDe = (m?: string) => m || "BRL";
+
+/** Acerta o bounty das sessões importadas com o que as mãos dizem (grava
+ *  no banco só as que mudaram). Sessão lançada à mão fica como está. */
+async function sincronizarBounties(sessoes: Session[], bounties: Map<string, number>): Promise<Session[]> {
+  return Promise.all(
+    sessoes.map(async (s) => {
+      if (!s.importedHandSessionId) return s;
+      const alvo = bounties.get(s.importedHandSessionId) ?? 0;
+      if (Math.abs((s.bounties ?? 0) - alvo) < 0.005) return s;
+      try {
+        await atualizarBountiesDaSessao(s.id, alvo);
+        return { ...s, bounties: alvo };
+      } catch (e) {
+        console.error("Falha ao gravar o bounty da sessão:", s.id, e);
+        return s;
+      }
+    }),
+  );
+}
 
 /** Ponto da curva de saldo: sessão OU movimentação de dinheiro. */
 export interface PontoSaldo {
@@ -83,6 +104,8 @@ export function useBanca() {
 
   const [torneiosAgente, setTorneiosAgente] = useState<HandSession[]>([]);
   const [premiosAgente, setPremiosAgente] = useState<TournamentPayout[]>([]);
+  // Bounties ganhos em cada torneio do agente (id do hand_sessions -> US$).
+  const [bountiesAgente, setBountiesAgente] = useState<Map<string, number>>(new Map());
   const [importando, setImportando] = useState(false);
   const [agente, setAgente] = useState<AgentDeviceStatus | null>(null);
   // Corte do botão do Radar: esconde sessões IMPORTADAS jogadas antes
@@ -101,7 +124,7 @@ export function useBanca() {
         // velho até a próxima visita (pedido explícito: "rebuy no gestor
         // de banca não está contando").
         const torneios = fetchTournamentSessions();
-        const [s, cfg, tx, brm, annos, tourn, payouts] = await Promise.all([
+        const [lidas, cfg, tx, brm, annos, tourn, payouts, bounties] = await Promise.all([
           torneios.then(() => fetchSessions(), () => fetchSessions()),
           fetchSettings(),
           fetchTransactions(),
@@ -109,8 +132,16 @@ export function useBanca() {
           fetchAnnotations(),
           torneios,
           fetchTournamentPayouts(),
+          // Complemento: se falhar, a banca abre com os bounties já gravados.
+          fetchBountiesDosTorneios().catch(() => null),
         ]);
         if (!vivo) return;
+        // Bounty das sessões importadas vem sozinho das mãos (pedido
+        // explícito: "precisa vir automatico essa informação do bounty"):
+        // a sessão cujo valor gravado não bate com o das mãos é corrigida.
+        const s = bounties ? await sincronizarBounties(lidas, bounties) : lidas;
+        if (!vivo) return;
+        if (bounties) setBountiesAgente(bounties);
         setSessoes(s);
         setBase(Number(cfg.bankroll) || 0);
         setLimiteDia(cfg.stopLossBuyins ?? null);
@@ -174,6 +205,7 @@ export function useBanca() {
           buyIn: buyInUsd,
           reentries: hs.reentries ?? 0,
           cashout: cashoutUsd,
+          bounties: bountiesAgente.get(hs.id) ?? 0,
           stake: "",
           venue: sala || undefined,
           currency: "USD",

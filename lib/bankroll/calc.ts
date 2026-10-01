@@ -34,10 +34,10 @@ function markupIncome(s: Session) {
   return backerShare * (markupOf(s) - 1);
 }
 
-// Retorno economico do proprio jogador: sua fatia do cashout + o que
-// ganhou vendendo acao. Sem staking (ownPct=100) e' identico a s.cashout.
+// Retorno economico do proprio jogador: sua fatia do cashout + bounties +
+// o que ganhou vendendo acao. Sem staking (ownPct=100) e' cashout + bounties.
 function ownCashout(s: Session) {
-  return (Number(s.cashout) || 0) * (ownPct(s) / 100) + markupIncome(s);
+  return ((Number(s.cashout) || 0) + (Number(s.bounties) || 0)) * (ownPct(s) / 100) + markupIncome(s);
 }
 
 // Resultado liquido do jogador (ja' considerando staking, se houver).

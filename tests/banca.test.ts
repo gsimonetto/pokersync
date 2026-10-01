@@ -22,6 +22,25 @@ describe("custo e resultado da sessão", () => {
     expect(net(s)).toBe(17);
   });
 
+  it("bounties somam no resultado (com o rebuy já no custo)", () => {
+    // $27 com 1 rebuy = $54 de custo; sem prêmio, $12,25 de bounty.
+    const s = sessao({ buyIn: 27, reentries: 1, cashout: 0, bounties: 12.25 });
+    expect(invested(s)).toBe(54);
+    expect(net(s)).toBeCloseTo(-41.75);
+  });
+
+  it("bounty sem prêmio não conta como ITM, mas entra no lucro", () => {
+    const a = aggregate([sessao({ buyIn: 10, cashout: 0, bounties: 15 }), sessao({ buyIn: 10, cashout: 30 })]);
+    expect(a.itmCount).toBe(1);
+    expect(a.totalCashout).toBe(45);
+    expect(a.profit).toBe(25);
+  });
+
+  it("staking: o bounty também é dividido com o backer", () => {
+    const s = sessao({ buyIn: 100, cashout: 100, bounties: 100, ownPct: 50 });
+    expect(net(s)).toBe(50);
+  });
+
   it("staking: jogador com 50% da ação e markup 1,2", () => {
     // Investido do bolso: 100 × 50% = 50. Retorno: 300 × 50% + markup (100 × 50% × 0,2 = 10) = 160.
     const s = sessao({ buyIn: 100, cashout: 300, ownPct: 50, markup: 1.2 });
