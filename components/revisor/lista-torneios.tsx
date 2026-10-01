@@ -107,7 +107,7 @@ function IconeDaSala({ sala, cash }: { sala: string | null; cash: boolean }) {
       <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl shadow-[inset_0_1px_0_rgba(255,255,255,0.18)]" style={{ background: "linear-gradient(180deg,#d4262c,#a3141a)" }} title="PokerStars">
         <svg width="32" height="32" viewBox="4 2.5 16 18.5" aria-hidden>
           <path d="M12 3C12 3 5 9 5 13.2c0 2.4 1.9 4.1 4 4.1 1.1 0 2-.5 2.6-1.2l-1 4.4h2.8l-1-4.4c.6.7 1.5 1.2 2.6 1.2 2.1 0 4-1.7 4-4.1C19 9 12 3 12 3z" fill="#fff" />
-          <polygon points="12.00,9.50 12.71,11.43 14.76,11.50 13.14,12.77 13.70,14.75 12.00,13.60 10.30,14.75 10.86,12.77 9.24,11.50 11.29,11.43" fill="#c8161d" />
+          <polygon points="12.00,8.40 12.71,10.33 14.76,10.40 13.14,11.67 13.70,13.65 12.00,12.50 10.30,13.65 10.86,11.67 9.24,10.40 11.29,10.33" fill="#c8161d" />
         </svg>
       </span>
     );
