@@ -1,7 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
-import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Flag, Search, X, Eye, ChevronRight, PenLine } from "lucide-react";
+import { BookOpen, Plus, Clock, CheckCircle2, PlayCircle, Trash2, Image as ImageIcon, Trophy, Flag, Search, X, Eye, ChevronRight, PenLine, Zap } from "lucide-react";
 import { createClient } from "@/lib/supabase/client";
 import { getThumbUrl, deleteReview, type ReviewListItem } from "@/lib/services/hand-review-service";
 import { listSessionsWithCount, type HandSessionWithCount } from "@/lib/services/hand-session-service";
@@ -16,9 +16,22 @@ import {
   diaDoTorneio,
   estadoDaRevisao,
   rotuloDoDia,
+  resultadoDoTorneio,
   type ColocacaoTorneio,
   type ProgressoTorneio,
 } from "@/components/revisor/lista-torneios";
+import {
+  BotaoFiltros,
+  FILTROS_VAZIOS,
+  PainelFiltros,
+  faixaDoBuyin,
+  faixaDoStack,
+  temFiltroDeMao,
+  totalDeFiltros,
+  type FiltrosFila,
+  type FormatoTorneio,
+} from "@/components/revisor/filtros-fila";
+import { HalfCard } from "@/components/drill/card";
 
 const IMPORTED_HAND_SOURCES = ["agent", "import"];
 
@@ -42,14 +55,30 @@ const STATUS_META: Record<string, { label: string; color: string; Icon: typeof C
 // deliberadamente nao aparecem em Sessões, por decisao: "ignorar antigas").
 type Tab = "sessoes" | "avulsas";
 
+const CHAVE_FILTROS = "revisor:filtros-fila";
+
+// Mão lida pros filtros de posição/stack/all-in (só os campos que eles usam).
+interface MaoFiltravel {
+  id: string;
+  sessao: string | null;
+  titulo: string | null;
+  posicao: string | null;
+  stackBb: number | null;
+  allIn: boolean;
+  cartas: string[];
+}
+
 export function RevisorFila({
   onNova,
   onOpen,
   onOpenSession,
+  onOpenMaos,
 }: {
   onNova: () => void;
   onOpen: (id: string) => void;
   onOpenSession: (sessionId: string) => void;
+  /** Abre na mesa as mãos que bateram nos filtros, a partir da clicada. */
+  onOpenMaos: (reviewIds: string[], selectedId: string) => void;
 }) {
   const confirm = useConfirm();
   const [userId, setUserId] = useState<string | null>(null);
@@ -69,6 +98,33 @@ export function RevisorFila({
   const [colocacoes, setColocacoes] = useState<Map<string, ColocacaoTorneio>>(new Map());
   const [bountiesGanhos, setBountiesGanhos] = useState<Map<string, number>>(new Map());
   const [filtroRevisao, setFiltroRevisao] = useState<"todos" | "pendentes" | "revisados">("todos");
+  // Os filtros sobrevivem à ida pra mesa e à volta (a Fila remonta):
+  // ficam guardados nesta aba do navegador.
+  const [filtros, setFiltrosEstado] = useState<FiltrosFila>(FILTROS_VAZIOS);
+  const setFiltros = (f: FiltrosFila) => {
+    setFiltrosEstado(f);
+    try {
+      sessionStorage.setItem(CHAVE_FILTROS, JSON.stringify(f));
+    } catch {
+      // sem armazenamento: o filtro vale só enquanto a tela está aberta
+    }
+  };
+  const [painelFiltros, setPainelFiltros] = useState(false);
+  // Lido depois de montar (no servidor não existe sessionStorage).
+  useEffect(() => {
+    try {
+      const salvo = sessionStorage.getItem(CHAVE_FILTROS);
+      if (!salvo) return;
+      const f = { ...FILTROS_VAZIOS, ...JSON.parse(salvo) } as FiltrosFila;
+      setFiltrosEstado(f);
+      if (totalDeFiltros(f) > 0) setPainelFiltros(true);
+    } catch {
+      // filtro salvo ilegível: começa sem filtro
+    }
+  }, []);
+  // Mãos pros filtros de mão: lidas uma vez, só quando um deles é ligado.
+  const [maosFiltraveis, setMaosFiltraveis] = useState<MaoFiltravel[] | null>(null);
+  const [carregandoMaos, setCarregandoMaos] = useState(false);
 
   // ---- Mãos avulsas (comportamento antigo) ----
   const [filter, setFilter] = useState("todas");
@@ -173,6 +229,66 @@ export function RevisorFila({
     })();
   }, [userId, radarSince, sessionsList]);
 
+  const filtroDeMao = temFiltroDeMao(filtros);
+  useEffect(() => {
+    if (!userId || !filtroDeMao || maosFiltraveis || carregandoMaos) return;
+    setCarregandoMaos(true);
+    (async () => {
+      try {
+        const supabase = createClient();
+        const { data, error: qErr } = await supabase
+          .from("hand_reviews")
+          .select(
+            "id, hand_session_id, title, kind:parsed_data->>kind, pos:parsed_data->>heroPosition, heroi:parsed_data->>heroName, bb:parsed_data->bigBlind, seats:parsed_data->seats, preflop:parsed_data->streets->0, cartas:parsed_data->heroCards",
+          )
+          .eq("user_id", userId)
+          .order("created_at", { ascending: true });
+        if (qErr) throw qErr;
+        // eslint-disable-next-line @typescript-eslint/no-explicit-any
+        const lidas = ((data ?? []) as any[]).map((r): MaoFiltravel => {
+          const parsed = r.kind === "parsed";
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const assento = parsed && Array.isArray(r.seats) ? r.seats.find((s: any) => s.playerName === r.heroi) : null;
+          const bb = Number(r.bb) || 0;
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const acoes: any[] = parsed && r.preflop?.name === "preflop" && Array.isArray(r.preflop.actions) ? r.preflop.actions : [];
+          return {
+            id: r.id,
+            sessao: r.hand_session_id ?? null,
+            titulo: r.title ?? null,
+            posicao: parsed ? r.pos : null,
+            stackBb: assento && bb > 0 ? Number(assento.startingChips) / bb : null,
+            allIn: acoes.some((a) => a.player === r.heroi && a.isAllIn),
+            cartas: Array.isArray(r.cartas) ? r.cartas.filter((c: unknown) => typeof c === "string") : [],
+          };
+        });
+        setMaosFiltraveis(lidas);
+      } catch {
+        setSessionsError("Erro ao carregar as mãos pros filtros.");
+      } finally {
+        setCarregandoMaos(false);
+      }
+    })();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [userId, filtroDeMao]);
+
+  // Mãos que batem com os filtros de mão (posição, stack, all-in).
+  const maosQueBatem = useMemo(() => {
+    if (!filtroDeMao || !maosFiltraveis) return [];
+    return maosFiltraveis.filter((m) => {
+      if (filtros.soAllIn && !m.allIn) return false;
+      if (filtros.posicoes.length > 0 && !filtros.posicoes.includes(m.posicao as never)) return false;
+      if (filtros.stacks.length > 0 && (m.stackBb == null || !filtros.stacks.includes(faixaDoStack(m.stackBb)))) return false;
+      return true;
+    });
+  }, [filtroDeMao, maosFiltraveis, filtros]);
+  const maosPorSessao = useMemo(() => {
+    const m = new Map<string, number>();
+    for (const x of maosQueBatem) if (x.sessao) m.set(x.sessao, (m.get(x.sessao) ?? 0) + 1);
+    return m;
+  }, [maosQueBatem]);
+  const nomeDaSessao = useMemo(() => new Map(sessionsList.map((s) => [s.id, s.label])), [sessionsList]);
+
   useEffect(() => {
     if (!userId || tab !== "avulsas") return;
     load();
@@ -270,9 +386,31 @@ export function RevisorFila({
         const revisado = estadoDaRevisao(progresso[s.id], Number(s.hand_count || 0)) === "revisado";
         if (filtroRevisao === "revisados" ? !revisado : revisado) return false;
       }
+      if (filtros.formatos.length > 0) {
+        const formato: FormatoTorneio =
+          s.kind !== "tournament" ? "cash" : s.table_size === 3 ? "spin" : s.format_type === "pko" ? "pko" : s.format_type === "mystery" ? "mystery" : "regular";
+        if (!filtros.formatos.includes(formato)) return false;
+      }
+      if (filtros.buyins.length > 0 && (s.buyin == null || !filtros.buyins.includes(faixaDoBuyin(Number(s.buyin))))) return false;
+      if (filtros.resultados.length > 0) {
+        const c = s.tournament_id_ps ? colocacoes.get(s.tournament_id_ps) : undefined;
+        const r = resultadoDoTorneio(s, c, bountiesGanhos.get(s.id) ?? 0);
+        const bate = filtros.resultados.some((x) =>
+          x === "lucro"
+            ? r != null && r > 0
+            : x === "prejuizo"
+              ? r != null && r < 0
+              : x === "itm"
+                ? (c?.premio ?? 0) > 0 || s.champion
+                : s.champion || s.reached_ft || s.final_place != null,
+        );
+        if (!bate) return false;
+      }
+      // Filtro de mão ligado: só os torneios que têm mão batendo.
+      if (filtroDeMao && !maosPorSessao.has(s.id)) return false;
       return true;
     });
-  }, [sessionsList, sessionSearchQuery, radarVisibleSessionIds, filtroRevisao, progresso]);
+  }, [sessionsList, sessionSearchQuery, radarVisibleSessionIds, filtroRevisao, progresso, filtros, colocacoes, bountiesGanhos, filtroDeMao, maosPorSessao]);
 
   // Quantos torneios faltam revisar / já revisados (contagem dos filtros).
   const contagemRevisao = useMemo(() => {
@@ -397,6 +535,7 @@ export function RevisorFila({
 
         {tab === "sessoes" && (
           <>
+            <BotaoFiltros aberto={painelFiltros} ativos={totalDeFiltros(filtros)} onClick={() => setPainelFiltros((v) => !v)} />
             <button
               onClick={() => {
                 setSessionSearchOpen((v) => !v);
@@ -437,6 +576,71 @@ export function RevisorFila({
             </button>
           )}
         </div>
+      )}
+
+      {tab === "sessoes" && painelFiltros && <PainelFiltros f={filtros} onChange={setFiltros} />}
+
+      {/* Filtro de mão ligado: as mãos que batem, pra abrir direto na mesa
+          (o que antes ficava na aba "Filtros avançados"). */}
+      {tab === "sessoes" && filtroDeMao && (
+        <section className="painel-vidro fade-in-up mb-4 rounded-2xl border border-review/25 p-4">
+          {carregandoMaos || !maosFiltraveis ? (
+            <p className="text-[13px] text-muted">Procurando as mãos…</p>
+          ) : maosQueBatem.length === 0 ? (
+            <p className="text-[13px] text-muted">Nenhuma mão sua bate com esses filtros.</p>
+          ) : (
+            <>
+              <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+                <p className="text-[13px] text-ink">
+                  <b className="tnum">{maosQueBatem.length}</b> {maosQueBatem.length === 1 ? "mão bate" : "mãos batem"} com o filtro
+                  <span className="text-muted">
+                    {" "}
+                    · em {maosPorSessao.size} {maosPorSessao.size === 1 ? "torneio" : "torneios"}
+                    {maosQueBatem.some((m) => !m.sessao) ? " e mãos avulsas" : ""}
+                  </span>
+                </p>
+                <button
+                  type="button"
+                  onClick={() => onOpenMaos(maosQueBatem.map((m) => m.id), maosQueBatem[0].id)}
+                  className="inline-flex items-center gap-1 rounded-xl bg-[#E0B24C] px-3 py-2 text-[12.5px] font-semibold text-[#111] transition hover:brightness-110"
+                >
+                  Ver na mesa <ChevronRight size={14} />
+                </button>
+              </div>
+              <ul className="flex max-h-[260px] flex-wrap gap-2 overflow-y-auto pr-1">
+                {maosQueBatem.slice(0, 60).map((m) => (
+                  <li key={m.id}>
+                    <button
+                      type="button"
+                      onClick={() => onOpenMaos(maosQueBatem.map((x) => x.id), m.id)}
+                      title={m.sessao ? nomeDaSessao.get(m.sessao) : m.titulo ?? "Mão avulsa"}
+                      className="flex items-center gap-2 rounded-xl border border-white/10 bg-white/[0.03] py-1.5 pl-1.5 pr-2.5 text-left transition hover:border-white/25 hover:bg-white/[0.06]"
+                    >
+                      {m.cartas.length === 2 && (
+                        <span className="flex gap-0.5">
+                          {m.cartas.map((c) => (
+                            <HalfCard key={c} card={c} size="mini" />
+                          ))}
+                        </span>
+                      )}
+                      <span className="text-[11.5px] leading-tight">
+                        <span className="block font-semibold text-ink">
+                          {m.posicao ?? "—"}
+                          {m.stackBb != null && <span className="font-normal text-muted"> · {Math.round(m.stackBb)}bb</span>}
+                          {m.allIn && <Zap size={10} className="ml-1 inline text-[#F87171]" />}
+                        </span>
+                        <span className="block max-w-[130px] truncate text-muted">{m.sessao ? nomeDaSessao.get(m.sessao) ?? "Torneio" : "Mão avulsa"}</span>
+                      </span>
+                    </button>
+                  </li>
+                ))}
+                {maosQueBatem.length > 60 && (
+                  <li className="self-center px-2 text-[12px] text-muted">e mais {maosQueBatem.length - 60} na mesa</li>
+                )}
+              </ul>
+            </>
+          )}
+        </section>
       )}
 
       {tab === "sessoes" && (
@@ -487,6 +691,7 @@ export function RevisorFila({
                         bounties={bountiesGanhos.get(s.id) ?? 0}
                         onAbrir={() => onOpenSession(s.id)}
                         indice={idx}
+                        maosNoFiltro={filtroDeMao ? maosPorSessao.get(s.id) : undefined}
                       />
                     ))}
                   </ul>

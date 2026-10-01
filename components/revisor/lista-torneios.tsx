@@ -74,6 +74,14 @@ export function rotuloDoDia(d: Date): string {
   return d.toLocaleDateString("pt-BR", { weekday: "short", day: "2-digit", month: "short" });
 }
 
+/** Resultado do torneio em US$: prêmio + bounties − (buy-in × entradas).
+ *  null quando o buy-in não é conhecido (torneio colado à mão, cash). */
+export function resultadoDoTorneio(s: HandSessionWithCount, c: ColocacaoTorneio | undefined, bounties: number): number | null {
+  if (s.kind !== "tournament" || s.buyin == null) return null;
+  const custo = Number(s.buyin) * (1 + (Number(s.reentries) || 0));
+  return (c?.premio ?? 0) + bounties - custo;
+}
+
 function formatoDoTorneio(s: HandSessionWithCount): string | null {
   if (isSpinAndGo(s)) return "Spin & Go";
   if (s.kind !== "tournament") return "Cash";
@@ -132,6 +140,7 @@ export function CardTorneio({
   bounties,
   onAbrir,
   indice = 0,
+  maosNoFiltro,
 }: {
   s: HandSessionWithCount;
   progresso: ProgressoTorneio | undefined;
@@ -140,6 +149,8 @@ export function CardTorneio({
   bounties: number;
   onAbrir: () => void;
   indice?: number;
+  /** Com filtro de mãos ativo: quantas mãos deste torneio batem. */
+  maosNoFiltro?: number;
 }) {
   const { sala, nome } = partesDoNome(s.label);
   const formato = formatoDoTorneio(s);
@@ -157,7 +168,7 @@ export function CardTorneio({
   // quando o buy-in é conhecido (torneio importado pelo Radar).
   const rebuys = Number(s.reentries) || 0;
   const custo = s.kind === "tournament" && s.buyin != null ? Number(s.buyin) * (1 + rebuys) : null;
-  const resultado = custo != null ? (colocacao?.premio ?? 0) + bounties - custo : null;
+  const resultado = resultadoDoTorneio(s, colocacao, bounties);
 
   return (
     <li style={{ animationDelay: `${Math.min(indice, 10) * 30}ms` }} className="fade-in-up">
@@ -244,6 +255,11 @@ export function CardTorneio({
             <span className="tnum absolute text-[10px] font-bold text-ink">{pct}%</span>
           </span>
           <span className="min-w-0 flex-1 text-[12px] leading-snug text-muted">
+            {maosNoFiltro != null && (
+              <span className="mb-0.5 block font-semibold text-review">
+                {maosNoFiltro} {maosNoFiltro === 1 ? "mão bate" : "mãos batem"} com o filtro
+              </span>
+            )}
             <b className="tnum font-semibold text-ink">{vistas}</b> de {total} mãos vistas
             {progresso && progresso.concluidas > 0 && (
               <>
