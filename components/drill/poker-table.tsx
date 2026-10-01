@@ -205,8 +205,6 @@ interface TemaMesa {
   feltroPadrao?: { background: string; glow: string };
   luz: string;
   linhaAposta: string;
-  /** Cor da marca PokerSync impressa no feltro (bem apagada). */
-  marca: string;
   placa: { fundo: string; borda: string; nome: string; valor: string };
   pill: { fundo: string; borda: string; texto: string };
   pote: { fundo: string; borda: string; texto: string; brilho: string };
@@ -217,7 +215,6 @@ const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
   arena: {
     luz: "radial-gradient(40% 45% at 50% 40%, rgba(255,255,255,.12), transparent 70%)",
     linhaAposta: "rgba(255,255,255,.12)",
-    marca: "rgba(255,255,255,.075)",
     placa: { fundo: "linear-gradient(180deg, rgba(30,34,42,.94), rgba(10,12,15,.94))", borda: "rgba(255,255,255,.12)", nome: "rgba(255,255,255,.8)", valor: "#F5D48C" },
     pill: { fundo: "rgba(0,0,0,.75)", borda: "rgba(255,255,255,.18)", texto: "#FFFFFF" },
     pote: { fundo: "linear-gradient(180deg,#000000,#0A0A0A)", borda: "rgba(255,255,255,.20)", texto: "#FFFFFF", brilho: "0 0 20px rgba(52,211,153,.20)" },
@@ -230,7 +227,6 @@ const TEMAS_MESA: Record<EstiloMesa, TemaMesa> = {
     },
     luz: "radial-gradient(45% 50% at 50% 38%, rgba(255,240,210,.12), transparent 70%)",
     linhaAposta: "rgba(201,164,92,.35)",
-    marca: "rgba(214,178,105,.2)",
     placa: { fundo: "radial-gradient(120% 120% at 30% 0%, #3a2616, #1a0f08 70%)", borda: "#8A6A32", nome: "#F5E3B8", valor: "#FFFFFF" },
     pill: { fundo: "rgba(20,12,6,.92)", borda: "#8A6A32", texto: "#F5E3B8" },
     pote: { fundo: "linear-gradient(180deg, #2a1a0e, #140c06)", borda: "#C9A45C", texto: "#F5E3B8", brilho: "0 0 18px rgba(201,164,92,.25)" },
@@ -1328,28 +1324,24 @@ export function PokerTable({
           <div style={{ position: "absolute", inset: "12% 9%", borderRadius: cornerRadius, pointerEvents: "none", border: `1px solid ${tema.linhaAposta}` }} />
         </div>
 
-        {/* Marca PokerSync impressa no pano (pedido explícito: "na parte
-            de cima, sem atrapalhar a visualização"). Só a palavra, bem
-            apagada, no vão entre o assento de cima e o pote/SPR -- medido
-            com board de 5 cartas e placar: no computador o vão é de
-            ~28,7% a 31,5% da altura (por isso a marca é menor ali); em pé
-            (tablet/celular) sobra bem mais. Vem antes dos assentos, então
-            cartas, fichas e placas passam por cima. As letras foram
-            alinhadas (mesma altura, mesma base e espaço igual) a partir
-            do logo -- ver public/pokersync-tipografia.svg. */}
+        {/* Marca PokerSync impressa no pano (pedido explícito: na parte
+            de cima, igual nas duas mesas). É uma marcação do feltro: fica
+            antes dos assentos e do miolo, então pote, SPR, cartas e
+            fichas passam por cima dela. As letras foram alinhadas (mesma
+            altura, mesma base, espaço igual) e o SYNC redesenhado com
+            traço limpo -- ver public/pokersync-tipografia.svg. */}
         <div
           aria-hidden
-          data-marca=""
           style={{
             position: "absolute",
             left: "50%",
-            top: aspectRatioValue < 1 ? (aspectRatioValue < 0.7 ? "35.5%" : "31%") : "30.1%",
-            width: aspectRatioValue < 1 ? "50%" : "15.5%",
-            maxWidth: 360,
-            aspectRatio: "767 / 62",
+            top: aspectRatioValue < 0.7 ? "35.5%" : aspectRatioValue < 1 ? "31%" : "30%",
+            width: aspectRatioValue < 1 ? "50%" : "34%",
+            maxWidth: 420,
+            aspectRatio: "766.64 / 61.4",
             transform: "translate(-50%, -50%)",
             pointerEvents: "none",
-            background: tema.marca,
+            background: "rgba(255,255,255,.075)",
             WebkitMask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
             mask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
           }}
