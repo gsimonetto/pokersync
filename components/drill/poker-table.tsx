@@ -1326,28 +1326,34 @@ export function PokerTable({
           <TexturaFeltro estilo={mesa} />
           <div style={{ position: "absolute", inset: 0, pointerEvents: "none", background: tema.luz }} />
           <div style={{ position: "absolute", inset: "12% 9%", borderRadius: cornerRadius, pointerEvents: "none", border: `1px solid ${tema.linhaAposta}` }} />
-          {/* Marca PokerSync impressa no pano (pedido explícito: "sem
-              atrapalhar a visualização"). Só a palavra, bem apagada, no
-              vão entre o board e o herói -- no topo ela caía atrás do
-              assento de cima. Fica no feltro, então cartas, fichas e
-              placas passam por cima. */}
-          <div
-            aria-hidden
-            style={{
-              position: "absolute",
-              left: "50%",
-              top: "68%",
-              width: aspectRatioValue < 1 ? "56%" : "38%",
-              maxWidth: 440,
-              aspectRatio: "775 / 62",
-              transform: "translate(-50%, -50%)",
-              pointerEvents: "none",
-              background: tema.marca,
-              WebkitMask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
-              mask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
-            }}
-          />
         </div>
+
+        {/* Marca PokerSync impressa no pano (pedido explícito: "na parte
+            de cima, sem atrapalhar a visualização"). Só a palavra, bem
+            apagada, no vão entre o assento de cima e o pote/SPR -- medido
+            com board de 5 cartas e placar: no computador o vão é de
+            ~28,7% a 31,5% da altura (por isso a marca é menor ali); em pé
+            (tablet/celular) sobra bem mais. Vem antes dos assentos, então
+            cartas, fichas e placas passam por cima. As letras foram
+            alinhadas (mesma altura, mesma base e espaço igual) a partir
+            do logo -- ver public/pokersync-tipografia.svg. */}
+        <div
+          aria-hidden
+          data-marca=""
+          style={{
+            position: "absolute",
+            left: "50%",
+            top: aspectRatioValue < 1 ? (aspectRatioValue < 0.7 ? "35.5%" : "31%") : "30.1%",
+            width: aspectRatioValue < 1 ? "50%" : "15.5%",
+            maxWidth: 360,
+            aspectRatio: "767 / 62",
+            transform: "translate(-50%, -50%)",
+            pointerEvents: "none",
+            background: tema.marca,
+            WebkitMask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
+            mask: "url(/pokersync-tipografia.svg) center / contain no-repeat",
+          }}
+        />
 
         {/* FIX (2026-09): desceu de 44% pra 48% — com cartas SEMPRE em cima
             do nome (mudanca recente), o assento que cai bem no topo-centro
