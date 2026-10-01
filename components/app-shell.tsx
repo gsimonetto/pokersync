@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { usePathname, useRouter } from "next/navigation";
-import { Bell, CircleHelp, CreditCard, Crown, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, Settings, Trophy, X } from "lucide-react";
+import { Bell, CircleHelp, CreditCard, Crown, Home, Lock, LogOut, MessageCircle, PanelLeftClose, PanelLeftOpen, Menu, Settings, Trophy, UserRound, X } from "lucide-react";
 import { Logo } from "@/components/logo";
 import { NotificationsMenu } from "@/components/notifications-menu";
 import { HelpMenu } from "@/components/help-menu";
@@ -490,6 +490,12 @@ export function AppShell({ children }: { children: React.ReactNode }) {
                 <MarcaAtivo ativo={pathname === "/minha-conta"} />
               </Link>
             )}
+            {/* Meu perfil: ficha, troféus e números do jogador (pedido
+                explícito: "botão com ícone de um boneco no topo"). */}
+            <Link href="/perfil" className={iconeTopo(pathname === "/perfil")} aria-label="Meu perfil" title="Meu perfil">
+              <UserRound className="size-[18px]" />
+              <MarcaAtivo ativo={pathname === "/perfil"} />
+            </Link>
           </div>
           {/* espaçador simétrico ao botão de hamburguer, só pra manter os
               ícones centralizados também no mobile */}
