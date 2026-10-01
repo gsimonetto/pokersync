@@ -676,14 +676,23 @@ function Seat({
   // nome, ainda que pequena. Trocado por `bottom: 100%` (o badge fica
   // INTEIRO acima da placa, encostado na borda de cima) + `right: 0`
   // (alinhado com a quina direita) -- toca a quina sem nunca sobrepor.
+  // Revisado (pedido explícito): "o nome da posição encostado no nome do
+  // jogador, o bounty deve aparecer ao lado e não no meio, atrapalhando o
+  // alinhamento". Agora o badge fica ao lado da etiqueta de posição, na
+  // mesma linha e fora do fluxo (absolute) -- a etiqueta continua
+  // centralizada em cima da placa e encostada nela. Sempre do lado de
+  // DENTRO da mesa (assento na metade direita -> badge à esquerda), pra
+  // nunca passar da borda; e é obstáculo pras fichas de aposta desviarem.
+  const bountyDentro = seat.x > 50 ? { right: "100%", marginRight: 4 } : { left: "100%", marginLeft: 4 };
   const bountyChip = !empty && bountyValue != null && (
     <div
+      data-obstaculo=""
       title={`Bounty de $${bountyValue}`}
       style={{
         position: "absolute",
-        bottom: "100%",
-        right: 0,
-        marginBottom: 3,
+        ...bountyDentro,
+        top: "50%",
+        transform: "translateY(-50%)",
         zIndex: 4,
         display: "flex",
         alignItems: "center",
@@ -706,8 +715,9 @@ function Seat({
   );
 
   const seatInfo = (
-    <div style={{ display: "flex", flexDirection: "column", alignItems: "center", gap: 4 }}>
-      <div style={{ position: "relative" }}>
+    <div style={{ display: "flex", flexDirection: "column", alignItems: "center" }}>
+      <div style={{ position: "relative", zIndex: 1 }}>
+        {bountyChip}
         {isDealer && (
           <div
             style={{
@@ -759,15 +769,8 @@ function Seat({
       {opponentHudChip}
 
       {!empty && (
-        // marginTop reserva espaço pro badge de bounty (que fica INTEIRO
-        // acima da placa, ver bountyChip) não encostar no chip de posição
-        // acima -- só quando há bounty pra não abrir vão à toa nas outras
-        // mãos/formatos.
-        <div style={{ position: "relative", marginTop: bountyValue != null ? 13 : 0 }}>
-          {/* Bounty no canto superior-direito da placa de nome (pedido
-              explicito: "o pko pode colocar ao lado direito superior do
-              nick do jogador, bem na quina, sem sobrepor"). */}
-          {bountyChip}
+        // Encostada na etiqueta de posição (sem vão entre as duas).
+        <div style={{ position: "relative" }}>
           <div
             data-placa=""
             style={{
@@ -814,7 +817,7 @@ function Seat({
         </div>
       )}
 
-      {badgeArea}
+      <div style={{ marginTop: 4 }}>{badgeArea}</div>
     </div>
   );
 
