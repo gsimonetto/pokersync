@@ -244,10 +244,7 @@ export interface RangeReal {
  *  (até 10% de diferença, a mesma folga do Construtor). */
 export async function rangeReal(acao: AcaoReal, contra: "aumento" | "allin" | null = null, stack: number | null = null): Promise<RangeReal[]> {
   const supabase = createClient();
-  const { data, error } = await supabase.rpc(
-    "range_real",
-    contra || stack ? { p_acao: acao, p_contra: contra, p_stack: stack } : { p_acao: acao },
-  );
+  const { data, error } = await supabase.rpc("range_real_situacao", { p_acao: acao, p_contra: contra, p_stack: stack });
   if (error) throw error;
   const porPosicao = new Map<string, RangeReal>();
   for (const l of (data ?? []) as { posicao: string; mao: string; vezes: number; oportunidades: number }[]) {

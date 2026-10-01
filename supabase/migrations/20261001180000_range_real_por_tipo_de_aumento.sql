@@ -3,8 +3,9 @@
 -- abria no Construtor o range "BB paga all-in vs SB" -- "não pode trazer
 -- nada errado aqui"; "precisa ser verificado o stack pra buscar o range").
 --
--- range_real ganha p_contra (só em pagar e 3-bet, com um aumento só antes
--- do herói e ninguém pagando entre o aumento e ele):
+-- range_real_situacao: o range_real com dois filtros a mais -- p_contra
+-- (só em pagar e 3-bet, com um aumento só antes do herói e ninguém pagando
+-- entre o aumento e ele):
 --   'aumento'  o aumento foi normal
 --   'allin'    o aumento foi all-in
 --   null       os dois (o de antes, usado nas outras telas)
@@ -12,11 +13,11 @@
 -- acima do menor, a mesma folga do Construtor (lib/ranges/link-da-mao.ts).
 -- Stack efetivo: o menor entre o herói e quem aumentou; sem aumento, o
 -- maior stack de quem ainda não tinha foldado.
--- A versão antiga (2 parâmetros) sai pra chamada sem p_contra não ficar
--- ambígua; a nova aceita as mesmas chamadas de antes.
-drop function if exists public.range_real(text, integer);
-
-create or replace function public.range_real(p_acao text default 'abrir', p_limite integer default 5000, p_contra text default null, p_stack numeric default null)
+-- Função nova (e não parâmetros novos no range_real) pra não precisar
+-- apagar a antiga: com as duas assinaturas, range_real(p_acao => ...)
+-- ficaria ambíguo. O range_real continua igual pra quem chama e passa a
+-- usar esta por dentro.
+create or replace function public.range_real_situacao(p_acao text default 'abrir', p_contra text default null, p_stack numeric default null, p_limite integer default 5000)
 returns table (posicao text, mao text, vezes integer, oportunidades integer)
 language sql
 stable
@@ -135,5 +136,15 @@ as $$
   group by c.posicao, r.mao;
 $$;
 
-revoke all on function public.range_real(text, integer, text, numeric) from public, anon;
-grant execute on function public.range_real(text, integer, text, numeric) to authenticated;
+revoke all on function public.range_real_situacao(text, text, numeric, integer) from public, anon;
+grant execute on function public.range_real_situacao(text, text, numeric, integer) to authenticated;
+
+create or replace function public.range_real(p_acao text default 'abrir', p_limite integer default 5000)
+returns table (posicao text, mao text, vezes integer, oportunidades integer)
+language sql
+stable
+security invoker
+set search_path = public
+as $$
+  select * from public.range_real_situacao(p_acao, null, null, p_limite);
+$$;
