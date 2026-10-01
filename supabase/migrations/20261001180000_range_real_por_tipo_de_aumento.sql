@@ -8,7 +8,7 @@
 --   'aumento'  o aumento foi normal
 --   'allin'    o aumento foi all-in
 --   null       os dois (o de antes, usado nas outras telas)
--- e p_stack (BB): só as mãos com stack efetivo parecido -- o maior até 25%
+-- e p_stack (BB): só as mãos com stack efetivo parecido -- o maior até 10%
 -- acima do menor, a mesma folga do Construtor (lib/ranges/link-da-mao.ts).
 -- Stack efetivo: o menor entre o herói e quem aumentou; sem aumento, o
 -- maior stack de quem ainda não tinha foldado.
@@ -119,7 +119,7 @@ as $$
   where c.posicao is not null
     and (p_stack is null or (
       e.bb_efetivo > 0 and p_stack > 0
-      and greatest(e.bb_efetivo, p_stack) / least(e.bb_efetivo, p_stack) <= 1.25
+      and greatest(e.bb_efetivo, p_stack) / least(e.bb_efetivo, p_stack) <= 1.10
     ))
     and case p_contra
       when 'aumento' then not coalesce(c.aumento_allin, false) and pd.n = 0

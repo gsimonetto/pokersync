@@ -26,9 +26,11 @@ export interface SpotDaMao {
   stack: number | null;
 }
 
-/** Dois stacks (em BB) "parecidos" pra usar o mesmo range: o maior até 25%
- *  acima do menor (50bb aceita de 40 a 62,5bb; 20bb, de 16 a 25bb). */
-export const FOLGA_STACK = 1.25;
+/** Dois stacks (em BB) "parecidos" pra usar o mesmo range: o maior até 10%
+ *  acima do menor (50bb aceita de 46 a 55bb; 20bb, de 19 a 22bb). Pedido
+ *  explícito: "mais apertado pra 10%" -- entre ranges prontos mais longe
+ *  que isso (45bb fica entre 40 e 50), nenhum pronto vale. */
+export const FOLGA_STACK = 1.1;
 export function stackParecido(a: number, b: number): boolean {
   if (a <= 0 || b <= 0) return false;
   return Math.max(a, b) / Math.min(a, b) <= FOLGA_STACK;

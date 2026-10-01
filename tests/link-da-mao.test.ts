@@ -55,14 +55,14 @@ describe("situação da mão pro Construtor", () => {
   });
 });
 
-describe("stack parecido (até 25% de diferença)", () => {
-  it("50bb aceita 40 e 60bb", () => {
-    expect(stackParecido(50, 40)).toBe(true);
-    expect(stackParecido(50, 60)).toBe(true);
+describe("stack parecido (até 10% de diferença)", () => {
+  it("50bb aceita 46 e 55bb", () => {
+    expect(stackParecido(50, 46)).toBe(true);
+    expect(stackParecido(50, 55)).toBe(true);
   });
-  it("50bb não aceita 30 nem 75bb", () => {
-    expect(stackParecido(50, 30)).toBe(false);
-    expect(stackParecido(50, 75)).toBe(false);
+  it("50bb não aceita 40 nem 60bb", () => {
+    expect(stackParecido(50, 40)).toBe(false);
+    expect(stackParecido(50, 60)).toBe(false);
   });
   it("150bb não usa o range de 100bb", () => expect(stackParecido(150, 100)).toBe(false));
 });

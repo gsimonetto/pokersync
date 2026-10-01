@@ -241,7 +241,7 @@ export interface RangeReal {
 /** "Seu range de verdade", por posição, montado com as mãos importadas.
  *  contra (pagar e 3-bet): só as mãos contra um aumento normal ou só as
  *  contra um all-in. stack (BB): só as mãos com stack efetivo parecido
- *  (até 25% de diferença, a mesma folga do Construtor). */
+ *  (até 10% de diferença, a mesma folga do Construtor). */
 export async function rangeReal(acao: AcaoReal, contra: "aumento" | "allin" | null = null, stack: number | null = null): Promise<RangeReal[]> {
   const supabase = createClient();
   const { data, error } = await supabase.rpc(

@@ -64,7 +64,7 @@ const POSICAO_PARECIDA: Record<string, string> = { "UTG+1": "UTG", MP: "UTG", "M
 
 /** O range pronto da MESMA situação da mão: mesma posição, mesma ação e
  *  mesmo "contra" (aumento normal, all-in...), contra o mesmo jogador, e
- *  stack parecido (até 25% de diferença; o mais perto deles). Sem um
+ *  stack parecido (até 10% de diferença; o mais perto deles). Sem um
  *  assim, nenhum -- nunca o range de outra situação (pedido explícito:
  *  "não pode trazer nada errado"; "precisa ser verificado o stack"). */
 function prontoDoSpot(prontos: RangePronto[], pos: string, stack: number | null, acao: string, contra: ContraOQue, vs: string | null): RangePronto | null {
