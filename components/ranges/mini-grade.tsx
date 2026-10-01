@@ -13,8 +13,8 @@ function comAlfa(hex: string, a: number): string {
 }
 
 // Grade 13x13 em miniatura (cartões da biblioteca): a mão no range ganha a
-// cor da ação (raise verde, call azul, 3-bet laranja, all-in vermelho;
-// sem ação, dourado) -- mais forte = mais peso. Fora do range: cinza (fold).
+// cor da ação (raise vermelho, call verde, 3-bet vermelho escuro, all-in
+// laranja; sem ação, dourado) -- mais forte = mais peso. Fora do range: cinza.
 export const MiniGrade = memo(function MiniGrade({
   pesos,
   pesosCombo = {},
@@ -35,7 +35,7 @@ export const MiniGrade = memo(function MiniGrade({
           <span
             key={mao}
             className="aspect-square rounded-[1px]"
-            style={{ background: p > 0 ? comAlfa(cor, 0.25 + (0.7 * p) / 100) : comAlfa(COR_ACAO.fold, 0.1) }}
+            style={{ background: p > 0 ? comAlfa(cor, 0.25 + (0.7 * p) / 100) : comAlfa(COR_ACAO.fora, 0.1) }}
           />
         );
       })}

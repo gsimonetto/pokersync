@@ -89,8 +89,8 @@ export const NOME_ACAO: Record<Acao, string> = {
 };
 
 /** Cor da ação de um range (a mesma paleta da grade do Treino): raise
- *  verde; call, limp (completar) e check azul -- as jogadas passivas;
- *  3-bet laranja; all-in vermelho. Range sem ação definida ou misto
+ *  vermelho; call, limp (completar) e check verde -- as jogadas passivas;
+ *  3-bet vermelho escuro; all-in laranja. Range sem ação definida ou misto
  *  (completar ou all-in, sem separar as mãos) fica no dourado do produto. */
 export function corDaAcao(acao: string | null | undefined): string {
   if (acao === "abrir" || acao === "aumentar") return COR_ACAO.raise;

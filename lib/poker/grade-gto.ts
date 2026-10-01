@@ -24,10 +24,18 @@ export interface HandDecision {
 /** Mão ausente do mapa = fold 100%. */
 export type RangeHands = Record<string, HandDecision>;
 
-/** Cores das ações em toda grade de range do PokerSync (Treino, Construtor,
- *  biblioteca, Performance): fold cinza, call azul, raise verde, 3-bet
- *  laranja, all-in vermelho. */
-export const COR_ACAO = { fold: "#c4c7c8", call: "#3b82f6", raise: "#22c55e", threebet: "#f59e0b", allin: "#e0555a" } as const;
+/** Cores das ações em toda grade 13x13 do PokerSync (Treino, Construtor,
+ *  biblioteca, Performance) -- pedido explícito: call verde, fold azul,
+ *  raise vermelho, all-in laranja, 3-bet e 4-bet vermelho mais escuro e
+ *  cinza pra mão fora do range. */
+export const COR_ACAO = {
+  fold: "#3b82f6",
+  call: "#22c55e",
+  raise: "#e0555a",
+  threebet: "#9b1c2c",
+  allin: "#f59e0b",
+  fora: "#c4c7c8",
+} as const;
 
 const RAISE_TYPE_COLOR: Record<RaiseType, string> = { raise: COR_ACAO.raise, threebet: COR_ACAO.threebet, allin: COR_ACAO.allin };
 const EMPTY_DECISION: HandDecision = { fold: 100, call: 0, raise: 0 };
@@ -44,15 +52,14 @@ export function getHandLabel(rowIdx: number, colIdx: number): string {
   return `${rLow}${rHigh}o`;
 }
 
-// Gradiente empilhado de baixo pra cima: fold (cinza) -> call (azul) ->
-// raise (verde, laranja no 3-bet, vermelho no all-in). Fold 100% fica
-// quase invisível de propósito -- só o que tem ação chama atenção.
+// Gradiente empilhado de baixo pra cima: fold (azul) -> call (verde) ->
+// raise (vermelho, vermelho escuro no 3-bet, laranja no all-in).
 export function cellBackground(d: HandDecision): string {
   const foldC = COR_ACAO.fold,
     callC = COR_ACAO.call;
   const foldEnd = d.fold;
   const callEnd = d.fold + d.call;
-  const stops = [`${foldC}22 0%`, `${foldC}22 ${foldEnd}%`, `${callC} ${foldEnd}%`, `${callC} ${callEnd}%`];
+  const stops = [`${foldC} 0%`, `${foldC} ${foldEnd}%`, `${callC} ${foldEnd}%`, `${callC} ${callEnd}%`];
   if (d.raise > 0) {
     const mix = d.raiseMix && d.raiseMix.length > 1 ? d.raiseMix : [{ type: d.raiseType ?? "raise", weight: d.raise }];
     let cursor = callEnd;

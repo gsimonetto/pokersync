@@ -7,6 +7,7 @@ import { classificarJogada, ehAcerto, nomeDoVeredito, verdictColor, type Verdict
 import { TreinoResponsiveStyles } from "@/components/drill/treino-responsive-styles";
 import { PokerTable, type TableHand, type SeatState } from "@/components/drill/poker-table";
 import { computeStylizedSeatLayout } from "@/lib/poker/seat-layout";
+import { COR_ACAO } from "@/lib/poker/grade-gto";
 import { registerTraining } from "@/lib/services/xp-service";
 import { fetchResumoEvTreino, fetchTrainingAccuracy, fetchSessionState, type ResumoEvTreino, type RfiJamFilterState } from "@/lib/services/drill-service";
 import { bbPor100, emBb, fmtBbEv, valorDoBb } from "@/lib/poker/ev-em-bb";
@@ -126,9 +127,9 @@ const PHASES: { key: "sbOpen" | "bbJam" | "sbCallJam" | "bbCallJam"; label: stri
 ];
 type FaseKey = (typeof PHASES)[number]["key"];
 
-// Mesmas cores da grade (lib/poker/grade-gto.ts): raise verde, all-in vermelho, call azul.
+// Mesmas cores da grade (lib/poker/grade-gto.ts): raise vermelho, all-in laranja, call verde.
 function corDaAcao(action: RfiJamPhaseRaw["action"]): string {
-  return action === "allin" ? "#e0555a" : action === "call" ? "#3b82f6" : "#22c55e";
+  return action === "allin" ? COR_ACAO.allin : action === "call" ? COR_ACAO.call : COR_ACAO.raise;
 }
 
 // Dados da fase no spot e, no motor v2, a segunda ação real dela (quem
@@ -2052,7 +2053,7 @@ export function RfiJamDrill({ tabs, initialStackBb, initialMatchup, filtersLocke
                       legenda={[
                         { cor: corDaAcao(currentPhase.action), rotulo: actionLabel },
                         ...(round.extra ? [{ cor: corDaAcao(round.extra.action), rotulo: extraLabel }] : []),
-                        { cor: "#c4c7c855", rotulo: "Fold" },
+                        { cor: COR_ACAO.fold, rotulo: "Fold" },
                       ]}
                     />
                   )}

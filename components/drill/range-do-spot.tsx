@@ -8,8 +8,8 @@ import { RANKS, cellBackground, getDecision, getHandLabel, type RangeHands } fro
 // inteiro do spot (onde a mão dele cai dentro do range). Antes de
 // responder a grade fica desfocada, pra não entregar a resposta.
 //
-// Mesmas cores da biblioteca de ranges (cellBackground): fold cinza,
-// call azul, raise verde, all-in vermelho -- a fatia de cada cor é a
+// Mesmas cores da biblioteca de ranges (cellBackground): fold azul,
+// call verde, raise vermelho, all-in laranja -- a fatia de cada cor é a
 // frequência daquela jogada na mão.
 
 const F = '"Space Grotesk", sans-serif';
