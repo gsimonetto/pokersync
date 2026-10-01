@@ -16,12 +16,33 @@ export interface RfiJamSpot {
   matchup: string;
   stackBb: number;
   effectiveStack: number;
+  /** Pote antes da ação: blinds (+ ante e blind morto do SB no motor v2). */
   pot: number;
   exploitability: number | null;
   sbOpen: RfiJamPhaseRaw;
   bbJam: RfiJamPhaseRaw;
   // So' existe em spots de RFI/Jam -- spots de Push/Fold tem so' 2 fases.
   sbCallJam?: RfiJamPhaseRaw;
+  // Motor v2 (pokersync-solver engine/rfi_jam_v2.py, 2026-10): ante, call
+  // do BB e all-in direto de quem abre. Cada decisão passa a ter as
+  // opções reais -- quem abre: fold/raise/all-in; BB diante do raise:
+  // fold/call/all-in; BB diante do all-in direto: fold/call.
+  /** Quem abre indo all-in direto (2a opção da fase sbOpen). */
+  sbJam?: RfiJamPhaseRaw;
+  /** BB pagando o raise (2a opção da fase bbJam). */
+  bbCallRaise?: RfiJamPhaseRaw;
+  /** BB diante do all-in direto de quem abre (fase própria). */
+  bbCallJam?: RfiJamPhaseRaw;
+  /** Ante em bb (só v2). */
+  ante?: number;
+  /** Valor de 1 bb na escala do motor, calculado pelo próprio motor (v2). */
+  icmPorBb?: number;
+  /** Frequência total de cada ação -- fase que quase nunca acontece fica de fora do sorteio. */
+  totals?: {
+    opener: { fold: number; raise: number; jam: number };
+    bb_vs_raise: { fold: number; call: number; jam: number };
+    bb_vs_jam: { fold: number; call: number };
+  };
 }
 
 export interface RfiJamListItem {
@@ -83,12 +104,56 @@ function phaseToRangeHands(phase: RfiJamPhaseRaw | undefined): RangeHands {
   return out;
 }
 
+// Fase com duas ações além do fold (motor v2): quem abre (raise +
+// all-in) e o BB diante do raise (call + all-in). A barra de raise vira
+// a mistura raise/all-in (cores diferentes na mesma célula).
+function twoActionPhaseToRangeHands(main: RfiJamPhaseRaw, extra: RfiJamPhaseRaw): RangeHands {
+  const out: RangeHands = {};
+  for (const [label, [freqMain]] of Object.entries(main.hands)) {
+    const freqExtra = extra.hands[label]?.[0] ?? 0;
+    const a = Math.round(freqMain * 100);
+    const b = Math.round(freqExtra * 100);
+    const fold = Math.max(0, 100 - a - b);
+    if (extra.action === "call") {
+      // BB diante do raise: main = all-in, extra = call
+      out[label] = { fold, call: b, raise: a, raiseType: "allin" };
+    } else {
+      // quem abre: main = raise, extra = all-in
+      out[label] = {
+        fold,
+        call: 0,
+        raise: a + b,
+        raiseType: b > a ? "allin" : "raise",
+        raiseMix: a > 0 && b > 0 ? [{ type: "raise", weight: a }, { type: "allin", weight: b }] : undefined,
+      };
+    }
+  }
+  return out;
+}
+
 export function rfiJamSpotToRangeHands(spot: RfiJamSpot) {
   return {
-    sbOpen: phaseToRangeHands(spot.sbOpen),
-    bbJam: phaseToRangeHands(spot.bbJam),
+    sbOpen: spot.sbJam ? twoActionPhaseToRangeHands(spot.sbOpen, spot.sbJam) : phaseToRangeHands(spot.sbOpen),
+    bbJam: spot.bbCallRaise ? twoActionPhaseToRangeHands(spot.bbJam, spot.bbCallRaise) : phaseToRangeHands(spot.bbJam),
     sbCallJam: phaseToRangeHands(spot.sbCallJam),
+    bbCallJam: phaseToRangeHands(spot.bbCallJam),
   };
+}
+
+// Fase que quase nunca acontece no equilíbrio (ex.: com 10 bb ninguém dá
+// raise pequeno, então "BB diante do raise" não existe na prática) fica
+// fora do sorteio -- treinar uma decisão que o GTO nunca enfrenta só
+// ensinaria ruído. Spots antigos (sem `totals`) mantêm as fases que têm.
+const MIN_FREQ_FASE = 0.03;
+export function faseDisponivel(spot: RfiJamSpot, key: "sbOpen" | "bbJam" | "sbCallJam" | "bbCallJam"): boolean {
+  if (key === "sbOpen") return true;
+  const phase = spot[key];
+  if (!phase) return false;
+  const t = spot.totals;
+  if (!t) return true;
+  if (key === "bbJam") return t.opener.raise >= MIN_FREQ_FASE;
+  if (key === "sbCallJam") return t.opener.raise * t.bb_vs_raise.jam >= MIN_FREQ_FASE / 2;
+  return t.opener.jam >= MIN_FREQ_FASE;
 }
 
 // Situações que o Treino sabe desenhar hoje -- RFI/Jam (3 fases:
@@ -140,6 +205,12 @@ export async function getRfiJamSpot(spotId: string): Promise<RfiJamSpot | null> 
     sb_open: RfiJamPhaseRaw;
     bb_jam: RfiJamPhaseRaw;
     sb_call_jam?: RfiJamPhaseRaw;
+    sb_jam?: RfiJamPhaseRaw;
+    bb_call_raise?: RfiJamPhaseRaw;
+    bb_call_jam?: RfiJamPhaseRaw;
+    ante?: number;
+    icm_por_bb?: number;
+    totals?: RfiJamSpot["totals"];
   };
 
   return {
@@ -152,5 +223,11 @@ export async function getRfiJamSpot(spotId: string): Promise<RfiJamSpot | null> 
     sbOpen: nodes.sb_open,
     bbJam: nodes.bb_jam,
     sbCallJam: nodes.sb_call_jam,
+    sbJam: nodes.sb_jam,
+    bbCallRaise: nodes.bb_call_raise,
+    bbCallJam: nodes.bb_call_jam,
+    ante: nodes.ante,
+    icmPorBb: nodes.icm_por_bb,
+    totals: nodes.totals,
   };
 }

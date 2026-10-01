@@ -41,3 +41,12 @@ describe("conversão e bb/100", () => {
     expect(fmtBbEv(0)).toBe("0 bb");
   });
 });
+
+describe("motor v2 (com ante)", () => {
+  it("usa o valor de 1 bb gravado pelo motor", () => {
+    expect(valorDoBb({ ...sb15, icmPorBb: 6.295 })).toBe(6.295);
+  });
+  it("valor inválido vira null", () => {
+    expect(valorDoBb({ ...sb15, icmPorBb: 0 })).toBeNull();
+  });
+});

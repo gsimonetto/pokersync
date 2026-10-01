@@ -32,10 +32,13 @@ export interface SpotComEv {
   matchup: string;
   sbOpen: FaseComEv;
   bbJam: FaseComEv;
+  /** Motor v2: o próprio motor já calcula o valor de 1 bb (com ante a conta abaixo não vale). */
+  icmPorBb?: number;
 }
 
 /** Quanto vale 1 bb, na escala do motor, perto do stack do spot. null = não dá pra calcular. */
 export function valorDoBb(spot: SpotComEv): number | null {
+  if (spot.icmPorBb != null) return spot.icmPorBb > 0 ? spot.icmPorBb : null;
   const blindDoHeroi = spot.matchup.startsWith("sb_") ? 0.5 : 0;
   const fichas = 1 - blindDoHeroi;
   const valor = (spot.sbOpen.ev_fold - spot.bbJam.ev_fold) / fichas;
