@@ -13,17 +13,39 @@ export interface MaoParaRebuy {
   handId?: string | null;
   date?: string | null;
   seats?: { playerName: string; startingChips: number }[] | null;
-  streets?: { name: string; actions?: { player: string; action: string; amount?: number; raiseTo?: number; postType?: string }[] }[] | null;
+  streets?: { name: string; actions?: { player: string; action: string; amount?: number; raiseTo?: number; postType?: string; isAllIn?: boolean }[] }[] | null;
   winnings?: { player: string; amount: number }[] | null;
   winner?: string | null;
+}
+
+// Valor do ante quando os "posts" vieram sem tipo -- mãos do PokerStars
+// salvas antes da correção do parser (os posts de lá ficam antes de
+// "*** HOLE CARDS ***" e saíam sem postType). O ante é o valor que vários
+// jogadores (3+) pagam igual, como primeiro post de cada um.
+function anteSemTipo(mao: MaoParaRebuy): number | null {
+  const preflop = (mao.streets ?? [])[0]?.actions ?? [];
+  const contagem = new Map<number, number>();
+  const jaPostou = new Set<string>();
+  for (const a of preflop) {
+    if (a.action !== "posts" || a.postType || jaPostou.has(a.player)) continue;
+    jaPostou.add(a.player);
+    const v = Number(a.amount) || 0;
+    contagem.set(v, (contagem.get(v) ?? 0) + 1);
+  }
+  let ante: number | null = null;
+  let maior = 0;
+  for (const [v, n] of contagem) if (n >= 3 && n > maior) [ante, maior] = [v, n];
+  return ante;
 }
 
 // Fichas que o herói colocou na mesa na mão inteira (blinds, antes,
 // apostas), já descontando aposta devolvida por não ter sido paga.
 function fichasColocadas(mao: MaoParaRebuy, heroi: string): number {
+  const ante = anteSemTipo(mao);
   let total = 0;
   for (const rua of mao.streets ?? []) {
     let naRua = 0;
+    let postou = false;
     for (const a of rua.actions ?? []) {
       if (a.player !== heroi) continue;
       const valor = Number(a.amount) || 0;
@@ -33,7 +55,11 @@ function fichasColocadas(mao: MaoParaRebuy, heroi: string): number {
       }
       if (a.action === "posts") {
         total += valor;
-        if (a.postType !== "ante") naRua += valor;
+        // Ante vai direto pro pote: não conta na aposta da rua (o "raises
+        // to X" é medido a partir do blind, sem o ante).
+        const ehAnte = a.postType === "ante" || (!a.postType && !postou && ante != null && valor === ante);
+        postou = true;
+        if (!ehAnte) naRua += valor;
         continue;
       }
       if (a.action === "raises" && a.raiseTo != null) {
@@ -62,6 +88,13 @@ export function heroiQuebrou(mao: MaoParaRebuy): boolean {
     ? mao.winnings.some((w) => w.player === heroi && w.amount > 0)
     : mao.winner === heroi;
   if (ganhou) return false;
+
+  // Foi all-in, não ganhou nada e nada voltou pra ele: quebrou. Não
+  // depende da conta de fichas (que erra se algum post vier sem tipo).
+  const acoes = (mao.streets ?? []).flatMap((r) => r.actions ?? []).filter((a) => a.player === heroi);
+  const foiAllIn = acoes.some((a) => a.isAllIn || a.action === "allin");
+  const recebeuDeVolta = acoes.some((a) => a.action === "uncalled_return" && (Number(a.amount) || 0) > 0);
+  if (foiAllIn && !recebeuDeVolta) return true;
 
   return fichasColocadas(mao, heroi) >= assento.startingChips - 0.001;
 }
