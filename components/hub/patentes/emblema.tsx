@@ -239,13 +239,13 @@ const AUREOLA = Array.from({ length: 22 }, (_, i) => {
 
 // ---------- Materiais ----------
 
-interface Material {
+export interface Material {
   claro: string;
   base: string;
   escuro: string;
 }
 
-const MATERIAIS: Material[] = [
+export const MATERIAIS: Material[] = [
   { claro: "#F1C694", base: "#B08D57", escuro: "#4B2A10" }, // Bronze
   { claro: "#FFFFFF", base: "#C0C6CC", escuro: "#3F474F" }, // Prata
   { claro: "#FFF1B8", base: "#E0B24C", escuro: "#6B4306" }, // Ouro
