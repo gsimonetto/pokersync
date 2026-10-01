@@ -113,7 +113,7 @@ export function deReal(r: RangeReal): RangeAtual {
   return {
     id: null,
     origem: "real",
-    nome: `Seu range de verdade · ${r.posicao} ${NOME_ACAO_REAL[r.acao]}`,
+    nome: `Seu range de verdade · ${r.posicao} ${r.acao === "pagar" && r.contra === "allin" ? "paga um all-in" : NOME_ACAO_REAL[r.acao]}`,
     pesos: r.pesos,
     pesosCombo: {},
     posicao: r.posicao,
