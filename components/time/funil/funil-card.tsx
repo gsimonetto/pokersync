@@ -12,6 +12,7 @@ import {
   quandoRelativo,
 } from "@/lib/time/funil-regras";
 import type { ItemFunil } from "@/components/time/funil/tipos";
+import type { CSSProperties } from "react";
 
 // Cartão do quadro. Ordem de leitura pensada pro coach decidir sem abrir:
 //   1) quem é -- crachá compacto (score, resultado, buy-in, acerto)
@@ -22,6 +23,15 @@ import type { ItemFunil } from "@/components/time/funil/tipos";
 // parado), sempre repetida em texto no rodapé -- nunca só cor. O
 // "parado" (congelado) ganha cara de gelo: borda azul e um reflexo que
 // passa devagar pela superfície (.card-congelado em globals.css).
+
+// Cada cartão congelado reflete a luz num momento diferente do ciclo
+// (atraso negativo = já começa no meio) -- vários no mesmo quadro não
+// piscam juntos.
+function atrasoDoReflexo(id: string): string {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `-${(h % 70) / 10}s`;
+}
 
 export function crachaDoItem(item: ItemFunil): CrachaDados {
   if (item.jogador) {
@@ -83,15 +93,22 @@ export function FunilCard({
         }
       }}
       aria-label={`${item.nome}: abrir cartão`}
-      className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-white/[0.04] py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-colors hover:border-white/20 focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
-        pr.pronto ? "border-positive/35" : congelado ? "border-[#7dd3fc]/35" : "border-hairline"
-      } ${congelado ? "card-congelado" : ""}`}
+      style={congelado ? ({ "--atraso-gelo": atrasoDoReflexo(card.playerId) } as CSSProperties) : undefined}
+      className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-white/[0.04] py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-[border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
+        congelado
+          ? `card-congelado ${pr.pronto ? "border-positive/35" : "border-[#7dd3fc]/30"} hover:border-[#7dd3fc]/60`
+          : `${pr.pronto ? "border-positive/35" : "border-hairline"} hover:border-white/20`
+      }`}
     >
       {/* Só exceção ganha cor: "em dia" fica neutro pra "esfriando" e
           "parado" saltarem aos olhos. */}
       <span
         className="absolute inset-y-0 left-0 w-[3px]"
-        style={{ background: temperatura === "em_dia" ? "rgba(255,255,255,0.08)" : corTemp }}
+        style={
+          congelado
+            ? { background: "linear-gradient(180deg, #f0f9ff, #7dd3fc 45%, #38bdf8)", boxShadow: "0 0 10px rgba(125, 211, 252, 0.55)" }
+            : { background: temperatura === "em_dia" ? "rgba(255,255,255,0.08)" : corTemp }
+        }
         aria-hidden
       />
 
@@ -190,7 +207,9 @@ export function FunilCard({
           )}
         </span>
         <span
-          className="flex shrink-0 items-center gap-0.5 text-[10.5px] tabular-nums"
+          className={`flex shrink-0 items-center text-[10.5px] tabular-nums ${
+            congelado ? "selo-congelado gap-1 rounded-full px-1.5 py-0.5 font-medium" : "gap-0.5"
+          }`}
           style={{ color: temperatura === "em_dia" ? undefined : corTemp }}
           title={`${TEMPERATURA_LABEL[temperatura]} · ${item.diasNaFase} dias nesta fase`}
         >
