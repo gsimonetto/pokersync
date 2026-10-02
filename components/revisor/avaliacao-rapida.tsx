@@ -19,12 +19,14 @@ import { GRUPO_MESA } from "@/components/drill/mesa-ui";
 // "somenteLeitura" -- mostra só a nota que o JOGADOR deu, sem botões.
 //
 // Onde fica: no computador, um cartão no rodapé da coluna de mãos (colado
-// na mesa, com as 4 ruas); no celular, uma faixa fina logo abaixo da mesa
-// com a rua mais recente em que você jogou. A primeira versão ficava
-// dentro da faixa de ações embaixo da mesa (computador) e num balão por
-// cima da mesa (celular) -- a faixa passava a esconder as ações em telas
-// de ~1280px e o balão cobria os assentos de cima em celular baixo
-// (iPhone SE) -- por isso a faixa do celular fica embaixo, não em cima.
+// na mesa, com as 4 ruas); no celular, uma faixa fina logo acima da mesa
+// (embaixo da barra do topo) com a rua mais recente em que você jogou --
+// pedido explícito: "colocar os botões de feedback lá no topo". A primeira
+// versão ficava dentro da faixa de ações embaixo da mesa (computador) e num
+// balão POR CIMA da mesa (celular) -- a faixa passava a esconder as ações em
+// telas de ~1280px e o balão cobria os assentos de cima em celular baixo
+// (iPhone SE). Por isso a faixa do celular fica FORA da mesa, com uma
+// margem embaixo pras cartas dos assentos do topo, que passam da borda.
 
 const RUAS_AVALIAVEIS = ["preflop", "flop", "turn", "river"] as const;
 
@@ -207,7 +209,7 @@ export function CartaoAvaliacao({
   );
 }
 
-/** Celular: faixa fina embaixo da mesa, com a rua mais recente em que você jogou. */
+/** Celular: faixa fina em cima da mesa, com a rua mais recente em que você jogou. */
 export function FaixaAvaliacaoCelular({
   avaliacoes,
   ruasLiberadas,
@@ -227,9 +229,11 @@ export function FaixaAvaliacaoCelular({
   const rua = liberada ? ruasLiberadas[ruasLiberadas.length - 1] : "preflop";
   const rotulo = NOME_RUA[rua.toUpperCase()] ?? rua;
   return (
-    // zIndex: a caixa (invisível) do assento do hero, que passa um tiquinho
-    // da borda de baixo da mesa no celular baixo, não pode roubar o toque.
-    <div style={{ height: 44, flexShrink: 0, position: "relative", zIndex: 41, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: F }}>
+    // zIndex: as caixas (invisíveis) dos assentos do topo, que passam um
+    // pouco da borda de cima da mesa, não podem roubar o toque.
+    // marginBottom: espaço pras cartas desses assentos, que sobem acima da
+    // borda da mesa -- sem ele elas ficavam por baixo da faixa.
+    <div style={{ height: 44, marginBottom: 14, flexShrink: 0, position: "relative", zIndex: 41, display: "flex", alignItems: "center", justifyContent: "center", fontFamily: F }}>
       {/* Mesmo vidro dos controles da mesa (ver mesa-ui.tsx). */}
       <div className={`${GRUPO_MESA} gap-2.5 whitespace-nowrap py-1 pl-3.5 pr-1`}>
         <span
