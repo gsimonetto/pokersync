@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, AlertTriangle, ArrowUpRight, ChevronLeft, ChevronRight, Clock3, CornerDownRight, Flag, ListChecks } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowUpRight, ChevronLeft, ChevronRight, Clock3, CornerDownRight, Flag, Flame, ListChecks, Snowflake } from "lucide-react";
 import { Chip } from "@/components/chip";
 import { PlayerBadge, crachaDoTime, type CrachaDados } from "@/components/time/player-badge";
 import type { FunnelPhase } from "@/lib/services/team-funnel-service";
@@ -12,6 +12,7 @@ import {
   quandoRelativo,
 } from "@/lib/time/funil-regras";
 import type { ItemFunil } from "@/components/time/funil/tipos";
+import type { CSSProperties } from "react";
 
 // Cartão do quadro. Ordem de leitura pensada pro coach decidir sem abrir:
 //   1) quem é -- crachá compacto (score, resultado, buy-in, acerto)
@@ -20,6 +21,21 @@ import type { ItemFunil } from "@/components/time/funil/tipos";
 //   4) contexto -- etiquetas, checklist, dias na fase
 // A faixa na borda esquerda é a temperatura (em dia / esfriando /
 // parado), sempre repetida em texto no rodapé -- nunca só cor.
+// Dois extremos ganham cara própria (globals.css):
+//   - pronto pra subir = pegando fogo: laranja, chamas tremulando na
+//     base, brasas subindo e reflexo no botão Subir (.card-em-chamas);
+//   - parado = congelado: azul-gelo, geada e reflexo de vidro
+//     (.card-congelado).
+// Um é o contrário do outro. Pronto e parado ao mesmo tempo pega fogo
+// (subir é a ação), com o selo de gelo no rodapé avisando que está parado.
+
+// Cada cartão anima num momento diferente do ciclo (atraso negativo = já
+// começa no meio) -- vários no mesmo quadro não piscam juntos.
+function atrasoDaAnimacao(id: string): string {
+  let h = 0;
+  for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
+  return `-${(h % 70) / 10}s`;
+}
 
 export function crachaDoItem(item: ItemFunil): CrachaDados {
   if (item.jogador) {
@@ -60,6 +76,12 @@ export function FunilCard({
 }) {
   const { card, prontidao: pr, requisitos, temperatura, passo, labels, checklist } = item;
   const corTemp = TEMPERATURA_COR[temperatura];
+  const emAlta = pr.pronto;
+  const parado = temperatura === "parado";
+  const congelado = parado && !emAlta;
+  // Selo de fogo no rodapé só quando está em dia -- "esfriando"/"parado"
+  // continuam avisando no selo, mesmo com o cartão pegando fogo.
+  const seloFogo = emAlta && temperatura === "em_dia";
   const faixa = foraDaFaixa(card.abiTorneio ?? item.jogador?.abiTorneio ?? null, item.fase);
 
   return (
@@ -80,15 +102,26 @@ export function FunilCard({
         }
       }}
       aria-label={`${item.nome}: abrir cartão`}
-      className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-white/[0.04] py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-colors hover:border-white/20 focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
-        pr.pronto ? "border-positive/35" : "border-hairline"
+      style={emAlta || congelado ? ({ "--atraso-card": atrasoDaAnimacao(card.playerId) } as CSSProperties) : undefined}
+      className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-white/[0.04] py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-[border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
+        emAlta
+          ? "card-em-chamas border-[#f97316]/40 hover:border-[#fb923c]/75"
+          : congelado
+            ? "card-congelado border-[#7dd3fc]/30 hover:border-[#7dd3fc]/60"
+            : "border-hairline hover:border-white/20"
       }`}
     >
       {/* Só exceção ganha cor: "em dia" fica neutro pra "esfriando" e
           "parado" saltarem aos olhos. */}
       <span
         className="absolute inset-y-0 left-0 w-[3px]"
-        style={{ background: temperatura === "em_dia" ? "rgba(255,255,255,0.08)" : corTemp }}
+        style={
+          emAlta
+            ? { background: "linear-gradient(0deg, #dc2626, #f97316 45%, #fde047)", boxShadow: "0 0 10px rgba(249, 115, 22, 0.6)" }
+            : congelado
+              ? { background: "linear-gradient(180deg, #f0f9ff, #7dd3fc 45%, #38bdf8)", boxShadow: "0 0 10px rgba(125, 211, 252, 0.55)" }
+              : { background: temperatura === "em_dia" ? "rgba(255,255,255,0.08)" : corTemp }
+        }
         aria-hidden
       />
 
@@ -125,7 +158,9 @@ export function FunilCard({
               }}
               disabled={!faseSeguinte}
               title={faseSeguinte ? `Subir para ${faseSeguinte.name}` : "Já está na última fase"}
-              className="flex shrink-0 items-center gap-0.5 rounded-md bg-positive/15 px-1.5 py-0.5 text-[10.5px] font-bold text-positive transition-colors hover:bg-positive/25 disabled:cursor-default disabled:hover:bg-positive/15"
+              className={`flex shrink-0 items-center gap-0.5 rounded-md bg-positive/15 px-1.5 py-0.5 text-[10.5px] font-bold text-positive transition-colors hover:bg-positive/25 disabled:cursor-default disabled:hover:bg-positive/15 ${
+                faseSeguinte ? "botao-subir" : ""
+              }`}
             >
               {faseSeguinte ? "Subir" : "Pronto"}
               {faseSeguinte && <ArrowUpRight size={11} />}
@@ -187,13 +222,30 @@ export function FunilCard({
           )}
         </span>
         <span
-          className="flex shrink-0 items-center gap-0.5 text-[10.5px] tabular-nums"
-          style={{ color: temperatura === "em_dia" ? undefined : corTemp }}
-          title={`${TEMPERATURA_LABEL[temperatura]} · ${item.diasNaFase} dias nesta fase`}
+          className={`flex shrink-0 items-center text-[10.5px] tabular-nums ${
+            parado
+              ? "selo-congelado gap-1 rounded-full px-1.5 py-0.5 font-medium"
+              : seloFogo
+                ? "selo-fogo gap-1 rounded-full px-1.5 py-0.5 font-medium"
+                : "gap-0.5"
+          }`}
+          style={{ color: seloFogo ? "#fb923c" : temperatura === "em_dia" ? undefined : corTemp }}
+          title={
+            seloFogo
+              ? `Pronto pra subir · ${item.diasNaFase} dias nesta fase`
+              : `${TEMPERATURA_LABEL[temperatura]} · ${item.diasNaFase} dias nesta fase`
+          }
         >
-          <Clock3 size={11} className={temperatura === "em_dia" ? "text-muted" : ""} />
-          <span className={temperatura === "em_dia" ? "text-muted" : ""}>
-            {item.diasNaFase}d{temperatura !== "em_dia" && ` · ${TEMPERATURA_LABEL[temperatura].toLowerCase()}`}
+          {parado ? (
+            <Snowflake size={11} className="floco-girando" />
+          ) : seloFogo ? (
+            <Flame size={11} className="chama-tremula" />
+          ) : (
+            <Clock3 size={11} className={temperatura === "em_dia" ? "text-muted" : ""} />
+          )}
+          <span className={temperatura === "em_dia" && !seloFogo ? "text-muted" : ""}>
+            {item.diasNaFase}d
+            {seloFogo ? " · em alta" : temperatura !== "em_dia" && ` · ${TEMPERATURA_LABEL[temperatura].toLowerCase()}`}
           </span>
         </span>
 

@@ -132,10 +132,12 @@ export const TEMPERATURA_LABEL: Record<Temperatura, string> = {
   parado: "Parado",
 };
 
+// "Parado" é o cartão congelado (dobro do prazo da fase): azul-gelo, não
+// vermelho -- vermelho no quadro já quer dizer "sem próximo passo".
 export const TEMPERATURA_COR: Record<Temperatura, string> = {
   em_dia: "#22c55e",
   esfriando: "#f59e0b",
-  parado: "#e0555a",
+  parado: "#7dd3fc",
 };
 
 /** Prazo da fase; sem prazo próprio, vale o padrão do funil (configurável pelo admin). */

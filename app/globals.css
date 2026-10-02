@@ -174,6 +174,199 @@ select option {
   .orbit-spin-slow, .orbit-spin-slow-reverse { animation: none; }
 }
 
+/* Cartao congelado no funil do time (parado no dobro do prazo da fase).
+   Camadas, de baixo pra cima:
+     - fundo: tom de gelo mais forte no canto superior direito;
+     - ::before: geada -- tres cristais de gelo e pontos de brilho nesse canto;
+     - ::after: reflexo de vidro -- linha fina e clara com halo suave --
+       atravessando o cartao de tempos em tempos. O atraso vem do proprio
+       cartao (--atraso-card), pra varios congelados nao piscarem juntos.
+   O cartao ja e' relative + overflow-hidden. Sem movimento pra quem pede
+   "reduzir movimento" no sistema. */
+.card-congelado {
+  /* Contexto proprio de empilhamento: a geada (z-index -1) fica acima do
+     fundo do cartao e ABAIXO do texto -- nome longo ou a bandeira "Alta"
+     nunca ficam cobertos pelos cristais. */
+  isolation: isolate;
+  background-image:
+    radial-gradient(120% 90% at 100% 0%, rgba(125, 211, 252, 0.14), transparent 55%),
+    linear-gradient(165deg, rgba(125, 211, 252, 0.06), rgba(125, 211, 252, 0.01) 60%);
+  box-shadow:
+    inset 0 1px 0 rgba(224, 242, 254, 0.1),
+    0 0 22px -12px rgba(125, 211, 252, 0.6);
+}
+.card-congelado:hover {
+  box-shadow:
+    inset 0 1px 0 rgba(224, 242, 254, 0.14),
+    0 0 26px -10px rgba(125, 211, 252, 0.75);
+}
+.card-congelado::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  right: 0;
+  width: 112px;
+  height: 80px;
+  z-index: -1;
+  pointer-events: none;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 112 80' fill='none' stroke='%23e0f2fe' stroke-linecap='round'%3E%3Cpath stroke-width='0.8' d='M92.0 18.0L102.6 20.8M97.8 19.6L101.5 17.5M97.8 19.6L99.9 23.2M100.5 20.3L102.6 19.1M100.5 20.3L101.7 22.4M92.0 18.0L94.8 28.6M93.6 23.8L97.2 25.9M93.6 23.8L91.5 27.5M94.3 26.5L96.4 27.7M94.3 26.5L93.1 28.6M92.0 18.0L84.2 25.8M87.7 22.3L87.7 26.5M87.7 22.3L83.5 22.3M85.8 24.2L85.8 26.6M85.8 24.2L83.4 24.2M92.0 18.0L81.4 15.2M86.2 16.4L82.5 18.5M86.2 16.4L84.1 12.8M83.5 15.7L81.4 16.9M83.5 15.7L82.3 13.6M92.0 18.0L89.2 7.4M90.4 12.2L86.8 10.1M90.4 12.2L92.5 8.5M89.7 9.5L87.6 8.3M89.7 9.5L90.9 7.4M92.0 18.0L99.8 10.2M96.3 13.7L96.3 9.5M96.3 13.7L100.5 13.7M98.2 11.8L98.2 9.4M98.2 11.8L100.6 11.8'/%3E%3Cpath stroke-width='0.6' opacity='0.75' d='M66.0 10.0L72.5 10.6M69.6 10.3L71.5 8.7M69.6 10.3L71.1 12.2M71.2 10.5L72.3 9.5M71.2 10.5L72.1 11.5M66.0 10.0L68.7 15.9M67.5 13.2L69.8 14.1M67.5 13.2L66.7 15.6M68.2 14.7L69.5 15.2M68.2 14.7L67.7 16.1M66.0 10.0L62.3 15.3M63.9 12.9L64.4 15.4M63.9 12.9L61.5 13.4M63.0 14.3L63.3 15.7M63.0 14.3L61.6 14.5M66.0 10.0L59.5 9.4M62.4 9.7L60.5 11.3M62.4 9.7L60.9 7.8M60.8 9.5L59.7 10.5M60.8 9.5L59.9 8.5M66.0 10.0L63.3 4.1M64.5 6.8L62.2 5.9M64.5 6.8L65.3 4.4M63.8 5.3L62.5 4.8M63.8 5.3L64.3 3.9M66.0 10.0L69.7 4.7M68.1 7.1L67.6 4.6M68.1 7.1L70.5 6.6M69.0 5.7L68.7 4.3M69.0 5.7L70.4 5.5'/%3E%3Cpath stroke-width='0.55' opacity='0.6' d='M101.0 46.0L106.0 48.3M103.7 47.3L105.7 46.6M103.7 47.3L104.5 49.2M105.0 47.9L106.1 47.4M105.0 47.9L105.4 49.0M101.0 46.0L101.5 51.5M101.3 49.0L102.9 50.4M101.3 49.0L99.9 50.6M101.4 50.4L102.3 51.2M101.4 50.4L100.6 51.3M101.0 46.0L96.5 49.2M98.5 47.7L98.2 49.8M98.5 47.7L96.5 47.4M97.4 48.5L97.2 49.7M97.4 48.5L96.2 48.3M101.0 46.0L96.0 43.7M98.3 44.7L96.3 45.4M98.3 44.7L97.5 42.8M97.0 44.1L95.9 44.6M97.0 44.1L96.6 43.0M101.0 46.0L100.5 40.5M100.7 43.0L99.1 41.6M100.7 43.0L102.1 41.4M100.6 41.6L99.7 40.8M100.6 41.6L101.4 40.7M101.0 46.0L105.5 42.8M103.5 44.3L103.8 42.2M103.5 44.3L105.5 44.6M104.6 43.5L104.8 42.3M104.6 43.5L105.8 43.7'/%3E%3Cg fill='%23f0f9ff' stroke='none'%3E%3Ccircle cx='78' cy='30' r='0.9'/%3E%3Ccircle cx='54' cy='22' r='0.6'/%3E%3Ccircle cx='106' cy='8' r='0.8'/%3E%3Ccircle cx='84' cy='50' r='0.5'/%3E%3Ccircle cx='72' cy='4' r='0.5'/%3E%3C/g%3E%3C/svg%3E") no-repeat top right / 112px 80px;
+  opacity: 0.55;
+  -webkit-mask-image: radial-gradient(circle at 100% 0%, #000 35%, transparent 80%);
+  mask-image: radial-gradient(circle at 100% 0%, #000 35%, transparent 80%);
+}
+.card-congelado::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(
+    115deg,
+    transparent 38%,
+    rgba(224, 242, 254, 0.06) 45%,
+    rgba(255, 255, 255, 0.2) 49.5%,
+    rgba(255, 255, 255, 0.2) 50.5%,
+    rgba(224, 242, 254, 0.06) 55%,
+    transparent 62%
+  );
+  transform: translateX(-110%);
+  animation: gelo-reflexo 7s cubic-bezier(0.45, 0, 0.2, 1) infinite;
+  animation-delay: var(--atraso-card, 0s);
+}
+@keyframes gelo-reflexo {
+  0% { transform: translateX(-110%); }
+  30%, 100% { transform: translateX(110%); }
+}
+/* Selo "19d · parado" do rodape: etiqueta de gelo com o floco girando. */
+.selo-congelado {
+  background: rgba(125, 211, 252, 0.1);
+  box-shadow: inset 0 0 0 1px rgba(125, 211, 252, 0.25);
+}
+.selo-congelado svg {
+  filter: drop-shadow(0 0 3px rgba(125, 211, 252, 0.8));
+}
+.floco-girando {
+  animation: floco-girar 9s linear infinite;
+}
+@keyframes floco-girar {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-congelado::after { display: none; }
+  .floco-girando { animation: none; }
+}
+
+/* Cartao "pegando fogo" no funil do time (cumpriu todos os requisitos,
+   pronto pra subir) -- o contrario do congelado, peca por peca:
+     - fundo: brasa laranja subindo da base (o gelo vem do topo);
+     - ::before: chamas pequenas no canto inferior direito, tremulando
+       atras do texto -- do tamanho da geada, que fica no canto superior;
+     - ::after: brasas -- pontinhos laranja/amarelos subindo e apagando
+       antes do topo (no gelo, um reflexo de vidro);
+     - brilho em volta que tremula como fogo, irregular.
+   O botao Subir ganha um reflexo proprio (.botao-subir). Mesmo atraso por
+   cartao (--atraso-card) do congelado. */
+.card-em-chamas {
+  isolation: isolate;
+  background-image:
+    radial-gradient(120% 85% at 85% 115%, rgba(249, 115, 22, 0.2), transparent 60%),
+    linear-gradient(0deg, rgba(249, 115, 22, 0.06), rgba(249, 115, 22, 0.01) 65%);
+  animation: fogo-brilho 2.6s ease-in-out infinite;
+  animation-delay: var(--atraso-card, 0s);
+}
+@keyframes fogo-brilho {
+  0%, 100% { box-shadow: inset 0 -1px 0 rgba(253, 186, 116, 0.12), 0 0 20px -12px rgba(249, 115, 22, 0.6); }
+  23% { box-shadow: inset 0 -1px 0 rgba(253, 186, 116, 0.18), 0 0 26px -9px rgba(249, 115, 22, 0.8); }
+  41% { box-shadow: inset 0 -1px 0 rgba(253, 186, 116, 0.1), 0 0 18px -12px rgba(239, 68, 68, 0.55); }
+  68% { box-shadow: inset 0 -1px 0 rgba(253, 186, 116, 0.2), 0 0 28px -8px rgba(251, 146, 60, 0.85); }
+}
+.card-em-chamas::before,
+.card-em-chamas::after {
+  content: "";
+  position: absolute;
+  z-index: -1;
+  pointer-events: none;
+}
+.card-em-chamas::before {
+  right: 0;
+  bottom: 0;
+  width: 60px;
+  height: 40px;
+  background: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 120 80'%3E%3Cdefs%3E%3ClinearGradient id='f' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0' stop-color='%23ef4444'/%3E%3Cstop offset='0.45' stop-color='%23f97316'/%3E%3Cstop offset='1' stop-color='%23fde047' stop-opacity='0'/%3E%3C/linearGradient%3E%3ClinearGradient id='n' x1='0' y1='1' x2='0' y2='0'%3E%3Cstop offset='0' stop-color='%23fde047'/%3E%3Cstop offset='1' stop-color='%23fef3c7' stop-opacity='0'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath fill='url(%23f)' d='M98 80C79.3 80 74.2 59.0 82.7 41.5C87.8 29.6 94.6 27.5 93.92 10C104.8 22.6 109.9 36.6 108.2 48.5C112.28 43.6 113.3 36.6 112.28 31.0C121.8 48.5 121.12 69.5 98 80Z'/%3E%3Cpath fill='url(%23f)' opacity='0.8' d='M70 80C56.8 80 53.2 65.6 59.2 53.599999999999994C62.8 45.44 67.6 44.0 67.12 32C74.8 40.64 78.4 50.24 77.2 58.4C80.08 55.04 80.8 50.24 80.08 46.400000000000006C86.8 58.4 86.32 72.8 70 80Z'/%3E%3Cpath fill='url(%23f)' opacity='0.7' d='M114 80C104.1 80 101.4 68.0 105.9 58.0C108.6 51.2 112.2 50.0 111.84 40C117.6 47.2 120.3 55.2 119.4 62.0C121.56 59.2 122.1 55.2 121.56 52.0C126.6 62.0 126.24 74.0 114 80Z'/%3E%3Cpath fill='url(%23n)' opacity='0.85' d='M98 80C89.2 80 86.8 69.2 90.8 60.2C93.2 54.08 96.4 53.0 96.08 44C101.2 50.480000000000004 103.6 57.68 102.8 63.8C104.72 61.28 105.2 57.68 104.72 54.8C109.2 63.8 108.88 74.6 98 80Z'/%3E%3C/svg%3E") no-repeat bottom right / 60px 40px;
+  opacity: 0.28;
+  transform-origin: 80% 100%;
+  -webkit-mask-image: linear-gradient(0deg, #000 30%, transparent 95%);
+  mask-image: linear-gradient(0deg, #000 30%, transparent 95%);
+  animation: fogo-chamas 1.8s ease-in-out infinite;
+  animation-delay: var(--atraso-card, 0s);
+}
+@keyframes fogo-chamas {
+  0%, 100% { transform: scaleY(1) skewX(0deg); opacity: 0.28; }
+  25% { transform: scaleY(1.05) skewX(-1.5deg); opacity: 0.34; }
+  50% { transform: scaleY(0.97) skewX(1deg); opacity: 0.25; }
+  75% { transform: scaleY(1.03) skewX(-0.5deg); opacity: 0.32; }
+}
+.card-em-chamas::after {
+  inset: 0;
+  background-image:
+    radial-gradient(circle at 12% 30%, rgba(253, 224, 71, 0.95) 0 1.3px, transparent 2.3px),
+    radial-gradient(circle at 36% 75%, rgba(251, 146, 60, 0.9) 0 1.6px, transparent 2.6px),
+    radial-gradient(circle at 58% 15%, rgba(253, 186, 116, 0.9) 0 1px, transparent 1.9px),
+    radial-gradient(circle at 70% 60%, rgba(249, 115, 22, 0.95) 0 1.7px, transparent 2.8px),
+    radial-gradient(circle at 86% 40%, rgba(253, 224, 71, 0.9) 0 1.2px, transparent 2.2px),
+    radial-gradient(circle at 94% 85%, rgba(251, 146, 60, 0.9) 0 1.4px, transparent 2.4px);
+  background-size: 100% 110px;
+  -webkit-mask-image: linear-gradient(0deg, transparent, #000 15%, #000 50%, transparent 85%);
+  mask-image: linear-gradient(0deg, transparent, #000 15%, #000 50%, transparent 85%);
+  animation: fogo-brasas 3.5s linear infinite;
+  animation-delay: var(--atraso-card, 0s);
+}
+@keyframes fogo-brasas {
+  from { background-position: 0 0; }
+  to { background-position: 4px -110px; }
+}
+/* Selo "Xd · em alta" do rodape: etiqueta de fogo com a chama tremulando. */
+.selo-fogo {
+  background: rgba(249, 115, 22, 0.12);
+  box-shadow: inset 0 0 0 1px rgba(249, 115, 22, 0.3);
+}
+.selo-fogo svg {
+  filter: drop-shadow(0 0 3px rgba(249, 115, 22, 0.9));
+}
+.chama-tremula {
+  transform-origin: 50% 100%;
+  animation: chama-tremula 1.2s ease-in-out infinite;
+}
+@keyframes chama-tremula {
+  0%, 100% { transform: scale(1) rotate(0deg); }
+  30% { transform: scale(1.12, 1.18) rotate(-4deg); }
+  60% { transform: scale(0.95, 1.05) rotate(3deg); }
+}
+.botao-subir {
+  position: relative;
+  overflow: hidden;
+}
+.botao-subir::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(110deg, transparent 30%, rgba(255, 255, 255, 0.45) 50%, transparent 70%);
+  transform: translateX(-120%);
+  animation: subir-reflexo 3.2s ease-in-out infinite;
+  animation-delay: var(--atraso-card, 0s);
+}
+@keyframes subir-reflexo {
+  0%, 55% { transform: translateX(-120%); }
+  80%, 100% { transform: translateX(120%); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-em-chamas { animation: none; box-shadow: 0 0 22px -10px rgba(249, 115, 22, 0.7); }
+  .card-em-chamas::before,
+  .card-em-chamas::after,
+  .chama-tremula { animation: none; }
+  .botao-subir::after { display: none; }
+}
+
 /* Utilitarios de acento: a cor vem da custom property --acc definida
    inline no elemento. Espelha exatamente o design de referencia (v0). */
 .acc-card {
