@@ -959,6 +959,17 @@ export function RevisorHandTable({
           </div>
         )}
 
+        {/* Celular: nota da rua numa faixa fina EM CIMA da mesa, logo
+            abaixo da barra do topo (pedido explicito: "colocar os botoes de
+            feedback la no topo"). Fica FORA da mesa, no fluxo normal -- a
+            mesa encolhe pra caber, nada fica por cima dos assentos. A
+            margem de baixo (ver FaixaAvaliacaoCelular) e' o espaco das
+            cartas dos assentos do topo, que passam um pouco da borda da
+            mesa pra cima e antes cobriam a faixa. */}
+        {isMobile && podeAvaliar && (
+          <FaixaAvaliacaoCelular avaliacoes={avaliacoes} ruasLiberadas={ruasAvaliaveis} onAvaliar={avaliar} somenteLeitura={somenteLeitura} />
+        )}
+
         {/* Altura responsiva por breakpoint (className, nao inline) — fixa
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. position:relative pra sustentar os overlays
@@ -1036,12 +1047,6 @@ export function RevisorHandTable({
         )}
         </div>
 
-        {/* Celular: nota da rua numa faixa fina EMBAIXO da mesa, fora dela
-            (perto do polegar) -- em cima não dá: as cartas dos assentos do
-            topo passam da borda da mesa e cobriam a faixa no celular baixo. */}
-        {isMobile && podeAvaliar && (
-          <FaixaAvaliacaoCelular avaliacoes={avaliacoes} ruasLiberadas={ruasAvaliaveis} onAvaliar={avaliar} somenteLeitura={somenteLeitura} />
-        )}
       </div>
 
       {/* Salvar/Compartilhar/Analisar no celular: portados pro slot que
@@ -1062,34 +1067,9 @@ export function RevisorHandTable({
                 grande
               />
             )}
-            {/* EV/ICM no celular (pedido explicito: "nao localizei no
-                celular o botao integrado a mesa") -- o header com o chip
-                desktop some inteiro aqui (ver !isMobile acima), entao o
-                mesmo gatilho precisa migrar pro slot de acoes do topo,
-                igual Salvar/Analisar ja fazem. NUNCA iconOnly aqui (bug
-                corrigido: "nao aconteceu nada quando cliquei") -- iconOnly
-                so mostra o motivo de bloqueio (torneio sem premiacao, etc)
-                via `title`, que e' um tooltip de hover e nunca aparece no
-                toque do celular. Com rotulo em texto, o motivo fica visivel
-                na propria tela em vez de invisivel. */}
-            {evEligible &&
-              !somenteLeitura &&
-              (evResult ? (
-                <ChipButton
-                  icon={<Gauge size={13} />}
-                  label={`${evResult.heroEquityPct?.toFixed(0)}% eq.`}
-                  onClick={handleComputeEv}
-                  title="Recalcular EV/ICM"
-                />
-              ) : (
-                <ChipButton
-                  icon={evLoading ? <Loader2 size={15} className="animate-spin" /> : <Gauge size={15} />}
-                  label={evLoading ? "Calculando…" : evError || "Calcular EV/ICM"}
-                  onClick={handleComputeEv}
-                  disabled={evLoading}
-                  title={evError || "Calcular EV/ICM desse all-in via pokersync-solver"}
-                />
-              ))}
+            {/* EV/ICM saiu do celular (pedido explicito: "tirar o botao
+                de icm que nao esta funcionando") -- o espaco no topo ficou
+                livre. No computador o chip continua no header da mesa. */}
             {canAnalyze && (
               <ChipButton
                 icon={<Target size={16} />}
