@@ -20,14 +20,18 @@ import type { CSSProperties } from "react";
 //   3) o que vem agora -- próximo passo e quando (vermelho se não tem)
 //   4) contexto -- etiquetas, checklist, dias na fase
 // A faixa na borda esquerda é a temperatura (em dia / esfriando /
-// parado), sempre repetida em texto no rodapé -- nunca só cor. O
-// "parado" (congelado) ganha cara de gelo: borda azul e um reflexo que
-// passa devagar pela superfície (.card-congelado em globals.css).
+// parado), sempre repetida em texto no rodapé -- nunca só cor.
+// Dois extremos ganham cara própria (globals.css):
+//   - pronto pra subir = "em alta": verde, brilho que respira, faíscas
+//     subindo e reflexo no botão Subir (.card-em-alta);
+//   - parado = congelado: azul-gelo, geada e reflexo de vidro
+//     (.card-congelado).
+// Pronto e parado ao mesmo tempo fica "em alta" (subir é a ação), com o
+// selo de gelo no rodapé avisando que está parado.
 
-// Cada cartão congelado reflete a luz num momento diferente do ciclo
-// (atraso negativo = já começa no meio) -- vários no mesmo quadro não
-// piscam juntos.
-function atrasoDoReflexo(id: string): string {
+// Cada cartão anima num momento diferente do ciclo (atraso negativo = já
+// começa no meio) -- vários no mesmo quadro não piscam juntos.
+function atrasoDaAnimacao(id: string): string {
   let h = 0;
   for (const c of id) h = (h * 31 + c.charCodeAt(0)) >>> 0;
   return `-${(h % 70) / 10}s`;
@@ -72,7 +76,9 @@ export function FunilCard({
 }) {
   const { card, prontidao: pr, requisitos, temperatura, passo, labels, checklist } = item;
   const corTemp = TEMPERATURA_COR[temperatura];
-  const congelado = temperatura === "parado";
+  const emAlta = pr.pronto;
+  const parado = temperatura === "parado";
+  const congelado = parado && !emAlta;
   const faixa = foraDaFaixa(card.abiTorneio ?? item.jogador?.abiTorneio ?? null, item.fase);
 
   return (
@@ -93,11 +99,13 @@ export function FunilCard({
         }
       }}
       aria-label={`${item.nome}: abrir cartão`}
-      style={congelado ? ({ "--atraso-gelo": atrasoDoReflexo(card.playerId) } as CSSProperties) : undefined}
+      style={emAlta || congelado ? ({ "--atraso-card": atrasoDaAnimacao(card.playerId) } as CSSProperties) : undefined}
       className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-white/[0.04] py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-[border-color,box-shadow] focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
-        congelado
-          ? `card-congelado ${pr.pronto ? "border-positive/35" : "border-[#7dd3fc]/30"} hover:border-[#7dd3fc]/60`
-          : `${pr.pronto ? "border-positive/35" : "border-hairline"} hover:border-white/20`
+        emAlta
+          ? "card-em-alta border-positive/40 hover:border-positive/70"
+          : congelado
+            ? "card-congelado border-[#7dd3fc]/30 hover:border-[#7dd3fc]/60"
+            : "border-hairline hover:border-white/20"
       }`}
     >
       {/* Só exceção ganha cor: "em dia" fica neutro pra "esfriando" e
@@ -105,9 +113,11 @@ export function FunilCard({
       <span
         className="absolute inset-y-0 left-0 w-[3px]"
         style={
-          congelado
-            ? { background: "linear-gradient(180deg, #f0f9ff, #7dd3fc 45%, #38bdf8)", boxShadow: "0 0 10px rgba(125, 211, 252, 0.55)" }
-            : { background: temperatura === "em_dia" ? "rgba(255,255,255,0.08)" : corTemp }
+          emAlta
+            ? { background: "linear-gradient(0deg, #15803d, #22c55e 50%, #bbf7d0)", boxShadow: "0 0 10px rgba(34, 197, 94, 0.55)" }
+            : congelado
+              ? { background: "linear-gradient(180deg, #f0f9ff, #7dd3fc 45%, #38bdf8)", boxShadow: "0 0 10px rgba(125, 211, 252, 0.55)" }
+              : { background: temperatura === "em_dia" ? "rgba(255,255,255,0.08)" : corTemp }
         }
         aria-hidden
       />
@@ -145,7 +155,9 @@ export function FunilCard({
               }}
               disabled={!faseSeguinte}
               title={faseSeguinte ? `Subir para ${faseSeguinte.name}` : "Já está na última fase"}
-              className="flex shrink-0 items-center gap-0.5 rounded-md bg-positive/15 px-1.5 py-0.5 text-[10.5px] font-bold text-positive transition-colors hover:bg-positive/25 disabled:cursor-default disabled:hover:bg-positive/15"
+              className={`flex shrink-0 items-center gap-0.5 rounded-md bg-positive/15 px-1.5 py-0.5 text-[10.5px] font-bold text-positive transition-colors hover:bg-positive/25 disabled:cursor-default disabled:hover:bg-positive/15 ${
+                faseSeguinte ? "botao-subir" : ""
+              }`}
             >
               {faseSeguinte ? "Subir" : "Pronto"}
               {faseSeguinte && <ArrowUpRight size={11} />}
@@ -208,12 +220,12 @@ export function FunilCard({
         </span>
         <span
           className={`flex shrink-0 items-center text-[10.5px] tabular-nums ${
-            congelado ? "selo-congelado gap-1 rounded-full px-1.5 py-0.5 font-medium" : "gap-0.5"
+            parado ? "selo-congelado gap-1 rounded-full px-1.5 py-0.5 font-medium" : "gap-0.5"
           }`}
           style={{ color: temperatura === "em_dia" ? undefined : corTemp }}
           title={`${TEMPERATURA_LABEL[temperatura]} · ${item.diasNaFase} dias nesta fase`}
         >
-          {congelado ? (
+          {parado ? (
             <Snowflake size={11} className="floco-girando" />
           ) : (
             <Clock3 size={11} className={temperatura === "em_dia" ? "text-muted" : ""} />
