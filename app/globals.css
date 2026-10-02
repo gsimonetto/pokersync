@@ -174,6 +174,38 @@ select option {
   .orbit-spin-slow, .orbit-spin-slow-reverse { animation: none; }
 }
 
+/* Cartao congelado no funil do time (parado no dobro do prazo da fase):
+   tom de gelo e um reflexo de luz que atravessa a superficie devagar, de
+   tempos em tempos -- chama atencao no quadro sem piscar. O floco do
+   rodape gira bem devagar. O cartao ja e' relative + overflow-hidden. */
+.card-congelado {
+  background-image: linear-gradient(160deg, rgba(125, 211, 252, 0.1), rgba(125, 211, 252, 0.02) 55%);
+  box-shadow: 0 0 18px -8px rgba(125, 211, 252, 0.45);
+}
+.card-congelado::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  background: linear-gradient(115deg, transparent 35%, rgba(224, 242, 254, 0.14) 50%, transparent 65%);
+  transform: translateX(-100%);
+  animation: gelo-reflexo 6s ease-in-out infinite;
+}
+@keyframes gelo-reflexo {
+  0% { transform: translateX(-100%); }
+  35%, 100% { transform: translateX(100%); }
+}
+.floco-girando {
+  animation: floco-girar 8s linear infinite;
+}
+@keyframes floco-girar {
+  to { transform: rotate(360deg); }
+}
+@media (prefers-reduced-motion: reduce) {
+  .card-congelado::after { display: none; }
+  .floco-girando { animation: none; }
+}
+
 /* Utilitarios de acento: a cor vem da custom property --acc definida
    inline no elemento. Espelha exatamente o design de referencia (v0). */
 .acc-card {

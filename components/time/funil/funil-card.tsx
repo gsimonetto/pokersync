@@ -1,6 +1,6 @@
 "use client";
 
-import { AlertCircle, AlertTriangle, ArrowUpRight, ChevronLeft, ChevronRight, Clock3, CornerDownRight, Flag, ListChecks } from "lucide-react";
+import { AlertCircle, AlertTriangle, ArrowUpRight, ChevronLeft, ChevronRight, Clock3, CornerDownRight, Flag, ListChecks, Snowflake } from "lucide-react";
 import { Chip } from "@/components/chip";
 import { PlayerBadge, crachaDoTime, type CrachaDados } from "@/components/time/player-badge";
 import type { FunnelPhase } from "@/lib/services/team-funnel-service";
@@ -19,7 +19,9 @@ import type { ItemFunil } from "@/components/time/funil/tipos";
 //   3) o que vem agora -- próximo passo e quando (vermelho se não tem)
 //   4) contexto -- etiquetas, checklist, dias na fase
 // A faixa na borda esquerda é a temperatura (em dia / esfriando /
-// parado), sempre repetida em texto no rodapé -- nunca só cor.
+// parado), sempre repetida em texto no rodapé -- nunca só cor. O
+// "parado" (congelado) ganha cara de gelo: borda azul e um reflexo que
+// passa devagar pela superfície (.card-congelado em globals.css).
 
 export function crachaDoItem(item: ItemFunil): CrachaDados {
   if (item.jogador) {
@@ -60,6 +62,7 @@ export function FunilCard({
 }) {
   const { card, prontidao: pr, requisitos, temperatura, passo, labels, checklist } = item;
   const corTemp = TEMPERATURA_COR[temperatura];
+  const congelado = temperatura === "parado";
   const faixa = foraDaFaixa(card.abiTorneio ?? item.jogador?.abiTorneio ?? null, item.fase);
 
   return (
@@ -81,8 +84,8 @@ export function FunilCard({
       }}
       aria-label={`${item.nome}: abrir cartão`}
       className={`group relative w-full cursor-grab overflow-hidden rounded-xl border bg-white/[0.04] py-2.5 pl-3.5 pr-2.5 text-left outline-none transition-colors hover:border-white/20 focus-visible:ring-2 focus-visible:ring-training/60 active:cursor-grabbing ${
-        pr.pronto ? "border-positive/35" : "border-hairline"
-      }`}
+        pr.pronto ? "border-positive/35" : congelado ? "border-[#7dd3fc]/35" : "border-hairline"
+      } ${congelado ? "card-congelado" : ""}`}
     >
       {/* Só exceção ganha cor: "em dia" fica neutro pra "esfriando" e
           "parado" saltarem aos olhos. */}
@@ -191,7 +194,11 @@ export function FunilCard({
           style={{ color: temperatura === "em_dia" ? undefined : corTemp }}
           title={`${TEMPERATURA_LABEL[temperatura]} · ${item.diasNaFase} dias nesta fase`}
         >
-          <Clock3 size={11} className={temperatura === "em_dia" ? "text-muted" : ""} />
+          {congelado ? (
+            <Snowflake size={11} className="floco-girando" />
+          ) : (
+            <Clock3 size={11} className={temperatura === "em_dia" ? "text-muted" : ""} />
+          )}
           <span className={temperatura === "em_dia" ? "text-muted" : ""}>
             {item.diasNaFase}d{temperatura !== "em_dia" && ` · ${TEMPERATURA_LABEL[temperatura].toLowerCase()}`}
           </span>
