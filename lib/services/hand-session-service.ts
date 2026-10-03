@@ -110,7 +110,7 @@ export function extractTournamentInfo(hand: ParsedHand): ParsedTournamentInfo {
     if (parts.length > 0) buyin = Math.round(parts.reduce((s, n) => s + n, 0) * 100) / 100;
   }
 
-  const platform = hand.site === "pokerstars" ? "PokerStars" : hand.site ?? null;
+  const platform = hand.site === "pokerstars" ? "PokerStars" : hand.site === "acr" ? "ACR" : hand.site ?? null;
 
   // Bounty do heroi: procura o assento do heroi (isHero) e le bountyValue,
   // ja capturado pelo hand-parser.ts a partir do sufixo "Bounty de $ X" /

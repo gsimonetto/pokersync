@@ -23,7 +23,7 @@
 // switch nesses literais em ingles), o token e' normalizado via lookup table
 // logo apos o match. Downstream nunca ve portugues.
 
-export type PokerSite = "pokerstars" | "ggpoker" | "partypoker" | "888poker" | "desconhecido";
+export type PokerSite = "pokerstars" | "ggpoker" | "partypoker" | "888poker" | "acr" | "desconhecido";
 
 export interface ParsedAction {
   player: string;
@@ -197,9 +197,19 @@ export class HandParseError extends Error {
 // (nao capturada de uma mao real jogada) -- mesma cautela ja aplicada ao
 // GGPoker antes de ter amostra real: melhor-tentativa, precisa validar
 // contra hand history real de cada sala assim que aparecer uma.
+//
+// ACR / Winning Poker Network (RADAR-009, 2026-10-03): validado contra
+// hand history REAL (torneio PKO, 29 maos). Cabecalho parecido com o da
+// amostra de PartyPoker, mas com " - " depois do numero do torneio em vez
+// de virgula ("Game Hand #2838198875 - Tournament #36074377 - Holdem (No
+// Limit) - Level 10 (1800.00/3600.00) - 2026/10/03 17:48:09 UTC") -- por
+// isso e' testado ANTES da PartyPoker, que antes pegava a ACR por engano.
+const ACR_HAND_START = /Game Hand #\d+ - (?:Tournament #\d+ - )?(?:Hold'?em|Omaha)/i;
+
 function detectSite(text: string): PokerSite {
   if (/PokerStars Hand #|Mão PokerStars #/i.test(text)) return "pokerstars";
   if (/Poker Hand #|GGPoker Hand/i.test(text)) return "ggpoker";
+  if (ACR_HAND_START.test(text)) return "acr";
   if (/Game hand #\d+\s*-\s*Tournament #/i.test(text)) return "partypoker";
   if (/888poker Hand History/i.test(text)) return "888poker";
   return "desconhecido";
@@ -212,7 +222,7 @@ function detectSite(text: string): PokerSite {
 // Sem flag global (so' usado com .test() abaixo) -- o split em si continua
 // usando a versao "gi" embutida no lookahead, como sempre foi.
 const HAND_START =
-  /(?:PokerStars|GGPoker|Poker) Hand #|(?:Mão) (?:PokerStars|GGPoker|Poker) #|Game hand #\d+\s*-\s*Tournament #|\*{5} 888poker Hand History for Game/i;
+  /(?:PokerStars|GGPoker|Poker) Hand #|(?:Mão) (?:PokerStars|GGPoker|Poker) #|Game hand #\d+\s*-\s*(?:Tournament #|Hold'?em|Omaha)|\*{5} 888poker Hand History for Game/i;
 
 export function splitHands(text: string): string[] {
   const trimmed = text.trim();
@@ -367,7 +377,10 @@ function extractStreetActions(
       continue;
     }
 
-    const raiseM = l.match(new RegExp(`^(${P}):\\s+(?:raises|aumenta)\\s+\\$?([\\d.,]+)\\s+(?:to|para)\\s+\\$?([\\d.,]+)`, "i"));
+    // ":" depois do nome opcional: a ACR escreve sem ("FL_RAP raises 9900.00
+    // to 11700.00"). Mesmo "raises X to Y" do PokerStars -- o "to Y" e' o
+    // total da aposta, que e' o que o resto do sistema usa.
+    const raiseM = l.match(new RegExp(`^(${P}):?\\s+(?:raises|aumenta)\\s+\\$?([\\d.,]+)\\s+(?:to|para)\\s+\\$?([\\d.,]+)`, "i"));
     if (raiseM) {
       actions.push({
         player: raiseM[1],
@@ -403,7 +416,7 @@ function extractStreetActions(
     // "posts the ante" (PokerStars/GGPoker em inglês) além de "posts ante":
     // sem o "the" opcional nenhum ante dessas salas era lido, e o pote
     // reconstruído saía menor que o real.
-    const postM = l.match(new RegExp(`^(${P}):\\s+(?:posts|paga o|coloca)\\s+(?:the\\s+)?(small blind|big blind|ante)\\s+\\$?([\\d.,]+)`, "i"));
+    const postM = l.match(new RegExp(`^(${P}):?\\s+(?:posts|paga o|coloca)\\s+(?:the\\s+)?(small blind|big blind|ante)\\s+\\$?([\\d.,]+)`, "i"));
     if (postM) {
       actions.push({
         player: postM[1],
@@ -444,13 +457,18 @@ function extractStreetActions(
     // 888poker: mesmas acoes genericas (fold/check/call/bet), sem ":" e
     // valor entre colchetes em vez de solto ("Player6 calls [110]",
     // "Hero bets [100]", "Player6 folds" sem valor nenhum).
-    const genericNoColonM = l.match(new RegExp(`^(${P})\\s+(folds|checks|calls|bets|allin|all-in)\\s*(?:\\[\\$?([\\d.,]+)\\])?`, "i"));
+    // ACR: tambem sem ":", mas com o valor solto ("dpdp2 calls 4000.00",
+    // "X bets 12100.00 and is all-in") -- grupo 4. Sem isso o call/bet da
+    // ACR entrava sem valor nenhum e o pote reconstruido saia menor.
+    const genericNoColonM = l.match(new RegExp(`^(${P})\\s+(folds|checks|calls|bets|allin|all-in)\\s*(?:\\[\\$?([\\d.,]+)\\]|\\$?([\\d.,]+))?`, "i"));
     if (genericNoColonM) {
       const canonical = ACTION_WORD_MAP[genericNoColonM[2].toLowerCase()] ?? genericNoColonM[2].toLowerCase();
+      const valor = genericNoColonM[3] ?? genericNoColonM[4];
       actions.push({
         player: genericNoColonM[1],
         action: canonical,
-        amount: genericNoColonM[3] ? Number(genericNoColonM[3].replace(",", "")) : undefined,
+        amount: valor ? Number(valor.replace(",", "")) : undefined,
+        isAllIn: /and is all-in/i.test(l),
       });
       continue;
     }
@@ -474,7 +492,30 @@ function extractWinner(text: string, playerPattern: string = "\\S+"): string | n
   // "Total pot" nenhuma, entao extractPot fica null nesse formato (so'
   // temos o valor coletado pelo vencedor, nao o pote total antes do rake).
   const bracketM = text.match(new RegExp(`(${P}) collected \\[\\s*\\$?([\\d.,]+)\\s*\\]`, "i"));
-  return bracketM ? bracketM[1] : null;
+  if (bracketM) return bracketM[1];
+  return extractSummaryWinnings(text, P)[0]?.player ?? null;
+}
+
+// ACR (RADAR-009): quando ninguem paga pra ver, a mao nao tem linha
+// "collected" nenhuma -- so' "FL_RAP does not show" e, no resumo, "Seat 8:
+// FL_RAP did not show and won 10800.00". Com showdown o resumo diz "Seat
+// 3: damfool showed [Kh Qh] and won 265650.00 with a flush...". So' e'
+// usado quando nao achou "collected" antes do resumo (PokerStars sempre
+// tem, e la' o valor do resumo vem entre parenteses, que nao casa aqui).
+function extractSummaryWinnings(text: string, playerPattern: string): { player: string; amount: number }[] {
+  const inicio = text.search(/\*\*\* (?:SUMMARY|SUM[AÁ]RIO) \*\*\*/i);
+  if (inicio === -1) return [];
+  const re = new RegExp(
+    `^Seat \\d+: (${playerPattern})(?: \\([^)]*\\))* (?:did not show|showed \\[[^\\]]*\\]) and won \\$?([\\d.,]+)`,
+    "gim"
+  );
+  const total = new Map<string, number>();
+  let m: RegExpExecArray | null;
+  while ((m = re.exec(text.slice(inicio))) !== null) {
+    const amount = Number(m[2].replace(/,/g, ""));
+    if (Number.isFinite(amount) && amount > 0) total.set(m[1], (total.get(m[1]) ?? 0) + amount);
+  }
+  return [...total.entries()].map(([player, amount]) => ({ player, amount }));
 }
 
 // Todas as linhas "X collected N" antes do resumo: pote dividido e side
@@ -496,6 +537,7 @@ function extractWinnings(text: string, playerPattern: string = "\\S+"): { player
       linha.match(new RegExp(`^(${P}) collected \\[\\s*\\$?([\\d.,]+)\\s*\\]`, "i"));
     if (m) somar(m[1], m[2]);
   }
+  if (total.size === 0) return extractSummaryWinnings(text, P);
   return [...total.entries()].map(([player, amount]) => ({ player, amount }));
 }
 
@@ -601,7 +643,8 @@ function extractShowdown(text: string, playerPattern: string = "\\S+"): ParsedSh
   const results: ParsedShowdown[] = [];
   for (const rawLine of block.split("\n")) {
     const l = rawLine.trim();
-    const m = l.match(new RegExp(`^(${P}):\\s+(?:shows|mostra)\\s+\\[([^\\]]+)\\]\\s+\\(([^)]+)\\)`, "i"));
+    // ":" opcional: a ACR escreve "pokercrazy3314 shows [Kh Ah] (...)".
+    const m = l.match(new RegExp(`^(${P}):?\\s+(?:shows|mostra)\\s+\\[([^\\]]+)\\]\\s+\\(([^)]+)\\)`, "i"));
     if (m) {
       results.push({ player: m[1], cards: parseCards(m[2]), handDescription: m[3] });
     }
@@ -686,10 +729,22 @@ const POSITIONS_BY_TABLE_SIZE: Record<number, string[]> = {
 // botao — essa e' a ordem de acao pos-flop (SB age primeiro, BTN por
 // ultimo). Retorna null se o buttonSeat nao bate com nenhum assento
 // listado (hand history incompleta/nao suportada).
+//
+// "Botao morto" (visto em hand history real da ACR, 2026-10-03): quando o
+// jogador que seria o botao foi eliminado na mao anterior, o site deixa o
+// botao num assento VAZIO ("Seat #3 is the button" sem ninguem no 3). Ai'
+// a ordem comeca no primeiro assento ocupado depois dele (quem paga o
+// small blind) e o ultimo ocupado antes dele age como botao. Antes isso
+// devolvia null e a mao inteira ficava sem posicao nenhuma.
 function rotateStartingAfterButton(seats: ParsedSeat[], buttonSeat: number): ParsedSeat[] | null {
   const sorted = [...seats].sort((a, b) => a.seatNumber - b.seatNumber);
+  if (sorted.length === 0) return null;
   const btnIdx = sorted.findIndex((s) => s.seatNumber === buttonSeat);
-  if (btnIdx === -1) return null;
+  if (btnIdx === -1) {
+    const depois = sorted.findIndex((s) => s.seatNumber > buttonSeat);
+    const inicio = depois === -1 ? 0 : depois;
+    return [...sorted.slice(inicio), ...sorted.slice(0, inicio)];
+  }
   return [...sorted.slice(btnIdx + 1), ...sorted.slice(0, btnIdx + 1)];
 }
 
@@ -1015,7 +1070,7 @@ function extractPreambleBlindActions(text: string, playerPattern: string = "\\S+
     const l = rawLine.trim();
     // Nome com espaço e "posts the ante": ver playerNamePattern e o
     // comentário equivalente em extractStreetActions.
-    const postM = l.match(new RegExp(`^(${P}):\\s+(?:posts|paga o|coloca)\\s+(?:the\\s+)?(small blind|big blind|ante)\\s+\\$?([\\d.,]+)`, "i"));
+    const postM = l.match(new RegExp(`^(${P}):?\\s+(?:posts|paga o|coloca)\\s+(?:the\\s+)?(small blind|big blind|ante)\\s+\\$?([\\d.,]+)`, "i"));
     if (postM) {
       // postType também aqui (bug corrigido 2026-10): no PokerStars os
       // posts ficam todos antes de "*** HOLE CARDS ***" e saíam sem tipo --

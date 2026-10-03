@@ -2,6 +2,8 @@ import { describe, expect, it } from "vitest";
 import { parseHand, parseSession, valorMonetario } from "@/lib/poker/hand-parser";
 import { extractTournamentInfo } from "@/lib/services/hand-session-service";
 import { CORPO_QUEBRA, MAO_PKO_EN, MAO_PKO_PT, maoEn } from "./maos";
+import { ACR_BOTAO_MORTO, ACR_POTE_DIVIDIDO, ACR_SEM_SHOWDOWN } from "./maos-acr";
+import { projectHandAtStep } from "@/lib/poker/hand-replay-projector";
 
 describe("valorMonetario", () => {
   it.each([
@@ -72,5 +74,66 @@ describe("mão completa", () => {
   it("separa várias mãos coladas juntas", () => {
     const texto = [101, 102, 103].map((id) => maoEn({ id, heroiFichas: 1500, corpo: CORPO_QUEBRA })).join("\n\n\n");
     expect(parseSession(texto).map((m) => m.handId)).toEqual(["101", "102", "103"]);
+  });
+});
+
+describe("ACR (mãos reais de um PKO)", () => {
+  it("reconhece a sala e separa as mãos", () => {
+    const maos = parseSession([ACR_SEM_SHOWDOWN, ACR_BOTAO_MORTO, ACR_POTE_DIVIDIDO].join("\n\n"));
+    expect(maos.map((m) => m.handId)).toEqual(["2838198875", "2838208664", "2838223030"]);
+    expect(maos.every((m) => m.site === "acr")).toBe(true);
+    expect(extractTournamentInfo(maos[0]).platform).toBe("ACR");
+  });
+
+  it("lê blinds, ante, raise e call sem os dois-pontos depois do nome", () => {
+    const mao = parseHand(ACR_SEM_SHOWDOWN);
+    expect(mao.format).toBe("MTT");
+    expect([mao.smallBlind, mao.bigBlind]).toEqual([1800, 3600]);
+    expect(mao.heroName).toBe("Hero");
+    expect(mao.heroCards).toEqual(["2h", "2s"]);
+    expect(mao.heroPosition).toBe("CO");
+    const preflop = mao.streets.find((s) => s.name === "preflop")!.actions;
+    expect(preflop.filter((a) => a.postType === "ante")).toHaveLength(8);
+    expect(preflop.find((a) => a.postType === "big blind")).toMatchObject({ player: "Vilao8", amount: 3600 });
+    expect(preflop.find((a) => a.action === "raises")).toMatchObject({ player: "Vilao2", raiseTo: 11700 });
+
+    const call = parseHand(ACR_POTE_DIVIDIDO).streets[0].actions.find((a) => a.action === "calls");
+    expect(call).toMatchObject({ player: "Vilao12", amount: 97500 });
+  });
+
+  it("acha o vencedor no resumo quando ninguém paga pra ver", () => {
+    const mao = parseHand(ACR_SEM_SHOWDOWN);
+    expect(mao.winner).toBe("Vilao2");
+    expect(mao.winnings).toEqual([{ player: "Vilao2", amount: 10800 }]);
+  });
+
+  it("dá posição a todos com o botão num assento vazio", () => {
+    const mao = parseHand(ACR_BOTAO_MORTO);
+    const pos = Object.fromEntries(mao.seats.map((s) => [s.seatNumber, s.position]));
+    expect(pos).toEqual({ 4: "SB", 5: "BB", 6: "UTG", 7: "MP", 8: "HJ", 1: "CO", 2: "BTN" });
+    expect(mao.heroPosition).toBe("UTG");
+  });
+
+  it("lê o showdown e o pote dividido", () => {
+    const mao = parseHand(ACR_POTE_DIVIDIDO);
+    expect(mao.showdown.map((s) => [s.player, s.cards])).toEqual([
+      ["Vilao12", ["As", "Kd"]],
+      ["Vilao3", ["Ad", "Ks"]],
+    ]);
+    expect(mao.winnings).toEqual([
+      { player: "Vilao3", amount: 103750 },
+      { player: "Vilao12", amount: 103750 },
+    ]);
+  });
+
+  it.each([
+    ["sem showdown", ACR_SEM_SHOWDOWN],
+    ["botão morto", ACR_BOTAO_MORTO],
+    ["pote dividido", ACR_POTE_DIVIDIDO],
+  ])("a mesa do Revisor monta o mesmo pote da ACR (%s)", (_nome, texto) => {
+    const mao = parseHand(texto);
+    const inicio = projectHandAtStep(mao, 0, undefined, undefined, true);
+    const fim = projectHandAtStep(mao, inicio.stepCount - 1, undefined, undefined, true);
+    expect(fim.tableHand.pot).toBe(mao.pot);
   });
 });
