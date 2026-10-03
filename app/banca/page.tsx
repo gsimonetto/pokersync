@@ -126,11 +126,14 @@ export default function BancaPage() {
             {/* Cabeçalho: título, status do Radar e as duas ações do dia a
                 dia, com texto (antes eram só ícones). */}
             <header className="mb-3 flex shrink-0 flex-col gap-3 lg:flex-row lg:items-end lg:justify-between">
-              <div className="min-w-0">
-                <h1 className="text-2xl font-semibold tracking-tight sm:text-3xl">Gestão de Banca</h1>
-                <p className="mt-1 text-[12.5px] text-muted">Sua banca, sessão a sessão. Passe o mouse nos números pra entender cada um.</p>
+              {/* O título nunca quebra: antes, com os botões na mesma linha,
+                  "Gestão de Banca" virava duas linhas espremidas. Quando não
+                  cabe tudo, são os botões que descem pra linha de baixo. */}
+              <div className="min-w-0 lg:shrink-0">
+                <h1 className="whitespace-nowrap text-2xl font-semibold tracking-tight sm:text-3xl">Gestão de Banca</h1>
+                <p className="mt-1 max-w-[24rem] text-[12.5px] text-muted">Sua banca, sessão a sessão. Passe o mouse nos números pra entender cada um.</p>
               </div>
-              <div className="flex flex-wrap items-center gap-2 lg:flex-nowrap">
+              <div className="flex flex-wrap items-center gap-2 lg:justify-end">
                 <StatusRadar b={b} />
                 <RadarModuleMenu
                   module="banca"

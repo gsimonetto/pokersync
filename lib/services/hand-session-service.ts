@@ -6,6 +6,7 @@ import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { todayISO } from "@/lib/bankroll/format";
 import { plataformaDoRotulo } from "@/lib/bankroll/platforms";
+import { buyinNoNome } from "@/lib/format";
 import { garantirRebuysCalculados, recalcularRebuys } from "@/lib/services/tournament-rebuy-service";
 
 // Camada de servico do novo agrupador do Revisor. Torneios sao unicos por
@@ -129,7 +130,7 @@ export function extractTournamentInfo(hand: ParsedHand, nomeArquivo?: string | n
   // explicito pra dar contexto imediato na fila. Fallback pra "Torneio #ID"
   // quando buy-in nao parseou.
   const tournamentName = platform && buyin != null
-    ? `${platform} / $${buyin}`
+    ? `${platform} / ${buyinNoNome(buyin)}`
     : platform && nomeAcr
       ? `${platform} / ${nomeAcr}`
       : tournamentIdPs

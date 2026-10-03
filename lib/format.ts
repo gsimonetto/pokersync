@@ -43,3 +43,8 @@ export function niceTicks(min: number, max: number, targetCount = 4): number[] {
   for (let v = niceMin; v <= niceMax + step * 0.5; v += step) ticks.push(+v.toFixed(6));
   return ticks;
 }
+
+/** Buy-in no nome do torneio: "$11", "$16.50" (antes saía "$16.5"). */
+export function buyinNoNome(valor: number): string {
+  return Number.isInteger(valor) ? `$${valor}` : `$${valor.toFixed(2)}`;
+}

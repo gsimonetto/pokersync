@@ -974,7 +974,10 @@ export function RevisorHandTable({
             e diferente por formato: menor no celular, media no tablet,
             maior no desktop. position:relative pra sustentar os overlays
             do modo mobile (blinds fosco + dock de navegacao) abaixo. */}
-        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: 28 }}>
+        {/* Com as ações ao lado, o assento da direita (a placa e o chip do
+            bounty) passa uns 30px da borda da mesa: com 28px de folga ele
+            ficava por baixo da coluna. */}
+        <div style={{ flex: 1, minHeight: 0, display: "flex", gap: acoesAoLado ? 64 : 28 }}>
         <div style={{ flex: 1, minWidth: 0, minHeight: 0, position: "relative" }}>
           <PokerTable
             hand={mesaComInfo ?? replayState.tableHand}

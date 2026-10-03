@@ -19,7 +19,7 @@ export const modules: ModuleDef[] = [
     key: "drill",
     icon: Target,
     title: "Modo Treino",
-    subtitle: "Ranges e frequencias GTO",
+    subtitle: "Ranges e frequências GTO",
     accent: ACCENT.green,
     available: true,
     href: "/treino",
@@ -27,7 +27,7 @@ export const modules: ModuleDef[] = [
   {
     key: "bankroll",
     icon: TrendingUp,
-    title: "Gestao de Banca",
+    title: "Gestão de Banca",
     subtitle: "Controle de risco e ROI",
     accent: ACCENT.blue,
     available: true,
@@ -36,8 +36,8 @@ export const modules: ModuleDef[] = [
   {
     key: "revisor",
     icon: BookOpen,
-    title: "Revisao de Maos",
-    subtitle: "Analise tecnica de jogadas",
+    title: "Revisão de Mãos",
+    subtitle: "Análise técnica de jogadas",
     accent: ACCENT.purple,
     available: true,
     href: "/revisor",
@@ -55,7 +55,7 @@ export const modules: ModuleDef[] = [
     key: "time",
     icon: Users,
     title: "Meu Time",
-    subtitle: "Membros, papeis e convites",
+    subtitle: "Membros, papéis e convites",
     // Antes usava o mesmo verde do Modo Treino -- cor deixava de
     // diferenciar os dois modulos numa varredura rapida do grid.
     accent: ACCENT.indigo,
@@ -77,7 +77,7 @@ export const modules: ModuleDef[] = [
     key: "ranges",
     icon: Layers,
     title: "Construtor de Ranges",
-    subtitle: "Mapeamento estrategico",
+    subtitle: "Mapeamento estratégico",
     accent: ACCENT.pink,
     available: true,
     href: "/ranges",
