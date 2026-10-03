@@ -46,6 +46,15 @@ function MarcaAtivo({ ativo }: { ativo: boolean }) {
   return <span className="absolute -bottom-[3px] left-1/2 h-[2px] w-4 -translate-x-1/2 rounded-full" style={{ background: OURO }} aria-hidden="true" />;
 }
 
+// Ordem do menu lateral (pedido explícito: Banca, Performance, Treino,
+// Revisor, Ranges, Time, Vagas). Só o menu: a página de planos segue a
+// ordem de modules-data.tsx.
+const ORDEM_DO_MENU = ["bankroll", "performance", "drill", "revisor", "ranges", "time", "marketplace"];
+function ordemNoMenu(key: string): number {
+  const i = ORDEM_DO_MENU.indexOf(key);
+  return i === -1 ? ORDEM_DO_MENU.length : i;
+}
+
 // Casca compartilhada (sidebar + topbar) entre os módulos que já migraram
 // pro layout novo -- hoje /modulos e /banca. Cada módulo continua dono do
 // próprio conteúdo/dados; isto aqui é só navegação e identidade (perfil,
@@ -215,6 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           de planos) reaproveitam o icone/copy de "hub" de la. */}
       {modules
         .filter((m) => m.key !== "hub" && m.key !== "radar")
+        .sort((a, b) => ordemNoMenu(a.key) - ordemNoMenu(b.key))
         .map((m) => {
         const Icon = m.icon;
         const active = pathname === m.href || (!!m.href && m.href !== "/" && pathname.startsWith(`${m.href}/`));
@@ -263,6 +273,9 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           );
         }
 
+        // Hover "deslize com risco" (opção 2 escolhida entre 5 exemplos): o
+        // item anda 4px pra direita e o risco lateral na cor do módulo cresce
+        // do centro. O item ativo não anda, só mantém o risco.
         const aceso = active || hovered;
         return (
           <Link
@@ -273,19 +286,19 @@ export function AppShell({ children }: { children: React.ReactNode }) {
             onClick={() => setMobileOpen(false)}
             onMouseEnter={() => setHoverKey(m.key)}
             onMouseLeave={() => setHoverKey((k) => (k === m.key ? null : k))}
-            className={`relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[13.5px] font-medium transition-colors duration-150 ${
+            className={`relative flex items-center gap-3 rounded-xl border px-3 py-2.5 text-[13.5px] font-medium transition-[transform,color,background-color,border-color] duration-200 ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none ${
               collapsed ? "justify-center" : ""
-            } ${aceso ? "text-ink" : "border-transparent text-muted"}`}
+            } ${aceso ? "text-ink" : "text-muted"} ${active ? "" : "border-transparent"} ${hovered && !active ? "translate-x-1 motion-reduce:translate-x-0" : ""}`}
             style={{
-              background: active ? `${m.accent}1F` : hovered ? `${m.accent}12` : undefined,
-              borderColor: active ? `${m.accent}40` : hovered ? `${m.accent}24` : undefined,
+              background: active ? `${m.accent}1F` : hovered ? "rgba(255,255,255,0.03)" : undefined,
+              borderColor: active ? `${m.accent}40` : undefined,
             }}
           >
             <span
-              className="absolute inset-y-2 -left-3 w-[3px] rounded-r-full transition-opacity"
-              style={{ background: m.accent, opacity: active ? 1 : 0, boxShadow: `0 0 10px ${m.accent}` }}
+              className="absolute inset-y-2 -left-3 w-[3px] origin-center rounded-r-full transition-transform duration-[260ms] ease-[cubic-bezier(.2,.8,.2,1)] motion-reduce:transition-none"
+              style={{ background: m.accent, transform: aceso ? "scaleY(1)" : "scaleY(0)", boxShadow: `0 0 10px ${m.accent}` }}
             />
-            <Icon size={18} className="shrink-0 transition-colors" style={{ color: aceso ? m.accent : undefined }} />
+            <Icon size={18} className="shrink-0 transition-colors duration-200" style={{ color: aceso ? m.accent : undefined }} />
             {!collapsed && <span className="truncate">{m.title}</span>}
           </Link>
         );
