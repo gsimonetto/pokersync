@@ -453,6 +453,13 @@ export async function fetchBountiesDosTorneios(): Promise<Map<string, number>> {
   return out;
 }
 
+/** Completa buy-in/prêmio de uma sessão importada que entrou com 0. */
+export async function completarSessaoImportada(id: string, campos: { buy_in?: number; cashout?: number }): Promise<void> {
+  const supabase = createClient();
+  const { error } = await supabase.from("bankroll_sessions").update(campos).eq("id", id);
+  if (error) throw error;
+}
+
 /** Grava só o bounty de uma sessão (o resto da linha fica como está). */
 export async function atualizarBountiesDaSessao(id: string, bounties: number): Promise<void> {
   const supabase = createClient();

@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { aggregate, currenciesInUse, invested, net, netWorth, platformBalances } from "@/lib/bankroll/calc";
 import { consolidarEmReais, saldosPorMoeda } from "@/lib/bankroll/consolidado";
+import { plataformaDoRotulo } from "@/lib/bankroll/platforms";
 import type { Session, Transaction } from "@/lib/bankroll/types";
 
 let seq = 0;
@@ -126,5 +127,12 @@ describe("patrimônio e plataformas", () => {
     const sessoes = [sessao({ venue: "GGPoker", buyIn: 10, cashout: 60 }), sessao({ buyIn: 10 })];
     const gg = platformBalances(sessoes, transacoes).find((p) => p.platform === "GGPoker")!;
     expect(gg.balance).toBe(50 + 500 + 30 - 100);
+  });
+});
+
+describe("sala do torneio importado", () => {
+  it("ACR cai no mesmo saldo dos depósitos da ACR", () => {
+    expect(plataformaDoRotulo("ACR")).toBe("ACR (Winning Poker Network)");
+    expect(plataformaDoRotulo("PokerStars")).toBe("PokerStars");
   });
 });

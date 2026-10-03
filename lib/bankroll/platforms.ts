@@ -20,3 +20,10 @@ export const PLATFORMS = [
 ] as const;
 
 export const OUTRO_PLATFORM = "Outro";
+
+// Sala no rótulo do torneio importado ("ACR / PKO - 20000 GTD") -> nome da
+// lista acima. Sem isso o torneio da ACR caía num saldo "ACR" separado do
+// "ACR (Winning Poker Network)" onde ficam os depósitos dessa sala.
+export function plataformaDoRotulo(sala: string): string {
+  return sala.trim().toLowerCase() === "acr" ? "ACR (Winning Poker Network)" : sala;
+}

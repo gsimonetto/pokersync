@@ -195,7 +195,7 @@ export function RevisorNovaMao({
     try {
       const b = await createImportBatch(userId, importText);
       if (b.parsed_hands.length === 0) {
-        setError("Não consegui identificar nenhuma mão nesse texto. Confirme se é hand history do PokerStars ou GGPoker.");
+        setError("Não consegui identificar nenhuma mão nesse texto. Confirme se é hand history do PokerStars, GGPoker ou ACR.");
         setBatch(null);
       } else {
         setBatch(b);
@@ -591,7 +591,7 @@ export function RevisorNovaMao({
             <label className="text-sm font-semibold text-ink">Importar hand history</label>
           </div>
           <p className="mb-3 text-xs text-muted">
-            Cole o texto do PokerStars ou GGPoker — uma mão ou uma sessão inteira. Eu identifico e separo automaticamente, e agrupo por torneio ou cash game.
+            Cole o texto do PokerStars, GGPoker ou ACR — uma mão ou uma sessão inteira. Eu identifico e separo automaticamente, e agrupo por torneio ou cash game.
           </p>
 
           {!batch ? (

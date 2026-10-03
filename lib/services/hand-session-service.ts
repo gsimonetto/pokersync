@@ -5,6 +5,7 @@ import { addSession, fetchBountiesDosTorneios } from "@/lib/services/bankroll-se
 import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
 import { todayISO } from "@/lib/bankroll/format";
+import { plataformaDoRotulo } from "@/lib/bankroll/platforms";
 import { garantirRebuysCalculados, recalcularRebuys } from "@/lib/services/tournament-rebuy-service";
 
 // Camada de servico do novo agrupador do Revisor. Torneios sao unicos por
@@ -392,7 +393,7 @@ export async function linkOrCreateBankrollSessionForTournament(params: {
     .then((m) => m.get(handSession.id) ?? 0)
     .catch(() => 0);
 
-  const rawVenue = (handSession.label.split(" / ")[0] || "").trim();
+  const rawVenue = plataformaDoRotulo((handSession.label.split(" / ")[0] || "").trim());
   const saved = await addSession({
     date: handSession.updated_at?.slice(0, 10) || todayISO(),
     format: isSpinAndGo({ kind: handSession.kind, table_size: tableSize }) ? "Spin" : "MTT",
