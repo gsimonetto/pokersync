@@ -125,15 +125,15 @@ export const MODULE_COPY: Record<ModuleKey, ModuleCopy> = {
 // Tauri + Rust). Varre o computador do jogador atras de hand history e
 // sincroniza sozinho com o Revisor/Player Evolution -- sem precisar colar
 // mao por mao na mao. Os textos abaixo so' prometem o que o Radar faz de
-// verdade: leitura validada com mao real so' de PokerStars e GGPoker
-// (PartyPoker/888poker a partir de exemplo, ACR sem leitor no site ainda --
+// verdade: leitura validada com mao real de PokerStars, GGPoker e ACR
+// (ACR desde 03/10/2026; PartyPoker/888poker so' a partir de exemplo --
 // ver lib/poker/hand-parser.ts), e "segundo plano" depende de ele abrir com
 // o computador (ligado por padrao desde a versao 0.2.0 do Radar).
 export const RADAR_COPY: ModuleCopy = {
   title: "Radar PokerSync",
   blurb: "O programa do seu computador que encontra suas hand histories sozinho e sincroniza com o PokerSync em segundo plano.",
   benefits: [
-    "Encontra sozinho o histórico da PokerStars e da GGPoker (PartyPoker, 888poker e ACR em teste)",
+    "Encontra sozinho o histórico da PokerStars, da GGPoker e da ACR (PartyPoker e 888poker em teste)",
     "Só envia as mãos novas desde a última varredura",
     "Sincroniza direto com Revisor e Performance",
     "Abre junto com o computador e roda em segundo plano",

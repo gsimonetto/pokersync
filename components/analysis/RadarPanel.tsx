@@ -222,8 +222,8 @@ export function RadarPanel({ onReset, cabecalho = true }: { onReset?: () => void
           <div className={`${CARD_VIDRO} p-5`}>
             <p className="text-[10px] font-bold uppercase tracking-[0.12em] text-muted/80">Como funciona</p>
             <p className="mt-2 text-sm leading-relaxed text-muted">
-              Depois de instalado, o Radar abre junto com o computador e fica perto do relógio, varrendo as pastas de hand history — PokerStars e
-              GGPoker (PartyPoker, 888poker e ACR ainda em fase de teste). Só as mãos novas são enviadas, e cada mão importada alimenta
+              Depois de instalado, o Radar abre junto com o computador e fica perto do relógio, varrendo as pastas de hand history — PokerStars,
+              GGPoker e ACR (PartyPoker e 888poker ainda em fase de teste). Só as mãos novas são enviadas, e cada mão importada alimenta
               automaticamente o Revisor e o Performance, sem precisar colar hand history na mão.
             </p>
           </div>
