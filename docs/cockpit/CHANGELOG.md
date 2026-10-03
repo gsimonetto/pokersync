@@ -12,8 +12,13 @@
   Revisor bate com o da ACR em todas as mãos.
 - **Botão em assento vazio:** quando o jogador do botão caiu na mão
   anterior, a mão ficava sem posição. Corrigido (vale pra qualquer sala).
-- **Falta:** a mão da ACR não traz bounty, buy-in nem colocação; bounty
-  continua manual e o resto depende do resumo de torneio da ACR (RADAR-009).
+- **Resumo de torneio da ACR:** o arquivo `.ots` (JSON) dá colocação e
+  prêmio; o buy-in vem do nome dele e o nome do torneio/PKO do nome do
+  arquivo de mãos.
+- **Radar:** reconhece os arquivos reais da ACR (antes ignorava tudo),
+  manda o nome do arquivo e libera o envio da ACR.
+- **Falta:** publicar essa versão do Radar; bounty da ACR continua manual
+  (não aparece em nenhum dos dois arquivos).
 
 ## 25/09/2026 — Radar 0.2.0 publicado
 
