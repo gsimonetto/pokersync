@@ -115,7 +115,7 @@ Achados na mesma auditoria de 22/09/2026, todos já em produção:
 | RADAR-006 | Publicação e atualização automática | 🟠 | 🔴 P0 | confirmar a primeira atualização automática (0.2.0 → próxima) |
 | RADAR-007 | Escolha do que importar valendo (3 opções, no Radar e no site) | 🟠 | 🟠 P1 | confirmar no uso real com a 0.2.0 |
 | RADAR-008 | Seletor do Radar por módulo | 🟠 | 🟡 P2 | conferir na tela em produção |
-| RADAR-009 | Leitor de mãos da ACR | ⚪ | 🟡 P2 | conseguir hand history real da ACR |
+| RADAR-009 | Leitor de mãos da ACR | 🟠 | 🟡 P2 | publicar nova versão do Radar (envio da ACR liberado) e conferir no PC real |
 
 *Nota: auditado com o código do Radar (Rust/Tauri) aberto em 25/09/2026 —
 antes disso, RADAR-002/003 tinham sido confirmados só por evidência no

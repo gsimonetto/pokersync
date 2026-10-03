@@ -80,8 +80,9 @@ migrations no ar, e **0.2.0 publicada como versão oficial no mesmo dia**
 (botão "Baixar" do site testado nos 3 sistemas; atualização automática
 assinada, com chave nova — RADAR-006).
 **Próximo:** 🔴 P0 — o dono instalar a 0.2.0 uma vez pelo botão do site (a
-0.1.0 não se atualiza sozinha) e confirmar no uso real; depois 🟡 P2 —
-leitor da ACR (RADAR-009, precisa de arquivo real).
+0.1.0 não se atualiza sozinha) e confirmar no uso real; a ACR ficou pronta no site em
+03/10 (mãos e resumo de torneio, RADAR-009); falta publicar a versão do
+Radar que libera o envio da ACR.
 **Bloqueio:** nenhum. A chave de assinatura das atualizações foi refeita e
 cadastrada nos secrets em 25/09 (ver `TAURI_UPDATER_SETUP.md` no repo do
 Radar); assinatura de código do Windows (aviso do SmartScreen) fica pra

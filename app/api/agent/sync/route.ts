@@ -14,6 +14,11 @@ function badRequest(message: string) {
   return Response.json({ ok: false, error: message }, { status: 400 });
 }
 
+// fileName (Radar a partir da versão que manda o nome): opcional, só o nome do arquivo no disco.
+function nomeDeArquivoValido(v: unknown): boolean {
+  return v == null || (typeof v === "string" && v.length <= 512);
+}
+
 function isValidInput(body: unknown): body is AgentSyncInput {
   if (!body || typeof body !== "object") return false;
   const b = body as Record<string, unknown>;
@@ -30,7 +35,11 @@ function isValidInput(body: unknown): body is AgentSyncInput {
   if (typeof b.pokerRoom !== "string" || !b.pokerRoom) return false;
   if (!Array.isArray(b.files)) return false;
   return b.files.every(
-    (f) => f && typeof f === "object" && typeof (f as { rawText?: unknown }).rawText === "string"
+    (f) =>
+      f &&
+      typeof f === "object" &&
+      typeof (f as { rawText?: unknown }).rawText === "string" &&
+      nomeDeArquivoValido((f as { fileName?: unknown }).fileName)
   );
 }
 
@@ -86,7 +95,7 @@ export async function POST(request: Request) {
 
   if (!isValidInput(body)) {
     return badRequest(
-      "Corpo inválido. Esperado { device: { deviceId, deviceName, platform, agentVersion }, pokerRoom, files: [{ rawText, capturedAt? }] }."
+      "Corpo inválido. Esperado { device: { deviceId, deviceName, platform, agentVersion }, pokerRoom, files: [{ rawText, capturedAt?, fileName? }] }."
     );
   }
 

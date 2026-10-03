@@ -21,6 +21,8 @@ export interface AgentDeviceInfo {
 export interface AgentSyncFile {
   rawText: string;
   capturedAt?: string | null;
+  /** Nome do arquivo no disco (Radar a partir da versão que manda o nome). Na ACR traz o nome do torneio. */
+  fileName?: string | null;
 }
 
 export interface AgentSyncInput {
@@ -228,15 +230,16 @@ export async function processAgentSync(
   // Cada arquivo pode conter várias mãos concatenadas (histórico do dia
   // inteiro) — splitHands já sabe separar; quando não reconhece nenhum
   // marcador de início, trata o arquivo inteiro como uma mão só.
-  type Block = { rawText: string; capturedAt: string | null };
+  type Block = { rawText: string; capturedAt: string | null; fileName: string | null };
   const blocks: Block[] = [];
   for (const file of input.files) {
     const parts = splitHands(file.rawText);
     const capturedAt = file.capturedAt ?? null;
+    const fileName = file.fileName ?? null;
     if (parts.length === 0) {
-      if (file.rawText.trim()) blocks.push({ rawText: file.rawText, capturedAt });
+      if (file.rawText.trim()) blocks.push({ rawText: file.rawText, capturedAt, fileName });
     } else {
-      for (const part of parts) blocks.push({ rawText: part, capturedAt });
+      for (const part of parts) blocks.push({ rawText: part, capturedAt, fileName });
     }
   }
 
@@ -248,6 +251,7 @@ export async function processAgentSync(
     capturedAt: string | null;
     parsed: ParsedHand | null;
     rawText: string;
+    fileName: string | null;
   };
   const candidates: Candidate[] = [];
 
@@ -265,7 +269,7 @@ export async function processAgentSync(
       continue;
     }
     const externalHandId = parsed.handId ?? fallbackHandId(block.rawText);
-    candidates.push({ externalHandId, capturedAt: block.capturedAt, parsed, rawText: block.rawText });
+    candidates.push({ externalHandId, capturedAt: block.capturedAt, parsed, rawText: block.rawText, fileName: block.fileName });
   }
 
   let imported = 0;
@@ -306,7 +310,7 @@ export async function processAgentSync(
       // uma mão só de torneio isolada.
       let handSessionId: string | null = null;
       if (c.parsed) {
-        const info = extractTournamentInfo(c.parsed);
+        const info = extractTournamentInfo(c.parsed, c.fileName);
         if (info.tournamentIdPs) {
           const cached = sessionIdByTournament.get(info.tournamentIdPs);
           handSessionId = cached ?? (await resolveTournamentSessionId(supabase, userId, info));

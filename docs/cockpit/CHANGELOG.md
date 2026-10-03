@@ -4,6 +4,22 @@
 > no `POKERSYNC.md`/README do Solver — aqui é o resumo pra quem só quer
 > saber "o que mudou".
 
+## 03/10/2026 — Leitor de mãos da ACR
+
+- **ACR reconhecida:** validado com hand history real de um PKO (29
+  mãos). Antes a ACR era confundida com a PartyPoker e perdia raises,
+  blinds, calls e showdown; agora tudo é lido e o pote da mesa do
+  Revisor bate com o da ACR em todas as mãos.
+- **Botão em assento vazio:** quando o jogador do botão caiu na mão
+  anterior, a mão ficava sem posição. Corrigido (vale pra qualquer sala).
+- **Resumo de torneio da ACR:** o arquivo `.ots` (JSON) dá colocação e
+  prêmio; o buy-in vem do nome dele e o nome do torneio/PKO do nome do
+  arquivo de mãos.
+- **Radar:** reconhece os arquivos reais da ACR (antes ignorava tudo),
+  manda o nome do arquivo e libera o envio da ACR.
+- **Falta:** publicar essa versão do Radar; bounty da ACR continua manual
+  (não aparece em nenhum dos dois arquivos).
+
 ## 25/09/2026 — Radar 0.2.0 publicado
 
 - **Versão oficial no ar:** release v0.2.0 é a "latest" do repositório

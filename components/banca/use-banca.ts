@@ -21,6 +21,7 @@ import {
   tiltImpact,
 } from "@/lib/bankroll/calc";
 import { saldosPorMoeda } from "@/lib/bankroll/consolidado";
+import { plataformaDoRotulo } from "@/lib/bankroll/platforms";
 import { todayISO } from "@/lib/bankroll/format";
 import { useTaxasCambio } from "@/lib/hooks/use-taxas-cambio";
 import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
@@ -34,6 +35,7 @@ import {
   addAnnotation as apiAddAnnotation,
   addSession as apiAddSession,
   atualizarBountiesDaSessao,
+  completarSessaoImportada,
   addTransaction as apiAddTransaction,
   deleteAnnotation as apiDeleteAnnotation,
   deleteSession as apiDeleteSession,
@@ -74,6 +76,36 @@ async function sincronizarBounties(sessoes: Session[], bounties: Map<string, num
         return { ...s, bounties: alvo };
       } catch (e) {
         console.error("Falha ao gravar o bounty da sessão:", s.id, e);
+        return s;
+      }
+    }),
+  );
+}
+
+/** Buy-in e prêmio que chegaram depois da sessão importada. Na ACR os dois
+ *  só vêm com o resumo do torneio, gravado quando o herói cai -- se a Banca
+ *  abriu no meio do torneio, a sessão foi criada com 0 e ficava assim pra
+ *  sempre. Só completa o que está 0 (valor editado à mão fica). */
+async function completarImportadas(
+  sessoes: Session[],
+  torneios: HandSession[],
+  premios: TournamentPayout[],
+): Promise<Session[]> {
+  return Promise.all(
+    sessoes.map(async (s) => {
+      if (!s.importedHandSessionId) return s;
+      const hs = torneios.find((t) => t.id === s.importedHandSessionId);
+      if (!hs) return s;
+      const premio = premios.find((p) => p.tournamentIdPs === hs.tournament_id_ps)?.heroPayoutAmount ?? 0;
+      const campos: { buy_in?: number; cashout?: number } = {};
+      if (!s.buyIn && hs.buyin) campos.buy_in = hs.buyin;
+      if (!s.cashout && premio > 0) campos.cashout = premio;
+      if (campos.buy_in == null && campos.cashout == null) return s;
+      try {
+        await completarSessaoImportada(s.id, campos);
+        return { ...s, buyIn: campos.buy_in ?? s.buyIn, cashout: campos.cashout ?? s.cashout };
+      } catch (e) {
+        console.error("Falha ao completar a sessão importada:", s.id, e);
         return s;
       }
     }),
@@ -139,7 +171,8 @@ export function useBanca() {
         // Bounty das sessões importadas vem sozinho das mãos (pedido
         // explícito: "precisa vir automatico essa informação do bounty"):
         // a sessão cujo valor gravado não bate com o das mãos é corrigida.
-        const s = bounties ? await sincronizarBounties(lidas, bounties) : lidas;
+        const comBounty = bounties ? await sincronizarBounties(lidas, bounties) : lidas;
+        const s = await completarImportadas(comBounty, tourn, payouts);
         if (!vivo) return;
         if (bounties) setBountiesAgente(bounties);
         setSessoes(s);
@@ -198,7 +231,7 @@ export function useBanca() {
         const premio = premiosAgente.find((p) => p.tournamentIdPs === hs.tournament_id_ps);
         const buyInUsd = hs.buyin ?? 0;
         const cashoutUsd = premio?.heroPayoutAmount ?? 0;
-        const sala = (hs.label.split(" / ")[0] || "").trim();
+        const sala = plataformaDoRotulo((hs.label.split(" / ")[0] || "").trim());
         const salva = await apiAddSession({
           date: (hs.updated_at || hs.created_at || todayISO()).slice(0, 10),
           format: isSpinAndGo(hs) ? "Spin" : "MTT",

@@ -111,7 +111,7 @@ function IconeDaSala({ sala, cash }: { sala: string | null; cash: boolean }) {
         </svg>
       </span>
     );
-  const sigla = nome.includes("gg") ? "GG" : nome.includes("888") ? "888" : nome.includes("party") ? "PP" : nome.includes("winamax") ? "WA" : null;
+  const sigla = nome.includes("acr") ? "ACR" : nome.includes("gg") ? "GG" : nome.includes("888") ? "888" : nome.includes("party") ? "PP" : nome.includes("winamax") ? "WA" : null;
   return (
     <span className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-white/[0.04] ring-1 ring-inset ring-white/[0.08]" title={sala ?? undefined}>
       {cash ? (
