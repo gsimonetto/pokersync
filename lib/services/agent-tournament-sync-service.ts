@@ -16,7 +16,14 @@
 // hand_sync_devices.last_sync_at, reaproveitando upsertDevice).
 import type { SupabaseClient } from "@supabase/supabase-js";
 import { randomUUID } from "node:crypto";
-import { parseTournamentSummary, parseHeroFinishPlaceFromList, parseTournamentStartDate } from "@/lib/poker/tournament-summary-parser";
+import {
+  parseTournamentSummary,
+  parseHeroFinishPlaceFromList,
+  parseTournamentStartDate,
+  parseResumoAcr,
+  colocacaoNoResumoAcr,
+} from "@/lib/poker/tournament-summary-parser";
+import { buyinDoArquivoResumoAcr } from "@/lib/poker/acr-arquivos";
 import { upsertDevice, type AgentDeviceInfo } from "@/lib/services/agent-sync-service";
 import { jogadoAntesDoCorte } from "@/lib/supabase/agent-import-scope";
 
@@ -58,6 +65,27 @@ async function lookupHeroNameForTournament(
 export interface AgentTournamentSyncFile {
   rawText: string;
   capturedAt?: string | null;
+  /** Nome do arquivo no disco (Radar a partir da versão que manda o nome). Na ACR é de onde vem o buy-in. */
+  fileName?: string | null;
+}
+
+// ACR: o resumo não diz o buy-in (só o nome do arquivo) e o torneio pode ter
+// sido criado pelas mãos antes, sem buy-in e com o nome provisório
+// "Torneio #N". Completa só o que está vazio -- nunca troca um buy-in que o
+// jogador já digitou.
+async function completarBuyinAcr(supabase: SupabaseClient, userId: string, tournamentIdPs: string, buyin: number) {
+  await supabase
+    .from("hand_sessions")
+    .update({ buyin })
+    .eq("user_id", userId)
+    .eq("tournament_id_ps", tournamentIdPs)
+    .is("buyin", null);
+  await supabase
+    .from("hand_sessions")
+    .update({ label: `ACR / $${buyin}` })
+    .eq("user_id", userId)
+    .eq("tournament_id_ps", tournamentIdPs)
+    .eq("label", `Torneio #${tournamentIdPs}`);
 }
 
 export interface AgentTournamentSyncInput {
@@ -93,7 +121,10 @@ export async function processAgentTournamentSync(
   const seenThisBatch = new Set<string>();
 
   for (const file of input.files) {
-    const parsed = parseTournamentSummary(file.rawText);
+    const acr = parseResumoAcr(file.rawText);
+    const parsed = acr
+      ? { tournamentIdPs: acr.tournamentIdPs, totalEntrants: acr.totalEntrants, prizePool: acr.prizePool, heroFinishPlace: null as number | null, heroPayoutAmount: null as number | null, heroName: null }
+      : parseTournamentSummary(file.rawText);
     if (!parsed.tournamentIdPs) {
       // Não achou nem o número do torneio no texto — arquivo não
       // reconhecido (sala sem suporte ainda, ou formato inesperado).
@@ -104,7 +135,7 @@ export async function processAgentTournamentSync(
       duplicates += 1;
       continue;
     }
-    if (jogadoAntesDoCorte(parseTournamentStartDate(file.rawText), corte)) {
+    if (jogadoAntesDoCorte(acr ? acr.inicio : parseTournamentStartDate(file.rawText), corte)) {
       ignoradasPorData += 1;
       continue;
     }
@@ -115,7 +146,10 @@ export async function processAgentTournamentSync(
       // desistir -- so' funciona se alguma mao desse MESMO torneio ja foi
       // sincronizada antes (e' de la' que vem o nome do heroi).
       const heroName = await lookupHeroNameForTournament(supabase, userId, parsed.tournamentIdPs);
-      const fallbackPlace = heroName ? parseHeroFinishPlaceFromList(file.rawText, heroName) : null;
+      // ACR: a lista tem todo mundo e nada marca o herói -- é sempre por aqui.
+      const naAcr = acr && heroName ? colocacaoNoResumoAcr(acr, heroName) : null;
+      const fallbackPlace = naAcr ? naAcr.posicao : heroName ? parseHeroFinishPlaceFromList(file.rawText, heroName) : null;
+      if (naAcr) parsed.heroPayoutAmount = naAcr.premio;
       if (fallbackPlace != null) {
         parsed.heroFinishPlace = fallbackPlace;
       } else {
@@ -159,6 +193,8 @@ export async function processAgentTournamentSync(
       errors += 1;
       continue;
     }
+    const buyinAcr = acr ? buyinDoArquivoResumoAcr(file.fileName) : null;
+    if (buyinAcr != null) await completarBuyinAcr(supabase, userId, parsed.tournamentIdPs, buyinAcr);
     imported += 1;
   }
 

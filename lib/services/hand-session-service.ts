@@ -1,5 +1,6 @@
 import { createClient } from "@/lib/supabase/client";
 import type { ParsedHand } from "@/lib/poker/hand-parser";
+import { nomeEhDeBounty, nomeTorneioDoArquivoAcr } from "@/lib/poker/acr-arquivos";
 import { addSession, fetchBountiesDosTorneios } from "@/lib/services/bankroll-service";
 import { linkHandSessionReviews } from "@/lib/services/hand-review-service";
 import { fetchTournamentPayouts } from "@/lib/services/tournament-payout-service";
@@ -89,7 +90,9 @@ interface ParsedTournamentInfo {
 // — hand-parser.ts ja normaliza o resto, mas essa extracao roda direto no
 // rawText pra pegar detalhes que ParsedHand nao guarda em campo proprio
 // (buy-in, nome do torneio).
-export function extractTournamentInfo(hand: ParsedHand): ParsedTournamentInfo {
+// `nomeArquivo` (opcional, vem do Radar): na ACR o nome do torneio e o
+// "PKO" só existem no nome do arquivo de mãos (ver acr-arquivos.ts).
+export function extractTournamentInfo(hand: ParsedHand, nomeArquivo?: string | null): ParsedTournamentInfo {
   const text = hand.rawText;
   const tournM = text.match(/(?:Tournament|Torneio)\s+#(\d+)/i);
   const tournamentIdPs = tournM ? tournM[1] : null;
@@ -118,14 +121,17 @@ export function extractTournamentInfo(hand: ParsedHand): ParsedTournamentInfo {
   // formato nao tem bounty visivel, fica null — modal pede digitado nesse caso.
   const heroSeat = hand.seats.find((s) => s.isHero);
   const heroBountyFromHand = heroSeat?.bountyValue ?? null;
-  const looksLikeBounty = hand.seats.some((s) => s.bountyValue != null);
+  const nomeAcr = hand.site === "acr" ? nomeTorneioDoArquivoAcr(nomeArquivo) : null;
+  const looksLikeBounty = hand.seats.some((s) => s.bountyValue != null) || nomeEhDeBounty(nomeAcr);
 
   // Nome curto do card do torneio — formato "Plataforma / Buy-in", pedido
   // explicito pra dar contexto imediato na fila. Fallback pra "Torneio #ID"
   // quando buy-in nao parseou.
   const tournamentName = platform && buyin != null
     ? `${platform} / $${buyin}`
-    : tournamentIdPs
+    : platform && nomeAcr
+      ? `${platform} / ${nomeAcr}`
+      : tournamentIdPs
       ? `Torneio #${tournamentIdPs}`
       : null;
 

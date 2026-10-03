@@ -113,6 +113,60 @@ export function parseTournamentSummary(text: string): ParsedTournamentSummary {
   };
 }
 
+// ACR / Winning Poker Network (RADAR-009, validado contra arquivo REAL de
+// 03/10/2026): o resumo é um JSON (.ots), não texto. Traz o número do
+// torneio, o garantido, o total de entradas e a lista de colocações de
+// TODO mundo -- mas não diz qual nome é o do herói nem o buy-in (esse vem
+// do nome do arquivo, ver buyinDoArquivoResumoAcr em acr-arquivos.ts).
+// Cuidados vistos no arquivo real:
+//   - o mesmo nome aparece várias vezes (cada reentrada é uma linha);
+//   - o arquivo é gravado quando o herói cai, com o torneio ainda rolando:
+//     as posições do 1º até a do herói - 1 são de quem ainda estava vivo
+//     (prêmio 0), não a colocação final deles.
+export interface ResumoAcr {
+  tournamentIdPs: string;
+  totalEntrants: number | null;
+  prizePool: number | null;
+  /** ISO (UTC): quando o herói começou a jogar essa entrada. */
+  inicio: string | null;
+  colocacoes: { jogador: string; posicao: number; premio: number }[];
+}
+
+export function parseResumoAcr(text: string): ResumoAcr | null {
+  const t = text.trim().replace(/^\uFEFF/, "");
+  if (!t.startsWith("{")) return null;
+  let j: Record<string, unknown>;
+  try {
+    j = JSON.parse(t);
+  } catch {
+    return null;
+  }
+  const rede = `${j.network_name ?? ""} ${j.site_name ?? ""}`;
+  if (!/winning\s*poker\s*network|americas\s*cardroom|\bacr\b/i.test(rede)) return null;
+  const id = String(j.tournament_number ?? "").match(/\d+/)?.[0];
+  if (!id) return null;
+  const numero = (v: unknown) => (typeof v === "number" && Number.isFinite(v) ? v : null);
+  const inicio = typeof j.start_date_utc === "string" && !Number.isNaN(Date.parse(j.start_date_utc)) ? new Date(j.start_date_utc).toISOString() : null;
+  const lista = Array.isArray(j.tournament_finishes_and_winnings) ? j.tournament_finishes_and_winnings : [];
+  const colocacoes = lista.flatMap((c: Record<string, unknown>) => {
+    const posicao = numero(c?.finish_position);
+    if (typeof c?.player_name !== "string" || posicao == null) return [];
+    return [{ jogador: c.player_name, posicao, premio: (numero(c.prize) ?? 0) + (numero(c.ticket_value) ?? 0) }];
+  });
+  return { tournamentIdPs: id, totalEntrants: numero(j.player_count), prizePool: numero(j.prize_pool), inicio, colocacoes };
+}
+
+// Colocação do herói no resumo da ACR. Com reentradas o nome aparece mais de
+// uma vez; a melhor posição (menor número) é a da entrada mais recente --
+// quem cai depois sempre fica com um número menor -- e é dela que o arquivo
+// fala (ele é gravado quando essa entrada cai).
+export function colocacaoNoResumoAcr(resumo: ResumoAcr, heroName: string): { posicao: number; premio: number } | null {
+  const minhas = resumo.colocacoes.filter((c) => c.jogador === heroName);
+  if (minhas.length === 0) return null;
+  const melhor = minhas.reduce((a, b) => (b.posicao < a.posicao ? b : a));
+  return { posicao: melhor.posicao, premio: melhor.premio };
+}
+
 // Quando o torneio começou, pelo primeiro "AAAA/MM/DD HH:MM:SS" do resumo
 // (na PokerStars, a linha "Tournament started ..."/"Torneio iniciado ...").
 // Usado só pro corte do "só a partir de agora" do Radar
