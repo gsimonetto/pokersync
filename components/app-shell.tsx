@@ -46,6 +46,15 @@ function MarcaAtivo({ ativo }: { ativo: boolean }) {
   return <span className="absolute -bottom-[3px] left-1/2 h-[2px] w-4 -translate-x-1/2 rounded-full" style={{ background: OURO }} aria-hidden="true" />;
 }
 
+// Ordem do menu lateral (pedido explícito: Banca, Performance, Treino,
+// Revisor, Ranges, Time, Vagas). Só o menu: a página de planos segue a
+// ordem de modules-data.tsx.
+const ORDEM_DO_MENU = ["bankroll", "performance", "drill", "revisor", "ranges", "time", "marketplace"];
+function ordemNoMenu(key: string): number {
+  const i = ORDEM_DO_MENU.indexOf(key);
+  return i === -1 ? ORDEM_DO_MENU.length : i;
+}
+
 // Casca compartilhada (sidebar + topbar) entre os módulos que já migraram
 // pro layout novo -- hoje /modulos e /banca. Cada módulo continua dono do
 // próprio conteúdo/dados; isto aqui é só navegação e identidade (perfil,
@@ -215,6 +224,7 @@ export function AppShell({ children }: { children: React.ReactNode }) {
           de planos) reaproveitam o icone/copy de "hub" de la. */}
       {modules
         .filter((m) => m.key !== "hub" && m.key !== "radar")
+        .sort((a, b) => ordemNoMenu(a.key) - ordemNoMenu(b.key))
         .map((m) => {
         const Icon = m.icon;
         const active = pathname === m.href || (!!m.href && m.href !== "/" && pathname.startsWith(`${m.href}/`));
