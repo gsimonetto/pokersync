@@ -106,7 +106,9 @@ export function PerfilJogo({ rows, preflop }: { rows: AnalysisHandRow[]; preflop
         <SeloAmostra n={rows.length} />
       </div>
 
-      <div className="flex min-h-0 flex-1 items-center justify-center">
+      {/* px-8: os rótulos das pontas ficam fora do pentágono e o da direita
+          ("Agressão pré") encostava na borda do card. */}
+      <div className="flex min-h-0 flex-1 items-center justify-center px-8">
         <PentagonoHolograma
           eixos={eixos}
           amostra={rows.length}

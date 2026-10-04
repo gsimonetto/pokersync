@@ -24,6 +24,7 @@ import {
   colocacaoNoResumoAcr,
 } from "@/lib/poker/tournament-summary-parser";
 import { buyinDoArquivoResumoAcr } from "@/lib/poker/acr-arquivos";
+import { buyinNoNome } from "@/lib/format";
 import { upsertDevice, type AgentDeviceInfo } from "@/lib/services/agent-sync-service";
 import { jogadoAntesDoCorte } from "@/lib/supabase/agent-import-scope";
 
@@ -82,7 +83,7 @@ async function completarBuyinAcr(supabase: SupabaseClient, userId: string, tourn
     .is("buyin", null);
   await supabase
     .from("hand_sessions")
-    .update({ label: `ACR / $${buyin}` })
+    .update({ label: `ACR / ${buyinNoNome(buyin)}` })
     .eq("user_id", userId)
     .eq("tournament_id_ps", tournamentIdPs)
     .eq("label", `Torneio #${tournamentIdPs}`);

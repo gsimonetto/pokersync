@@ -29,6 +29,7 @@ describe("bounty (PKO de $16,50)", () => {
     const mao = parseHand(texto);
     const info = extractTournamentInfo(mao);
     expect(info.buyin).toBe(16.5);
+    expect(info.tournamentName).toMatch(/ \/ \$16\.50$/);
     expect(info.heroBountyFromHand).toBe(11.25);
     expect(info.looksLikeBounty).toBe(true);
     expect(mao.seats.map((s) => s.bountyValue)).toEqual([7.5, 11.25]);
